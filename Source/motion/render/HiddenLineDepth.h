@@ -29,8 +29,18 @@ public:
 
     DepthBuffer() : nearest(static_cast<std::size_t>(size) * size, 0.0f) {}
 
+    // Only what was drawn since the last clear is cleared.
     void clear() {
-        std::fill(nearest.begin(), nearest.end(), 0.0f);
+        if (!empty) {
+            for (auto y = drawnBottom; y <= drawnTop; ++y) {
+                const auto row = nearest.begin() + static_cast<std::ptrdiff_t>(y) * size;
+                std::fill(row + drawnLeft, row + drawnRight + 1, 0.0f);
+            }
+        }
+        drawnLeft = size;
+        drawnRight = -1;
+        drawnBottom = size;
+        drawnTop = -1;
         empty = true;
     }
     bool isEmpty() const { return empty; }
@@ -47,25 +57,39 @@ public:
         if (left > right || bottom > top) { return; }
         // Inverse depth is linear on screen: its plane, and how steeply it
         // changes across a pixel, which is how far it is pushed back.
-        const auto dwdx = ((b.w - a.w) * (cy - ay) - (c.w - a.w) * (by - ay)) / area;
-        const auto dwdy = ((c.w - a.w) * (bx - ax) - (b.w - a.w) * (cx - ax)) / area;
+        const auto inverseArea = 1 / area;
+        const auto dwdx = ((b.w - a.w) * (cy - ay) - (c.w - a.w) * (by - ay)) * inverseArea;
+        const auto dwdy = ((c.w - a.w) * (bx - ax) - (b.w - a.w) * (cx - ax)) * inverseArea;
         const auto push = 1.5 * (std::abs(dwdx) + std::abs(dwdy)) + 1.0e-4 * std::max({a.w, b.w, c.w});
         const auto sign = area > 0 ? 1.0 : -1.0;
+        // Each edge's test is linear across the pixels, as is depth. A row of
+        // a larger triangle visits only the span its edges allow (a pixel
+        // wider each side, as rounding may land there); a small one's rows
+        // are too short for that to pay. Every pixel visited is tested exactly.
+        const Edge edges[3] {Edge::of(ax, ay, bx, by, sign), Edge::of(bx, by, cx, cy, sign), Edge::of(cx, cy, ax, ay, sign)};
+        const auto small = right - left < 6;
         for (auto y = bottom; y <= top; ++y) {
             const auto py = y + .5;
-            for (auto x = left; x <= right; ++x) {
-                const auto px = x + .5;
-                // Inside, edges included (with room for rounding, which can
-                // put a pixel on a shared edge just outside both neighbours).
-                const auto e0 = sign * ((bx - ax) * (py - ay) - (by - ay) * (px - ax));
-                const auto e1 = sign * ((cx - bx) * (py - by) - (cy - by) * (px - bx));
-                const auto e2 = sign * ((ax - cx) * (py - cy) - (ay - cy) * (px - cx));
-                if (e0 < -edgeSlack || e1 < -edgeSlack || e2 < -edgeSlack) { continue; }
-                const auto w = a.w + dwdx * (px - ax) + dwdy * (py - ay) - push;
-                auto& cell = nearest[static_cast<std::size_t>(y) * size + static_cast<std::size_t>(x)];
-                if (w > cell) { cell = static_cast<float>(w); }
+            const auto [first, last] = small ? std::pair {left, right} : span(edges, py, left, right);
+            if (first > last) { continue; }
+            const auto firstX = first + .5;
+            // Inside, edges included (with room for rounding, which can put a
+            // pixel on a shared edge just outside both neighbours).
+            auto e0 = edges[0].at(firstX, py), e1 = edges[1].at(firstX, py), e2 = edges[2].at(firstX, py);
+            auto w = a.w + dwdx * (firstX - ax) + dwdy * (py - ay) - push;
+            auto* cell = nearest.data() + static_cast<std::size_t>(y) * size + static_cast<std::size_t>(first);
+            for (auto x = first; x <= last; ++x, ++cell) {
+                if (e0 >= -edgeSlack && e1 >= -edgeSlack && e2 >= -edgeSlack && w > *cell) { *cell = static_cast<float>(w); }
+                e0 += edges[0].stepX;
+                e1 += edges[1].stepX;
+                e2 += edges[2].stepX;
+                w += dwdx;
             }
         }
+        drawnLeft = std::min(drawnLeft, left);
+        drawnRight = std::max(drawnRight, right);
+        drawnBottom = std::min(drawnBottom, bottom);
+        drawnTop = std::max(drawnTop, top);
         empty = false;
     }
 
@@ -78,9 +102,38 @@ public:
     }
 
 private:
-    static double toPixel(double value) { return (value + extent) / pixel; }
+    static double toPixel(double value) { return (value + extent) * (1 / pixel); }
+    // Which side of the edge from (x0, y0) to (x1, y1) a pixel centre is on:
+    // positive inside, as a plane over the pixels.
+    struct Edge {
+        double stepX, stepY, offset;
+        static Edge of(double x0, double y0, double x1, double y1, double sign) {
+            return {-sign * (y1 - y0), sign * (x1 - x0), sign * ((y1 - y0) * x0 - (x1 - x0) * y0)};
+        }
+        double at(double x, double y) const { return stepX * x + stepY * y + offset; }
+    };
+    // The pixels of a row (centres at `py`) that can be inside all three
+    // edges, within [left, right].
+    static std::pair<int, int> span(const Edge (&edges)[3], double py, int left, int right) {
+        auto low = static_cast<double>(left), high = static_cast<double>(right);
+        for (const auto& edge : edges) {
+            // stepX * (x + .5) + rest >= -edgeSlack
+            const auto rest = edge.stepY * py + edge.offset + edgeSlack;
+            if (edge.stepX > 0) {
+                low = std::max(low, -rest / edge.stepX - .5);
+            } else if (edge.stepX < 0) {
+                high = std::min(high, -rest / edge.stepX - .5);
+            } else if (rest < 0) {
+                return {1, 0};
+            }
+        }
+        if (!(low <= high + 2)) { return {1, 0}; }
+        return {std::max(left, static_cast<int>(std::floor(low)) - 1), std::min(right, static_cast<int>(std::ceil(high)) + 1)};
+    }
 
     std::vector<float> nearest;
+    // The pixels drawn since the last clear.
+    int drawnLeft = size, drawnRight = -1, drawnBottom = size, drawnTop = -1;
     bool empty = true;
 };
 }

@@ -4,6 +4,7 @@
 #include "HiddenLineBake.h"
 #include "HiddenLineCrossings.h"
 #include "HiddenLineDepth.h"
+#include "HiddenLineMidpoints.h"
 #include "../model/Vec3.h"
 #include <thread>
 
@@ -71,6 +72,30 @@ inline constexpr double sliver = 2 * DepthBuffer::pixel;
 // Nothing nearer the eye than this is drawn or hides anything.
 inline constexpr double nearPlane = .05;
 
+// A crossing lies on both its surfaces, so one on a triangle nothing can be
+// seen of never shows. Small triangles (every diced piece) none of whose
+// corners, edge middles or middle shows are dropped before crossings are
+// looked for; larger ones are kept, as a point could show between those.
+inline void dropUnseen(std::vector<crossing::Triangle>& triangles, std::vector<std::array<osci::Point, 3>>& sources, const DepthBuffer& depth, double focalLength) {
+    constexpr double small = 3 * DepthBuffer::pixel;
+    std::size_t kept = 0;
+    for (std::size_t index = 0; index < triangles.size(); ++index) {
+        const auto& eye = triangles[index].eye;
+        const auto at = [&](Vec3 point) { return Screen {point.x / point.z * focalLength, point.y / point.z * focalLength, 1 / point.z}; };
+        const std::array<Screen, 3> corners {at(eye[0]), at(eye[1]), at(eye[2])};
+        const auto reach = std::max({std::abs(corners[1].x - corners[0].x), std::abs(corners[2].x - corners[0].x), std::abs(corners[1].y - corners[0].y), std::abs(corners[2].y - corners[0].y)});
+        bool seen = reach > small;
+        const std::array<Vec3, 7> probes {eye[0], eye[1], eye[2], (eye[0] + eye[1]) * .5, (eye[1] + eye[2]) * .5, (eye[2] + eye[0]) * .5, (eye[0] + eye[1] + eye[2]) / 3};
+        for (std::size_t probe = 0; probe < probes.size() && !seen; ++probe) { seen = depth.shows(at(probes[probe])); }
+        if (!seen) { continue; }
+        triangles[kept] = triangles[index];
+        sources[kept] = sources[index];
+        ++kept;
+    }
+    triangles.resize(kept);
+    sources.resize(kept);
+}
+
 // One frame with hidden lines removed, as the active camera sees it.
 //
 // Point by point: surfaces that hide (meshes' faces, and the fills of flat
@@ -129,6 +154,12 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     std::vector<std::array<osci::Point, 3>> surfaceSources;
     const auto unproject = [&](const Screen& at) { return Vec3 {at.x / at.w / view->focalLength, at.y / at.w / view->focalLength, 1 / at.w}; };
     std::vector<std::optional<Vec3>> corners;
+    // A point of a face being diced: where it is in its source, and on screen.
+    struct Corner {
+        osci::Point source;
+        std::optional<Screen> at;
+    };
+    MidpointCache<Corner> midpoints;
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
@@ -166,8 +197,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             // a new point bent like any other, until no edge is longer than
             // diceCell on screen. Pieces wholly off the frame hide nothing on
             // it and are dropped.
-            struct Corner { osci::Point source; std::optional<Screen> at; };
             const auto reach = DepthBuffer::extent;
+            midpoints.clear();
             const auto off = [reach](const Corner& p, const Corner& q, const Corner& r) {
                 if (!p.at.has_value() && !q.at.has_value() && !r.at.has_value()) { return true; }
                 if (!p.at.has_value() || !q.at.has_value() || !r.at.has_value()) { return false; }
@@ -177,13 +208,16 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             };
             const auto split = [&](auto&& self, const Corner& p, const Corner& q, const Corner& r, int depthLeft) -> void {
                 if (off(p, q, r)) { return; }
+                // Lengths are compared squared, in pixels.
                 const auto length = [&](const Corner& u, const Corner& v) {
-                    return u.at.has_value() && v.at.has_value() ? pixels(*u.at, *v.at) : std::numeric_limits<double>::infinity();
+                    if (!u.at.has_value() || !v.at.has_value()) { return std::numeric_limits<double>::infinity(); }
+                    const auto dx = (v.at->x - u.at->x) / DepthBuffer::pixel, dy = (v.at->y - u.at->y) / DepthBuffer::pixel;
+                    return dx * dx + dy * dy;
                 };
                 const auto pq = length(p, q), qr = length(q, r), rp = length(r, p);
                 // Behind the eye, a piece is split only so far.
                 if (!p.at.has_value() || !q.at.has_value() || !r.at.has_value()) { depthLeft = std::min(depthLeft, 12); }
-                if (std::max({pq, qr, rp}) <= diceCell || depthLeft == 0) {
+                if (std::max({pq, qr, rp}) <= diceCell * diceCell || depthLeft == 0) {
                     if (p.at.has_value() && q.at.has_value() && r.at.has_value()) {
                         depth.triangle(*p.at, *q.at, *r.at);
                         if (surfaces > 1) {
@@ -194,8 +228,10 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     return;
                 }
                 const auto halve = [&](const Corner& u, const Corner& v) {
-                    const auto middle = osci::Point((u.source.x + v.source.x) * .5f, (u.source.y + v.source.y) * .5f, (u.source.z + v.source.z) * .5f);
-                    return Corner {middle, screen(eye(*item.clip, middle))};
+                    return midpoints.at(u.source, v.source, [&] {
+                        const auto middle = osci::Point((u.source.x + v.source.x) * .5f, (u.source.y + v.source.y) * .5f, (u.source.z + v.source.z) * .5f);
+                        return Corner {middle, screen(eye(*item.clip, middle))};
+                    });
                 };
                 if (pq >= qr && pq >= rp) {
                     const auto m = halve(p, q);
@@ -215,6 +251,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         }
     }
     if (depth.isEmpty()) { return frame; }
+    dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
     const auto crossings = crossing::runs(surfaceTriangles, view->focalLength);
 
     // What is hidden: every line, every half pixel along its true path.

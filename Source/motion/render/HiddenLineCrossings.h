@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -114,6 +115,64 @@ inline std::optional<Piece> between(const std::vector<Triangle>& triangles, std:
 }
 
 namespace detail {
+// A triangle's reach on screen and in depth.
+struct Box {
+    double left, right, bottom, top, near, far;
+    static Box empty() { return {1.0e300, -1.0e300, 1.0e300, -1.0e300, 1.0e300, -1.0e300}; }
+    void include(const Box& other) {
+        left = std::min(left, other.left);
+        right = std::max(right, other.right);
+        bottom = std::min(bottom, other.bottom);
+        top = std::max(top, other.top);
+        near = std::min(near, other.near);
+        far = std::max(far, other.far);
+    }
+    bool overlaps(const Box& other) const {
+        return !(right < other.left || other.right < left || top < other.bottom || other.top < bottom || far < other.near || other.far < near);
+    }
+};
+inline Box boxOf(const Triangle& triangle, double focalLength) {
+    auto box = Box::empty();
+    for (const auto& corner : triangle.eye) {
+        const auto x = corner.x / corner.z * focalLength, y = corner.y / corner.z * focalLength;
+        box.include({x, x, y, y, corner.z, corner.z});
+    }
+    return box;
+}
+
+// Triangles bucketed by the screen cells their boxes cover, in one flat
+// array (counted, then filled), with cells about twice the triangles' size.
+class ScreenGrid {
+public:
+    ScreenGrid(const std::vector<std::uint32_t>& members, const std::vector<Box>& boxes, double typicalSize) {
+        constexpr auto span = 2 * DepthBuffer::extent;
+        cells = std::clamp(static_cast<int>(span / std::max(2 * typicalSize, 1.0e-9)), 16, 512);
+        starts.assign(static_cast<std::size_t>(cells * cells) + 1, 0);
+        const auto covered = [&](const Box& box, auto&& visit) {
+            for (auto y = axisCell(box.bottom); y <= axisCell(box.top); ++y) {
+                for (auto x = axisCell(box.left); x <= axisCell(box.right); ++x) { visit(y * cells + x); }
+            }
+        };
+        for (const auto member : members) { covered(boxes[member], [&](int cell) { ++starts[static_cast<std::size_t>(cell) + 1]; }); }
+        for (std::size_t index = 1; index < starts.size(); ++index) { starts[index] += starts[index - 1]; }
+        entries.resize(starts.back());
+        auto fill = starts;
+        for (const auto member : members) { covered(boxes[member], [&](int cell) { entries[fill[static_cast<std::size_t>(cell)]++] = member; }); }
+    }
+    int cellCount() const { return cells * cells; }
+    std::span<const std::uint32_t> cell(int index) const { return {entries.data() + starts[static_cast<std::size_t>(index)], starts[static_cast<std::size_t>(index) + 1] - starts[static_cast<std::size_t>(index)]}; }
+    int cellAt(double x, double y) const { return axisCell(y) * cells + axisCell(x); }
+
+private:
+    int axisCell(double value) const {
+        constexpr auto extent = DepthBuffer::extent;
+        return std::clamp(static_cast<int>(std::floor((value + extent) / (2 * extent) * cells)), 0, cells - 1);
+    }
+    int cells = 16;
+    std::vector<std::size_t> starts;
+    std::vector<std::uint32_t> entries;
+};
+
 // Pieces end to end as runs: a piece follows another of the same surface
 // that ends where it starts (turned round if need be). Ends meet within a
 // millionth of a unit, found through a hash of the cells they fall in.
@@ -176,50 +235,59 @@ inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const 
 
 // Every crossing between different surfaces' triangles, in runs: pieces end
 // to end as the triangles they lie on are, so each run draws as one line.
-// Triangles are paired through a grid over the screen; `focalLength`
-// projects eye space onto it, and pairs wholly off the frame are never seen.
+// `triangles` comes surface by surface. Only triangles where another surface
+// overlaps them on screen and in depth can cross it; those are paired through
+// a grid over the screen sized to them, and only across surfaces, never
+// within one. `focalLength` projects eye space onto the screen; nothing off
+// the frame is ever seen.
 inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangles, double focalLength) {
     std::vector<Piece> pieces;
     if (triangles.size() < 2) { return {}; }
-    struct Box {
-        double left, right, bottom, top, near, far;
-    };
+    using detail::Box;
     std::vector<Box> boxes;
     boxes.reserve(triangles.size());
+    std::vector<Box> surfaceBoxes;
     for (const auto& triangle : triangles) {
-        Box box {1.0e300, -1.0e300, 1.0e300, -1.0e300, 1.0e300, -1.0e300};
-        for (const auto& corner : triangle.eye) {
-            const auto x = corner.x / corner.z * focalLength, y = corner.y / corner.z * focalLength;
-            box = {std::min(box.left, x), std::max(box.right, x), std::min(box.bottom, y), std::max(box.top, y), std::min(box.near, corner.z), std::max(box.far, corner.z)};
-        }
+        auto box = detail::boxOf(triangle, focalLength);
         boxes.push_back(box);
+        if (surfaceBoxes.size() <= triangle.surface) { surfaceBoxes.resize(triangle.surface + 1, Box::empty()); }
+        surfaceBoxes[triangle.surface].include(box);
     }
-    constexpr int cells = 64;
-    constexpr auto extent = DepthBuffer::extent;
-    const auto cellOf = [](double value) { return std::clamp(static_cast<int>(std::floor((value + extent) / (2 * extent) * cells)), 0, cells - 1); };
-    std::vector<std::vector<std::uint32_t>> grid(static_cast<std::size_t>(cells * cells));
+    // Where some other surface could be.
+    const auto frame = Box {-DepthBuffer::extent, DepthBuffer::extent, -DepthBuffer::extent, DepthBuffer::extent, -1.0e300, 1.0e300};
+    std::vector<std::uint32_t> candidates;
+    double extentSum = 0;
     for (std::uint32_t index = 0; index < triangles.size(); ++index) {
         const auto& box = boxes[index];
-        if (box.right < -extent || box.left > extent || box.top < -extent || box.bottom > extent) { continue; }
-        for (auto y = cellOf(box.bottom); y <= cellOf(box.top); ++y) {
-            for (auto x = cellOf(box.left); x <= cellOf(box.right); ++x) { grid[static_cast<std::size_t>(y * cells + x)].push_back(index); }
-        }
+        if (!box.overlaps(frame)) { continue; }
+        const auto own = triangles[index].surface;
+        bool shared = false;
+        for (std::uint32_t surface = 0; surface < surfaceBoxes.size() && !shared; ++surface) { shared = surface != own && box.overlaps(surfaceBoxes[surface]); }
+        if (!shared) { continue; }
+        candidates.push_back(index);
+        extentSum += std::max(box.right - box.left, box.top - box.bottom);
     }
-    for (int y = 0; y < cells; ++y) {
-        for (int x = 0; x < cells; ++x) {
-            const auto& cell = grid[static_cast<std::size_t>(y * cells + x)];
-            for (std::size_t i = 0; i < cell.size(); ++i) {
-                for (std::size_t j = i + 1; j < cell.size(); ++j) {
-                    if (triangles[cell[i]].surface == triangles[cell[j]].surface) { continue; }
-                    const auto& p = boxes[cell[i]];
-                    const auto& q = boxes[cell[j]];
-                    if (p.right < q.left || q.right < p.left || p.top < q.bottom || q.top < p.bottom || p.far < q.near || q.far < p.near) { continue; }
+    if (candidates.size() < 2) { return {}; }
+    const detail::ScreenGrid grid(candidates, boxes, extentSum / static_cast<double>(candidates.size()));
+    for (int cell = 0; cell < grid.cellCount(); ++cell) {
+        const auto members = grid.cell(cell);
+        // Members come surface by surface: each surface's run is paired with
+        // every later surface's.
+        for (std::size_t first = 0; first < members.size();) {
+            auto firstEnd = first;
+            while (firstEnd < members.size() && triangles[members[firstEnd]].surface == triangles[members[first]].surface) { ++firstEnd; }
+            for (auto i = first; i < firstEnd; ++i) {
+                for (auto j = firstEnd; j < members.size(); ++j) {
+                    const auto& p = boxes[members[i]];
+                    const auto& q = boxes[members[j]];
+                    if (!p.overlaps(q)) { continue; }
                     // Each pair once: in the cell where their boxes' overlap starts.
-                    if (cellOf(std::max(p.left, q.left)) != x || cellOf(std::max(p.bottom, q.bottom)) != y) { continue; }
-                    const auto piece = between(triangles, cell[i], cell[j]);
+                    if (grid.cellAt(std::max(p.left, q.left), std::max(p.bottom, q.bottom)) != cell) { continue; }
+                    const auto piece = between(triangles, members[i], members[j]);
                     if (piece.has_value()) { pieces.push_back(*piece); }
                 }
             }
+            first = firstEnd;
         }
     }
     return detail::joined(pieces, triangles);

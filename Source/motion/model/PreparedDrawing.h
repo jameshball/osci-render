@@ -25,7 +25,7 @@ public:
 
     // `fadeOpenEnds`: open strokes fade in and out rather than dwell lit at
     // their ends, for drawings whose strokes end where something hides them.
-    explicit PreparedDrawing(std::vector<std::unique_ptr<osci::Shape>> source, bool fadeOpenEnds = false) : shapes(std::move(source)), fading(fadeOpenEnds) {
+    explicit PreparedDrawing(std::vector<std::unique_ptr<osci::Shape>> source, bool fadeOpenEnds = false) : fading(fadeOpenEnds), shapes(std::move(source)) {
         ends.reserve(shapes.size());
         osci::Point firstStart, previousEnd;
         bool havePositive = false;

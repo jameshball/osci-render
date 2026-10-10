@@ -3,6 +3,7 @@
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/BeamRenderer.h"
+#include "../Source/motion/render/HiddenLines.h"
 #if JUCE_MAC
 #include <malloc/malloc.h>
 #endif
@@ -19,18 +20,121 @@ public:
             logMessage("Motion benchmarks not run: set MOTION_BENCHMARK=1.");
             return;
         }
-        for (const auto& [name, scale] : {std::pair<const char*, Scale> {"typical", {8, 20, 8, 1, 4}}, {"dense", {32, 60, 24, 3, 16}}}) {
-            beginTest(juce::String("Stress project: ") + name);
-            benchmarkProject(name, stressProject(scale));
+        // Only hidden lines, when picking them out by name.
+        if (juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_ONLY", "").isEmpty()) {
+            for (const auto& [name, scale] : {std::pair<const char*, Scale> {"typical", {8, 20, 8, 1, 4}}, {"dense", {32, 60, 24, 3, 16}}}) {
+                beginTest(juce::String("Stress project: ") + name);
+                benchmarkProject(name, stressProject(scale));
+            }
+            beginTest("Nested compositions");
+            benchmarkProject("nested", nestedProject());
+            beginTest("Imports");
+            benchmarkImports();
         }
-        beginTest("Nested compositions");
-        benchmarkProject("nested", nestedProject());
-        beginTest("Imports");
-        benchmarkImports();
+        beginTest("Hidden lines");
+        benchmarkHiddenLines();
     }
 
 private:
     struct Scale { int tracks, clipsPerTrack, keysPerCurve, effectsPerClip, modulators; };
+
+    // A mesh from the repository's models, turning once over two seconds.
+    static std::shared_ptr<motion::Asset> modelAsset(motion::Id id, const char* model) {
+        const auto file = juce::File(__FILE__).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);
+        auto asset = std::make_shared<motion::Asset>();
+        asset->id = id;
+        asset->name = model;
+        asset->extension = ".obj";
+        file.loadFileAsData(asset->data);
+        const auto decoded = motion::decodeAsset(*asset);
+        jassert(decoded.wasOk());
+        return asset;
+    }
+    static motion::Project hiddenLineProject(const std::vector<std::shared_ptr<motion::Asset>>& assets, int copies, bool bulge) {
+        motion::Project project;
+        project.duration = 2;
+        project.assets.assign(assets.begin(), assets.end());
+        motion::Id next = 1000;
+        for (int copy = 0; copy < copies; ++copy) {
+            const auto& asset = *assets[static_cast<std::size_t>(copy) % assets.size()];
+            auto clip = motion::Document::makeClip(next++, asset, 0);
+            clip.duration = 2;
+            clip.properties["rotation.x"] = motion::Curve(20 + 7 * copy);
+            auto& turn = clip.properties["rotation.y"];
+            turn.setKey({0, 37.0 * copy, motion::Interpolation::linear});
+            turn.setKey({2, 37.0 * copy + 360, motion::Interpolation::linear});
+            // Copies overlap, so their surfaces cut through each other.
+            clip.properties["position.x"] = motion::Curve(copies == 1 ? 0 : -.45 + .9 * copy / (copies - 1));
+            if (bulge) { clip.effects.push_back(motion::makeEffect(next++, *motion::effectDefinition("bulge"))); }
+            motion::Track track;
+            track.id = next++;
+            track.insert(clip, project.tempo());
+            project.tracks.push_back(track);
+        }
+        motion::Camera camera;
+        camera.id = next++;
+        camera.hideHiddenLines = true;
+        project.cameras.push_back(camera);
+        return project;
+    }
+    // Per frame on one thread, then every frame on all of them, and what was
+    // kept: the same project must keep the same lines however fast it gets.
+    void benchmarkHiddenLineProject(const juce::String& name, const motion::Project& project) {
+        // MOTION_BENCHMARK_ONLY=teapot runs only the scenes with that in their name.
+        const auto only = juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_ONLY", "");
+        if (only.isNotEmpty() && !name.containsIgnoreCase(only)) { return; }
+        const motion::PreparedComposition prepared(project, sampleRate);
+        if (prepared.hiddenLines == nullptr) {
+            logMessage(name + ": no camera hides hidden lines");
+            return;
+        }
+        motion::hidden::DepthBuffer depth;
+        constexpr int frames = 40;
+        double kept = 0;
+        std::size_t shapes = 0;
+        // Frames are sampled where something plays.
+        double first = prepared.duration, last = 0;
+        for (const auto& clip : prepared.clips) {
+            first = std::min(first, clip.start);
+            last = std::max(last, std::min(clip.end, prepared.duration));
+        }
+        if (!(last > first)) { first = 0, last = prepared.duration; }
+        const auto perFrame = milliseconds([&] {
+            for (int frame = 0; frame < frames; ++frame) {
+                const auto culled = motion::hidden::cull(prepared, first + (last - first) * frame / frames, depth);
+                for (const auto& entry : culled->drawings) {
+                    kept += entry.drawing->length();
+                    shapes += entry.drawing->shapeCount();
+                }
+            }
+        }) / frames;
+        std::atomic<bool> stop {false};
+        const auto bake = milliseconds([&] { motion::hidden::Baker::bakeAll(*prepared.hiddenLines, sampleRate, stop); });
+        report("Hidden lines: " + name + " per frame", perFrame, "ms");
+        report("Hidden lines: " + name + " bake of " + juce::String(static_cast<int>(prepared.hiddenLines->frameCount())) + " frames", bake, "ms");
+        logMessage("  kept " + juce::String(kept, 6) + " in " + juce::String(static_cast<int>(shapes)) + " shapes over " + juce::String(frames) + " frames");
+    }
+    void benchmarkHiddenLines() {
+        const auto teapot = modelAsset(1, "teapot.obj"), lamp = modelAsset(2, "lamp.obj");
+        benchmarkHiddenLineProject("teapot", hiddenLineProject({teapot}, 1, false));
+        benchmarkHiddenLineProject("lamp", hiddenLineProject({lamp}, 1, false));
+        benchmarkHiddenLineProject("bulged teapot", hiddenLineProject({teapot}, 1, true));
+        benchmarkHiddenLineProject("four crossing teapots", hiddenLineProject({teapot}, 4, false));
+        benchmarkHiddenLineProject("two bulged crossing teapots", hiddenLineProject({teapot}, 2, true));
+        // A project of your own: MOTION_BENCHMARK_PROJECT=/path/to.osci-motion
+        const auto path = juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_PROJECT", "");
+        if (path.isEmpty()) { return; }
+        juce::MemoryBlock bytes;
+        juce::File(path).loadFileAsData(bytes);
+        const auto xml = juce::AudioProcessor::getXmlFromBinary(bytes.getData(), static_cast<int>(bytes.getSize()));
+        const auto* composition = xml != nullptr ? xml->getChildByName("composition") : nullptr;
+        motion::Project project;
+        if (composition == nullptr || motion::Document::prepareLoad(*composition, project).failed()) {
+            logMessage("Could not load " + path);
+            return;
+        }
+        benchmarkHiddenLineProject(juce::File(path).getFileNameWithoutExtension(), project);
+    }
     static constexpr double sampleRate = 48000, renderSeconds = 10;
 
     template <typename Function>
