@@ -21,6 +21,8 @@ MotionProcessor::MotionProcessor()
     // the history to about 256 MiB, always keeping the last 5 steps.
     getUndoManager().setMaxNumberOfStoredUnits(256 * 1024, 5);
     preparationWorker = std::make_unique<motion::CompositionPreparationWorker>([this] { triggerAsyncUpdate(); });
+    recordingParameters.canvasWidth.addListener(this);
+    recordingParameters.canvasHeight.addListener(this);
     blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto frames) { publishLiveSources(std::move(frames)); });
     document.onChanged = [this] {
         // The loop range reaches the audio thread with every edit, editor or not.
@@ -39,6 +41,8 @@ MotionProcessor::~MotionProcessor() {
     // timer before destroying its document access and publication callback.
     const juce::MessageManagerLock messageLock;
     visualiserParameters.applyExternalModulation = nullptr;
+    recordingParameters.canvasWidth.removeListener(this);
+    recordingParameters.canvasHeight.removeListener(this);
     blender.reset();
     preparationWorker.reset();
     cancelPendingUpdate();
@@ -48,11 +52,12 @@ MotionProcessor::~MotionProcessor() {
 
 void MotionProcessor::prepareComposition(const motion::Project& project) {
     preparationSampleRate = requestedSampleRate.load();
-    preparationRevision = preparationWorker->request(project, preparationSampleRate);
+    preparationReach = canvasReach();
+    preparationRevision = preparationWorker->request(project, preparationSampleRate, preparationReach);
 }
 
 void MotionProcessor::handleAsyncUpdate() {
-    if (preparationSampleRate != requestedSampleRate.load()) {
+    if (preparationSampleRate != requestedSampleRate.load() || preparationReach != canvasReach()) {
         prepareComposition(document.project());
         return;
     }

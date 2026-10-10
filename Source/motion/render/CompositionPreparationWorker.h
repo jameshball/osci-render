@@ -27,8 +27,8 @@ public:
         waitForThreadToExit(-1);
     }
     // Publisher/message thread only; previous pending work is replaced.
-    std::uint64_t request(const Project& project, double sampleRate) {
-        auto next = std::make_shared<Request>(project, sampleRate, ++revision);
+    std::uint64_t request(const Project& project, double sampleRate, hidden::Reach reach = {}) {
+        auto next = std::make_shared<Request>(project, sampleRate, reach, ++revision);
         std::shared_ptr<Request> replaced;
         {
             const juce::SpinLock::ScopedLockType lock(queueLock);
@@ -45,9 +45,10 @@ public:
 
 private:
     struct Request {
-        Request(const Project& project, double rate, std::uint64_t revision) : project(project), rate(rate), revision(revision) {}
+        Request(const Project& project, double rate, hidden::Reach reach, std::uint64_t revision) : project(project), rate(rate), reach(reach), revision(revision) {}
         Project project;
         double rate;
+        hidden::Reach reach;
         std::uint64_t revision;
         std::atomic<bool> cancel {false};
     };
@@ -64,7 +65,7 @@ private:
             auto result = std::make_unique<Result>();
             result->revision = job->revision;
             try {
-                result->composition = std::make_unique<PreparedComposition>(job->project, job->rate, &job->cancel);
+                result->composition = std::make_unique<PreparedComposition>(job->project, job->rate, &job->cancel, CompositionPurpose::signal, job->reach);
                 result->error = result->composition->preparationError;
             } catch (...) {
                 result->error = "Could not prepare the composition for playback.";

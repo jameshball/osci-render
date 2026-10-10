@@ -104,7 +104,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                 result = temporary->directory.createDirectory();
                 if (result.wasOk() && !state->cancelled.load()) {
                     const auto rate = state->sampleRate;
-                    const motion::PreparedComposition prepared(project, rate, &state->cancelled);
+                    const motion::PreparedComposition prepared(project, rate, &state->cancelled, motion::CompositionPurpose::signal, motion::hidden::Reach::ofCanvas(config.renderSize.width, config.renderSize.height));
                     picture = std::make_shared<const motion::PreparedBeam>(prepared.beam);
                     result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress);
                     if (result.wasOk() && config.includeAudio) {
@@ -253,12 +253,13 @@ void MotionEditor::exportSignal() {
             return;
         }
         const auto project = owner->processor.document.mainProject();
+        const auto reach = owner->processor.canvasReach();
         owner->exportBar.setName("Signal export progress");
         owner->exportProgress = 0;
         owner->exportBar.setVisible(true);
         owner->cancelExport.setVisible(true);
-        owner->exports.addJob([owner, state, project, destination] {
-            const auto result = motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress);
+        owner->exports.addJob([owner, state, project, destination, reach] {
+            const auto result = motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach);
             juce::MessageManager::callAsync([owner, state, result] {
                 if (owner == nullptr) {
                     return;

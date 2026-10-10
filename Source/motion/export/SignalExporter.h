@@ -8,14 +8,14 @@ namespace motion {
 // Synchronous XYRGB worker export, separate from stereo soundtrack audio.
 class SignalExporter {
 public:
-    static juce::Result write(Project snapshot, const juce::File& destination, double sampleRate, const std::atomic<bool>& cancel, std::atomic<double>* progress = nullptr) try {
+    static juce::Result write(Project snapshot, const juce::File& destination, double sampleRate, const std::atomic<bool>& cancel, std::atomic<double>* progress = nullptr, hidden::Reach reach = {}) try {
         if (progress != nullptr) {
             progress->store(0.0, std::memory_order_relaxed);
         }
         if (cancel.load(std::memory_order_relaxed)) {
             return juce::Result::fail("Signal export cancelled.");
         }
-        return write(PreparedComposition(snapshot, sampleRate, &cancel), destination, sampleRate, cancel, progress);
+        return write(PreparedComposition(snapshot, sampleRate, &cancel, CompositionPurpose::signal, reach), destination, sampleRate, cancel, progress);
     } catch (...) {
         return juce::Result::fail("Cannot prepare the composition for signal export.");
     }

@@ -157,9 +157,11 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         return Screen {point->x / point->z * view->focalLength, point->y / point->z * view->focalLength, 1 / point->z};
     };
 
-    // What hides. Its triangles are kept too when two or more surfaces could
-    // cut through each other.
-    depth.clear();
+    // What hides, over what the Scope shows. Its triangles are kept too when
+    // two or more surfaces could cut through each other.
+    const auto reach = composition.hiddenLineReach;
+    depth.cover(reach);
+    workspace.dicer.setReach(reach);
     const auto surfaces = std::count_if(items.begin(), items.end(), [](const Item& item) { return item.drawing != nullptr && !item.drawing->faces().empty(); });
     auto& surfaceTriangles = workspace.triangles;
     auto& surfaceSources = workspace.sources;
@@ -214,7 +216,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     }
     if (depth.isEmpty()) { return frame; }
     dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
-    const auto crossings = crossing::runs(surfaceTriangles, view->focalLength);
+    const auto crossings = crossing::runs(surfaceTriangles, view->focalLength, reach);
 
     // What is hidden: every line, every half pixel along its true path.
     // `place(t)` is a point of a run at progress t; the parts that show come
@@ -372,7 +374,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             if (line && !item.bent) {
                 // Straight through the camera: interpolated exactly.
                 const auto sa = screen(from), sb = screen(to);
-                const auto length = sa.has_value() && sb.has_value() ? std::hypot(sb->x - sa->x, sb->y - sa->y) : 2 * DepthBuffer::extent;
+                const auto length = sa.has_value() && sb.has_value() ? std::hypot(sb->x - sa->x, sb->y - sa->y) : 2 * (reach.x + reach.y);
                 visibleRuns([&](double t) { return from.has_value() && to.has_value() ? screen(*from + (*to - *from) * t) : std::optional<Screen>(); }, length);
             } else {
                 // Along its true path: its length on screen, from a few points
@@ -495,7 +497,7 @@ private:
         if (cancel.load()) { return; }
         std::unique_ptr<PreparedComposition> composition;
         try {
-            composition = std::make_unique<PreparedComposition>(*bake.project, sampleRate, &cancel);
+            composition = std::make_unique<PreparedComposition>(*bake.project, sampleRate, &cancel, CompositionPurpose::signal, bake.reach);
         } catch (...) {
             return;
         }

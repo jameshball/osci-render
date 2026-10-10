@@ -374,7 +374,7 @@ struct PreparedBeam {
 };
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = {}) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         // Editor geometry is rebuilt during drags; loudness modulation only
         // matters to the signal, so the envelope is built there alone.
@@ -434,7 +434,7 @@ struct PreparedComposition {
         }
         // Cameras that hide hidden lines show frames baked off the render thread.
         if (purpose == CompositionPurpose::signal && std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.hidesHiddenLines; })) {
-            hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration);
+            hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach);
         }
         for (std::size_t index = 0; index < beamPropertySpecs.size(); ++index) {
             beam.curves[index] = curveOrDefault(project.beam.properties, beamPropertySpecs[index]);
@@ -645,7 +645,10 @@ public:
     PreparedSoundtrack soundtrack;
     std::vector<PreparedClip> clips;
     std::vector<PreparedCamera> cameras;
-    // Frames with hidden lines removed, when a camera hides them.
+    // What the Scope shows (wider than the frame on a wide canvas), which
+    // hidden lines are removed across, and the frames with them removed, when
+    // a camera hides them.
+    hidden::Reach hiddenLineReach;
     std::shared_ptr<hidden::Bake> hiddenLines;
     PreparedBeam beam;
 

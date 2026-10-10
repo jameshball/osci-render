@@ -13,7 +13,22 @@ struct Screen {
     double x, y, w;
 };
 
-// What hides what, point by point: a depth buffer over the frame, holding the
+// How far from the middle the Scope shows, in output units: -1 to 1 across a
+// square canvas, and further across the longer side of one that is not.
+struct Reach {
+    double x = 1, y = 1;
+
+    static Reach ofCanvas(int width, int height) {
+        if (width <= 0 || height <= 0) { return {}; }
+        const auto aspect = static_cast<double>(width) / height;
+        return {std::max(1.0, aspect), std::max(1.0, 1 / aspect)};
+    }
+    bool operator==(const Reach&) const = default;
+};
+
+// What hides what, point by point: a depth buffer over what the Scope shows
+// (a little past it, for the beam's width), at the same pixel size however wide
+// that is, holding the
 // nearest surface at every pixel. Surfaces are drawn into it as triangles small
 // enough to follow whatever bends them; a point shows when nothing in its pixel
 // is in front of it. Each pixel keeps which triangle is nearest at its centre,
@@ -22,17 +37,19 @@ struct Screen {
 // pixel, and testing at the centre would need it pushed back as far, letting
 // whatever is just behind it show. A point inside that triangle is tested
 // against its depth there, pushed back by a small part of that depth and a
-// little for surfaces bent between their corners. A point just outside it (on the far side
-// of an edge two surfaces share, in a pixel whose centre the other has) meets
-// its plane carried past the edge, so the plane is pushed back by its depth
-// slope across as far as the point is outside, as polygon offset does: a line
-// on a surface (its edges, where two surfaces touch) is never hidden by it.
+// little for surfaces bent between their corners. A point just outside it (on
+// the far side of an edge two surfaces share, in a pixel whose centre the
+// other has) meets its plane carried past the edge, so the plane is pushed
+// back by its depth slope across as far as the point is outside, as polygon
+// offset does: a line on a surface (its edges, where two surfaces touch) is
+// never hidden by it. Nothing outside the buffer can be seen, so a point there
+// shows.
 class DepthBuffer {
 public:
-    // Pixels across the frame, and how far past its edges the buffer reaches.
-    static constexpr int size = 1024;
-    static constexpr double extent = 1.05;
-    static constexpr double pixel = 2 * extent / size;
+    // How far past what the Scope shows the buffer reaches, and its pixels:
+    // 1024 across a square canvas.
+    static constexpr double overscan = 1.05;
+    static constexpr double pixel = 2 * overscan / 1024;
     // In squared pixels: far less than a pixel, far more than rounding.
     static constexpr double edgeSlack = 1.0e-6;
     // How far a plane is pushed back: this much of its depth (a line this
@@ -44,19 +61,36 @@ public:
     static constexpr double insidePush = .25;
     static constexpr double slopePush = 1.5;
 
-    DepthBuffer() : pixels(static_cast<std::size_t>(size) * size) {}
+    explicit DepthBuffer(Reach reach = {}) { cover(reach); }
+
+    // Covers what a canvas shows, emptied; only a new reach reallocates.
+    void cover(Reach reach) {
+        if (reach == covered && !pixels.empty()) {
+            clear();
+            return;
+        }
+        covered = reach;
+        originX = reach.x * overscan;
+        originY = reach.y * overscan;
+        width = static_cast<int>(std::ceil(2 * originX / pixel));
+        height = static_cast<int>(std::ceil(2 * originY / pixel));
+        pixels.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), Pixel {});
+        empty = true;
+        clear();
+    }
+    Reach reach() const { return covered; }
 
     // Only what was drawn since the last clear is cleared.
     void clear() {
         if (!empty) {
             for (auto y = drawnBottom; y <= drawnTop; ++y) {
-                const auto row = pixels.begin() + static_cast<std::ptrdiff_t>(y) * size;
+                const auto row = pixels.begin() + static_cast<std::ptrdiff_t>(y) * width;
                 std::fill(row + drawnLeft, row + drawnRight + 1, Pixel {});
             }
         }
-        drawnLeft = size;
+        drawnLeft = width;
         drawnRight = -1;
-        drawnBottom = size;
+        drawnBottom = height;
         drawnTop = -1;
         empty = true;
         planes.clear();
@@ -65,16 +99,16 @@ public:
 
     // Draws a triangle of surface; corners must be in front of the eye.
     void triangle(Screen a, Screen b, Screen c) {
-        const auto ax = toPixel(a.x), ay = toPixel(a.y), bx = toPixel(b.x), by = toPixel(b.y), cx = toPixel(c.x), cy = toPixel(c.y);
+        const auto ax = toPixelX(a.x), ay = toPixelY(a.y), bx = toPixelX(b.x), by = toPixelY(b.y), cx = toPixelX(c.x), cy = toPixelY(c.y);
         const auto area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
         if (!std::isfinite(area) || std::abs(area) < 1.0e-12) { return; }
         // The pixels whose centres (x + .5) the triangle's box can reach, with
         // room for a centre right on an edge.
         constexpr double margin = 1.0e-6;
         const auto left = std::max(0, static_cast<int>(std::ceil(std::min({ax, bx, cx}) - .5 - margin)));
-        const auto right = std::min(size - 1, static_cast<int>(std::floor(std::max({ax, bx, cx}) - .5 + margin)));
+        const auto right = std::min(width - 1, static_cast<int>(std::floor(std::max({ax, bx, cx}) - .5 + margin)));
         const auto bottom = std::max(0, static_cast<int>(std::ceil(std::min({ay, by, cy}) - .5 - margin)));
-        const auto top = std::min(size - 1, static_cast<int>(std::floor(std::max({ay, by, cy}) - .5 + margin)));
+        const auto top = std::min(height - 1, static_cast<int>(std::floor(std::max({ay, by, cy}) - .5 + margin)));
         if (left > right || bottom > top) { return; }
         // Inverse depth is linear on screen: its plane, and how steeply it
         // changes across a pixel, which is how far it is pushed back.
@@ -102,7 +136,7 @@ public:
             // pixel on a shared edge just outside both neighbours).
             auto e0 = edges[0].at(firstX, py), e1 = edges[1].at(firstX, py), e2 = edges[2].at(firstX, py);
             auto w = a.w + dwdx * (firstX - ax) + dwdy * (py - ay);
-            const auto offset = static_cast<std::size_t>(y) * size + static_cast<std::size_t>(first);
+            const auto offset = static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(first);
             auto* cell = pixels.data() + offset;
             for (auto x = first; x <= last; ++x, ++cell) {
                 if (e0 >= -edgeSlack && e1 >= -edgeSlack && e2 >= -edgeSlack && w > cell->w) { *cell = {static_cast<float>(w), index}; }
@@ -122,10 +156,10 @@ public:
     // Whether a point shows: nothing drawn in front of it in its pixel.
     bool shows(Screen point) const {
         if (empty) { return true; }
-        const auto px = toPixel(point.x), py = toPixel(point.y);
+        const auto px = toPixelX(point.x), py = toPixelY(point.y);
         const auto x = static_cast<int>(std::floor(px)), y = static_cast<int>(std::floor(py));
-        if (x < 0 || y < 0 || x >= size || y >= size) { return true; }
-        const auto cell = static_cast<std::size_t>(y) * size + static_cast<std::size_t>(x);
+        if (x < 0 || y < 0 || x >= width || y >= height) { return true; }
+        const auto cell = static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
         const auto& here = pixels[cell];
         if (here.w == 0) { return true; }
         const auto& plane = planes[static_cast<std::size_t>(here.owner)];
@@ -139,7 +173,8 @@ public:
 
 private:
     static constexpr double halfDiagonal = .7072;
-    static double toPixel(double value) { return (value + extent) * (1 / pixel); }
+    double toPixelX(double value) const { return (value + originX) * (1 / pixel); }
+    double toPixelY(double value) const { return (value + originY) * (1 / pixel); }
     // Which side of the edge from (x0, y0) to (x1, y1) a pixel centre is on:
     // positive inside, as a plane over the pixels.
     struct Edge {
@@ -203,10 +238,13 @@ private:
         float w = 0;
         std::int32_t owner = 0;
     };
+    Reach covered;
+    double originX = 0, originY = 0;
+    int width = 0, height = 0;
     std::vector<Pixel> pixels;
     std::vector<Plane> planes;
     // The pixels drawn since the last clear.
-    int drawnLeft = size, drawnRight = -1, drawnBottom = size, drawnTop = -1;
+    int drawnLeft = 0, drawnRight = -1, drawnBottom = 0, drawnTop = -1;
     bool empty = true;
 };
 }

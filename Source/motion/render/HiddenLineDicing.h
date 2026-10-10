@@ -29,6 +29,9 @@ public:
     // is too large to grid.
     static constexpr double cell = 4, gridReach = 8 * cell;
 
+    // What the Scope shows: a piece wholly past it is dropped.
+    void setReach(Reach value) { reach = value; }
+
     // `bend` places a source point on screen; `emit` takes each piece.
     template <typename Bend, typename Emit>
     void dice(const DiceCorner& a, const DiceCorner& b, const DiceCorner& c, Bend&& bend, Emit&& emit) {
@@ -43,13 +46,13 @@ private:
         const auto dx = (v.at->x - u.at->x) / DepthBuffer::pixel, dy = (v.at->y - u.at->y) / DepthBuffer::pixel;
         return dx * dx + dy * dy;
     }
-    static bool offFrame(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r) {
+    bool offFrame(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r) const {
         if (!p.at.has_value() && !q.at.has_value() && !r.at.has_value()) { return true; }
         if (!p.at.has_value() || !q.at.has_value() || !r.at.has_value()) { return false; }
-        constexpr auto reach = DepthBuffer::extent;
+        const auto x = reach.x * DepthBuffer::overscan, y = reach.y * DepthBuffer::overscan;
         const auto past = [&](auto&& test) { return test(*p.at) && test(*q.at) && test(*r.at); };
-        return past([](const Screen& s) { return s.x < -reach; }) || past([](const Screen& s) { return s.x > reach; })
-            || past([](const Screen& s) { return s.y < -reach; }) || past([](const Screen& s) { return s.y > reach; });
+        return past([x](const Screen& s) { return s.x < -x; }) || past([x](const Screen& s) { return s.x > x; })
+            || past([y](const Screen& s) { return s.y < -y; }) || past([y](const Screen& s) { return s.y > y; });
     }
     static osci::Point mix(const osci::Point& from, const osci::Point& u, const osci::Point& v, double s, double t) {
         const auto at = [&](float osci::Point::* axis) { return static_cast<float>(from.*axis + (u.*axis - from.*axis) * s + (v.*axis - from.*axis) * t); };
@@ -131,5 +134,6 @@ private:
 
     MidpointCache<DiceCorner> midpoints;
     std::vector<DiceCorner> points;
+    Reach reach;
 };
 }

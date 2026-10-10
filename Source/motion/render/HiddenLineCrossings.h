@@ -140,17 +140,18 @@ inline Box boxOf(const Triangle& triangle, double focalLength) {
     return box;
 }
 
-// Triangles bucketed by the screen cells their boxes cover, in one flat
-// array (counted, then filled), with cells about twice the triangles' size.
+// Triangles bucketed by the cells their boxes cover of an area of the screen,
+// in one flat array (counted, then filled), with cells about twice the
+// triangles' size.
 class ScreenGrid {
 public:
-    ScreenGrid(const std::vector<std::uint32_t>& members, const std::vector<Box>& boxes, double typicalSize) {
-        constexpr auto span = 2 * DepthBuffer::extent;
+    ScreenGrid(const std::vector<std::uint32_t>& members, const std::vector<Box>& boxes, double typicalSize, const Box& area) : area(area) {
+        const auto span = std::max(area.right - area.left, area.top - area.bottom);
         cells = std::clamp(static_cast<int>(span / std::max(2 * typicalSize, 1.0e-9)), 16, 512);
         starts.assign(static_cast<std::size_t>(cells * cells) + 1, 0);
         const auto covered = [&](const Box& box, auto&& visit) {
-            for (auto y = axisCell(box.bottom); y <= axisCell(box.top); ++y) {
-                for (auto x = axisCell(box.left); x <= axisCell(box.right); ++x) { visit(y * cells + x); }
+            for (auto y = axisCell(box.bottom, area.bottom, area.top); y <= axisCell(box.top, area.bottom, area.top); ++y) {
+                for (auto x = axisCell(box.left, area.left, area.right); x <= axisCell(box.right, area.left, area.right); ++x) { visit(y * cells + x); }
             }
         };
         for (const auto member : members) { covered(boxes[member], [&](int cell) { ++starts[static_cast<std::size_t>(cell) + 1]; }); }
@@ -161,13 +162,13 @@ public:
     }
     int cellCount() const { return cells * cells; }
     std::span<const std::uint32_t> cell(int index) const { return {entries.data() + starts[static_cast<std::size_t>(index)], starts[static_cast<std::size_t>(index) + 1] - starts[static_cast<std::size_t>(index)]}; }
-    int cellAt(double x, double y) const { return axisCell(y) * cells + axisCell(x); }
+    int cellAt(double x, double y) const { return axisCell(y, area.bottom, area.top) * cells + axisCell(x, area.left, area.right); }
 
 private:
-    int axisCell(double value) const {
-        constexpr auto extent = DepthBuffer::extent;
-        return std::clamp(static_cast<int>(std::floor((value + extent) / (2 * extent) * cells)), 0, cells - 1);
+    int axisCell(double value, double low, double high) const {
+        return std::clamp(static_cast<int>(std::floor((value - low) / (high - low) * cells)), 0, cells - 1);
     }
+    Box area;
     int cells = 16;
     std::vector<std::size_t> starts;
     std::vector<std::uint32_t> entries;
@@ -238,9 +239,9 @@ inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const 
 // `triangles` comes surface by surface. Only triangles where another surface
 // overlaps them on screen and in depth can cross it; those are paired through
 // a grid over the screen sized to them, and only across surfaces, never
-// within one. `focalLength` projects eye space onto the screen; nothing off
-// the frame is ever seen.
-inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangles, double focalLength) {
+// within one. `focalLength` projects eye space onto the screen; nothing past
+// what the Scope shows (`reach`) is ever seen.
+inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangles, double focalLength, Reach reach = {}) {
     std::vector<Piece> pieces;
     if (triangles.size() < 2) { return {}; }
     using detail::Box;
@@ -254,7 +255,8 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
         surfaceBoxes[triangle.surface].include(box);
     }
     // Where some other surface could be.
-    const auto frame = Box {-DepthBuffer::extent, DepthBuffer::extent, -DepthBuffer::extent, DepthBuffer::extent, -1.0e300, 1.0e300};
+    const auto x = reach.x * DepthBuffer::overscan, y = reach.y * DepthBuffer::overscan;
+    const auto frame = Box {-x, x, -y, y, -1.0e300, 1.0e300};
     std::vector<std::uint32_t> candidates;
     double extentSum = 0;
     for (std::uint32_t index = 0; index < triangles.size(); ++index) {
@@ -268,7 +270,7 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
         extentSum += std::max(box.right - box.left, box.top - box.bottom);
     }
     if (candidates.size() < 2) { return {}; }
-    const detail::ScreenGrid grid(candidates, boxes, extentSum / static_cast<double>(candidates.size()));
+    const detail::ScreenGrid grid(candidates, boxes, extentSum / static_cast<double>(candidates.size()), frame);
     for (int cell = 0; cell < grid.cellCount(); ++cell) {
         const auto members = grid.cell(cell);
         // Members come surface by surface: each surface's run is paired with

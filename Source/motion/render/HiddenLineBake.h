@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/PreparedDrawing.h"
+#include "HiddenLineDepth.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -45,8 +46,8 @@ struct Frame {
 // yet baked. Frames are kept until the bake is destroyed.
 class Bake {
 public:
-    Bake(std::shared_ptr<const Project> snapshot, double frameRate, double duration)
-        : project(std::move(snapshot)), rate(std::isfinite(frameRate) && frameRate > 0 ? frameRate : 60),
+    Bake(std::shared_ptr<const Project> snapshot, double frameRate, double duration, Reach shown = {})
+        : project(std::move(snapshot)), reach(shown), rate(std::isfinite(frameRate) && frameRate > 0 ? frameRate : 60),
           count(std::isfinite(duration) && duration > 0 ? static_cast<std::size_t>(std::ceil(duration * rate - 1.0e-9)) + 1 : 1),
           slots(std::make_unique<std::atomic<const Frame*>[]>(count)) {
         for (std::size_t index = 0; index < count; ++index) { slots[index].store(nullptr, std::memory_order_relaxed); }
@@ -57,8 +58,10 @@ public:
     Bake(const Bake&) = delete;
     Bake& operator=(const Bake&) = delete;
 
-    // The project the composition was prepared from, for the bake's workers.
+    // The project the composition was prepared from, and what the Scope
+    // shows of it, for the bake's workers.
     const std::shared_ptr<const Project> project;
+    const Reach reach;
 
     double frameRate() const { return rate; }
     std::size_t frameCount() const { return count; }

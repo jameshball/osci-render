@@ -13,8 +13,13 @@
 #include "live/LiveBlenderController.h"
 #include "ScopeBeam.h"
 
-class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater {
+class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater, private juce::AudioProcessorParameter::Listener {
 public:
+    // What the Scope shows across the output canvas; message thread.
+    motion::hidden::Reach canvasReach() {
+        const auto size = recordingParameters.getCanvasSize();
+        return motion::hidden::Reach::ofCanvas(size.width, size.height);
+    }
     enum class OutputMode { soundtrack, xy, xyrgb };
     // Pausing the Scope or sharing its picture are view settings, not edits.
     bool isUndoExcluded(const juce::String& paramID) const override {
@@ -74,6 +79,9 @@ public:
 
 private:
     void handleAsyncUpdate() override;
+    // The canvas changing changes what hidden lines are removed across.
+    void parameterValueChanged(int, float) override { triggerAsyncUpdate(); }
+    void parameterGestureChanged(int, bool) override {}
     void routeSignalOutput(juce::AudioBuffer<float>& buffer);
     void writeSignal(int index, const osci::Point& point) {
         const std::array<float, 6> values {point.x, point.y, point.z, point.r, point.g, point.b};
@@ -83,6 +91,7 @@ private:
     std::uint64_t preparationRevision = 0, acceptedPreparationRevision = 0;
     std::atomic<double> requestedSampleRate {48000};
     double preparationSampleRate = 48000;
+    motion::hidden::Reach preparationReach;
     juce::String preparationError;
     std::uint64_t previousRevision = 0;
     bool wasPlaying = false;

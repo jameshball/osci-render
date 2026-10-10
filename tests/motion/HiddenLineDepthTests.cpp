@@ -87,6 +87,23 @@ void edgeOn() {
     check(shown(depth, behind(a), behind(b)) < .01, "a line just behind it is hidden");
 }
 
+void wideCanvas() {
+    // A face past the side of the square frame, where a wide canvas still
+    // shows it: what is behind it there is hidden, and the buffer, covered
+    // anew for a square canvas, has nothing there to hide anything.
+    const Point3 corners[4] {{6, -1, 4}, {7, -1, 4}, {7, 1, 4}, {6, 1, 4}};
+    const Point3 behind {13, 0, 8}, before {4.875, 0, 3};
+    DepthBuffer depth(motion::hidden::Reach::ofCanvas(1920, 1080));
+    depth.triangle(project(corners[0]), project(corners[1]), project(corners[2]));
+    depth.triangle(project(corners[0]), project(corners[2]), project(corners[3]));
+    check(!depth.shows(project(behind)), "a point behind a face past a square frame's side is hidden on a wide canvas");
+    check(depth.shows(project(before)), "and one in front of it shows");
+    depth.cover({});
+    depth.triangle(project(corners[0]), project(corners[1]), project(corners[2]));
+    depth.triangle(project(corners[0]), project(corners[2]), project(corners[3]));
+    check(depth.shows(project(behind)), "a square canvas shows nothing there, so nothing there is hidden");
+}
+
 void matchesRayCasting() {
     // Random triangles and points: the buffer agrees with ray casting except
     // within a pixel or two of an edge.
@@ -149,6 +166,7 @@ void benchmark() {
 int main() {
     cube();
     edgeOn();
+    wideCanvas();
     matchesRayCasting();
     benchmark();
     std::cout << "Hidden line depth tests passed\n";
