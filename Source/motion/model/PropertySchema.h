@@ -28,24 +28,30 @@ inline PropertySpec effectPropertySpec(const EffectParameterDefinition& paramete
     return {parameter.id, parameter.name, "Effect", "", parameter.min, parameter.max, parameter.defaultValue, span / 200.0, span >= 50 ? 1 : 3, ""};
 }
 
-// A generator clip's own parameter, when the target is one. Only projects
-// that hold assets have generators; `generatorOf` comes with their assets.
+// What generates a clip, when the target is a generator's clip. Only
+// projects that hold assets have generators; `generatorOf` comes with their
+// assets.
 template <typename ProjectType>
-const PropertySpec* generatorSpec(const ProjectType& project, Id target, std::string_view property) {
+const GeneratorDefinition* generatorFor(const ProjectType& project, Id target) {
     if constexpr (requires { project.assets; }) {
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
                 if (clip.id != target || clip.asset == 0) { continue; }
                 for (const auto& asset : project.assets) {
-                    if (asset == nullptr || asset->id != clip.asset) { continue; }
-                    const auto* generator = generatorOf(*asset);
-                    return generator != nullptr ? findPropertySpec(generator->parameters, property) : nullptr;
+                    if (asset != nullptr && asset->id == clip.asset) { return generatorOf(*asset); }
                 }
                 return nullptr;
             }
         }
     }
     return nullptr;
+}
+
+// A generator clip's own parameter, when the target is one.
+template <typename ProjectType>
+const PropertySpec* generatorSpec(const ProjectType& project, Id target, std::string_view property) {
+    const auto* generator = generatorFor(project, target);
+    return generator != nullptr ? findPropertySpec(generator->parameters, property) : nullptr;
 }
 
 // One of a target's properties as specified: an effect parameter, a

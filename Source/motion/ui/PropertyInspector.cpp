@@ -704,15 +704,7 @@ std::vector<motion::PropertySpec> MotionPropertyInspector::luaSliders() const {
 }
 
 const motion::GeneratorDefinition* MotionPropertyInspector::targetGenerator() const {
-    const auto& project = processor.document.project();
-    for (const auto& track : project.tracks) {
-        for (const auto& clip : track.clips) {
-            if (clip.id != target || clip.composition != 0) { continue; }
-            const auto asset = motion::findAsset(project.assets, clip.asset);
-            return asset != nullptr ? motion::generatorOf(*asset) : nullptr;
-        }
-    }
-    return nullptr;
+    return motion::generatorFor(processor.document.project(), target);
 }
 
 motion::Curve* MotionPropertyInspector::createSlider(motion::Project& project, const std::string& property) const {

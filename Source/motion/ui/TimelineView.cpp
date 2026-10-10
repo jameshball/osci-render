@@ -2096,8 +2096,12 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
     // A lane reads like a channel in the Graph: under its track's header,
     // as light as it, with the axis colour as a dot and on its keys.
     fillCard(g, y, height - bandGap, osci::Colours::surface(), osci::Colours::surfaceSunken());
+    // Named as the first clip keying it names it: a generator's numbers and
+    // a script's sliders are its own.
+    const auto keyed = std::find_if(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return clip.properties.contains(row.lane); });
+    const auto own = keyed != track.clips.end() ? motion::specFor(project, keyed->id, row.lane) : std::nullopt;
     const auto specs = track.kind == motion::TrackKind::audio ? std::span<const motion::PropertySpec>(motion::audioPropertySpecs) : motion::objectPropertySpecs;
-    const auto* spec = motion::findPropertySpec(specs, row.lane);
+    const auto* spec = own.has_value() ? &*own : motion::findPropertySpec(specs, row.lane);
     const auto colour = spec != nullptr && !spec->axis.empty() ? motion::style::axisColour(spec->axis) : motion::style::key();
     const auto indent = std::min(64, row.depth * 16) + 30;
     g.setColour(colour.withAlpha(.85f));
