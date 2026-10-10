@@ -83,6 +83,21 @@ inline juce::Path shapes() {
     path.addRectangle(56, 54, 30, 30);
     return fitted(path);
 }
+// A light bulb, its screw base below.
+inline juce::Path bulb() {
+    juce::Path path;
+    path.startNewSubPath(36, 70);
+    path.cubicTo(36, 56, 18, 50, 18, 34);
+    path.cubicTo(18, 16, 32, 6, 50, 6);
+    path.cubicTo(68, 6, 82, 16, 82, 34);
+    path.cubicTo(82, 50, 64, 56, 64, 70);
+    path.closeSubPath();
+    path.startNewSubPath(38, 80);
+    path.lineTo(62, 80);
+    path.startNewSubPath(42, 90);
+    path.lineTo(58, 90);
+    return fitted(path);
+}
 // A folder, its tab at the upper left.
 inline juce::Path folder() {
     juce::Path path;

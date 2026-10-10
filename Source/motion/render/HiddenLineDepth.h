@@ -49,9 +49,11 @@ struct Reach {
 class DepthBuffer {
 public:
     // How far past what the Scope shows the buffer reaches, and its pixels:
-    // 1024 across a square canvas.
+    // 1024 across a square canvas, as a camera's buffer has them (a light's
+    // shadows, seen from the light, need fewer).
     static constexpr double overscan = 1.05;
-    static constexpr double pixel = 2 * overscan / 1024;
+    static constexpr int pixelsAcross = 1024;
+    static constexpr double pixel = 2 * overscan / pixelsAcross;
     // In squared pixels: far less than a pixel, far more than rounding.
     static constexpr double edgeSlack = 1.0e-6;
     // How near an edge, in pixels, a point is on it.
@@ -65,7 +67,9 @@ public:
     static constexpr double insidePush = .25;
     static constexpr double slopePush = 1.5;
 
-    explicit DepthBuffer(Reach reach = {}) { cover(reach); }
+    explicit DepthBuffer(Reach reach = {}, int across = pixelsAcross) : size(2 * overscan / std::max(16, across)) { cover(reach); }
+    // Its pixels' size, in output units.
+    double pixelSize() const { return size; }
 
     // Covers what a canvas shows, emptied; only a new reach reallocates.
     void cover(Reach reach) {
@@ -76,8 +80,8 @@ public:
         covered = reach;
         originX = reach.x * overscan;
         originY = reach.y * overscan;
-        width = static_cast<int>(std::ceil(2 * originX / pixel));
-        height = static_cast<int>(std::ceil(2 * originY / pixel));
+        width = static_cast<int>(std::ceil(2 * originX / size));
+        height = static_cast<int>(std::ceil(2 * originY / size));
         pixels.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), Pixel {});
         empty = true;
         clear();
@@ -197,8 +201,8 @@ private:
     // a small part of its own depth, so a surface reaching far nearer the eye
     // elsewhere is not pushed back further for it.
     static bool inFront(Screen point, double w) { return point.w * (1 + depthPush) >= w; }
-    double toPixelX(double value) const { return (value + originX) * (1 / pixel); }
-    double toPixelY(double value) const { return (value + originY) * (1 / pixel); }
+    double toPixelX(double value) const { return (value + originX) * (1 / size); }
+    double toPixelY(double value) const { return (value + originY) * (1 / size); }
     // Which side of the edge from (x0, y0) to (x1, y1) a pixel centre is on:
     // positive inside, as a plane over the pixels.
     struct Edge {
@@ -266,6 +270,7 @@ private:
         float w = 0;
         std::int32_t owner = 0;
     };
+    double size = pixel;
     Reach covered;
     double originX = 0, originY = 0;
     int width = 0, height = 0;

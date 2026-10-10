@@ -1704,6 +1704,30 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
             clip.properties["rotation.x"] = Curve(25);
             clip.properties["rotation.y"] = Curve(-35);
         }
+        // A light starts white, above and to the side of the middle of the
+        // scene; one that shines one way shines at it.
+        if (generator->category == GeneratorCategory::light) {
+            const auto place = [&](double x, double y, double z) {
+                clip.properties["position.x"] = Curve(x);
+                clip.properties["position.y"] = Curve(y);
+                clip.properties["position.z"] = Curve(z);
+                // Unturned, a light shines down -Z: turned about X, then Y, to the middle.
+                const auto length = std::sqrt(x * x + y * y + z * z);
+                if (length > 0) {
+                    constexpr auto degrees = 180 / 3.14159265358979323846;
+                    clip.properties["rotation.x"] = Curve(std::asin(-y / length) * degrees);
+                    clip.properties["rotation.y"] = Curve(std::atan2(x, z) * degrees);
+                }
+            };
+            // Near enough to be in the Scene's view as it opens.
+            switch (generator->kind) {
+                case GeneratorKind::ambientLight: place(-.8, .8, 0); break;
+                case GeneratorKind::directionalLight: place(.8, .8, .6); break;
+                case GeneratorKind::pointLight: place(.45, .5, 1.6); break;
+                default: place(.4, .45, 2); break;
+            }
+            return clip;
+        }
     }
     // A source without its own colours starts in the phosphor green.
     if (asset.source == nullptr || !asset.source->hasExplicitColour()) {

@@ -21,7 +21,8 @@ inline juce::Path generatorPicture(const GeneratorDefinition& definition, float 
         default: break;
     }
     const auto geometry = generator::build(definition, defaults);
-    const auto solid = definition.category == GeneratorCategory::solid;
+    // Solids and lights (which shine one way, in depth) are seen in three dimensions.
+    const auto solid = definition.category == GeneratorCategory::solid || definition.category == GeneratorCategory::light;
     // Seen from a little above and to the side (a torus, lying flat, from
     // higher up); y up becomes y down.
     const auto tilt = definition.kind == GeneratorKind::torus ? 0.95 : 0.45;

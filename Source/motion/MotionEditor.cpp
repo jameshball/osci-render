@@ -479,6 +479,17 @@ void MotionEditor::setUpLibrary() {
             }
         }
         menu.addSubMenu("Generate", generate, true, icons::stroked(icons::glyph::shapes(), icons::ink()));
+        // Lights: what the Scope draws, lit by them.
+        juce::PopupMenu lights;
+        for (std::size_t index = 0; index < motion::generatorDefinitions.size(); ++index) {
+            const auto& definition = motion::generatorDefinitions[index];
+            if (definition.category != motion::GeneratorCategory::light) { continue; }
+            juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
+            entry.itemID = 1000 + static_cast<int>(index);
+            entry.image = motion::ui::generatorIcon(definition, icons::ink());
+            lights.addItem(std::move(entry));
+        }
+        menu.addSubMenu("Light", lights, true, icons::stroked(icons::glyph::bulb(), icons::ink()));
         menu.addItem(item(1, "Import file...", icons::glyph::folder()));
         menu.addItem(item(2, "Blender live source...", icons::glyph::live()));
         // The examples that ship with osci-motion, by kind, each pictured as
@@ -1164,10 +1175,12 @@ void MotionEditor::timerCallback() {
             if (interleave > 1) { statistics += dot + "dense: each object every " + juce::String(interleave) + " cycles"; }
         }
         const auto hiding = processor.hiddenLineProgress();
+        const auto hides = processor.hidesHiddenLines(), lights = processor.lightsFrames();
         if (hiding.has_value()) {
-            statistics += dot + "hiding lines " + juce::String(juce::roundToInt(*hiding * 100)) + "%";
-        } else if (processor.hidesHiddenLines()) {
-            statistics += dot + "hidden lines removed";
+            const auto doing = hides && lights ? "hiding lines and lighting " : lights ? "lighting " : "hiding lines ";
+            statistics += dot + doing + juce::String(juce::roundToInt(*hiding * 100)) + "%";
+        } else if (hides || lights) {
+            statistics += dot + (hides && lights ? "hidden lines removed, lit" : lights ? "lit" : "hidden lines removed");
         }
         statusBar.setStatistics(statistics);
     }

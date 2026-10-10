@@ -62,6 +62,8 @@ public:
     // shows of it, for the bake's workers.
     const std::shared_ptr<const Project> project;
     const Reach reach;
+    // What it bakes: lines a camera hides, light from lights, or both.
+    bool hides = true, lights = false;
 
     double frameRate() const { return rate; }
     std::size_t frameCount() const { return count; }

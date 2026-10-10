@@ -7,8 +7,11 @@
 #include "HiddenLineDepth.h"
 #include "HiddenLineFingerprint.h"
 #include "HiddenLineDicing.h"
+#include "Lighting.h"
 #include "../model/Vec3.h"
+#include <map>
 #include <thread>
+#include <unordered_map>
 
 namespace motion::hidden {
 // The part of a shape between two points of its progress. The shape itself
@@ -89,7 +92,7 @@ inline constexpr double testStep = DepthBuffer::pixel;
 // see but would cost the beam a sample of its own, so it is trimmed.
 inline constexpr double sliver = 2 * DepthBuffer::pixel;
 // Nothing nearer the eye than this is drawn or hides anything.
-inline constexpr double nearPlane = .05;
+inline constexpr double nearPlane = Projection::nearPlane;
 
 // A crossing lies on both its surfaces, so one on a triangle nothing can be
 // seen of never shows. Small triangles (every diced piece) none of whose
@@ -115,10 +118,172 @@ inline void dropUnseen(std::vector<crossing::Triangle>& triangles, std::vector<s
     sources.resize(kept);
 }
 
+// A clip of the frame being culled or lit: its drawing at that time (or, for
+// a point source, its frame of points), and whether anything bends it.
+struct SceneItem {
+    std::size_t index;
+    const PreparedClip* clip;
+    std::shared_ptr<const PreparedSource> source;
+    const PreparedDrawing* drawing;
+    const PreparedPointFrames* points;
+    std::size_t frame;
+    bool bent;
+};
+
+// Which of a drawing's faces each of its lines runs along, by triangle: two
+// for an edge between faces, one for an edge of a surface, none for a line on
+// no face. Every line of a flat drawing lies on its one plane.
+inline std::vector<std::array<std::int32_t, 2>> facesAlong(const PreparedDrawing& drawing) {
+    const auto& mesh = drawing.faces();
+    std::vector<std::array<std::int32_t, 2>> along(drawing.shapeCount(), {-1, -1});
+    if (mesh.empty()) { return along; }
+    if (mesh.planar) {
+        for (auto& faces : along) { faces[0] = 0; }
+        return along;
+    }
+    using Key = std::array<std::int64_t, 3>;
+    const auto key = [](const osci::Point& point) {
+        const auto rounded = [](float value) { return static_cast<std::int64_t>(std::llround(static_cast<double>(value) * 1.0e5)); };
+        return Key {rounded(point.x), rounded(point.y), rounded(point.z)};
+    };
+    const auto edgeKey = [](Key a, Key b) { return a < b ? std::pair {a, b} : std::pair {b, a}; };
+    std::map<std::pair<Key, Key>, std::array<std::int32_t, 2>> edges;
+    for (std::size_t triangle = 0; triangle < mesh.triangles.size(); ++triangle) {
+        const auto index = static_cast<std::int32_t>(triangle);
+        for (std::size_t corner = 0; corner < 3; ++corner) {
+            const auto& from = mesh.vertices[mesh.triangles[triangle][corner]];
+            const auto& to = mesh.vertices[mesh.triangles[triangle][(corner + 1) % 3]];
+            auto& faces = edges.try_emplace(edgeKey(key(from), key(to)), std::array<std::int32_t, 2> {-1, -1}).first->second;
+            if (faces[0] < 0) {
+                faces[0] = index;
+            } else if (faces[1] < 0 && faces[0] != index) {
+                faces[1] = index;
+            }
+        }
+    }
+    for (std::size_t index = 0; index < drawing.shapeCount(); ++index) {
+        auto* shape = drawing.shape(index);
+        if (shape == nullptr) { continue; }
+        const auto found = edges.find(edgeKey(key(shape->nextVector(0)), key(shape->nextVector(1))));
+        if (found != edges.end()) { along[index] = found->second; }
+    }
+    return along;
+}
+
+// A shape, or part of one, lit: it draws its own colours (white where it has
+// none) times the light reaching it, blended from one end to the other.
+class LitPart final : public osci::Shape {
+public:
+    LitPart(std::shared_ptr<osci::Shape> whole, float from, float to, std::array<float, 3> lightFrom, std::array<float, 3> lightTo)
+        : shape(std::move(whole)), start(from), end(to), first(lightFrom), last(lightTo) {}
+    osci::Point nextVector(float progress) override {
+        auto point = shape->nextVector(start + (end - start) * progress);
+        const auto lit = [&](float own, std::size_t channel) { return (own < 0 ? 1.0f : own) * (first[channel] + (last[channel] - first[channel]) * progress); };
+        point.r = lit(point.r, 0);
+        point.g = lit(point.g, 1);
+        point.b = lit(point.b, 2);
+        return point;
+    }
+    void scale(float, float, float) override {}
+    void translate(float, float, float) override {}
+    float length() override {
+        if (len < 0) { len = shape->length() * (end - start); }
+        return len;
+    }
+    std::unique_ptr<osci::Shape> clone() override { return std::make_unique<LitPart>(*this); }
+    std::string type() override { return "Lit"; }
+
+private:
+    std::shared_ptr<osci::Shape> shape;
+    float start, end;
+    std::array<float, 3> first, last;
+};
+
+// Every surface's faces (meshes', and flat drawings' fills) drawn into a
+// depth buffer as an eye sees them: a camera, to hide lines, or a light, to
+// find its shadows. `world` holds each item's mesh corners in the scene;
+// `place(item, point)` puts any point of an item there, for the faces
+// something bends, which are diced so they follow it. `whole(surface, eye,
+// sources)` is told of every face, or part of one cut where it comes into
+// view, drawn flat: its corners in the eye's space and before the chain.
+// False when cancelled partway.
+template <typename Place, typename Whole, typename Cancelled>
+bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world, Place&& place, const Eye& eye, const Projection& projection,
+    Reach reach, DepthBuffer& depth, Dicer& dicer, Whole&& whole, Cancelled&& cancelled) {
+    depth.cover(reach);
+    dicer.setReach(reach);
+    const auto seen = [&](const std::optional<Vec3>& point) -> std::optional<Vec3> {
+        if (!point.has_value()) { return std::nullopt; }
+        return eye.see(*point);
+    };
+    for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+        const auto& item = items[surface];
+        if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
+        const auto& mesh = item.drawing->faces();
+        const auto& corners = world[surface];
+        for (const auto& triangle : mesh.triangles) {
+            if (cancelled()) { return false; }
+            const auto a = seen(corners[triangle[0]]), b = seen(corners[triangle[1]]), c = seen(corners[triangle[2]]);
+            if (!item.bent) {
+                // Exact through the eye: whole, cut (in perspective) a hair in
+                // front of the near plane, so every corner kept, the cut's own
+                // included, is in front of it.
+                if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
+                // What each corner kept was before the chain, to place what
+                // crosses it: nothing bends the face, so a cut point is as far
+                // along its edge before it as after.
+                std::array<Vec3, 4> kept {};
+                std::array<osci::Point, 4> keptSources {};
+                std::size_t count = 0;
+                const std::array<Vec3, 3> around {*a, *b, *c};
+                const std::array<osci::Point, 3> sources {mesh.vertices[triangle[0]], mesh.vertices[triangle[1]], mesh.vertices[triangle[2]]};
+                constexpr auto cut = Projection::nearPlane * (1 + 1.0e-6);
+                for (std::size_t index = 0; index < 3; ++index) {
+                    const auto& current = around[index];
+                    const auto& next = around[(index + 1) % 3];
+                    if (projection.keeps(current.z)) {
+                        keptSources[count] = sources[index];
+                        kept[count++] = current;
+                    }
+                    if (projection.keeps(current.z) != projection.keeps(next.z)) {
+                        const auto along = (cut - current.z) / (next.z - current.z);
+                        const auto& from = sources[index];
+                        const auto& to = sources[(index + 1) % 3];
+                        keptSources[count] = osci::Point(static_cast<float>(from.x + (to.x - from.x) * along), static_cast<float>(from.y + (to.y - from.y) * along), static_cast<float>(from.z + (to.z - from.z) * along));
+                        kept[count++] = current + (next - current) * along;
+                    }
+                }
+                std::array<Screen, 4> at {};
+                bool drawn = count >= 3;
+                for (std::size_t index = 0; index < count && drawn; ++index) {
+                    const auto point = projection(kept[index]);
+                    drawn = point.has_value();
+                    if (drawn) { at[index] = *point; }
+                }
+                if (!drawn) { continue; }
+                depth.triangle(at[0], at[1], at[2]);
+                if (count == 4) { depth.triangle(at[0], at[2], at[3]); }
+                for (std::size_t piece = 2; piece < count; ++piece) { whole(surface, std::array<Vec3, 3> {kept[0], kept[piece - 1], kept[piece]}, std::array<osci::Point, 3> {keptSources[0], keptSources[piece - 1], keptSources[piece]}); }
+                continue;
+            }
+            // Diced point by point into pieces flat enough, once bent, to draw.
+            dicer.dice({mesh.vertices[triangle[0]], projection(a)}, {mesh.vertices[triangle[1]], projection(b)}, {mesh.vertices[triangle[2]], projection(c)},
+                [&](const osci::Point& point) { return projection(seen(place(item, point))); },
+                [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, bool flat) {
+                    depth.triangle(*p.at, *q.at, *r.at);
+                    // A piece cut at the near plane reaches far off the
+                    // screen: only whole pieces are told of.
+                    if (flat) { whole(surface, std::array<Vec3, 3> {projection.unproject(*p.at), projection.unproject(*q.at), projection.unproject(*r.at)}, std::array<osci::Point, 3> {p.source, q.source, r.source}); }
+                });
+        }
+    }
+    return true;
+}
+
 // What culling works in, kept from frame to frame so a worker's buffers are
 // allocated once rather than every frame: the depth buffer, what has been
-// drawn, the surfaces gathered for crossings, and the scratch lists of points
-// and runs. One per thread.
+// drawn, the surfaces gathered for crossings, the lights' shadows, and the
+// scratch lists of points and runs. One per thread.
 struct Workspace {
     DepthBuffer depth;
     Coverage coverage;
@@ -127,12 +292,31 @@ struct Workspace {
     std::vector<std::size_t> drawnStarts;
     std::vector<crossing::Triangle> triangles;
     std::vector<std::array<osci::Point, 3>> sources;
-    std::vector<std::optional<Vec3>> corners, eyes;
+    std::vector<std::optional<Vec3>> eyes;
+    std::vector<std::vector<std::optional<Vec3>>> world;
     std::vector<std::pair<double, double>> runs;
     Dicer dicer;
+    ShadowBuffers shadows;
+    std::vector<LightView> lights;
+    // Which faces each line of a drawing runs along, found once a drawing
+    // (whose source is kept alive here, so its address is never another's).
+    struct Along {
+        std::shared_ptr<const PreparedSource> source;
+        std::vector<std::array<std::int32_t, 2>> faces;
+    };
+    std::unordered_map<const PreparedDrawing*, Along> along;
+    const std::vector<std::array<std::int32_t, 2>>& facesAlongOf(const PreparedDrawing& drawing, const std::shared_ptr<const PreparedSource>& source) {
+        auto found = along.find(&drawing);
+        if (found == along.end()) {
+            if (along.size() > 1024) { along.clear(); }
+            found = along.emplace(&drawing, Along {source, facesAlong(drawing)}).first;
+        }
+        return found->second.faces;
+    }
 };
 
-// One frame with hidden lines removed, as the active camera sees it.
+// One frame as the active camera sees it, with hidden lines removed when it
+// hides them, and lit when lights shine.
 //
 // Point by point: surfaces that hide (meshes' faces, and the fills of flat
 // drawings: SVG, text, Lottie) are drawn into a depth buffer over the frame;
@@ -147,25 +331,22 @@ struct Workspace {
 // edge of what is seen that neither drawing has: it is added, and tested too.
 // The drawing keeps its own shapes, cut where they hide; hidden runs are
 // dropped, not darkened, so the beam skips straight to the next visible part.
+//
+// Lights see the same surfaces, each from where it is, so whatever something
+// blocks from a light is in its shadow. What is kept is then lit, a couple of
+// pixels at a time: each part draws its own colour times the light reaching
+// it, and parts no light reaches are dropped as hidden ones are.
 // None when `cancel` is set partway.
 inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel = nullptr) {
     auto& depth = workspace.depth;
     const auto cancelled = [cancel] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
     auto frame = std::make_unique<Frame>();
     const auto* camera = composition.activeCamera(time);
-    if (camera == nullptr || !camera->hidesHiddenLines) { return frame; }
-    const auto view = camera->frame(time);
-    if (!view.has_value()) { return frame; }
-    struct Item {
-        std::size_t index;
-        const PreparedClip* clip;
-        std::shared_ptr<const PreparedSource> source;
-        const PreparedDrawing* drawing;
-        const PreparedPointFrames* points;
-        std::size_t frame;
-        bool bent;
-    };
-    std::vector<Item> items;
+    const auto view = camera != nullptr ? camera->frame(time) : std::nullopt;
+    const auto hides = camera != nullptr && camera->hidesHiddenLines && view.has_value();
+    const auto lit = composition.lit(time);
+    if (!hides && !lit) { return frame; }
+    std::vector<SceneItem> items;
     for (std::size_t index = 0; index < composition.clips.size(); ++index) {
         const auto& clip = composition.clips[index];
         if (!clip.active(time) || !clip.visible(time) || clip.liveIdentity != nullptr || clip.source == nullptr) { continue; }
@@ -176,108 +357,113 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         const auto bent = bends(clip) || std::any_of(clip.ancestors.begin(), clip.ancestors.end(), [](const auto& stage) { return bends(stage); });
         items.push_back({index, &clip, clip.source, drawing, points, sourceFrame, bent});
     }
+    const Eye cameraEye = view.has_value() ? Eye {view->position, view->right, view->up, view->forward} : Eye {};
+    const Projection cameraProjection {view.has_value() ? view->focalLength : 1.0};
     const auto eye = [&](const PreparedClip& clip, osci::Point point) { return composition.eyePoint(clip.processPoint(point, time), time); };
-    const auto screen = [&](const std::optional<Vec3>& point) -> std::optional<Screen> {
-        if (!point.has_value() || !(point->z > nearPlane)) { return std::nullopt; }
-        return Screen {point->x / point->z * view->focalLength, point->y / point->z * view->focalLength, 1 / point->z};
+    const auto screen = [&](const std::optional<Vec3>& point) { return cameraProjection(point); };
+    const auto place = [&](const SceneItem& item, const osci::Point& point) { return composition.worldPoint(*item.clip, point, time); };
+    // Where a clip's point lands in the frame, with or without a camera.
+    const auto onFrame = [&](const PreparedClip& clip, const osci::Point& point) -> std::optional<Screen> {
+        if (view.has_value()) { return screen(eye(clip, point)); }
+        const auto projected = composition.projectVisible(clip.processPoint(point, time), time);
+        if (!projected.has_value()) { return std::nullopt; }
+        return Screen {projected->x, projected->y, 1};
     };
+    // Every mesh corner in the scene, once, for every eye that sees it.
+    auto& world = workspace.world;
+    world.resize(items.size());
+    for (std::size_t surface = 0; surface < items.size(); ++surface) {
+        world[surface].clear();
+        const auto& item = items[surface];
+        if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
+        for (const auto& vertex : item.drawing->faces().vertices) { world[surface].push_back(place(item, vertex)); }
+    }
+    const auto surfaces = std::count_if(items.begin(), items.end(), [](const SceneItem& item) { return item.drawing != nullptr && !item.drawing->faces().empty(); });
+
+    // The lights shining, and what each sees, to find its shadows.
+    auto& lights = workspace.lights;
+    lights.clear();
+    workspace.shadows.reset();
+    if (lit) {
+        for (const auto& light : composition.lights) {
+            const auto state = composition.lightAt(light, time);
+            if (!state.has_value()) { continue; }
+            lights.push_back({*state, {}});
+            auto& shining = lights.back();
+            if (!state->casts() || surfaces == 0) { continue; }
+            const auto noCrossings = [](std::uint32_t, const std::array<Vec3, 3>&, const std::array<osci::Point, 3>&) {};
+            const auto see = [&](const Eye& from, const Projection& projection, bool cube) {
+                auto& buffer = workspace.shadows.next(cube);
+                shining.views.push_back({from, projection, &buffer});
+                return drawSurfaces(items, world, place, from, projection, Reach {}, buffer, workspace.dicer, noCrossings, cancelled);
+            };
+            bool done = true;
+            if (state->kind == GeneratorKind::pointLight) {
+                for (const auto& face : cubeEyes(state->position)) { done = done && see(face, Projection {1}, true); }
+            } else if (state->spot()) {
+                // A little past the cone, so its soft edge is all in view.
+                constexpr double radians = 3.14159265358979323846 / 180;
+                const auto half = std::clamp(state->cone / 2 + 2, 1.0, 87.0);
+                done = see(Eye::looking(state->position, state->direction), Projection {1 / std::tan(half * radians)}, false);
+            } else {
+                // Parallel, framed on every surface's corners as the light sees them.
+                auto from = Eye::looking({}, state->direction);
+                double left = 1.0e300, right = -1.0e300, bottom = 1.0e300, top = -1.0e300, nearest = 1.0e300, furthest = -1.0e300;
+                for (const auto& corners : world) {
+                    for (const auto& corner : corners) {
+                        if (!corner.has_value()) { continue; }
+                        const auto at = from.see(*corner);
+                        left = std::min(left, at.x);
+                        right = std::max(right, at.x);
+                        bottom = std::min(bottom, at.y);
+                        top = std::max(top, at.y);
+                        nearest = std::min(nearest, at.z);
+                        furthest = std::max(furthest, at.z);
+                    }
+                }
+                if (!(right >= left) || !(top >= bottom)) { continue; }
+                from.position = from.right * ((left + right) / 2) + from.up * ((bottom + top) / 2) + from.forward * nearest;
+                const auto half = std::max({(right - left) / 2, (top - bottom) / 2, 1.0e-9});
+                Projection projection {1 / half, true};
+                projection.far = furthest - nearest;
+                projection.span = std::max(projection.far, 1.0e-6);
+                done = see(from, projection, false);
+            }
+            if (!done) { return nullptr; }
+        }
+    }
 
     // What hides, over what the Scope shows. Its triangles are kept too when
     // two or more surfaces could cut through each other.
     const auto reach = composition.hiddenLineReach;
-    depth.cover(reach);
-    workspace.dicer.setReach(reach);
-    const auto surfaces = std::count_if(items.begin(), items.end(), [](const Item& item) { return item.drawing != nullptr && !item.drawing->faces().empty(); });
     auto& surfaceTriangles = workspace.triangles;
     auto& surfaceSources = workspace.sources;
     surfaceTriangles.clear();
     surfaceSources.clear();
-    const auto unproject = [&](const Screen& at) { return Vec3 {at.x / at.w / view->focalLength, at.y / at.w / view->focalLength, 1 / at.w}; };
-    auto& corners = workspace.corners;
-    for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
-        const auto& item = items[surface];
-        if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
-        const auto& mesh = item.drawing->faces();
-        corners.clear();
-        for (const auto& vertex : mesh.vertices) { corners.push_back(eye(*item.clip, vertex)); }
-        for (const auto& triangle : mesh.triangles) {
+    std::vector<std::vector<crossing::Piece>> crossings;
+    if (hides) {
+        const auto gather = [&](std::uint32_t surface, const std::array<Vec3, 3>& corners, const std::array<osci::Point, 3>& sources) {
+            if (surfaces < 2) { return; }
+            surfaceTriangles.push_back({corners, surface});
+            surfaceSources.push_back(sources);
+        };
+        if (!drawSurfaces(items, world, place, cameraEye, cameraProjection, reach, depth, workspace.dicer, gather, cancelled)) { return nullptr; }
+        if (!depth.isEmpty()) {
+            dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
+            crossings = crossing::runs(surfaceTriangles, view->focalLength, reach, cancel);
             if (cancelled()) { return nullptr; }
-            const auto& a = corners[triangle[0]];
-            const auto& b = corners[triangle[1]];
-            const auto& c = corners[triangle[2]];
-            if (!item.bent) {
-                // Exact through the camera: whole, cut at the near plane.
-                if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
-                // Cut a hair in front of the near plane, so every corner kept
-                // (the cut's own, rounding included) is in front of it.
-                constexpr auto cut = nearPlane * (1 + 1.0e-6);
-                // What each corner kept was before the chain, to place what
-                // crosses it: nothing bends the face, so a cut point is as far
-                // along its edge before it as after.
-                std::array<Vec3, 4> kept {};
-                std::array<osci::Point, 4> keptSources {};
-                std::size_t count = 0;
-                const std::array<Vec3, 3> around {*a, *b, *c};
-                const std::array<osci::Point, 3> sources {mesh.vertices[triangle[0]], mesh.vertices[triangle[1]], mesh.vertices[triangle[2]]};
-                for (std::size_t index = 0; index < 3; ++index) {
-                    const auto& current = around[index];
-                    const auto& next = around[(index + 1) % 3];
-                    if (current.z > cut) {
-                        keptSources[count] = sources[index];
-                        kept[count++] = current;
-                    }
-                    if ((current.z > cut) != (next.z > cut)) {
-                        const auto along = (cut - current.z) / (next.z - current.z);
-                        const auto& from = sources[index];
-                        const auto& to = sources[(index + 1) % 3];
-                        keptSources[count] = osci::Point(static_cast<float>(from.x + (to.x - from.x) * along), static_cast<float>(from.y + (to.y - from.y) * along), static_cast<float>(from.z + (to.z - from.z) * along));
-                        kept[count++] = current + (next - current) * along;
-                    }
-                }
-                std::array<Screen, 4> at {};
-                bool seen = count >= 3;
-                for (std::size_t index = 0; index < count && seen; ++index) {
-                    const auto point = screen(kept[index]);
-                    seen = point.has_value();
-                    if (seen) { at[index] = *point; }
-                }
-                if (seen) { depth.triangle(at[0], at[1], at[2]); }
-                if (seen && count == 4) { depth.triangle(at[0], at[2], at[3]); }
-                // Crossings are found in front of the eye, so a face cut at
-                // the near plane joins the search as the pieces kept: a floor
-                // reaching back past the eye still meets what stands on it.
-                if (surfaces > 1 && seen) {
-                    for (std::size_t piece = 2; piece < count; ++piece) {
-                        surfaceTriangles.push_back({{kept[0], kept[piece - 1], kept[piece]}, surface});
-                        surfaceSources.push_back({keptSources[0], keptSources[piece - 1], keptSources[piece]});
-                    }
-                }
-                continue;
-            }
-            // Diced point by point into pieces flat enough, once bent, to draw.
-            workspace.dicer.dice({mesh.vertices[triangle[0]], screen(a)}, {mesh.vertices[triangle[1]], screen(b)}, {mesh.vertices[triangle[2]], screen(c)},
-                [&](const osci::Point& point) { return screen(eye(*item.clip, point)); },
-                [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, bool whole) {
-                    depth.triangle(*p.at, *q.at, *r.at);
-                    // Crossings are only found in front of the eye: a piece
-                    // cut at the near plane reaches far off the screen.
-                    if (surfaces > 1 && whole) {
-                        surfaceTriangles.push_back({{unproject(*p.at), unproject(*q.at), unproject(*r.at)}, surface});
-                        surfaceSources.push_back({p.source, q.source, r.source});
-                    }
-                });
         }
     }
-    if (depth.isEmpty()) { return frame; }
-    dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
-    const auto crossings = crossing::runs(surfaceTriangles, view->focalLength, reach, cancel);
-    if (cancelled()) { return nullptr; }
+    // Hiding lines, a camera that sees no surface hides nothing.
+    const auto hiding = hides && !depth.isEmpty();
+    if (!hiding && !lit) { return frame; }
 
     // What is hidden, and what would be drawn twice: every line, every pixel
     // along its true path. A point shows where nothing is in front of it and
     // no other clip's line already drawn runs along it. `place(t)` is a point
     // of a run at progress t; the parts that show come back as intervals of
-    // t, and are kept as drawn until `commitDrawn`.
+    // t, and are kept as drawn until `commitDrawn`. Not hiding lines, all of
+    // every line shows.
     auto& runs = workspace.runs;
     auto& coverage = workspace.coverage;
     auto& samples = workspace.samples;
@@ -288,11 +474,15 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     drawnStarts.clear();
     // Only worth recording while a later clip, or a crossing, could retrace it.
     bool recording = false;
-    const auto visibleRuns = [&](auto&& place, double length) {
+    const auto visibleRuns = [&](auto&& at, double length) {
         runs.clear();
+        if (!hiding) {
+            runs.emplace_back(0.0, 1.0);
+            return;
+        }
         const auto steps = std::clamp(static_cast<int>(std::ceil(length / testStep)), 1, 65536);
         samples.clear();
-        for (int step = 0; step <= steps; ++step) { samples.push_back(place(static_cast<double>(step) / steps)); }
+        for (int step = 0; step <= steps; ++step) { samples.push_back(at(static_cast<double>(step) / steps)); }
         const auto showing = [&](int step) {
             const auto& point = samples[static_cast<std::size_t>(step)];
             if (!point.has_value() || !depth.shows(*point)) { return false; }
@@ -326,14 +516,18 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         }
     };
     const auto commitDrawn = [&] {
+        if (!hiding) { return; }
         drawnStarts.push_back(drawn.size());
         for (std::size_t index = 0; index + 1 < drawnStarts.size(); ++index) { coverage.add(std::span<const Screen>(drawn).subspan(drawnStarts[index], drawnStarts[index + 1] - drawnStarts[index])); }
         drawn.clear();
         drawnStarts.clear();
     };
+    // A piece kept, whether culling cut it, and the faces it runs along, in
+    // the scene, to light it by.
     struct Kept {
         std::unique_ptr<osci::Shape> shape;
         bool cut;
+        Normals normals;
     };
     // A run culling cut too short to see would only draw a dot: it is
     // dropped. Runs culling left whole stay as they are. The beam spends a
@@ -344,7 +538,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         double length = 0;
         std::optional<Screen> previous;
         for (int probe = 0; probe <= 4; ++probe) {
-            const auto next = screen(eye(clip, shape.nextVector(probe / 4.0f)));
+            const auto next = onFrame(clip, shape.nextVector(probe / 4.0f));
             if (previous.has_value() && next.has_value()) { length += std::hypot(next->x - previous->x, next->y - previous->y); }
             previous = next;
         }
@@ -354,7 +548,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     // of the line joining their far ends, on screen.
     const auto joinable = [&](osci::Shape& a, osci::Shape& b, const PreparedClip& clip) {
         if (dynamic_cast<osci::Line*>(&a) == nullptr || dynamic_cast<osci::Line*>(&b) == nullptr) { return false; }
-        const auto p = screen(eye(clip, a.nextVector(0))), q = screen(eye(clip, a.nextVector(1))), r = screen(eye(clip, b.nextVector(1)));
+        const auto p = onFrame(clip, a.nextVector(0)), q = onFrame(clip, a.nextVector(1)), r = onFrame(clip, b.nextVector(1));
         if (!p.has_value() || !q.has_value() || !r.has_value()) { return false; }
         const auto dx = r->x - p->x, dy = r->y - p->y;
         const auto span = dx * dx + dy * dy;
@@ -401,11 +595,39 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         const auto f = static_cast<float>(t);
         return osci::Point(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f, a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f);
     };
+    // Each surface's faces' normals in the scene, to light the lines on them.
+    std::vector<std::vector<std::optional<Vec3>>> faceNormals(items.size());
+    if (lit) {
+        for (std::size_t surface = 0; surface < items.size(); ++surface) {
+            const auto& item = items[surface];
+            if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
+            const auto& corners = world[surface];
+            for (const auto& triangle : item.drawing->faces().triangles) {
+                const auto& a = corners[triangle[0]];
+                const auto& b = corners[triangle[1]];
+                const auto& c = corners[triangle[2]];
+                faceNormals[surface].push_back(a.has_value() && b.has_value() && c.has_value() ? normalOf(*a, *b, *c) : std::nullopt);
+            }
+        }
+    }
+    const auto normalsOf = [&](std::size_t surface, std::size_t shape) {
+        Normals normals;
+        if (!lit || items[surface].drawing == nullptr || faceNormals[surface].empty()) { return normals; }
+        const auto& along = workspace.facesAlongOf(*items[surface].drawing, items[surface].source);
+        if (shape >= along.size()) { return normals; }
+        for (const auto face : along[shape]) {
+            if (face >= 0 && static_cast<std::size_t>(face) < faceNormals[surface].size()) { normals.add(faceNormals[surface][static_cast<std::size_t>(face)]); }
+        }
+        return normals;
+    };
     auto& eyes = workspace.eyes;
     // Every clip's own lines first, then where surfaces cut through each
     // other: a crossing along an edge already drawn is the one left out.
     std::vector<std::vector<Kept>> keptBy(items.size());
     std::vector<char> lostBy(items.size(), 0);
+    // A point source's whole length, to give it the share of the beam its
+    // runs that show are of it.
+    std::vector<double> wholeBy(items.size(), -1);
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (cancelled()) { return nullptr; }
@@ -425,12 +647,18 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             };
             const auto dark = [](const osci::Point& point) { return point.r == 0 && point.g == 0 && point.b == 0; };
             eyes.clear();
-            for (std::size_t index = 0; index < count; ++index) { eyes.push_back(eye(*item.clip, pointAt(index))); }
+            if (hiding) {
+                for (std::size_t index = 0; index < count; ++index) { eyes.push_back(eye(*item.clip, pointAt(index))); }
+            }
             double whole = 0;
             for (std::size_t index = 0; index < count; ++index) {
                 const auto a = pointAt(index), b = pointAt(index + 1);
                 if (dark(a) || dark(b) || (a.x == b.x && a.y == b.y && a.z == b.z)) { continue; }
                 whole += std::hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+                if (!hiding) {
+                    kept.push_back({std::make_unique<ColouredLine>(a, b), false, {}});
+                    continue;
+                }
                 const auto& ea = eyes[index];
                 const auto& eb = eyes[(index + 1) % count];
                 const auto sa = screen(ea), sb = screen(eb);
@@ -440,18 +668,15 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     return ea.has_value() && eb.has_value() ? screen(*ea + (*eb - *ea) * t) : std::optional<Screen>();
                 }, length);
                 if (runs.size() == 1 && runs.front().first <= 0 && runs.front().second >= 1) {
-                    kept.push_back({std::make_unique<ColouredLine>(a, b), false});
+                    kept.push_back({std::make_unique<ColouredLine>(a, b), false, {}});
                     continue;
                 }
                 lost = true;
-                for (const auto& [from, to] : runs) { kept.push_back({std::make_unique<ColouredLine>(mix(a, b, from), mix(a, b, to)), true}); }
+                for (const auto& [from, to] : runs) { kept.push_back({std::make_unique<ColouredLine>(mix(a, b, from), mix(a, b, to)), true, {}}); }
             }
             commitDrawn();
-            if (lost) {
-                auto shown = keep(kept, *item.clip);
-                const auto fraction = whole > 0 ? shown->length() / whole : 0.0;
-                frame->drawings.push_back({item.index, std::move(shown), fraction});
-            }
+            wholeBy[surface] = whole;
+            lostBy[surface] = lost;
             continue;
         }
         // A line usually starts where the last ended: its end is reused.
@@ -460,6 +685,10 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         for (std::size_t index = 0; index < item.drawing->shapeCount(); ++index) {
             auto* shape = item.drawing->shape(index);
             if (shape == nullptr || !(shape->length() > 0)) { continue; }
+            if (!hiding) {
+                kept.push_back({shape->clone(), false, normalsOf(surface, index)});
+                continue;
+            }
             const auto line = dynamic_cast<osci::Line*>(shape) != nullptr;
             const auto start = shape->nextVector(0), end = shape->nextVector(1);
             const auto from = lastEye.has_value() && start.x == lastEnd.x && start.y == lastEnd.y && start.z == lastEnd.z ? lastEye : eye(*item.clip, start);
@@ -485,15 +714,15 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 visibleRuns([&](double t) { return screen(eye(*item.clip, shape->nextVector(static_cast<float>(t)))); }, length);
             }
             if (runs.size() == 1 && runs.front().first <= 0 && runs.front().second >= 1) {
-                kept.push_back({shape->clone(), false});
+                kept.push_back({shape->clone(), false, normalsOf(surface, index)});
                 continue;
             }
             lost = true;
             for (const auto& [a, b] : runs) {
                 if (line) {
-                    kept.push_back({std::make_unique<osci::Line>(shape->nextVector(static_cast<float>(a)), shape->nextVector(static_cast<float>(b))), true});
+                    kept.push_back({std::make_unique<osci::Line>(shape->nextVector(static_cast<float>(a)), shape->nextVector(static_cast<float>(b))), true, normalsOf(surface, index)});
                 } else {
-                    kept.push_back({std::make_unique<ShapePart>(*shape, item.source, static_cast<float>(a), static_cast<float>(b)), true});
+                    kept.push_back({std::make_unique<ShapePart>(*shape, item.source, static_cast<float>(a), static_cast<float>(b)), true, normalsOf(surface, index)});
                 }
             }
         }
@@ -521,14 +750,126 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             const auto from = source(piece.from), to = source(piece.to);
             visibleRuns([&](double t) { return screen(piece.eyeFrom + (piece.eyeTo - piece.eyeFrom) * t); }, std::hypot(sb->x - sa->x, sb->y - sa->y));
             commitDrawn();
+            // It lies on the face it was found on.
+            Normals normals;
+            if (lit) {
+                const auto a = place(items[surface], corners[0]), b = place(items[surface], corners[1]), c = place(items[surface], corners[2]);
+                if (a.has_value() && b.has_value() && c.has_value()) { normals.add(normalOf(*a, *b, *c)); }
+            }
             for (const auto& [a, b] : runs) {
                 lostBy[surface] = 1;
-                kept.push_back({std::make_unique<osci::Line>(mix(from, to, a), mix(from, to, b)), true});
+                kept.push_back({std::make_unique<osci::Line>(mix(from, to, a), mix(from, to, b)), true, normals});
             }
         }
     }
+
+    // Lit: each piece kept, a couple of pixels at a time, the light reaching
+    // it found; pieces of it no light reaches dropped, and the rest drawn in
+    // as few parts as keep its light within a little of what it is all along.
+    if (lit) {
+        constexpr double litStep = 2 * DepthBuffer::pixel;
+        constexpr float dark = 1.0f / 512;
+        constexpr double tolerance = 1.0 / 64;
+        std::vector<double> ts;
+        std::vector<std::array<float, 3>> light;
+        std::vector<std::size_t> breaks;
+        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+            if (cancelled()) { return nullptr; }
+            const auto& item = items[surface];
+            std::vector<Kept> litPieces;
+            for (auto& piece : keptBy[surface]) {
+                std::shared_ptr<osci::Shape> shape = std::move(piece.shape);
+                // Its length in the frame, from a few points of it.
+                double length = 0;
+                std::optional<Screen> previous;
+                for (int probe = 0; probe <= 8; ++probe) {
+                    const auto next = onFrame(*item.clip, shape->nextVector(probe / 8.0f));
+                    if (previous.has_value() && next.has_value()) { length += std::hypot(next->x - previous->x, next->y - previous->y); }
+                    previous = next;
+                }
+                const auto steps = std::clamp(static_cast<int>(std::ceil(length * 1.25 / litStep)), 1, 4096);
+                ts.clear();
+                light.clear();
+                for (int step = 0; step <= steps; ++step) {
+                    const auto t = static_cast<double>(step) / steps;
+                    const auto at = place(item, shape->nextVector(static_cast<float>(t)));
+                    std::array<float, 3> reaching {};
+                    if (at.has_value()) {
+                        const auto total = illumination(lights, *at, piece.normals);
+                        for (std::size_t channel = 0; channel < 3; ++channel) { reaching[channel] = static_cast<float>(total[channel]); }
+                    }
+                    ts.push_back(t);
+                    light.push_back(reaching);
+                }
+                const auto isDark = [&](std::size_t index) { return std::max({light[index][0], light[index][1], light[index][2]}) < dark; };
+                // The parts any light reaches: from halfway to the dark either side.
+                const auto firstMade = litPieces.size();
+                bool partial = false;
+                std::size_t index = 0;
+                while (index < ts.size()) {
+                    if (isDark(index)) {
+                        partial = true;
+                        ++index;
+                        continue;
+                    }
+                    auto last = index;
+                    while (last + 1 < ts.size() && !isDark(last + 1)) { ++last; }
+                    // Breaks where its light strays from a straight blend.
+                    breaks.clear();
+                    breaks.push_back(index);
+                    std::vector<std::pair<std::size_t, std::size_t>> pending {{index, last}};
+                    while (!pending.empty()) {
+                        const auto [low, high] = pending.back();
+                        pending.pop_back();
+                        double worst = 0;
+                        std::size_t at = low;
+                        for (auto middle = low + 1; middle < high; ++middle) {
+                            const auto blend = (ts[middle] - ts[low]) / (ts[high] - ts[low]);
+                            for (std::size_t channel = 0; channel < 3; ++channel) {
+                                const auto straight = light[low][channel] + (light[high][channel] - light[low][channel]) * blend;
+                                const auto stray = std::abs(light[middle][channel] - straight);
+                                if (stray > worst) {
+                                    worst = stray;
+                                    at = middle;
+                                }
+                            }
+                        }
+                        if (worst > tolerance) {
+                            breaks.push_back(at);
+                            pending.push_back({low, at});
+                            pending.push_back({at, high});
+                        }
+                    }
+                    breaks.push_back(last);
+                    std::sort(breaks.begin(), breaks.end());
+                    breaks.erase(std::unique(breaks.begin(), breaks.end()), breaks.end());
+                    const auto from = index == 0 ? 0.0 : (ts[index - 1] + ts[index]) * .5;
+                    const auto to = last + 1 == ts.size() ? 1.0 : (ts[last] + ts[last + 1]) * .5;
+                    const auto positionOf = [&](std::size_t sample) { return sample == index ? from : sample == last ? to : ts[sample]; };
+                    if (breaks.size() == 1) {
+                        // One lit sample: a part as wide as it.
+                        litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(from), static_cast<float>(to), light[index], light[index]), true, {}});
+                    }
+                    for (std::size_t part = 1; part < breaks.size(); ++part) {
+                        const auto a = breaks[part - 1], b = breaks[part];
+                        litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(positionOf(a)), static_cast<float>(positionOf(b)), light[a], light[b]), piece.cut, {}});
+                    }
+                    index = last + 1;
+                }
+                if (partial) {
+                    for (auto made = firstMade; made < litPieces.size(); ++made) { litPieces[made].cut = true; }
+                }
+            }
+            keptBy[surface] = std::move(litPieces);
+            lostBy[surface] = 1;
+        }
+    }
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
-        if (lostBy[surface] != 0) { frame->drawings.push_back({items[surface].index, keep(keptBy[surface], *items[surface].clip)}); }
+        if (lostBy[surface] == 0) { continue; }
+        auto shown = keep(keptBy[surface], *items[surface].clip);
+        const auto whole = wholeBy[surface];
+        const auto fraction = whole < 0 ? 1.0 : whole > 0 ? shown->length() / whole : 0.0;
+        frame->drawings.push_back({items[surface].index, std::move(shown), fraction});
     }
     return frame;
 }

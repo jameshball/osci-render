@@ -6,19 +6,21 @@
 
 namespace motion {
 // Sources made from a few numbers rather than a file: shapes, curves, grids
-// and solids. A generator's asset names its kind; each clip of it keeps the
-// numbers as its own properties ("generator.points" and so on), so they key,
-// modulate and link like any other, and the clip is redrawn from them frame
-// by frame.
+// and solids, and lights. A generator's asset names its kind; each clip of it
+// keeps the numbers as its own properties ("generator.points" and so on), so
+// they key, modulate and link like any other, and the clip is redrawn from
+// them frame by frame. A light draws nothing on the Scope: it lights what
+// does, and its drawing is only its picture in the Scene.
 enum class GeneratorKind {
     rectangle, ellipse, polygon, star, ring, arc,
     spiral, lissajous, spirograph, rose, wave,
     grid, polarGrid, hexGrid,
     box, sphere, torus, cylinder, cone,
+    ambientLight, directionalLight, pointLight, spotLight,
 };
 
 // How generators are grouped where they are chosen.
-enum class GeneratorCategory { shape, curve, grid, solid };
+enum class GeneratorCategory { shape, curve, grid, solid, light };
 
 struct GeneratorDefinition {
     GeneratorKind kind;
@@ -127,9 +129,46 @@ inline constexpr std::array<PropertySpec, 3> cone {{
     {"generator.height", "Height", "Height", "", 0, 4, 1, .01, 3, ""},
     {"generator.segments", "Segments", "Segments", "", 3, 64, 16, 1, 0, ""},
 }};
+// A light's colour is its clip's Colour, dimmed by its Opacity. Intensity
+// scales it; Range is how far a point or spot light reaches, fading to
+// nothing there; Cone is a spot light's full angle, and Edge softness how much
+// of it fades out toward its edge; Shadows is how dark what something else
+// blocks it from is.
+inline constexpr std::array<PropertySpec, 1> ambientLight {{
+    {"light.intensity", "Intensity", "Intensity", "", 0, 4, .25, .01, 2, "×"},
+}};
+inline constexpr std::array<PropertySpec, 2> directionalLight {{
+    {"light.intensity", "Intensity", "Intensity", "", 0, 10, 1, .01, 2, "×"},
+    {"light.shadows", "Shadows", "Shadows", "", 0, 100, 100, 1, 0, "%"},
+}};
+inline constexpr std::array<PropertySpec, 3> pointLight {{
+    {"light.intensity", "Intensity", "Intensity", "", 0, 10, 1.5, .01, 2, "×"},
+    {"light.range", "Range", "Range", "", .01, 100, 6, .05, 2, ""},
+    {"light.shadows", "Shadows", "Shadows", "", 0, 100, 100, 1, 0, "%"},
+}};
+inline constexpr std::array<PropertySpec, 5> spotLight {{
+    {"light.intensity", "Intensity", "Intensity", "", 0, 10, 1.5, .01, 2, "×"},
+    {"light.range", "Range", "Range", "", .01, 100, 8, .05, 2, ""},
+    {"light.cone", "Cone", "Cone", "", 1, 170, 60, 1, 1, "°"},
+    {"light.softness", "Edge softness", "Edge softness", "", 0, 100, 30, 1, 0, "%"},
+    {"light.shadows", "Shadows", "Shadows", "", 0, 100, 100, 1, 0, "%"},
+}};
 }
 
-inline constexpr std::array<GeneratorDefinition, 19> generatorDefinitions {{
+// A light's picture in the Scene, in its own space (it shines down -Z, as a
+// camera looks): the sizes its handles follow too.
+namespace light_glyph {
+// Ambient and point lights: a disc, and rays reaching further the brighter it is.
+inline constexpr double disc = .1;
+inline double rayReach(double intensity) { return .16 + .06 * intensity; }
+// Directional lights: arrows from a disc, longer the brighter it is.
+inline double arrowReach(double intensity) { return .2 + .08 * intensity; }
+// Spot lights: a cone this long, its intensity's handle beyond it.
+inline constexpr double spotLength = .5;
+inline double spotReach(double intensity) { return spotLength + .06 + .06 * intensity; }
+}
+
+inline constexpr std::array<GeneratorDefinition, 23> generatorDefinitions {{
     {GeneratorKind::rectangle, "rectangle", "Rectangle", GeneratorCategory::shape, generator_specs::rectangle},
     {GeneratorKind::ellipse, "ellipse", "Ellipse", GeneratorCategory::shape, generator_specs::ellipse},
     {GeneratorKind::polygon, "polygon", "Polygon", GeneratorCategory::shape, generator_specs::polygon},
@@ -149,6 +188,10 @@ inline constexpr std::array<GeneratorDefinition, 19> generatorDefinitions {{
     {GeneratorKind::torus, "torus", "Torus", GeneratorCategory::solid, generator_specs::torus},
     {GeneratorKind::cylinder, "cylinder", "Cylinder", GeneratorCategory::solid, generator_specs::cylinder},
     {GeneratorKind::cone, "cone", "Cone", GeneratorCategory::solid, generator_specs::cone},
+    {GeneratorKind::ambientLight, "ambientLight", "Ambient light", GeneratorCategory::light, generator_specs::ambientLight},
+    {GeneratorKind::directionalLight, "directionalLight", "Directional light", GeneratorCategory::light, generator_specs::directionalLight},
+    {GeneratorKind::pointLight, "pointLight", "Point light", GeneratorCategory::light, generator_specs::pointLight},
+    {GeneratorKind::spotLight, "spotLight", "Spot light", GeneratorCategory::light, generator_specs::spotLight},
 }};
 
 inline const GeneratorDefinition* findGenerator(std::string_view id) {
@@ -164,6 +207,7 @@ inline std::string_view generatorCategoryName(GeneratorCategory category) {
         case GeneratorCategory::curve: return "Curves";
         case GeneratorCategory::grid: return "Grids";
         case GeneratorCategory::solid: return "3D";
+        case GeneratorCategory::light: return "Lights";
     }
     return "";
 }
@@ -175,6 +219,7 @@ inline std::string_view generatorCategoryLabel(GeneratorCategory category) {
         case GeneratorCategory::curve: return "Curve";
         case GeneratorCategory::grid: return "Grid";
         case GeneratorCategory::solid: return "3D shape";
+        case GeneratorCategory::light: return "Light";
     }
     return "";
 }

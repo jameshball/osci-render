@@ -442,6 +442,62 @@ inline Geometry build(const GeneratorDefinition& definition, std::span<const dou
             }
             break;
         }
+        // Lights: pictures for the Scene, never drawn on the Scope.
+        case GeneratorKind::ambientLight:
+        case GeneratorKind::pointLight: {
+            // A disc with rays all round (a point light's in three dimensions,
+            // round a ball of three rings), reaching further the brighter it is.
+            const auto reach = light_glyph::rayReach(value(0));
+            constexpr auto disc = light_glyph::disc;
+            if (definition.kind == GeneratorKind::ambientLight) {
+                geometry.paths.push_back(ellipse({}, disc, disc));
+                for (int ray = 0; ray < 8; ++ray) { geometry.paths.push_back({line(polar(1.4 * disc, 45.0 * ray), polar(reach, 45.0 * ray))}); }
+                break;
+            }
+            const auto ring = [&](int axis) {
+                return polyline(sampled(48, [&](double t) {
+                    const auto a = disc * std::cos(2 * pi * t), b = disc * std::sin(2 * pi * t);
+                    return axis == 0 ? Vec3 {a, b, 0} : axis == 1 ? Vec3 {a, 0, b} : Vec3 {0, a, b};
+                }), false);
+            };
+            for (int axis = 0; axis < 3; ++axis) { geometry.paths.push_back(ring(axis)); }
+            for (const auto direction : {Vec3 {1, 0, 0}, Vec3 {-1, 0, 0}, Vec3 {0, 1, 0}, Vec3 {0, -1, 0}, Vec3 {0, 0, 1}, Vec3 {0, 0, -1}}) {
+                geometry.paths.push_back({line(direction * (1.4 * disc), direction * reach)});
+            }
+            break;
+        }
+        case GeneratorKind::directionalLight: {
+            // A disc facing the way it shines, and parallel arrows from it,
+            // longer the brighter it is.
+            constexpr auto disc = light_glyph::disc;
+            const auto reach = light_glyph::arrowReach(value(0));
+            geometry.paths.push_back(ellipse({}, disc, disc));
+            for (const auto from : {Vec3 {}, polar(.6 * disc, 0), polar(.6 * disc, 90), polar(.6 * disc, 180), polar(.6 * disc, 270)}) {
+                const auto tip = from + Vec3 {0, 0, -reach};
+                geometry.paths.push_back({line(from, tip), line(tip, tip + Vec3 {.025, 0, .045})});
+                geometry.paths.push_back({line(tip, tip + Vec3 {-.025, 0, .045})});
+            }
+            break;
+        }
+        case GeneratorKind::spotLight: {
+            // Its cone, with the ring inside which it is at full strength,
+            // and its axis out to its intensity's handle.
+            constexpr auto length = light_glyph::spotLength;
+            const auto cone = value(2), softness = value(3) / 100;
+            const auto rimAt = [&](double degrees) { return length * std::tan(degrees * pi / 360); };
+            const auto ring = [&](double radius) {
+                return polyline(sampled(48, [&](double t) { return Vec3 {radius * std::cos(2 * pi * t), radius * std::sin(2 * pi * t), -length}; }), false);
+            };
+            const auto outer = rimAt(cone), inner = rimAt(cone * (1 - softness));
+            geometry.paths.push_back(ring(outer));
+            if (softness > 0 && inner > 1.0e-3) { geometry.paths.push_back(ring(inner)); }
+            for (int side = 0; side < 4; ++side) {
+                const auto angle = pi / 2 * side;
+                geometry.paths.push_back({line({}, {outer * std::cos(angle), outer * std::sin(angle), -length})});
+            }
+            geometry.paths.push_back({line({}, {0, 0, -light_glyph::spotReach(value(0))})});
+            break;
+        }
     }
     return geometry;
 }

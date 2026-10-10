@@ -85,7 +85,9 @@ void MotionPropertyInspector::refresh() {
         const auto* generator = targetGenerator();
         if (generator != nullptr) { specList.assign(generator->parameters.begin(), generator->parameters.end()); }
         const auto base = motion::propertySpecs(*found);
-        specList.insert(specList.end(), base.begin(), base.end());
+        // A light takes no share of the beam: it draws nothing.
+        const auto light = generator != nullptr && generator->category == motion::GeneratorCategory::light;
+        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [light](const auto& spec) { return !light || spec.id != "beam"; });
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
     }
     const auto specs = std::span<const motion::PropertySpec>(specList);
@@ -708,7 +710,7 @@ const motion::GeneratorDefinition* MotionPropertyInspector::targetGenerator() co
 }
 
 motion::Curve* MotionPropertyInspector::createSlider(motion::Project& project, const std::string& property) const {
-    if (property.starts_with("generator.")) { return motion::ensurePropertyCurve(project, target, property); }
+    if (property.starts_with("generator.") || property.starts_with("light.")) { return motion::ensurePropertyCurve(project, target, property); }
     if (!property.starts_with("slider.")) { return nullptr; }
     auto found = motion::findPropertyTarget(project, target);
     if (!found.has_value() || found->properties == nullptr) { return nullptr; }

@@ -11,12 +11,14 @@
 #include "../model/Vec3.h"
 #include "../live/LiveSourceFrames.h"
 #include "HiddenLineBake.h"
+#include "LightState.h"
 #include "../../../modules/osci_gui/visualiser/osci_VisualiserGeometry.h"
 #include "../model/PropertySchema.h"
 #include "../model/LuaClipBake.h"
 #include "SampleClock.h"
 #include "TimeCache.h"
 #include <array>
+#include <span>
 #include <numbers>
 #include <optional>
 
@@ -239,6 +241,28 @@ struct PreparedClip : PreparedClipStage {
     }
 };
 
+// A light clip as it lights the frames: where it is and which way it shines
+// come from its clip's transform (and the groups and placements holding it),
+// its colour from its Colour and Opacity, and the rest from its parameters.
+struct PreparedLight {
+    GeneratorKind kind = GeneratorKind::pointLight;
+    PreparedClip clip;
+    std::span<const PropertySpec> specs;
+    std::vector<Curve> parameters;
+
+    using State = LightState;
+    // A parameter at the clip's own time, within its range; its default
+    // when the light has none such.
+    double parameter(std::string_view id, double time, double fallback) const {
+        for (std::size_t index = 0; index < specs.size() && index < parameters.size(); ++index) {
+            if (specs[index].id != id) { continue; }
+            const auto value = parameters[index].evaluate(clip.localTime(time));
+            return std::isfinite(value) ? specs[index].clamp(value) : specs[index].defaultValue;
+        }
+        return fallback;
+    }
+};
+
 // A transform chain from a clip or group up through its parent groups, used
 // to place camera targets and parents. Groups run on the scope (project)
 // clock; a clip link maps project time to its content time.
@@ -436,10 +460,6 @@ struct PreparedComposition {
             }
             cameras.push_back(std::move(item));
         }
-        // Cameras that hide hidden lines show frames baked off the render thread.
-        if (purpose == CompositionPurpose::signal && std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.hidesHiddenLines; })) {
-            hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach);
-        }
         for (std::size_t index = 0; index < beamPropertySpecs.size(); ++index) {
             beam.curves[index] = curveOrDefault(project.beam.properties, beamPropertySpecs[index]);
             drivers.driveBeam(beam.curves[index], project, mainClock, beamPropertySpecs[index].id);
@@ -504,7 +524,8 @@ struct PreparedComposition {
             item.source = clip.luaBake != nullptr && clip.luaBake->source != nullptr ? clip.luaBake->source : asset->source;
             // A generator is drawn from this clip's own values of its
             // parameters, keyed, modulated and linked like any property.
-            if (const auto* generator = generatorOf(*asset)) {
+            const auto* generator = generatorOf(*asset);
+            if (generator != nullptr) {
                 const auto& scope = scopeOf(stages, stages.size() - 1);
                 std::vector<Curve> parameters;
                 parameters.reserve(generator->parameters.size());
@@ -521,10 +542,37 @@ struct PreparedComposition {
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));
             }
+            // A light lights what the Scope draws and is never drawn there
+            // itself; the Scene shows its picture.
+            if (generator != nullptr && generator->category == GeneratorCategory::light && purpose == CompositionPurpose::signal) {
+                PreparedLight light;
+                light.kind = generator->kind;
+                light.specs = generator->parameters;
+                const auto& scope = scopeOf(stages, stages.size() - 1);
+                for (const auto& spec : generator->parameters) {
+                    light.parameters.push_back(curveOrDefault(clip.properties, spec));
+                    drivers.drive(light.parameters.back(), scope, leaf.scopeClock, clip.id, spec.id);
+                }
+                item.source.reset();
+                light.clip = std::move(item);
+                lights.push_back(std::move(light));
+                return;
+            }
             clips.push_back(std::move(item));
         }, cancel);
         if (!expanded) { preparationError = expanded.error; }
-        if (preparationError.isNotEmpty()) { clips.clear(); }
+        if (preparationError.isNotEmpty()) {
+            clips.clear();
+            lights.clear();
+        }
+        // Frames whose hidden lines a camera removes, or that lights light,
+        // are baked off the render thread.
+        const auto hides = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.hidesHiddenLines; });
+        if (purpose == CompositionPurpose::signal && preparationError.isEmpty() && (hides || !lights.empty())) {
+            hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach);
+            hiddenLines->hides = hides;
+            hiddenLines->lights = !lights.empty();
+        }
     }
 
     // Geometry probe: the beam allocation at one phase of a static multiplexed
@@ -615,6 +663,39 @@ struct PreparedComposition {
     osci::Point projectPoint(osci::Point point, double time) const {
         return projectVisible(point, time).value_or(osci::Point(0, 0, 0, 0, 0, 0));
     }
+    // A point of a clip in the scene, after everything that moves it but the
+    // camera: what lights light.
+    std::optional<Vec3> worldPoint(const PreparedClip& clip, osci::Point point, double time) const {
+        point = applyCompositionEffects(clip.processPoint(point, time), time);
+        if (!point.hasFinitePosition()) { return std::nullopt; }
+        return Vec3 {point.x, point.y, point.z};
+    }
+    // A light while its clip plays: its anchor is where it is, and it shines
+    // down its own -Z.
+    std::optional<PreparedLight::State> lightAt(const PreparedLight& light, double time) const {
+        if (!std::isfinite(time) || !light.clip.active(time)) { return std::nullopt; }
+        const auto local = light.clip.localTime(time);
+        const auto anchor = [&](std::size_t axis) { return static_cast<float>(light.clip.curves[anchorIndex + axis].evaluate(local)); };
+        const osci::Point origin(anchor(0), anchor(1), anchor(2), -1, -1, -1);
+        const auto at = applyCompositionEffects(light.clip.processPoint(origin, time), time);
+        const auto ahead = applyCompositionEffects(light.clip.processPoint(osci::Point(anchor(0), anchor(1), anchor(2) - 1), time), time);
+        if (!at.isFinite() || !ahead.hasFinitePosition()) { return std::nullopt; }
+        PreparedLight::State state;
+        state.kind = light.kind;
+        state.position = {at.x, at.y, at.z};
+        state.direction = (Vec3 {ahead.x, ahead.y, ahead.z} - state.position).normalized(1.0e-12).value_or(Vec3 {0, 0, -1});
+        state.colour = {std::max(0.0f, at.r), std::max(0.0f, at.g), std::max(0.0f, at.b)};
+        state.intensity = light.parameter("light.intensity", time, 1);
+        state.range = light.parameter("light.range", time, 10);
+        state.cone = light.parameter("light.cone", time, 40);
+        state.softness = light.parameter("light.softness", time, 0) / 100;
+        state.shadows = light.parameter("light.shadows", time, 100) / 100;
+        return state;
+    }
+    // Whether any light shines at a time: without one, everything is as bright as it is.
+    bool lit(double time) const {
+        return std::any_of(lights.begin(), lights.end(), [&](const PreparedLight& light) { return light.clip.active(time); });
+    }
     // A world point in the active camera's eye space (x right, y up, z along
     // its view), as projectVisible sees it before dividing by depth; none
     // without a camera.
@@ -648,6 +729,7 @@ public:
     juce::String preparationError;
     PreparedSoundtrack soundtrack;
     std::vector<PreparedClip> clips;
+    std::vector<PreparedLight> lights;
     std::vector<PreparedCamera> cameras;
     // What the Scope shows (wider than the frame on a wide canvas), which
     // hidden lines are removed across, and the frames with them removed, when

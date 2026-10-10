@@ -49,7 +49,8 @@ void everyGeneratorDraws() {
         const auto hides = definition.category == GeneratorCategory::solid || definition.category == GeneratorCategory::grid;
         check(geometry.triangles.empty() != hides, std::string(definition.name) + " has faces exactly when it is a solid or a grid");
         for (const auto& spec : definition.parameters) {
-            check(spec.id.starts_with("generator."), "parameters are named generator.*");
+            const auto light = definition.category == GeneratorCategory::light;
+            check(spec.id.starts_with(light ? "light." : "generator."), "parameters are named generator.*, a light's light.*");
             check(spec.contains(spec.defaultValue), std::string(spec.label) + " starts in range");
         }
     }

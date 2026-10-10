@@ -213,6 +213,23 @@ inline std::vector<Handle> handles(const GeneratorDefinition& definition, std::s
             result.push_back(point({-value(0), -value(1) / 2, 0}, {0}, name(0), 2, Vec3 {1, 0, 0}));
             result.push_back(point({0, value(1) / 2, 0}, {1}, name(1), std::nullopt, Vec3 {0, 1, 0}));
             break;
+        // A light's intensity at the tip of its rays or arrows; a spot
+        // light's cone and the edge it fades over on its rim.
+        case GeneratorKind::ambientLight:
+        case GeneratorKind::pointLight:
+            result.push_back(point({0, light_glyph::rayReach(value(0)), 0}, {0}, name(0), std::nullopt, Vec3 {0, 1, 0}));
+            break;
+        case GeneratorKind::directionalLight:
+            result.push_back(point({0, 0, -light_glyph::arrowReach(value(0))}, {0}, name(0), std::nullopt, Vec3 {0, 0, 1}));
+            break;
+        case GeneratorKind::spotLight: {
+            constexpr auto length = light_glyph::spotLength;
+            const auto rimAt = [&](double degrees) { return length * std::tan(degrees * pi / 360); };
+            result.push_back(point({0, rimAt(value(2)), -length}, {2}, name(2), std::nullopt, Vec3 {0, 1, 0}));
+            result.push_back(point({0, -rimAt(value(2) * (1 - value(3) / 100)), -length}, {3}, name(3), std::nullopt, Vec3 {0, 1, 0}));
+            result.push_back(point({0, 0, -light_glyph::spotReach(value(0))}, {0}, name(0), std::nullopt, Vec3 {0, 0, 1}));
+            break;
+        }
     }
     return result;
 }
@@ -365,6 +382,25 @@ inline std::vector<double> drag(const GeneratorDefinition& definition, std::size
                 values[1] = 2 * std::abs(to.y);
             }
             break;
+        case GeneratorKind::ambientLight:
+        case GeneratorKind::pointLight:
+            values[0] = (std::abs(to.y) - light_glyph::rayReach(0)) / (light_glyph::rayReach(1) - light_glyph::rayReach(0));
+            break;
+        case GeneratorKind::directionalLight:
+            values[0] = (std::abs(to.z) - light_glyph::arrowReach(0)) / (light_glyph::arrowReach(1) - light_glyph::arrowReach(0));
+            break;
+        case GeneratorKind::spotLight: {
+            // The angle a rim this far from the axis makes, at the cone's end.
+            const auto degrees = 2 * std::atan(std::abs(to.y) / light_glyph::spotLength) * 180 / pi;
+            if (index == 0) {
+                values[2] = degrees;
+            } else if (index == 1) {
+                values[3] = value(2) > 0 ? (1 - degrees / value(2)) * 100 : 0;
+            } else {
+                values[0] = (std::abs(to.z) - light_glyph::spotReach(0)) / (light_glyph::spotReach(1) - light_glyph::spotReach(0));
+            }
+            break;
+        }
     }
     return settle(definition, values);
 }

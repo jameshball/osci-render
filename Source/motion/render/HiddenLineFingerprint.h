@@ -4,10 +4,11 @@
 #include <vector>
 
 namespace motion::hidden {
-// Everything a frame's hidden lines depend on at a time, as numbers: the
-// active camera and its view, then for each clip whether it plays and shows,
-// which drawing of its source it shows, and every pose and effect setting along
-// its chain (colour aside, which hides nothing). Two times with equal
+// Everything a frame's hidden lines and lighting depend on at a time, as
+// numbers: the active camera and its view, each light, then for each clip
+// whether it plays and shows, which drawing of its source it shows, and every
+// pose and effect setting along its chain (its colour aside: that is applied
+// as the beam draws, after what is baked). Two times with equal
 // fingerprints cull to the same frame, so a bake can reuse one for the other:
 // a still stretch of a project costs one frame.
 class Fingerprint {
@@ -25,6 +26,14 @@ public:
             }
         }
         addEffects(composition.compositionEffects(), time);
+        // Each light that shines, as it shines: its colour lights what is baked.
+        for (const auto& light : composition.lights) {
+            add(light.clip.active(time) ? 1.0 : 0.0);
+            const auto state = composition.lightAt(light, time);
+            if (!state.has_value()) { continue; }
+            add(static_cast<double>(state->kind), state->position.x, state->position.y, state->position.z, state->direction.x, state->direction.y, state->direction.z);
+            add(state->colour[0], state->colour[1], state->colour[2], state->intensity, state->range, state->cone, state->softness, state->shadows);
+        }
         for (const auto& clip : composition.clips) {
             const auto active = clip.active(time);
             add(active ? 1.0 : 0.0);
