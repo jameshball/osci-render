@@ -1201,12 +1201,11 @@ void MotionCompositionView::paintOverChildren(juce::Graphics& g) {
 void MotionCompositionView::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) {
     if (navigating || edit.active()) { return; }
     const auto pixels = juce::Point<double>(wheel.deltaX, wheel.deltaY) * 256.0;
+    // Orbiting and panning carry on with the trackpad's momentum once the
+    // fingers lift, as scrolling does anywhere; zooming stops where it is let go.
     if (!wheel.isSmooth || event.mods.isCommandDown() || event.mods.isCtrlDown()) {
         if (wheel.isInertial) { return; }
         camera.dolly(-(std::abs(wheel.deltaY) >= std::abs(wheel.deltaX) ? wheel.deltaY : wheel.deltaX) * 2.0);
-    } else if (wheel.isInertial) {
-        // Momentum after the fingers lift would keep the view drifting.
-        return;
     } else if (event.mods.isShiftDown()) {
         camera.pan(pixels.x, pixels.y, outputFrame().getHeight());
     } else {
