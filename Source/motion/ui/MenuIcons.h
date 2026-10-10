@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "MotionStyle.h"
+#include "InterpolationGlyph.h"
 
 // Pictures beside menu items. Each is drawn in a 96-unit square that is the
 // whole icon, so every icon in a menu scales alike, with lines fine enough to
@@ -222,29 +223,27 @@ inline std::unique_ptr<juce::Drawable> picture(const juce::Image& mask) {
     return icon;
 }
 
-// A key as the Timeline and the Graph draw it, filled: smaller than a line
-// glyph, as a solid shape weighs more.
-inline std::unique_ptr<juce::Drawable> key(style::KeyShape shape) {
-    return filled(style::keyShapePath({size / 2, size / 2}, 22, shape), ink());
+// A key menu's interpolations, and its eases, as the Key panel draws them.
+inline std::unique_ptr<juce::Drawable> segment(const SegmentGlyph& glyph) {
+    std::vector<std::unique_ptr<juce::DrawableShape>> shapes;
+    shapes.push_back(strokeOf(glyph.segment, ink(), glyph.stroke));
+    if (!glyph.handles.isEmpty()) {
+        auto handles = std::make_unique<juce::DrawablePath>();
+        handles->setPath(glyph.handles);
+        handles->setFill(juce::FillType());
+        handles->setStrokeFill(ink().withMultipliedAlpha(.55f));
+        handles->setStrokeType(juce::PathStrokeType(glyph.handleStroke, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+        shapes.push_back(std::move(handles));
+    }
+    juce::Path keys;
+    for (const auto end : glyph.keys) { keys.addEllipse(juce::Rectangle<float>(glyph.keySize, glyph.keySize).withCentre(end)); }
+    shapes.push_back(fillOf(keys, ink()));
+    return inSquare(std::move(shapes));
 }
-
-// A key menu's interpolations as their keys are drawn: Hold, Linear, Auto
-// (smooth) and Bezier (eased, as a key with its handles pulled flat is).
-inline std::unique_ptr<juce::Drawable> interpolation(int index) {
-    constexpr std::array<style::KeyShape, 4> shapes {style::KeyShape::hold, style::KeyShape::linear, style::KeyShape::smooth, style::KeyShape::eased};
-    return key(shapes[static_cast<std::size_t>(std::clamp(index, 0, 3))]);
-}
-
-// How a value eases between keys, as a curve rising from lower left to
-// upper right: flat where it eases (leaving the first key, arriving at the
-// second, or both).
-inline std::unique_ptr<juce::Drawable> ease(bool leaving, bool arriving) {
-    juce::Path path;
-    const juce::Point<float> from(10, 86), to(86, 10);
-    path.startNewSubPath(from);
-    path.cubicTo(leaving ? juce::Point<float>(58, 86) : juce::Point<float>(30, 66), arriving ? juce::Point<float>(38, 10) : juce::Point<float>(66, 30), to);
-    return stroked(path, ink());
-}
+// The Key panel's box (14 by 12), scaled to fill an icon's square.
+inline juce::Rectangle<float> segmentBox() { return juce::Rectangle<float>(84, 72).withCentre({size / 2, size / 2}); }
+inline std::unique_ptr<juce::Drawable> interpolation(motion::Interpolation kind) { return segment(interpolationGlyph(segmentBox(), kind)); }
+inline std::unique_ptr<juce::Drawable> ease(bool leaving, bool arriving) { return segment(easeGlyph(segmentBox(), leaving, arriving)); }
 
 // A label colour: a rounded swatch, or an empty outline for none.
 inline std::unique_ptr<juce::Drawable> swatch(std::optional<juce::Colour> colour) {

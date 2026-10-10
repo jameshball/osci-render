@@ -1425,7 +1425,7 @@ void MotionCurveEditor::showKeyMenu() {
         item.itemID = i + 1;
         item.isEnabled = editable;
         item.isTicked = static_cast<int>(key->interpolation) == i;
-        item.image = motion::ui::menu_icons::interpolation(i);
+        item.image = motion::ui::menu_icons::interpolation(static_cast<motion::Interpolation>(i));
         menu.addItem(std::move(item));
     }
     menu.addSeparator();

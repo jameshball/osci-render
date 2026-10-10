@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "InterpolationGlyph.h"
 #include "../model/Animation.h"
 #include <algorithm>
 #include <array>
@@ -82,30 +83,7 @@ private:
                 g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
             }
             const auto colour = !isEnabled() ? osci::Colours::textMuted().withAlpha(.35f) : lit ? juce::Colours::white : osci::Colours::text().withAlpha(over ? 1.0f : .7f);
-            const auto box = bounds.withSizeKeepingCentre(14.0f, 12.0f);
-            const auto x0 = box.getX(), x1 = box.getRight(), y0 = box.getBottom(), y1 = box.getY();
-            juce::Path glyph;
-            glyph.startNewSubPath(x0, y0);
-            switch (interpolation) {
-                case motion::Interpolation::hold:
-                    glyph.lineTo(box.getCentreX(), y0);
-                    glyph.lineTo(box.getCentreX(), y1);
-                    glyph.lineTo(x1, y1);
-                    break;
-                case motion::Interpolation::linear: glyph.lineTo(x1, y1); break;
-                // Auto rises and settles; Bezier is an S with its handles.
-                case motion::Interpolation::smooth: glyph.cubicTo(x0 + 3.0f, y1 + 1.0f, x1 - 6.0f, y1, x1, y1); break;
-                case motion::Interpolation::cubic: glyph.cubicTo(x1 - 2.0f, y0, x0 + 2.0f, y1, x1, y1); break;
-            }
-            g.setColour(colour);
-            g.strokePath(glyph, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            if (interpolation == motion::Interpolation::cubic) {
-                g.setColour(colour.withMultipliedAlpha(.55f));
-                g.drawLine(x0, y0, x0 + 5.0f, y0, 1.0f);
-                g.drawLine(x1, y1, x1 - 5.0f, y1, 1.0f);
-            }
-            // Both ends are keys, as on the curve.
-            for (const auto end : {juce::Point<float>(x0, y0), juce::Point<float>(x1, y1)}) { g.fillEllipse(juce::Rectangle<float>(3.2f, 3.2f).withCentre(end)); }
+            motion::ui::drawSegmentGlyph(g, motion::ui::interpolationGlyph(bounds.withSizeKeepingCentre(14.0f, 12.0f), interpolation), colour);
         }
     };
     struct EaseButton final : juce::Button {

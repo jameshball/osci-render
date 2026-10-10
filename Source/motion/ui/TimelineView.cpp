@@ -2330,7 +2330,7 @@ void MotionTimelineView::showKeyMenu() {
     for (int index = 0; index < 4; ++index) {
         juce::PopupMenu::Item item(names[index]);
         item.itemID = index + 1;
-        item.image = motion::ui::menu_icons::interpolation(index);
+        item.image = motion::ui::menu_icons::interpolation(static_cast<motion::Interpolation>(index));
         menu.addItem(std::move(item));
     }
     menu.addSeparator();
