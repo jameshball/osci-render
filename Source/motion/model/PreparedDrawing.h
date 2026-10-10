@@ -75,8 +75,8 @@ public:
     }
 
     // Every positive segment contributes its endpoint; each stroke adds a dark
-    // start, and a closed one a lit start and a dark end. Zero means there is
-    // no usable traversal.
+    // start, a lit start and a dark end. Zero means there is no usable
+    // traversal.
     std::int64_t minimumTraversalSamples() const { return traversalMinimum; }
 
     // Independent from sample(): an integer budget covers complete strokes,
@@ -90,17 +90,28 @@ public:
         const auto extra = count - traversalMinimum;
         const auto stroke = std::lower_bound(strokes.begin(), strokes.end(), index, [&](const TraversalStroke& item, std::int64_t value) {
             const auto& last = segments[item.last];
-            return last.baseEnd + (item.closed ? 1 : 0) + extraThrough(last, extra) < value;
+            return last.baseEnd + 1 + extraThrough(last, extra) < value;
         });
         if (stroke == strokes.end()) { return osci::Point(0, 0, 0, 0, 0, 0); }
         const auto& first = segments[stroke->first];
         const auto& last = segments[stroke->last];
         const auto beforeExtra = stroke->first == 0 ? 0 : extraThrough(segments[stroke->first - 1], extra);
-        const auto lead = stroke->closed ? 1 : 0;
-        const auto start = first.baseEnd - 1 - lead + beforeExtra;
-        const auto end = last.baseEnd + lead + extraThrough(last, extra);
-        if (index <= start + lead) {
-            auto point = shapes[first.shape]->nextVector(0);
+        const auto start = first.baseEnd - 2 + beforeExtra;
+        const auto end = last.baseEnd + 1 + extraThrough(last, extra);
+        // Where a segment's samples start and end.
+        const auto bounds = [&](std::size_t segmentIndex) {
+            const auto previousEnd = segmentIndex == stroke->first ? start + 1 : segments[segmentIndex - 1].baseEnd + extraThrough(segments[segmentIndex - 1], extra);
+            return std::pair {previousEnd, segments[segmentIndex].baseEnd + extraThrough(segments[segmentIndex], extra)};
+        };
+        // A fading stroke's ends are reached half a step in from them (a
+        // quarter of a lone step), so it fades in and out over that, however
+        // few samples it has, and draws lit between.
+        const auto fadeIn = [&](std::size_t segmentIndex) {
+            const auto [previousEnd, segmentEnd] = bounds(segmentIndex);
+            return static_cast<float>(std::min(.25, .5 / static_cast<double>(segmentEnd - previousEnd)));
+        };
+        if (index <= start + 1) {
+            auto point = shapes[first.shape]->nextVector(stroke->fades && index > start ? fadeIn(stroke->first) : 0.0f);
             if (index == start) { point.r = point.g = point.b = 0; }
             return point;
         }
@@ -109,12 +120,10 @@ public:
             point.r = point.g = point.b = 0;
             return point;
         }
+        if (stroke->fades && index == end - 1) { return shapes[last.shape]->nextVector(1.0f - fadeIn(stroke->last)); }
         const auto segment = std::lower_bound(segments.begin() + stroke->first, segments.begin() + stroke->last + 1, index,
             [&](const TraversalSegment& item, std::int64_t value) { return item.baseEnd + extraThrough(item, extra) < value; });
-        const auto segmentIndex = static_cast<std::size_t>(segment - segments.begin());
-        const auto previousEnd = segmentIndex == stroke->first ? start + lead
-            : segments[segmentIndex - 1].baseEnd + extraThrough(segments[segmentIndex - 1], extra);
-        const auto segmentEnd = segment->baseEnd + extraThrough(*segment, extra);
+        const auto [previousEnd, segmentEnd] = bounds(static_cast<std::size_t>(segment - segments.begin()));
         const auto progress = static_cast<float>(static_cast<double>(index - previousEnd) / static_cast<double>(segmentEnd - previousEnd));
         return shapes[segment->shape]->nextVector(progress);
     }
@@ -138,9 +147,9 @@ private:
         double lengthEnd;
     };
     // A stroke dwells lit where it starts and ends, so a closed one's seam
-    // shows like any corner. In a fading drawing an open one fades in over its
-    // first step and out over its last instead, so its ends draw no dot.
-    struct TraversalStroke { std::size_t first, last; bool closed; };
+    // shows like any corner. In a fading drawing an open one fades in and out
+    // over a short way at its ends instead, so they draw no dot.
+    struct TraversalStroke { std::size_t first, last; bool fades; };
 
     std::int64_t extraThrough(const TraversalSegment& segment, std::int64_t extra) const {
         if (segment.lengthEnd == total) { return extra; }
@@ -167,7 +176,7 @@ private:
                 return;
             }
             if (!havePrevious || !connected(previous, start)) {
-                if (havePrevious) { strokes.back().closed = !fading || connected(previous, strokeStart); }
+                if (havePrevious) { strokes.back().fades = fading && !connected(previous, strokeStart); }
                 strokes.push_back({segments.size(), segments.size(), false});
                 strokeStart = start;
             }
@@ -177,14 +186,13 @@ private:
             havePrevious = true;
         }
         if (!havePrevious) { return; }
-        strokes.back().closed = !fading || connected(previous, strokeStart);
-        // A dark start, for a closed stroke a lit start too, each segment's
-        // end, and for a closed stroke a dark end; an open one's last end is dark.
+        strokes.back().fades = fading && !connected(previous, strokeStart);
+        // A dark start, a lit start, each segment's end and a dark end.
         std::int64_t reserved = 0;
         for (const auto& stroke : strokes) {
-            reserved += stroke.closed ? 2 : 1;
+            reserved += 2;
             for (auto segment = stroke.first; segment <= stroke.last; ++segment) { segments[segment].baseEnd = reserved++; }
-            if (stroke.closed) { ++reserved; }
+            ++reserved;
         }
         traversalMinimum = reserved;
     }

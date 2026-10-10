@@ -139,6 +139,59 @@ public:
             expect(fillFrame->drawing(1) == nullptr, "the square's own outline is untouched");
         }
 
+        beginTest("Where one mesh is sunk into another, the line they cross along is drawn");
+        {
+            // A small cube pushed partway into the big one: where it comes out
+            // is an edge of what is seen, though neither cube has it.
+            float half = 0;
+            const auto withSmallCube = [&](const char* axis, float offset) {
+                auto sunk = cubeProject(true);
+                auto small = sunk.tracks[0].clips[0];
+                small.id = 21;
+                small.properties["scale.x"] = motion::Curve(.4);
+                small.properties["scale.y"] = motion::Curve(.4);
+                small.properties["scale.z"] = motion::Curve(.4);
+                small.properties[axis] = motion::Curve(offset);
+                motion::Track track;
+                track.id = 11;
+                track.insert(small, sunk.tempo());
+                sunk.tracks.push_back(track);
+                return sunk;
+            };
+            // Lines of the big cube's culled drawing that lie on none of its edges.
+            const auto newLines = [&](const motion::Project& sunkProject) {
+                const motion::PreparedComposition prepared(sunkProject);
+                motion::hidden::DepthBuffer buffer;
+                const auto frame = motion::hidden::cull(prepared, 1, buffer);
+                const auto* whole = prepared.clips.front().source->drawingAt(0);
+                const auto* culled = frame->drawing(0);
+                int count = 0;
+                for (std::size_t index = 0; culled != nullptr && index < culled->shapeCount(); ++index) {
+                    auto* shape = culled->shape(index);
+                    const auto middle = shape->nextVector(.5f);
+                    double nearest = 1.0e9;
+                    for (std::size_t edge = 0; edge < whole->shapeCount(); ++edge) {
+                        auto* line = whole->shape(edge);
+                        const auto a = line->nextVector(0), b = line->nextVector(1);
+                        const motion::Vec3 ab {b.x - a.x, b.y - a.y, b.z - a.z}, am {middle.x - a.x, middle.y - a.y, middle.z - a.z};
+                        const auto t = std::clamp(am.dot(ab) / std::max(ab.dot(ab), 1.0e-12), 0.0, 1.0);
+                        nearest = std::min(nearest, (am - ab * t).length());
+                    }
+                    if (nearest > 1.0e-3) { ++count; }
+                }
+                return count;
+            };
+            // Centred on the big cube's surface facing the camera, so it is
+            // half in, half out where it can be seen.
+            {
+                const motion::PreparedComposition sized(cubeProject(true));
+                const auto* whole = sized.clips.front().source->drawingAt(0);
+                for (std::size_t index = 0; index < whole->shapeCount(); ++index) { half = std::max(half, std::abs(whole->shape(index)->nextVector(0).x)); }
+            }
+            expect(newLines(withSmallCube("position.z", half)) > 0, "the crossing shows on the big cube");
+            expectEquals(newLines(withSmallCube("position.x", 3.0f)), 0, "a cube apart from it adds nothing");
+        }
+
         beginTest("Profile: a frame of real meshes, and baking them");
         for (const auto& [model, bulge] : {std::pair {"teapot.obj", false}, std::pair {"lamp.obj", false}, std::pair {"teapot.obj", true}}) {
             const auto file = juce::File(__FILE__).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);
