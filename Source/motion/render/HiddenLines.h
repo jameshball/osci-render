@@ -433,21 +433,26 @@ public:
     Baker() = default;
     ~Baker() {
         stop();
-        for (auto& worker : retired) { worker.thread.join(); }
+        for (auto& worker : retired) { worker.thread->waitForThreadToExit(-1); }
     }
 
-    // Replaces any bake in progress.
+    // Replaces any bake in progress. Its workers run at low priority, so they
+    // can use every core but two without the editor, the Scope or the audio
+    // waiting on them.
     void start(std::shared_ptr<Bake> bake, double sampleRate, std::size_t firstFrame) {
         stop();
         if (bake == nullptr || bake->project == nullptr || bake->complete()) { return; }
         cancel = std::make_shared<std::atomic<bool>>(false);
-        const auto threads = std::clamp<unsigned>(std::thread::hardware_concurrency() / 2, 1u, 4u);
+        const auto cores = std::thread::hardware_concurrency();
+        const auto threads = std::clamp<unsigned>(cores > 2 ? cores - 2 : 1u, 1u, 8u);
         for (unsigned index = 0; index < threads; ++index) {
             auto done = std::make_shared<std::atomic<bool>>(false);
-            workers.push_back({std::thread([bake, sampleRate, firstFrame, flag = cancel, done] {
+            auto thread = std::make_unique<WorkerThread>([bake, sampleRate, firstFrame, flag = cancel, done] {
                 run(*bake, sampleRate, firstFrame, *flag);
                 done->store(true);
-            }), done});
+            });
+            thread->startThread(juce::Thread::Priority::low);
+            workers.push_back({std::move(thread), done});
         }
     }
     // Stops the bake without waiting: its workers finish the step they are
@@ -458,7 +463,7 @@ public:
         workers.clear();
         std::erase_if(retired, [](Worker& worker) {
             if (!worker.done->load()) { return false; }
-            worker.thread.join();
+            worker.thread->waitForThreadToExit(-1);
             return true;
         });
     }
@@ -473,8 +478,16 @@ public:
     }
 
 private:
+    class WorkerThread final : public juce::Thread {
+    public:
+        explicit WorkerThread(std::function<void()> work) : juce::Thread("Hidden line bake"), body(std::move(work)) {}
+        void run() override { body(); }
+
+    private:
+        std::function<void()> body;
+    };
     struct Worker {
-        std::thread thread;
+        std::unique_ptr<WorkerThread> thread;
         std::shared_ptr<std::atomic<bool>> done;
     };
 
