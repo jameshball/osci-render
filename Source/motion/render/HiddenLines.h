@@ -54,10 +54,30 @@ private:
     osci::Point a, b;
 };
 
+// Whether an effect can bend straight lines: one that only colours points,
+// or moves them all alike (turning, scaling, sliding or skewing), keeps a
+// line straight and a face flat, so its faces need no dicing.
+inline bool bends(const PreparedEffect& effect) {
+    if (!effect.enabled) { return false; }
+    switch (effect.kind) {
+        case EffectKind::colour:
+        case EffectKind::rotate:
+        case EffectKind::scale:
+        case EffectKind::translate:
+        case EffectKind::skew:
+            return false;
+        default:
+            return true;
+    }
+}
+inline bool bends(const std::vector<PreparedEffect>& effects) {
+    return std::any_of(effects.begin(), effects.end(), [](const PreparedEffect& effect) { return bends(effect); });
+}
+
 // Whether anything after a clip's transform can bend its straight lines.
 inline bool bends(const PreparedClipStage& stage) {
-    return !stage.effects.empty() || !stage.trackEffects.empty() || !stage.compositionEffects.empty()
-        || std::any_of(stage.groups.begin(), stage.groups.end(), [](const auto& group) { return !group.effects.empty(); });
+    return bends(stage.effects) || bends(stage.trackEffects) || bends(stage.compositionEffects)
+        || std::any_of(stage.groups.begin(), stage.groups.end(), [](const auto& group) { return bends(group.effects); });
 }
 
 // The shortest run that culling leaves kept, in output units (the frame
@@ -219,9 +239,11 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             // Diced point by point into pieces flat enough, once bent, to draw.
             workspace.dicer.dice({mesh.vertices[triangle[0]], screen(a)}, {mesh.vertices[triangle[1]], screen(b)}, {mesh.vertices[triangle[2]], screen(c)},
                 [&](const osci::Point& point) { return screen(eye(*item.clip, point)); },
-                [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r) {
+                [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, bool whole) {
                     depth.triangle(*p.at, *q.at, *r.at);
-                    if (surfaces > 1) {
+                    // Crossings are only found in front of the eye: a piece
+                    // cut at the near plane reaches far off the screen.
+                    if (surfaces > 1 && whole) {
                         surfaceTriangles.push_back({{unproject(*p.at), unproject(*q.at), unproject(*r.at)}, surface});
                         surfaceSources.push_back({p.source, q.source, r.source});
                     }

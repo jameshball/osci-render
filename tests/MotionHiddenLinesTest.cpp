@@ -232,7 +232,7 @@ public:
             const auto corner = [&](float x, float y, float z) { const osci::Point point(x, y, z); return motion::hidden::DiceCorner {point, bend(point)}; };
             motion::hidden::DepthBuffer depth;
             motion::hidden::Dicer dicer;
-            const auto draw = [&](const motion::hidden::DiceCorner& a, const motion::hidden::DiceCorner& b, const motion::hidden::DiceCorner& c) { depth.triangle(*a.at, *b.at, *c.at); };
+            const auto draw = [&](const motion::hidden::DiceCorner& a, const motion::hidden::DiceCorner& b, const motion::hidden::DiceCorner& c, bool) { depth.triangle(*a.at, *b.at, *c.at); };
             dicer.dice(corner(.25f, -2, -3), corner(.25f, -2, 12), corner(.25f, 2, 12), bend, draw);
             dicer.dice(corner(.25f, -2, -3), corner(.25f, 2, 12), corner(.25f, 2, -3), bend, draw);
             int shown = 0, total = 0;

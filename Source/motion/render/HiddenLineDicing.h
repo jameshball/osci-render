@@ -33,7 +33,8 @@ public:
     // What the Scope shows: a piece wholly past it is dropped.
     void setReach(Reach value) { reach = value; }
 
-    // `bend` places a source point on screen; `emit` takes each piece.
+    // `bend` places a source point on screen; `emit` takes each piece, and
+    // whether it is whole (rather than cut where it comes into view).
     template <typename Bend, typename Emit>
     void dice(const DiceCorner& a, const DiceCorner& b, const DiceCorner& c, Bend&& bend, Emit&& emit) {
         midpoints.clear();
@@ -75,7 +76,7 @@ private:
         if (!whole) { depthLeft = std::min(depthLeft, 12); }
         if (longest <= cell * cell || depthLeft <= 0) {
             if (whole) {
-                emit(p, q, r);
+                emit(p, q, r, true);
             } else {
                 clipToView(p, q, r, bend, emit);
             }
@@ -120,8 +121,8 @@ private:
             if (current.at.has_value()) { kept[count++] = current; }
             if (current.at.has_value() != next.at.has_value()) { kept[count++] = crossing(current, next, bend); }
         }
-        if (count >= 3) { emit(kept[0], kept[1], kept[2]); }
-        if (count == 4) { emit(kept[0], kept[2], kept[3]); }
+        if (count >= 3) { emit(kept[0], kept[1], kept[2], false); }
+        if (count == 4) { emit(kept[0], kept[2], kept[3], false); }
     }
     // Where an edge from a corner in view to one behind the eye (either way
     // round) comes into view, to well under a pixel.

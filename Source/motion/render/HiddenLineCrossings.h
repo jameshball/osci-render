@@ -261,7 +261,7 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
     const auto x = reach.x * DepthBuffer::overscan, y = reach.y * DepthBuffer::overscan;
     const auto frame = Box {-x, x, -y, y, -1.0e300, 1.0e300};
     std::vector<std::uint32_t> candidates;
-    double extentSum = 0;
+    std::vector<double> extents;
     for (std::uint32_t index = 0; index < triangles.size(); ++index) {
         const auto& box = boxes[index];
         if (!box.overlaps(frame)) { continue; }
@@ -270,10 +270,14 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
         for (std::uint32_t surface = 0; surface < surfaceBoxes.size() && !shared; ++surface) { shared = surface != own && box.overlaps(surfaceBoxes[surface]); }
         if (!shared) { continue; }
         candidates.push_back(index);
-        extentSum += std::max(box.right - box.left, box.top - box.bottom);
+        extents.push_back(std::max(box.right - box.left, box.top - box.bottom));
     }
     if (candidates.size() < 2) { return {}; }
-    const detail::ScreenGrid grid(candidates, boxes, extentSum / static_cast<double>(candidates.size()), frame);
+    // Cells sized to the middling triangle: a few huge ones (a floor seen
+    // close) would otherwise make every cell hold thousands of small ones.
+    const auto middle = extents.begin() + static_cast<std::ptrdiff_t>(extents.size() / 2);
+    std::nth_element(extents.begin(), middle, extents.end());
+    const detail::ScreenGrid grid(candidates, boxes, *middle, frame);
     for (int cell = 0; cell < grid.cellCount(); ++cell) {
         if ((cell & 63) == 0 && cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return {}; }
         const auto members = grid.cell(cell);
