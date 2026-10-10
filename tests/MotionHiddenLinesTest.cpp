@@ -19,7 +19,7 @@ public:
         if (composition.hiddenLines == nullptr) { return; }
         const auto* whole = composition.clips.front().source->drawingAt(0);
         expect(whole != nullptr && whole->faces().triangles.size() == 12, "the cube keeps its six faces as twelve triangles");
-        motion::hidden::DepthBuffer solver;
+        motion::hidden::Workspace solver;
         const auto frame = motion::hidden::cull(composition, 1, solver);
         const auto* culled = frame->drawing(0);
         expect(culled != nullptr, "some of the cube's lines are hidden");
@@ -64,7 +64,7 @@ public:
             bulge.properties["bulge"] = motion::Curve(.9);
             bent.tracks.change(0).effects.push_back(bulge);
             const motion::PreparedComposition bulged(bent);
-            motion::hidden::DepthBuffer bentSolver;
+            motion::hidden::Workspace bentSolver;
             const auto bentFrame = motion::hidden::cull(bulged, 1, bentSolver);
             const auto* source = bulged.clips.front().source->drawingAt(0);
             const auto* drawn = bentFrame->drawing(0);
@@ -98,7 +98,7 @@ public:
             ringTrack.insert(ringClip, withPoints.tempo());
             withPoints.tracks.push_back(ringTrack);
             const motion::PreparedComposition prepared(withPoints);
-            motion::hidden::DepthBuffer ringSolver;
+            motion::hidden::Workspace ringSolver;
             const auto ringFrame = motion::hidden::cull(prepared, 1, ringSolver);
             const auto* drawn = ringFrame->drawing(1);
             expect(drawn != nullptr, "the ring loses its part behind the cube");
@@ -131,7 +131,7 @@ public:
             squareTrack.insert(squareClip, behind.tempo());
             behind.tracks.push_back(squareTrack);
             const motion::PreparedComposition prepared(behind);
-            motion::hidden::DepthBuffer fillSolver;
+            motion::hidden::Workspace fillSolver;
             const auto fillFrame = motion::hidden::cull(prepared, 1, fillSolver);
             const auto* cube = fillFrame->drawing(0);
             const auto* cubeWhole = prepared.clips[0].source->drawingAt(0);
@@ -161,7 +161,7 @@ public:
             // Lines of the big cube's culled drawing that lie on none of its edges.
             const auto newLines = [&](const motion::Project& sunkProject) {
                 const motion::PreparedComposition prepared(sunkProject);
-                motion::hidden::DepthBuffer buffer;
+                motion::hidden::Workspace buffer;
                 const auto frame = motion::hidden::cull(prepared, 1, buffer);
                 const auto* whole = prepared.clips.front().source->drawingAt(0);
                 const auto* culled = frame->drawing(0);
@@ -192,6 +192,39 @@ public:
             expectEquals(newLines(withSmallCube("position.x", 3.0f)), 0, "a cube apart from it adds nothing");
         }
 
+        beginTest("A bake reuses a frame for a time that depends on just the same");
+        {
+            // A still cube: every frame is the first, shared. Turning it, none is.
+            auto still = cubeProject(true);
+            const motion::PreparedComposition prepared(still);
+            std::atomic<bool> stop {false};
+            motion::hidden::Baker::bakeAll(*prepared.hiddenLines, 48000, stop);
+            std::set<const motion::PreparedDrawing*> drawings;
+            for (std::size_t frame = 0; frame < prepared.hiddenLines->frameCount(); ++frame) {
+                const auto time = prepared.hiddenLines->timeOf(frame);
+                const auto* baked = prepared.hiddenLines->at(time);
+                expect(baked != nullptr, "every frame is baked");
+                // The cube plays until two seconds.
+                if (baked != nullptr && time < 2) {
+                    expect(baked->drawing(0) != nullptr, "the cube's hidden lines are removed at " + juce::String(time));
+                    drawings.insert(baked->drawing(0));
+                }
+            }
+            expect(drawings.size() <= static_cast<std::size_t>(std::thread::hardware_concurrency()), "a still cube is culled at most once a worker: " + juce::String(static_cast<int>(drawings.size())));
+            motion::hidden::Fingerprint first, second;
+            first.take(prepared, 0);
+            second.take(prepared, 1);
+            expect(first == second, "a still cube depends on the same at any time");
+            auto turning = cubeProject(true);
+            auto& turn = turning.tracks.change(0).clips[0].properties["rotation.y"];
+            turn.setKey({0, 0, motion::Interpolation::linear});
+            turn.setKey({2, 90, motion::Interpolation::linear});
+            const motion::PreparedComposition moving(turning);
+            first.take(moving, 0);
+            second.take(moving, 1);
+            expect(!(first == second), "a turning cube does not");
+        }
+
         beginTest("Profile: a frame of real meshes, and baking them");
         for (const auto& [model, bulge] : {std::pair {"teapot.obj", false}, std::pair {"lamp.obj", false}, std::pair {"teapot.obj", true}}) {
             const auto file = juce::File(__FILE__).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);
@@ -208,7 +241,7 @@ public:
             if (bulge) { meshProject.tracks.change(0).effects.push_back(motion::makeEffect(51, *motion::effectDefinition("bulge"))); }
             const motion::PreparedComposition prepared(meshProject);
             const auto faces = prepared.clips.front().source->drawingAt(0)->faces().triangles.size();
-            motion::hidden::DepthBuffer meshSolver;
+            motion::hidden::Workspace meshSolver;
             const auto started = juce::Time::getMillisecondCounterHiRes();
             double shown = 0;
             for (int index = 0; index < 20; ++index) {

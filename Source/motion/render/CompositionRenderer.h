@@ -553,6 +553,7 @@ struct PreparedComposition {
     }
 
     bool hasCompositionEffects() const { return !effects.empty(); }
+    const std::vector<PreparedEffect>& compositionEffects() const { return effects; }
     osci::Point applyCompositionEffects(osci::Point point, double time) const {
         return applyEffects(effects, point, time);
     }

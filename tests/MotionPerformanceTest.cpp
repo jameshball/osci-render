@@ -50,7 +50,7 @@ private:
         jassert(decoded.wasOk());
         return asset;
     }
-    static motion::Project hiddenLineProject(const std::vector<std::shared_ptr<motion::Asset>>& assets, int copies, bool bulge) {
+    static motion::Project hiddenLineProject(const std::vector<std::shared_ptr<motion::Asset>>& assets, int copies, bool bulge, bool still = false) {
         motion::Project project;
         project.duration = 2;
         project.assets.assign(assets.begin(), assets.end());
@@ -62,7 +62,7 @@ private:
             clip.properties["rotation.x"] = motion::Curve(20 + 7 * copy);
             auto& turn = clip.properties["rotation.y"];
             turn.setKey({0, 37.0 * copy, motion::Interpolation::linear});
-            turn.setKey({2, 37.0 * copy + 360, motion::Interpolation::linear});
+            if (!still) { turn.setKey({2, 37.0 * copy + 360, motion::Interpolation::linear}); }
             // Copies overlap, so their surfaces cut through each other.
             clip.properties["position.x"] = motion::Curve(copies == 1 ? 0 : -.45 + .9 * copy / (copies - 1));
             if (bulge) { clip.effects.push_back(motion::makeEffect(next++, *motion::effectDefinition("bulge"))); }
@@ -88,7 +88,7 @@ private:
             logMessage(name + ": no camera hides hidden lines");
             return;
         }
-        motion::hidden::DepthBuffer depth;
+        motion::hidden::Workspace depth;
         constexpr int frames = 40;
         double kept = 0;
         std::size_t shapes = 0;
@@ -121,6 +121,7 @@ private:
         benchmarkHiddenLineProject("bulged teapot", hiddenLineProject({teapot}, 1, true));
         benchmarkHiddenLineProject("four crossing teapots", hiddenLineProject({teapot}, 4, false));
         benchmarkHiddenLineProject("two bulged crossing teapots", hiddenLineProject({teapot}, 2, true));
+        benchmarkHiddenLineProject("still bulged teapot", hiddenLineProject({teapot}, 1, true, true));
         // A project of your own: MOTION_BENCHMARK_PROJECT=/path/to.osci-motion
         const auto path = juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_PROJECT", "");
         if (path.isEmpty()) { return; }

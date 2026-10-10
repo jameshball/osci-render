@@ -4,6 +4,7 @@
 #include "HiddenLineBake.h"
 #include "HiddenLineCrossings.h"
 #include "HiddenLineDepth.h"
+#include "HiddenLineFingerprint.h"
 #include "HiddenLineMidpoints.h"
 #include "../model/Vec3.h"
 #include <thread>
@@ -96,6 +97,25 @@ inline void dropUnseen(std::vector<crossing::Triangle>& triangles, std::vector<s
     sources.resize(kept);
 }
 
+// A point of a face being diced: where it is in its source, and on screen.
+struct DiceCorner {
+    osci::Point source;
+    std::optional<Screen> at;
+};
+
+// What culling works in, kept from frame to frame so a worker's buffers are
+// allocated once rather than every frame: the depth buffer, the surfaces
+// gathered for crossings, and the scratch lists of points and runs. One per
+// thread.
+struct Workspace {
+    DepthBuffer depth;
+    std::vector<crossing::Triangle> triangles;
+    std::vector<std::array<osci::Point, 3>> sources;
+    std::vector<std::optional<Vec3>> corners, eyes;
+    std::vector<std::pair<double, double>> runs;
+    MidpointCache<DiceCorner> midpoints;
+};
+
 // One frame with hidden lines removed, as the active camera sees it.
 //
 // Point by point: surfaces that hide (meshes' faces, and the fills of flat
@@ -112,7 +132,8 @@ inline void dropUnseen(std::vector<crossing::Triangle>& triangles, std::vector<s
 // The drawing keeps its own shapes, cut where they hide; hidden runs are
 // dropped, not darkened, so the beam skips straight to the next visible part.
 // None when `cancel` is set partway.
-inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, DepthBuffer& depth, const std::atomic<bool>* cancel = nullptr) {
+inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel = nullptr) {
+    auto& depth = workspace.depth;
     const auto cancelled = [cancel] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
     auto frame = std::make_unique<Frame>();
     const auto* camera = composition.activeCamera(time);
@@ -150,16 +171,14 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     // cut through each other.
     depth.clear();
     const auto surfaces = std::count_if(items.begin(), items.end(), [](const Item& item) { return item.drawing != nullptr && !item.drawing->faces().empty(); });
-    std::vector<crossing::Triangle> surfaceTriangles;
-    std::vector<std::array<osci::Point, 3>> surfaceSources;
+    auto& surfaceTriangles = workspace.triangles;
+    auto& surfaceSources = workspace.sources;
+    surfaceTriangles.clear();
+    surfaceSources.clear();
     const auto unproject = [&](const Screen& at) { return Vec3 {at.x / at.w / view->focalLength, at.y / at.w / view->focalLength, 1 / at.w}; };
-    std::vector<std::optional<Vec3>> corners;
-    // A point of a face being diced: where it is in its source, and on screen.
-    struct Corner {
-        osci::Point source;
-        std::optional<Screen> at;
-    };
-    MidpointCache<Corner> midpoints;
+    auto& corners = workspace.corners;
+    auto& midpoints = workspace.midpoints;
+    using Corner = DiceCorner;
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
@@ -257,7 +276,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     // What is hidden: every line, every half pixel along its true path.
     // `place(t)` is a point of a run at progress t; the parts that show come
     // back as intervals of t.
-    std::vector<std::pair<double, double>> runs;
+    auto& runs = workspace.runs;
     const auto visibleRuns = [&](auto&& place, double length) {
         runs.clear();
         const auto steps = std::clamp(static_cast<int>(std::ceil(length / testStep)), 1, 65536);
@@ -348,7 +367,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         const auto f = static_cast<float>(t);
         return osci::Point(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f, a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f);
     };
-    std::vector<std::optional<Vec3>> eyes;
+    auto& eyes = workspace.eyes;
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (cancelled()) { return nullptr; }
@@ -524,13 +543,25 @@ private:
         } catch (...) {
             return;
         }
-        auto depth = std::make_unique<DepthBuffer>();
+        auto workspace = std::make_unique<Workspace>();
+        // The last frame this worker culled and what it depended on: a frame
+        // that depends on just the same is the same, and is copied.
+        Fingerprint lastPrint, print;
+        std::unique_ptr<Frame> last;
         while (!cancel.load(std::memory_order_relaxed)) {
             const auto frame = bake.claim(firstFrame);
             if (!frame.has_value()) { return; }
             try {
-                auto result = cull(*composition, bake.timeOf(*frame), *depth, &cancel);
+                const auto time = bake.timeOf(*frame);
+                print.take(*composition, time);
+                if (last != nullptr && print == lastPrint) {
+                    bake.publish(*frame, std::make_unique<Frame>(*last));
+                    continue;
+                }
+                auto result = cull(*composition, time, *workspace, &cancel);
                 if (result == nullptr) { return; }
+                last = std::make_unique<Frame>(*result);
+                std::swap(lastPrint, print);
                 bake.publish(*frame, std::move(result));
             } catch (const std::bad_alloc&) {
                 return;
