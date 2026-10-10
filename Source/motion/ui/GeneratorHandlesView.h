@@ -77,7 +77,7 @@ inline bool write(Project& project, Id id, const Context& at, const std::vector<
 inline juce::String hint(const Context& at, const generator::Handle& handle) {
     const auto shown = [&](std::size_t parameter) {
         const auto& spec = at.definition->parameters[parameter];
-        return juce::String(at.values[parameter], spec.decimals) + juce::String(spec.unit.data(), spec.unit.size());
+        return juce::String(at.values[parameter], spec.decimals) + juce::String::fromUTF8(spec.unit.data(), static_cast<int>(spec.unit.size()));
     };
     juce::String text(handle.label);
     if (handle.kind == generator::Handle::Kind::count) {

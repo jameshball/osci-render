@@ -91,6 +91,24 @@ void dragsSetWhatTheySay() {
     const auto sizes = settle(cube, std::vector<double> {1, 1, 1});
     check(std::abs(drag(cube, 2, sizes, {0, 0, .5}, {0, 0, .9}, false)[2] - 1.8) < 1.0e-9, "a box's face sets its depth");
 
+    // A spot light's cone handle out from its axis widens the cone; its soft
+    // edge's handle in from the rim softens it; its intensity's along its axis.
+    const auto& spot = *findGenerator("spotLight");
+    const auto lit = settle(spot, defaults(spot));
+    const auto spotHandles = handles(spot, lit);
+    const auto cone = spotHandles[0].at;
+    const auto widened = drag(spot, 0, lit, cone, cone + Vec3 {0, .1, 0}, false);
+    check(widened[2] > lit[2] && widened[0] == lit[0], "a spot light's cone handle dragged out widens its cone alone");
+    const auto edge = spotHandles[1].at;
+    const auto softer = drag(spot, 1, lit, edge, edge + Vec3 {0, .05, 0}, false);
+    check(softer[3] > lit[3] && softer[2] == lit[2], "its soft edge's handle dragged toward the axis softens it");
+    const auto brighter = drag(spot, 2, lit, spotHandles[2].at, spotHandles[2].at + Vec3 {0, 0, -.06}, false);
+    check(std::abs(brighter[0] - (lit[0] + 1)) < 1.0e-9, "its intensity's handle along its axis brightens it, a step a unit");
+    const auto& point = *findGenerator("pointLight");
+    const auto bulb = settle(point, defaults(point));
+    const auto ray = handles(point, bulb)[0].at;
+    check(drag(point, 0, bulb, ray, ray + Vec3 {0, .06, 0}, false)[0] > bulb[0], "a point light's rays drawn out brighten it");
+
     const auto& hexGrid = *findGenerator("hexGrid");
     const auto cells = settle(hexGrid, defaults(hexGrid));
     const auto handle = handles(hexGrid, cells)[0];

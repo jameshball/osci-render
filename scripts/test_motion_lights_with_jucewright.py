@@ -56,7 +56,7 @@ def field(property_id, present=True):
 
 def add(menu, name):
     step("open sources", "click", "--name", "Add source", "--exact")
-    step("open " + menu.lower(), "click", "--name", menu)
+    step("open " + menu.lower(), "click", "--name", menu, "--role", "menuItem", "--exact")
     step("add " + name, "click", "--name", name, "--role", "menuItem", "--exact")
     session.wait_for_undo("Add " + name.lower())
 
@@ -135,6 +135,20 @@ try:
     step("wide cone", "set-value", field("light.cone")["ref"], "90")
     session.wait_for_undo("Change Cone")
 
+    # Each kind, with just its own properties.
+    expected = {
+        "Point light": (["light.intensity", "light.range", "light.shadows"], ["light.cone"]),
+        "Directional light": (["light.intensity", "light.shadows"], ["light.range", "light.cone"]),
+        "Ambient light": (["light.intensity"], ["light.range", "light.shadows"]),
+    }
+    for name, (present, absent) in expected.items():
+        add("Light", name)
+        for property_id in present:
+            field(property_id)
+        for property_id in absent:
+            field(property_id, present=False)
+        command("screenshot", "--file", session.artifact_dir / (name.lower().replace(" ", "-") + ".png"))
+
     step("save", "press", "command + s", "--class", "MotionEditor")
     time.sleep(1)
     data = project.read_bytes()
@@ -142,6 +156,10 @@ try:
     cone = next(p for p in saved.iter("property") if p.get("name") == "light.cone")
     if abs(float(cone.get("value") or cone.get("base") or 0) - 90) > 1e-6:
         raise RuntimeError("The cone should save: " + ET.tostring(cone, encoding="unicode"))
+    # Lights shine to the end of the composition.
+    clips = [clip for clip in saved.iter("clip") if clip.get("name", "").endswith("light")]
+    if len(clips) != 4 or any(abs(float(clip.get("start")) + float(clip.get("duration")) - 8) > 1e-6 for clip in clips):
+        raise RuntimeError("Four lights, each to the end: " + str([(c.get("name"), c.get("start"), c.get("duration")) for c in clips]))
     print("Motion lights passed", flush=True)
 finally:
     session.stop_app()

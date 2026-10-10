@@ -164,7 +164,7 @@ inline double rayReach(double intensity) { return .16 + .06 * intensity; }
 // Directional lights: arrows from a disc, longer the brighter it is.
 inline double arrowReach(double intensity) { return .2 + .08 * intensity; }
 // Spot lights: a cone this long, its intensity's handle beyond it.
-inline constexpr double spotLength = .5;
+inline constexpr double spotLength = .3;
 inline double spotReach(double intensity) { return spotLength + .06 + .06 * intensity; }
 }
 

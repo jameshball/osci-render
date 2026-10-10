@@ -1704,8 +1704,9 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
             clip.properties["rotation.x"] = Curve(25);
             clip.properties["rotation.y"] = Curve(-35);
         }
-        // A light starts white, above and to the side of the middle of the
-        // scene; one that shines one way shines at it.
+        // A light starts white, above and to the left of the middle of the
+        // scene, in front (clear of the Scene's axes in its corner); one that
+        // shines one way shines at the middle.
         if (generator->category == GeneratorCategory::light) {
             const auto place = [&](double x, double y, double z) {
                 clip.properties["position.x"] = Curve(x);
@@ -1721,10 +1722,10 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
             };
             // Near enough to be in the Scene's view as it opens.
             switch (generator->kind) {
-                case GeneratorKind::ambientLight: place(-.8, .8, 0); break;
-                case GeneratorKind::directionalLight: place(.8, .8, .6); break;
-                case GeneratorKind::pointLight: place(.45, .5, 1.6); break;
-                default: place(.4, .45, 2); break;
+                case GeneratorKind::ambientLight: place(.8, -.6, 0); break;
+                case GeneratorKind::directionalLight: place(-.8, .6, .6); break;
+                case GeneratorKind::pointLight: place(-.5, .35, 1.6); break;
+                default: place(-.35, .45, 2); break;
             }
             return clip;
         }

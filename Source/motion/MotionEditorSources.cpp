@@ -490,7 +490,9 @@ void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition) {
         statusBar.show(decoded.getErrorMessage(), MotionStatusBar::Kind::error);
         return;
     }
-    const auto clip = motion::Document::makeClip(document.newId(), *asset, document.project().frameTime(processor.position.load()));
+    auto clip = motion::Document::makeClip(document.newId(), *asset, document.project().frameTime(processor.position.load()));
+    // A light shines to the end, rather than going out partway through.
+    if (definition.category == motion::GeneratorCategory::light && document.project().duration - clip.start > 1.0e-3) { clip.duration = document.project().duration - clip.start; }
     motion::Track track;
     track.id = document.newId();
     track.name = asset->name.toStdString();
