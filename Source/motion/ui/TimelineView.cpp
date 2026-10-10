@@ -984,7 +984,10 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     before = processor.document.project();
     expectedRevision = processor.document.revision();
     changed = false;
-    if (!selectedClips.contains(original.id) || mode != Mode::move) {
+    // Moving, trimming, slipping and stretching take every selected clip
+    // along; a ripple trim shifts what follows, so takes one.
+    const auto together = mode != Mode::rippleLeft && mode != Mode::rippleRight;
+    if (!selectedClips.contains(original.id) || !together) {
         selectClip(original.id);
     } else {
         notifySelection(original.id);
@@ -1651,20 +1654,60 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         repaint();
         return;
     }
-    if (delta != 0.0) {
+    // A clip's timing with the drag applied to the edge (or contents) held.
+    const auto dragged = [&](const auto& from) {
+        auto to = from;
         if (mode == Mode::move) {
-            edited.moveTo(std::max(0.0, timing.start + delta));
+            to.moveTo(std::max(0.0, from.start + delta));
         } else if (mode == Mode::left) {
-            edited.setStart(std::max(0.0, timing.start + delta));
-            edited.offset = timing.localTime(edited.start);
+            to.setStart(std::max(0.0, from.start + delta));
+            to.offset = from.localTime(to.start);
         } else if (mode == Mode::right) {
-            edited.setEnd(edited.end() + delta);
+            to.setEnd(to.end() + delta);
         } else if (mode == Mode::slip) {
-            edited.offset += delta * timing.rate;
+            to.offset += delta * from.rate;
         } else {
-            edited.setEnd(edited.end() + delta);
-            edited.rate *= timing.duration() / edited.duration();
+            to.setEnd(to.end() + delta);
+            to.rate *= from.duration() / to.duration();
         }
+        return to;
+    };
+    if (mode != Mode::move && selectedClips.size() > 1 && selectedClips.contains(original.id)) {
+        // Every selected clip on an unlocked track by the same time, as the
+        // one held: all their start or end edges, contents or speeds.
+        auto updated = *before;
+        std::vector<std::pair<int, motion::Clip>> edits;
+        for (int index = 0; index < static_cast<int>(updated.tracks.size()); ++index) {
+            const auto& track = updated.tracks[index];
+            if (track.locked) { continue; }
+            for (const auto& item : track.clips) {
+                if (!selectedClips.contains(item.id)) { continue; }
+                auto clip = item;
+                if (delta != 0.0 && !clip.setTiming(dragged(item.timing(updated.tempo())), updated.tempo())) { return; }
+                edits.emplace_back(index, std::move(clip));
+            }
+        }
+        for (const auto& [index, clip] : edits) {
+            std::erase_if(updated.tracks.change(index).clips, [id = clip.id](const auto& item) { return item.id == id; });
+        }
+        for (const auto& [index, clip] : edits) {
+            if (!updated.tracks.change(index).insert(clip, updated.tempo())) {
+                // Where one would overlap another shows in red; all stay put.
+                blocked = clipBounds(clip, index);
+                repaint();
+                return;
+            }
+            updated.duration = std::max(updated.duration, clip.timing(updated.tempo()).end());
+        }
+        blocked.reset();
+        changed = delta != 0.0;
+        processor.document.preview(std::move(updated));
+        expectedRevision = processor.document.revision();
+        repaint();
+        return;
+    }
+    if (delta != 0.0) {
+        edited = dragged(timing);
         if (!candidate.setTiming(edited, before->tempo())) { return; }
     }
     const auto target = mode == Mode::move
@@ -1748,7 +1791,9 @@ void MotionTimelineView::mouseUp(const juce::MouseEvent&) {
     auto originalProject = std::move(*before);
     before.reset();
     if (changed) {
-        const auto label = markerDragging != 0 ? "Move marker" : (mode == Mode::rippleLeft || mode == Mode::rippleRight) ? "Ripple trim clip" : mode == Mode::move ? (selectedClips.size() > 1 ? "Move clips" : "Move clip") : (mode == Mode::slip ? "Slip clip" : (mode == Mode::stretch ? "Stretch clip" : "Trim clip"));
+        const auto several = selectedClips.size() > 1 && mode != Mode::rippleLeft && mode != Mode::rippleRight;
+        const juce::String action = mode == Mode::move ? "Move clip" : mode == Mode::slip ? "Slip clip" : mode == Mode::stretch ? "Stretch clip" : (mode == Mode::rippleLeft || mode == Mode::rippleRight) ? "Ripple trim clip" : "Trim clip";
+        const auto label = markerDragging != 0 ? juce::String("Move marker") : action + (several ? "s" : "");
         processor.document.commit(label, std::move(originalProject));
     }
     changed = false;
