@@ -188,18 +188,27 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             if (!item.bent) {
                 // Exact through the camera: whole, cut at the near plane.
                 if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
+                // Cut a hair in front of the near plane, so every corner kept
+                // (the cut's own, rounding included) is in front of it.
+                constexpr auto cut = nearPlane * (1 + 1.0e-6);
                 std::array<Vec3, 4> kept {};
                 std::size_t count = 0;
                 const std::array<Vec3, 3> around {*a, *b, *c};
                 for (std::size_t index = 0; index < 3; ++index) {
                     const auto& current = around[index];
                     const auto& next = around[(index + 1) % 3];
-                    if (current.z > nearPlane) { kept[count++] = current; }
-                    if ((current.z > nearPlane) != (next.z > nearPlane)) { kept[count++] = current + (next - current) * ((nearPlane - current.z) / (next.z - current.z)); }
+                    if (current.z > cut) { kept[count++] = current; }
+                    if ((current.z > cut) != (next.z > cut)) { kept[count++] = current + (next - current) * ((cut - current.z) / (next.z - current.z)); }
                 }
-                const auto at = [&](std::size_t index) { return *screen(kept[index]); };
-                if (count >= 3) { depth.triangle(at(0), at(1), at(2)); }
-                if (count == 4) { depth.triangle(at(0), at(2), at(3)); }
+                std::array<Screen, 4> at {};
+                bool seen = count >= 3;
+                for (std::size_t index = 0; index < count && seen; ++index) {
+                    const auto point = screen(kept[index]);
+                    seen = point.has_value();
+                    if (seen) { at[index] = *point; }
+                }
+                if (seen) { depth.triangle(at[0], at[1], at[2]); }
+                if (seen && count == 4) { depth.triangle(at[0], at[2], at[3]); }
                 // Crossings are only found in front of the eye.
                 if (surfaces > 1 && count == 3 && a->z > nearPlane && b->z > nearPlane && c->z > nearPlane) {
                     surfaceTriangles.push_back({{*a, *b, *c}, surface});

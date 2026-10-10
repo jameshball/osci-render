@@ -192,6 +192,20 @@ public:
             expectEquals(newLines(withSmallCube("position.x", 3.0f)), 0, "a cube apart from it adds nothing");
         }
 
+        beginTest("A camera among a mesh's faces, some passing behind it, culls them cut at the near plane");
+        {
+            // The camera a unit in front of the cube's middle: the faces
+            // round it pass behind the eye and are cut where they come into view.
+            auto close = cubeProject(true);
+            close.cameras.front().properties["position.z"] = motion::Curve(1);
+            const motion::PreparedComposition prepared(close);
+            motion::hidden::Workspace workspace;
+            for (const auto time : {0.0, .5, 1.0}) {
+                const auto frame = motion::hidden::cull(prepared, time, workspace);
+                expect(frame != nullptr, "a frame is culled with the camera among the faces");
+            }
+        }
+
         beginTest("A bent surface passing behind the eye still hides what it covers at the edge of the view");
         {
             // A wall beside the eye, x = 0.25, running from behind it to far in
