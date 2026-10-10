@@ -72,6 +72,21 @@ void cube() {
     check(shown(depth, {-4, 0, 2}, {4, 0, 2}) == 1, "a line in front shows whole");
 }
 
+void edgeOn() {
+    // A face seen nearly edge on, its depth changing steeply across its dozen
+    // or so pixels: a line on it shows, and one just behind it, 2% further
+    // away, is hidden (as an arm's far edge behind the body it touches).
+    const Point3 corners[4] {{1, -1, 4}, {1.3, -1, 6}, {1.3, 1, 6}, {1, 1, 4}};
+    DepthBuffer depth;
+    depth.triangle(project(corners[0]), project(corners[1]), project(corners[2]));
+    depth.triangle(project(corners[0]), project(corners[2]), project(corners[3]));
+    const Point3 a {1.15, -.8, 5}, b {1.15, .8, 5};
+    const auto behind = [](Point3 p) { return Point3 {p.x * 1.02, p.y * 1.02, p.z * 1.02}; };
+    check(shown(depth, a, b) == 1, "a line on a face seen edge on shows whole");
+    check(shown(depth, corners[0], corners[1]) == 1 && shown(depth, corners[1], corners[2]) == 1, "its edges show whole");
+    check(shown(depth, behind(a), behind(b)) < .01, "a line just behind it is hidden");
+}
+
 void matchesRayCasting() {
     // Random triangles and points: the buffer agrees with ray casting except
     // within a pixel or two of an edge.
@@ -133,6 +148,7 @@ void benchmark() {
 
 int main() {
     cube();
+    edgeOn();
     matchesRayCasting();
     benchmark();
     std::cout << "Hidden line depth tests passed\n";
