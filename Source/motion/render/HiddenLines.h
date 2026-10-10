@@ -2,6 +2,7 @@
 
 #include "CompositionRenderer.h"
 #include "HiddenLineBake.h"
+#include "HiddenLineCoverage.h"
 #include "HiddenLineCrossings.h"
 #include "HiddenLineDepth.h"
 #include "HiddenLineFingerprint.h"
@@ -95,11 +96,15 @@ inline void dropUnseen(std::vector<crossing::Triangle>& triangles, std::vector<s
 }
 
 // What culling works in, kept from frame to frame so a worker's buffers are
-// allocated once rather than every frame: the depth buffer, the surfaces
-// gathered for crossings, and the scratch lists of points and runs. One per
-// thread.
+// allocated once rather than every frame: the depth buffer, what has been
+// drawn, the surfaces gathered for crossings, and the scratch lists of points
+// and runs. One per thread.
 struct Workspace {
     DepthBuffer depth;
+    Coverage coverage;
+    std::vector<std::optional<Screen>> samples;
+    std::vector<Screen> drawn;
+    std::vector<std::size_t> drawnStarts;
     std::vector<crossing::Triangle> triangles;
     std::vector<std::array<osci::Point, 3>> sources;
     std::vector<std::optional<Vec3>> corners, eyes;
@@ -218,19 +223,38 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
     const auto crossings = crossing::runs(surfaceTriangles, view->focalLength, reach);
 
-    // What is hidden: every line, every half pixel along its true path.
-    // `place(t)` is a point of a run at progress t; the parts that show come
-    // back as intervals of t.
+    // What is hidden, and what would be drawn twice: every line, every pixel
+    // along its true path. A point shows where nothing is in front of it and
+    // no other clip's line already drawn runs along it. `place(t)` is a point
+    // of a run at progress t; the parts that show come back as intervals of
+    // t, and are kept as drawn until `commitDrawn`.
     auto& runs = workspace.runs;
+    auto& coverage = workspace.coverage;
+    auto& samples = workspace.samples;
+    auto& drawn = workspace.drawn;
+    auto& drawnStarts = workspace.drawnStarts;
+    coverage.clear(reach);
+    drawn.clear();
+    drawnStarts.clear();
+    // Only worth recording while a later clip, or a crossing, could retrace it.
+    bool recording = false;
     const auto visibleRuns = [&](auto&& place, double length) {
         runs.clear();
         const auto steps = std::clamp(static_cast<int>(std::ceil(length / testStep)), 1, 65536);
+        samples.clear();
+        for (int step = 0; step <= steps; ++step) { samples.push_back(place(static_cast<double>(step) / steps)); }
+        const auto showing = [&](int step) {
+            const auto& point = samples[static_cast<std::size_t>(step)];
+            if (!point.has_value() || !depth.shows(*point)) { return false; }
+            const auto& before = samples[static_cast<std::size_t>(std::max(0, step - 1))];
+            const auto& after = samples[static_cast<std::size_t>(std::min(steps, step + 1))];
+            return !before.has_value() || !after.has_value() || !coverage.covers(*point, after->x - before->x, after->y - before->y);
+        };
         bool open = false;
         double from = 0, previous = 0;
         for (int step = 0; step <= steps; ++step) {
             const auto t = static_cast<double>(step) / steps;
-            const auto point = place(t);
-            const auto shows = point.has_value() && depth.shows(*point);
+            const auto shows = showing(step);
             if (shows && !open) {
                 from = step == 0 ? 0.0 : (previous + t) * .5;
                 open = true;
@@ -241,6 +265,21 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             previous = t;
         }
         if (open) { runs.emplace_back(from, 1.0); }
+        if (!recording) { return; }
+        for (const auto& [a, b] : runs) {
+            drawnStarts.push_back(drawn.size());
+            for (int step = 0; step <= steps; ++step) {
+                const auto t = static_cast<double>(step) / steps;
+                const auto& point = samples[static_cast<std::size_t>(step)];
+                if (t >= a && t <= b && point.has_value()) { drawn.push_back(*point); }
+            }
+        }
+    };
+    const auto commitDrawn = [&] {
+        drawnStarts.push_back(drawn.size());
+        for (std::size_t index = 0; index + 1 < drawnStarts.size(); ++index) { coverage.add(std::span<const Screen>(drawn).subspan(drawnStarts[index], drawnStarts[index + 1] - drawnStarts[index])); }
+        drawn.clear();
+        drawnStarts.clear();
     };
     struct Kept {
         std::unique_ptr<osci::Shape> shape;
@@ -313,11 +352,16 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         return osci::Point(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f, a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f);
     };
     auto& eyes = workspace.eyes;
+    // Every clip's own lines first, then where surfaces cut through each
+    // other: a crossing along an edge already drawn is the one left out.
+    std::vector<std::vector<Kept>> keptBy(items.size());
+    std::vector<char> lostBy(items.size(), 0);
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (cancelled()) { return nullptr; }
-        std::vector<Kept> kept;
+        auto& kept = keptBy[surface];
         bool lost = false;
+        recording = surface + 1 < items.size() || !crossings.empty();
         if (item.drawing == nullptr) {
             // A point source: the line from each point to the next, round the
             // frame; a dark point lifts the pen.
@@ -352,6 +396,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 lost = true;
                 for (const auto& [from, to] : runs) { kept.push_back({std::make_unique<ColouredLine>(mix(a, b, from), mix(a, b, to)), true}); }
             }
+            commitDrawn();
             if (lost) {
                 auto shown = keep(kept, *item.clip);
                 const auto fraction = whole > 0 ? shown->length() / whole : 0.0;
@@ -402,27 +447,38 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 }
             }
         }
-        // Where it cuts through other surfaces: straight on the pieces it was
-        // drawn from, so interpolated between their ends.
-        for (const auto& run : crossings) {
-            if (surfaceTriangles[run.front().triangle].surface != surface) { continue; }
-            for (const auto& piece : run) {
-                const auto sa = screen(piece.eyeFrom), sb = screen(piece.eyeTo);
-                if (!sa.has_value() || !sb.has_value()) { continue; }
-                const auto& corners = surfaceSources[piece.triangle];
-                const auto source = [&](const crossing::Weights& weights) {
-                    const auto mixed = [&](float osci::Point::* axis) { return static_cast<float>(corners[0].*axis * weights[0] + corners[1].*axis * weights[1] + corners[2].*axis * weights[2]); };
-                    return osci::Point(mixed(&osci::Point::x), mixed(&osci::Point::y), mixed(&osci::Point::z));
-                };
-                const auto from = source(piece.from), to = source(piece.to);
-                visibleRuns([&](double t) { return screen(piece.eyeFrom + (piece.eyeTo - piece.eyeFrom) * t); }, std::hypot(sb->x - sa->x, sb->y - sa->y));
-                for (const auto& [a, b] : runs) {
-                    lost = true;
-                    kept.push_back({std::make_unique<osci::Line>(mix(from, to, a), mix(from, to, b)), true});
-                }
+        // A clip's path goes back over its own lines on purpose (the beam
+        // retraces an edge rather than jump), so only other clips' lines can
+        // cover it: what it draws counts once it is whole.
+        commitDrawn();
+        lostBy[surface] = lost;
+    }
+    // Where surfaces cut through each other: straight on the pieces they were
+    // drawn from, so interpolated between their ends.
+    recording = true;
+    for (const auto& run : crossings) {
+        if (cancelled()) { return nullptr; }
+        const auto surface = surfaceTriangles[run.front().triangle].surface;
+        auto& kept = keptBy[surface];
+        for (const auto& piece : run) {
+            const auto sa = screen(piece.eyeFrom), sb = screen(piece.eyeTo);
+            if (!sa.has_value() || !sb.has_value()) { continue; }
+            const auto& corners = surfaceSources[piece.triangle];
+            const auto source = [&](const crossing::Weights& weights) {
+                const auto mixed = [&](float osci::Point::* axis) { return static_cast<float>(corners[0].*axis * weights[0] + corners[1].*axis * weights[1] + corners[2].*axis * weights[2]); };
+                return osci::Point(mixed(&osci::Point::x), mixed(&osci::Point::y), mixed(&osci::Point::z));
+            };
+            const auto from = source(piece.from), to = source(piece.to);
+            visibleRuns([&](double t) { return screen(piece.eyeFrom + (piece.eyeTo - piece.eyeFrom) * t); }, std::hypot(sb->x - sa->x, sb->y - sa->y));
+            commitDrawn();
+            for (const auto& [a, b] : runs) {
+                lostBy[surface] = 1;
+                kept.push_back({std::make_unique<osci::Line>(mix(from, to, a), mix(from, to, b)), true});
             }
         }
-        if (lost) { frame->drawings.push_back({item.index, keep(kept, *item.clip)}); }
+    }
+    for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+        if (lostBy[surface] != 0) { frame->drawings.push_back({items[surface].index, keep(keptBy[surface], *items[surface].clip)}); }
     }
     return frame;
 }
