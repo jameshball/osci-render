@@ -18,13 +18,24 @@ namespace motion::hidden {
 // lose lines, by their index in the prepared composition. A clip not listed
 // draws whole; one listed with no shapes is wholly hidden.
 struct Frame {
-    std::vector<std::pair<std::size_t, std::shared_ptr<const PreparedDrawing>>> drawings;
+    struct Entry {
+        std::size_t clip;
+        std::shared_ptr<const PreparedDrawing> drawing;
+        // For a point source: the fraction of its path that shows, so its
+        // share of the beam is measured as it always is, scaled by it.
+        double shown = 1;
+    };
+    std::vector<Entry> drawings;
 
-    const PreparedDrawing* drawing(std::size_t clip) const {
-        for (const auto& [index, drawing] : drawings) {
-            if (index == clip) { return drawing.get(); }
+    const Entry* entry(std::size_t clip) const {
+        for (const auto& item : drawings) {
+            if (item.clip == clip) { return &item; }
         }
         return nullptr;
+    }
+    const PreparedDrawing* drawing(std::size_t clip) const {
+        const auto* found = entry(clip);
+        return found != nullptr ? found->drawing.get() : nullptr;
     }
 };
 

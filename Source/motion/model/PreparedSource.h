@@ -37,6 +37,8 @@ public:
     std::size_t previewSampleCount() const { return points != nullptr ? points->pointsPerFrame() : 512; }
     double previewPhaseSpan() const { return points != nullptr ? 0.0 : 1.0 / 512; }
     bool hasExplicitColour() const { return points != nullptr && points->hasExplicitColour(); }
+    // The raw frames of a point source; null for vector sources.
+    const PreparedPointFrames* pointFrames() const { return points.get(); }
     double duration() const {
         if (timing != nullptr) { return timing->duration(); }
         const auto seconds = static_cast<double>(frameCount()) / framesPerSecond;

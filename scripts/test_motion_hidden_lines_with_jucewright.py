@@ -74,6 +74,15 @@ def status_says(text, timeout=10.0):
     return False
 
 
+def status_stops_saying(text, timeout=10.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not any(text in str(n.get("value", "")) + str(n.get("name", "")) for n in nodes(json.loads(command("snapshot", "--json", "--full")))):
+            return True
+        time.sleep(.25)
+    return False
+
+
 def lit_on_scope(name):
     """Bright pixels in the Scope: drawn lines."""
     path = session.artifact_dir / name
@@ -116,7 +125,7 @@ try:
     if camera.get("hideHiddenLines") not in ("1", "true"):
         raise RuntimeError("The camera's setting should save with the project")
     step("undo", "click", "--name", "Undo", "--exact")
-    if status_says("hidden lines removed", timeout=1.0):
+    if not status_stops_saying("hidden lines removed"):
         raise RuntimeError("Undo should show the hidden lines again")
     lit_on_scope("restored.png")
     print("Motion hidden lines passed", flush=True)

@@ -19,7 +19,7 @@ public:
         if (composition.hiddenLines == nullptr) { return; }
         const auto* whole = composition.clips.front().source->drawingAt(0);
         expect(whole != nullptr && whole->faces().triangles.size() == 12, "the cube keeps its six faces as twelve triangles");
-        motion::hidden::Solver solver;
+        motion::hidden::DepthBuffer solver;
         const auto frame = motion::hidden::cull(composition, 1, solver);
         const auto* culled = frame->drawing(0);
         expect(culled != nullptr, "some of the cube's lines are hidden");
@@ -57,8 +57,90 @@ public:
         }
         expect(drewCulled, "the planned drawing is the baked one");
 
+        beginTest("A bent mesh hides exactly what its bent faces hide");
+        {
+            auto bent = cubeProject(true);
+            auto bulge = motion::makeEffect(50, *motion::effectDefinition("bulge"));
+            bulge.properties["bulge"] = motion::Curve(.9);
+            bent.tracks.change(0).effects.push_back(bulge);
+            const motion::PreparedComposition bulged(bent);
+            motion::hidden::DepthBuffer bentSolver;
+            const auto bentFrame = motion::hidden::cull(bulged, 1, bentSolver);
+            const auto* source = bulged.clips.front().source->drawingAt(0);
+            const auto* drawn = bentFrame->drawing(0);
+            const auto truth = rayCastShown(bulged, 0, 1);
+            const auto shown = drawn != nullptr ? drawn->length() / source->length() : 1.0;
+            logMessage("Bulged cube: " + juce::String(shown, 4) + " of its length shown; ray casting finds " + juce::String(truth, 4));
+            expectWithinAbsoluteError(shown, truth, .02, "the bulged cube's visible length matches ray casting its bulged surface");
+        }
+
+        beginTest("Point sources are hidden behind meshes, keeping their colours");
+        {
+            auto withPoints = cubeProject(true);
+            // A red ring around the cube, half of it behind.
+            std::vector<motion::PointSample> ring;
+            for (int index = 0; index < 256; ++index) {
+                const auto angle = index * 2 * juce::MathConstants<double>::pi / 256;
+                ring.push_back({static_cast<float>(std::cos(angle) * .9), 0.0f, static_cast<float>(std::sin(angle) * .9), 1.0f, 0.0f, 0.0f});
+            }
+            auto frames = motion::PreparedPointFrames::create(30, 1, ring.size(), std::move(ring));
+            expect(frames.source != nullptr, juce::String(frames.error));
+            auto points = std::make_shared<motion::Asset>();
+            points->id = 3;
+            points->name = "Ring.lua";
+            points->extension = ".lua";
+            points->source = std::make_shared<motion::PreparedSource>(frames.source);
+            withPoints.assets.push_back(points);
+            auto ringClip = motion::Document::makeClip(21, *points, 0);
+            ringClip.duration = 2;
+            motion::Track ringTrack;
+            ringTrack.id = 11;
+            ringTrack.insert(ringClip, withPoints.tempo());
+            withPoints.tracks.push_back(ringTrack);
+            const motion::PreparedComposition prepared(withPoints);
+            motion::hidden::DepthBuffer ringSolver;
+            const auto ringFrame = motion::hidden::cull(prepared, 1, ringSolver);
+            const auto* drawn = ringFrame->drawing(1);
+            expect(drawn != nullptr, "the ring loses its part behind the cube");
+            if (drawn != nullptr) {
+                const auto whole = 2 * juce::MathConstants<double>::pi * .9;
+                expect(drawn->length() < whole * .9 && drawn->length() > whole * .5, "most of the ring shows: " + juce::String(drawn->length() / whole));
+                expect(drawn->sample(.3).r == 1.0f && drawn->sample(.3).g == 0.0f, "what shows keeps its colour");
+            }
+        }
+
+        beginTest("A flat drawing's fill hides what is behind it, never its own outline");
+        {
+            auto behind = cubeProject(true);
+            auto square = std::make_shared<motion::Asset>();
+            square->id = 4;
+            square->name = "Square.svg";
+            square->extension = ".svg";
+            const juce::String svg = R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80" fill="white"/></svg>)";
+            square->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
+            expect(motion::decodeAsset(*square).wasOk());
+            expect(!square->source->drawingAt(0)->faces().empty() && square->source->drawingAt(0)->faces().planar, "a filled SVG has a fill that hides");
+            behind.assets.push_back(square);
+            auto squareClip = motion::Document::makeClip(22, *square, 0);
+            squareClip.duration = 2;
+            squareClip.properties["position.z"] = motion::Curve(1.5);
+            squareClip.properties["scale.x"] = motion::Curve(1.2);
+            squareClip.properties["scale.y"] = motion::Curve(1.2);
+            motion::Track squareTrack;
+            squareTrack.id = 12;
+            squareTrack.insert(squareClip, behind.tempo());
+            behind.tracks.push_back(squareTrack);
+            const motion::PreparedComposition prepared(behind);
+            motion::hidden::DepthBuffer fillSolver;
+            const auto fillFrame = motion::hidden::cull(prepared, 1, fillSolver);
+            const auto* cube = fillFrame->drawing(0);
+            const auto* cubeWhole = prepared.clips[0].source->drawingAt(0);
+            expect(cube != nullptr && cube->length() < cubeWhole->length() * .5, "the square in front hides most of the cube");
+            expect(fillFrame->drawing(1) == nullptr, "the square's own outline is untouched");
+        }
+
         beginTest("Profile: a frame of real meshes, and baking them");
-        for (const auto* model : {"teapot.obj", "lamp.obj"}) {
+        for (const auto& [model, bulge] : {std::pair {"teapot.obj", false}, std::pair {"lamp.obj", false}, std::pair {"teapot.obj", true}}) {
             const auto file = juce::File(__FILE__).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);
             if (!file.existsAsFile()) { continue; }
             auto meshProject = cubeProject(true);
@@ -70,9 +152,10 @@ public:
             expect(motion::decodeAsset(*mesh).wasOk());
             meshProject.assets = {mesh};
             meshProject.tracks.change(0).clips[0].asset = mesh->id;
+            if (bulge) { meshProject.tracks.change(0).effects.push_back(motion::makeEffect(51, *motion::effectDefinition("bulge"))); }
             const motion::PreparedComposition prepared(meshProject);
             const auto faces = prepared.clips.front().source->drawingAt(0)->faces().triangles.size();
-            motion::hidden::Solver meshSolver;
+            motion::hidden::DepthBuffer meshSolver;
             const auto started = juce::Time::getMillisecondCounterHiRes();
             double shown = 0;
             for (int index = 0; index < 20; ++index) {
@@ -85,7 +168,7 @@ public:
             const auto bakeStarted = juce::Time::getMillisecondCounterHiRes();
             motion::hidden::Baker::bakeAll(*prepared.hiddenLines, 48000, stop);
             const auto bake = juce::Time::getMillisecondCounterHiRes() - bakeStarted;
-            logMessage(juce::String(model) + ": " + juce::String(static_cast<int>(faces)) + " triangles, " + juce::String(perFrame, 2) + " ms a frame, "
+            logMessage(juce::String(model) + (bulge ? " bulged" : "") + ": " + juce::String(static_cast<int>(faces)) + " triangles, " + juce::String(perFrame, 2) + " ms a frame, "
                 + juce::String(static_cast<int>(prepared.hiddenLines->frameCount())) + " frames baked in " + juce::String(bake, 0) + " ms, "
                 + juce::String(juce::roundToInt(shown * 100)) + "% of its lines shown");
             expect(shown < .9, "much of a mesh is hidden from any side");
@@ -93,6 +176,61 @@ public:
     }
 
 private:
+    // Whether the ray from the eye to `point` meets the triangle before it.
+    static bool hiddenBy(motion::Vec3 point, motion::Vec3 a, motion::Vec3 b, motion::Vec3 c) {
+        const auto e1 = b - a, e2 = c - a, p = point.cross(e2);
+        const auto determinant = e1.dot(p);
+        if (std::abs(determinant) < 1.0e-14) { return false; }
+        const auto inverse = 1.0 / determinant;
+        const auto s = motion::Vec3 {} - a;
+        const auto u = s.dot(p) * inverse;
+        if (u < 0 || u > 1) { return false; }
+        const auto q = s.cross(e1);
+        const auto v = point.dot(q) * inverse;
+        if (v < 0 || u + v > 1) { return false; }
+        const auto t = e2.dot(q) * inverse;
+        return t > 0 && t < 1 - 3.0e-3;
+    }
+
+    // The fraction of a clip's lines that show, by ray casting many points of
+    // them against a fine grid of its own faces, each point bent as drawn.
+    static double rayCastShown(const motion::PreparedComposition& composition, std::size_t clipIndex, double time) {
+        const auto& clip = composition.clips[clipIndex];
+        const auto* drawing = clip.source->drawingAt(0);
+        const auto eye = [&](osci::Point point) { return composition.eyePoint(clip.processPoint(point, time), time).value_or(motion::Vec3 {}); };
+        std::vector<std::array<motion::Vec3, 3>> surface;
+        constexpr int level = 24;
+        const auto& mesh = drawing->faces();
+        for (const auto& triangle : mesh.triangles) {
+            const auto& a = mesh.vertices[triangle[0]];
+            const auto& b = mesh.vertices[triangle[1]];
+            const auto& c = mesh.vertices[triangle[2]];
+            const auto at = [&](int i, int j) {
+                const auto u = static_cast<float>(i) / level, v = static_cast<float>(j) / level;
+                return eye(osci::Point(a.x + (b.x - a.x) * u + (c.x - a.x) * v, a.y + (b.y - a.y) * u + (c.y - a.y) * v, a.z + (b.z - a.z) * u + (c.z - a.z) * v));
+            };
+            for (int j = 0; j < level; ++j) {
+                for (int i = 0; i + j < level; ++i) {
+                    surface.push_back({at(i, j), at(i + 1, j), at(i, j + 1)});
+                    if (i + j + 1 < level) { surface.push_back({at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)}); }
+                }
+            }
+        }
+        double shown = 0, total = 0;
+        for (std::size_t index = 0; index < drawing->shapeCount(); ++index) {
+            auto* shape = drawing->shape(index);
+            if (shape == nullptr || !(shape->length() > 0)) { continue; }
+            constexpr int samples = 60;
+            for (int sample = 0; sample < samples; ++sample) {
+                const auto point = eye(shape->nextVector((sample + .5f) / samples));
+                const auto hidden = std::any_of(surface.begin(), surface.end(), [&](const auto& face) { return hiddenBy(point, face[0], face[1], face[2]); });
+                total += shape->length() / samples;
+                shown += hidden ? 0 : shape->length() / samples;
+            }
+        }
+        return total > 0 ? shown / total : 1;
+    }
+
     static motion::Project cubeProject(bool hide) {
         motion::Project project;
         project.duration = 2;

@@ -147,6 +147,7 @@ private:
         std::int64_t minimum;
         double share = 1;
         const PreparedDrawing* drawing = nullptr;
+        double shown = 1;
     };
 
     // The beam's travel between two points; a non-finite one counts as far.
@@ -172,16 +173,18 @@ private:
         std::int64_t minimum;
         double share;
         const PreparedDrawing* drawing;
+        double shown;
     };
     // A clip's vector drawing at a frame: with the lines its camera can't see
-    // removed once that frame is baked.
-    static const PreparedDrawing* shownDrawing(const PreparedComposition& composition, const PreparedClip& clip, const PreparedSource& source, std::size_t frame, double time) {
+    // removed once that frame is baked, a point source's frame as the runs of
+    // it that show.
+    static std::pair<const PreparedDrawing*, double> shownDrawing(const PreparedComposition& composition, const PreparedClip& clip, const PreparedSource& source, std::size_t frame, double time) {
         const auto* whole = source.drawingAt(frame);
-        if (whole == nullptr || composition.hiddenLines == nullptr || clip.liveIdentity != nullptr) { return whole; }
+        if (composition.hiddenLines == nullptr || clip.liveIdentity != nullptr) { return {whole, 1.0}; }
         const auto* baked = composition.hiddenLines->at(time);
-        if (baked == nullptr) { return whole; }
-        const auto* culled = baked->drawing(static_cast<std::size_t>(&clip - composition.clips.data()));
-        return culled != nullptr ? culled : whole;
+        if (baked == nullptr) { return {whole, 1.0}; }
+        const auto* culled = baked->entry(static_cast<std::size_t>(&clip - composition.clips.data()));
+        return culled != nullptr ? std::pair {culled->drawing.get(), culled->shown} : std::pair {whole, 1.0};
     }
     static std::optional<Visible> visible(const PreparedComposition& composition, const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
         if (!clip.active(time) || !clip.visible(time)) { return std::nullopt; }
@@ -190,10 +193,12 @@ private:
         const auto* source = clip.resolveSource(liveFrames);
         if (source == nullptr || source->frameCount() == 0) { return std::nullopt; }
         const auto frame = source->frameIndex(clip.localTime(time));
-        const auto* drawing = shownDrawing(composition, clip, *source, frame, time);
+        const auto [drawing, shown] = shownDrawing(composition, clip, *source, frame, time);
         // Wholly hidden behind meshes.
         if (drawing != nullptr && drawing->empty()) { return std::nullopt; }
-        return Visible {source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2), share, drawing};
+        // A point source's runs keep its own budget: no floor per corner.
+        const auto floored = drawing != nullptr && source->drawingAt(frame) != nullptr;
+        return Visible {source, frame, std::max<std::int64_t>(2, floored ? drawing->minimumTraversalSamples() : 2), share, drawing, shown};
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
@@ -203,7 +208,7 @@ private:
             if (layerCount == maximumLayers) { break; }
             const auto shown = visible(composition, clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
-            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share, shown->drawing});
+            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share, shown->drawing, shown->shown});
         }
         finishPlan(composition, first, end, rate);
     }
@@ -216,12 +221,16 @@ private:
         // transforms, so pen-up jumps measure scale as well as strokes do.
         // Point frames have no stored length: sum their lit steps directly.
         const auto* vector = layer.drawing;
-        const auto probes = vector != nullptr ? lengthProbes : pointLengthProbes;
+        // A point source's frame, even as the runs of it that show, is measured
+        // as point frames always are, so hiding lines doesn't change its share.
+        const auto exact = vector != nullptr && layer.source->drawingAt(layer.frame) != nullptr;
+        const auto probes = exact ? lengthProbes : pointLengthProbes;
         osci::Point previousRaw, previousPoint;
         double sourceDistance = 0, projectedDistance = 0, litDistance = 0;
         for (int probe = 0; probe < probes; ++probe) {
             const auto phase = static_cast<double>(probe) / (probes - 1);
-            const auto raw = vector != nullptr ? vector->sample(phase) : layer.source->sampleFrame(layer.frame, phase);
+            // A point source is measured on its own frame, as always.
+            const auto raw = exact ? vector->sample(phase) : layer.source->sampleFrame(layer.frame, phase);
             const auto point = place(composition, *layer.clip, raw).value_or(osci::Point(0, 0, 0, 0, 0, 0));
             if (probe == 0) {
                 layer.start = point;
@@ -235,11 +244,16 @@ private:
             layer.end = point;
             previousRaw = raw; previousPoint = point;
         }
-        if (vector != nullptr) {
+        if (exact) {
             const auto scale = sourceDistance > 1.0e-9 ? projectedDistance / sourceDistance : 1.0;
             layer.length = vector->length() * (std::isfinite(scale) ? scale : 1.0);
         } else {
-            layer.length = litDistance;
+            layer.length = litDistance * layer.shown;
+            // Its runs, though, start and end where the shown part does.
+            if (vector != nullptr) {
+                layer.start = place(composition, *layer.clip, vector->sample(0)).value_or(layer.start);
+                layer.end = place(composition, *layer.clip, vector->sample(1)).value_or(layer.end);
+            }
         }
         layer.length = std::max(minimumLayerLength, layer.length);
         (*layers)[layerCount++] = layer;

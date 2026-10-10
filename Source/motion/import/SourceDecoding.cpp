@@ -8,6 +8,7 @@
 #include "../model/Drawing.h"
 #include "../model/SourceParts.h"
 #include "../model/MeshFaces.h"
+#include "../model/DrawingFill.h"
 #include "FractalPreparation.h"
 #include "../../../modules/osci_file_import/third_party/tinyobjloader/tiny_obj_loader.h"
 #include <cstring>
@@ -108,7 +109,7 @@ PreparedDrawing::Mesh meshFaces(const std::string& content, const std::vector<fl
     return mesh;
 }
 
-juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate, const std::function<juce::Result(int, ImportShapes&)>& draw, const std::atomic<bool>* cancel, std::atomic<double>* progress, const std::function<bool(int)>& repeatsPrevious = {}, PreparedDrawing::Mesh faces = {}) {
+juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate, const std::function<juce::Result(int, ImportShapes&)>& draw, const std::atomic<bool>* cancel, std::atomic<double>* progress, const std::function<bool(int)>& repeatsPrevious = {}, PreparedDrawing::Mesh faces = {}, bool fills = false) {
     if (frameCount <= 0 || static_cast<std::size_t>(frameCount) > maximumSourceFrames
         || !std::isfinite(frameRate) || frameRate <= 0.0 || frameRate > 1000.0
         || !std::isfinite(frameCount / frameRate)) {
@@ -136,7 +137,12 @@ juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate,
             return juce::Result::fail("Animation exceeds the geometry budget (100000 shapes per frame or 1000000 total). Simplify or shorten the source.");
         }
         auto drawing = std::make_shared<motion::PreparedDrawing>(std::move(shapes));
-        if (frame == 0) { drawing->setFaces(std::move(faces)); }
+        // A mesh's faces, or a flat drawing's fill, hide what is behind them.
+        if (frame == 0 && !faces.empty()) {
+            drawing->setFaces(std::move(faces));
+        } else if (fills) {
+            drawing->setFaces(fill::of(*drawing));
+        }
         hasGeometry = hasGeometry || !drawing->empty();
         frames.push_back(std::move(drawing));
         if (progress != nullptr) {
@@ -214,7 +220,7 @@ juce::Result prepareAnimatedText(Asset& asset, const juce::GlyphArrangement& gly
             shape->scale(scale, scale, 1);
         }
         return cancelled(cancel) ? juce::Result::fail("Source preparation cancelled.") : juce::Result::ok();
-    }, cancel, progress, [settled](int frame) { return frame > settled; });
+    }, cancel, progress, [settled](int frame) { return frame > settled; }, {}, true);
 }
 
 bool finiteNumber(const juce::var& value) {
@@ -565,7 +571,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
                 parser.setFrame(frame);
                 shapes = parser.draw();
                 return error.isEmpty() ? juce::Result::ok() : juce::Result::fail(error);
-            }, cancel, progress);
+            }, cancel, progress, {}, {}, true);
 #else
         return juce::Result::fail("Lottie import is not available in this build.");
 #endif
@@ -633,7 +639,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     return prepareSourceFrames(asset, 1, 30.0, [&](int, ImportShapes& frame) {
         frame = std::move(shapes);
         return juce::Result::ok();
-    }, cancel, progress, {}, std::move(faces));
+    }, cancel, progress, {}, std::move(faces), extension == ".svg" || extension == ".txt");
 } catch (const std::bad_alloc&) {
     return juce::Result::fail("Not enough memory to prepare this source. Simplify or shorten it.");
 } catch (const std::exception& error) {
