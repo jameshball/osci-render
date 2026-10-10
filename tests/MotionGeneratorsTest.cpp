@@ -112,6 +112,33 @@ public:
             const auto* whole = prepared.clips[0].source->drawingAt(0);
             expect(star != nullptr && star->length() < whole->length(), "some of the star is behind the box");
         }
+
+        beginTest("A grid is solid: it hides what is behind it, and draws all its own lines");
+        {
+            auto project = generatorProject("star");
+            auto grid = generatorAsset(5, "grid");
+            project.assets.push_back(grid);
+            auto clip = motion::Document::makeClip(6, *grid, 0);
+            clip.duration = 2;
+            clip.properties["position.z"] = motion::Curve(1);
+            clip.properties["generator.width"] = motion::Curve(.4);
+            clip.properties["generator.height"] = motion::Curve(.4);
+            motion::Track track;
+            track.id = 7;
+            track.insert(clip, project.tempo());
+            project.tracks.push_back(track);
+            motion::Camera camera;
+            camera.id = 8;
+            camera.hideHiddenLines = true;
+            project.cameras.push_back(camera);
+            const motion::PreparedComposition prepared(project);
+            motion::hidden::Workspace workspace;
+            const auto frame = motion::hidden::cull(prepared, .5, workspace);
+            const auto* star = frame->drawing(0);
+            const auto* whole = prepared.clips[0].source->drawingAt(0);
+            expect(star != nullptr && star->length() < whole->length(), "some of the star is behind the grid");
+            expect(frame->drawing(1) == nullptr, "the grid loses none of its lines");
+        }
     }
 
 private:

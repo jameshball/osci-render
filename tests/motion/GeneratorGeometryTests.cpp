@@ -46,7 +46,8 @@ void everyGeneratorDraws() {
         for (const auto& triangle : geometry.triangles) {
             for (const auto corner : triangle) { check(corner < geometry.vertices.size(), std::string(definition.name) + "'s faces use its vertices"); }
         }
-        check(geometry.triangles.empty() == (definition.category != GeneratorCategory::solid), std::string(definition.name) + " has faces exactly when it is a solid");
+        const auto hides = definition.category == GeneratorCategory::solid || definition.category == GeneratorCategory::grid;
+        check(geometry.triangles.empty() != hides, std::string(definition.name) + " has faces exactly when it is a solid or a grid");
         for (const auto& spec : definition.parameters) {
             check(spec.id.starts_with("generator."), "parameters are named generator.*");
             check(spec.contains(spec.defaultValue), std::string(spec.label) + " starts in range");
@@ -107,10 +108,32 @@ void shapesAreWhatTheySay() {
 }
 }
 
+// The area a geometry's faces cover, flat as a grid's are.
+double faceArea(const Geometry& geometry) {
+    double area = 0;
+    for (const auto& triangle : geometry.triangles) {
+        const auto& a = geometry.vertices[triangle[0]];
+        const auto& b = geometry.vertices[triangle[1]];
+        const auto& c = geometry.vertices[triangle[2]];
+        area += std::abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2;
+    }
+    return area;
+}
+
+void gridsAreSolid() {
+    // Each grid's face covers just what its lines span.
+    check(std::abs(faceArea(built("grid", {4, 3, 1.2, .9})) - 1.2 * .9) < 1.0e-9, "a grid is solid across its width and height");
+    const auto disc = faceArea(built("polarGrid", {3, 8, .8}));
+    check(std::abs(disc - 3.14159265358979323846 * .64) < .002, "a polar grid is a solid disc of its radius");
+    const auto cell = 3 * std::sqrt(3.0) / 2 * .1 * .1;
+    check(std::abs(faceArea(built("hexGrid", {3, 2, .1})) - 6 * cell) < 1.0e-9, "a hex grid is solid in each of its cells");
+}
+
 int main() {
     everyGeneratorDraws();
     settlesItsNumbers();
     shapesAreWhatTheySay();
+    gridsAreSolid();
     std::cout << "Generator geometry tests passed\n";
     return 0;
 }

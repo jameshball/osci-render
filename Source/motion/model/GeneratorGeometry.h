@@ -30,7 +30,7 @@ struct Geometry {
     // Closed flat shapes whose insides hide what is behind them, as an SVG's
     // fills do (a ring's hole hides nothing).
     bool filled = false;
-    // A solid's faces.
+    // A solid's faces, or a grid's: what hides behind it.
     std::vector<Vec3> vertices;
     std::vector<std::array<std::uint32_t, 3>> triangles;
 };
@@ -41,6 +41,12 @@ constexpr double pi = std::numbers::pi;
 constexpr double circleHandle = 0.5522847498307936;
 
 inline Segment line(Vec3 a, Vec3 b) { return {{a, a, b, b}, false}; }
+// A flat convex face, fanned from its first corner, added to the geometry's.
+inline void addFace(Geometry& geometry, std::initializer_list<Vec3> corners) {
+    const auto first = static_cast<std::uint32_t>(geometry.vertices.size());
+    geometry.vertices.insert(geometry.vertices.end(), corners.begin(), corners.end());
+    for (std::uint32_t corner = 2; corner < corners.size(); ++corner) { geometry.triangles.push_back({first, first + corner - 1, first + corner}); }
+}
 inline Segment cubic(Vec3 a, Vec3 b, Vec3 c, Vec3 d) { return {{a, b, c, d}, true}; }
 inline Vec3 flat(double x, double y) { return {x, y, 0}; }
 inline Vec3 polar(double radius, double degrees) { return flat(radius * std::cos(degrees * pi / 180), radius * std::sin(degrees * pi / 180)); }
@@ -289,6 +295,8 @@ inline Geometry build(const GeneratorDefinition& definition, std::span<const dou
                 const auto down = column % 2 == 0;
                 geometry.paths.push_back({line(flat(x, down ? h / 2 : -h / 2), flat(x, down ? -h / 2 : h / 2))});
             }
+            // Its cells are solid, as a floor or a wall.
+            addFace(geometry, {flat(-w / 2, -h / 2), flat(w / 2, -h / 2), flat(w / 2, h / 2), flat(-w / 2, h / 2)});
             break;
         }
         case GeneratorKind::polarGrid: {
@@ -300,6 +308,12 @@ inline Geometry build(const GeneratorDefinition& definition, std::span<const dou
                 const auto tip = polar(radius, 90 + 360.0 * spoke / spokes);
                 geometry.paths.push_back({outward ? line({}, tip) : line(tip, {})});
             }
+            // A solid disc, its edge within a hair of the outer ring.
+            constexpr int around = 96;
+            const auto centre = static_cast<std::uint32_t>(geometry.vertices.size());
+            geometry.vertices.push_back({});
+            for (int step = 0; step < around; ++step) { geometry.vertices.push_back(polar(radius, 360.0 * step / around)); }
+            for (std::uint32_t step = 0; step < around; ++step) { geometry.triangles.push_back({centre, centre + 1 + step, centre + 1 + (step + 1) % around}); }
             break;
         }
         case GeneratorKind::hexGrid: {
@@ -324,6 +338,9 @@ inline Geometry build(const GeneratorDefinition& definition, std::span<const dou
                         if (!seen.emplace(key(a, b), true).second) { continue; }
                         edges.emplace_back(a, b);
                     }
+                    // Each cell solid.
+                    const auto at = [&](int corner) { return centre + polar(size, 90 + 60.0 * corner); };
+                    addFace(geometry, {at(0), at(1), at(2), at(3), at(4), at(5)});
                 }
             }
             geometry.paths = chained(edges);
