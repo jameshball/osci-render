@@ -273,7 +273,7 @@ private:
     juce::Label undoDescription;
     void refreshUndo();
     // Edit menu ids clear of the menu model's own (1-based per item).
-    static constexpr int undoMenuId = 3001, redoMenuId = 3002;
+    static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100;
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;

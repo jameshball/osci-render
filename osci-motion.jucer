@@ -326,6 +326,10 @@
         <GROUP id="{CMP_MENU}" name="menu">
           <FILE id="ka6rAh" name="MainMenuBarModel.cpp" compile="1" resource="0"
                 file="Source/components/menu/MainMenuBarModel.cpp"/>
+          <FILE id="IsrMnuC" name="InternalSampleRateMenu.cpp" compile="1" resource="0"
+                file="Source/components/menu/InternalSampleRateMenu.cpp"/>
+          <FILE id="IsrMnuH" name="InternalSampleRateMenu.h" compile="0" resource="0"
+                file="Source/components/menu/InternalSampleRateMenu.h"/>
           <FILE id="t6oUhv" name="MainMenuBarModel.h" compile="0" resource="0"
                 file="Source/components/menu/MainMenuBarModel.h"/>
         </GROUP>

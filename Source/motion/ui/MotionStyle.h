@@ -535,12 +535,13 @@ inline void formRow(juce::Rectangle<int>& area, juce::Label& label, juce::Compon
 // Fields recess into the panel they sit on. Sheets (marked with this
 // property) sit on a darker panel than the editor's, so theirs go darker.
 inline constexpr const char* sheetProperty = "motionSheet";
-inline juce::Colour fieldFill(const juce::Component& component) {
+inline bool inSheet(const juce::Component& component) {
     for (auto* parent = &component; parent != nullptr; parent = parent->getParentComponent()) {
-        if (parent->getProperties().contains(sheetProperty)) { return osci::Colours::surfaceSunken(); }
+        if (parent->getProperties().contains(sheetProperty)) { return true; }
     }
-    return osci::Colours::veryDark();
+    return false;
 }
+inline juce::Colour fieldFill(const juce::Component& component) { return inSheet(component) ? osci::Colours::surfaceSunken() : osci::Colours::veryDark(); }
 // One field look for dialogs and popovers: dark, borderless, text 8 px in.
 inline void styleField(juce::Component& component) {
     auto* editor = dynamic_cast<juce::TextEditor*>(&component);
@@ -564,15 +565,13 @@ inline void styleFields(juce::Component& root) {
     styleField(root);
     for (auto* child : root.getChildren()) { styleFields(*child); }
 }
-// Gives a dialog's controls the editor's type sizes and field look. The
-// overlay hands its controls its own look whenever it lays out, so the
-// editor calls this after every overlay layout.
+// Gives a dialog's controls the editor's type sizes, including any that set
+// the overlay's look themselves (the audio settings do). Sheets recess their
+// fields; shared dialogs keep the overlay's, as in osci-render.
 inline void restyleDialog(juce::Component& component, DialogLookAndFeel& look) {
     auto* current = &component.getLookAndFeel();
-    if (current != &look && dynamic_cast<osci::OverlayLookAndFeel*>(current) != nullptr) {
-        styleField(component);
-        component.setLookAndFeel(&look);
-    }
+    if (current != &look && dynamic_cast<osci::OverlayLookAndFeel*>(current) != nullptr) { component.setLookAndFeel(&look); }
+    if (&component.getLookAndFeel() == &look && inSheet(component)) { styleField(component); }
     for (auto* child : component.getChildren()) { restyleDialog(*child, look); }
 }
 // Releases the look before it is destroyed.

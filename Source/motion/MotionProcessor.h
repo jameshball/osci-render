@@ -31,6 +31,8 @@ public:
     MotionProcessor();
     ~MotionProcessor() override;
     void prepareToPlayInternal(double sampleRate, int samplesPerBlock) override;
+    // The standalone app can run faster than the audio device, as osci-render does.
+    bool supportsInternalSampleRateOverride() const override { return OSCI_PREMIUM && wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone; }
     motion::Document document { getUndoManager() };
     std::atomic<bool> playing { false };
     std::atomic<double> position { 0.0 };

@@ -1,6 +1,7 @@
 #include "MotionEditor.h"
 #include "ui/CanvasSizeEditor.h"
 #include "ui/MarkerPanel.h"
+#include "../components/menu/InternalSampleRateMenu.h"
 #include <cstdlib>
 
 namespace {
@@ -110,6 +111,7 @@ void MotionEditor::setUpMenus() {
             juce::PopupMenu output;
             for (int id = 1; id <= 3; ++id) { output.addItem(2000 + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
             menu.addSubMenu("Audio interface plays", output);
+            InternalSampleRateMenu::addSubmenu(menu, processor, sampleRateMenuId);
             menu.addSeparator();
         }
         if (index == timingMenuIndex) {
@@ -138,6 +140,7 @@ void MotionEditor::setUpMenus() {
             monitorOutput.setSelectedId(id - 2000);
             return true;
         }
+        if (index == 4 && InternalSampleRateMenu::handleMenuId(id, sampleRateMenuId, processor, [this] { showPremiumSplashScreen(); })) { return true; }
         if (index == 1 && (id == undoMenuId || id == redoMenuId)) {
             if (id == undoMenuId) { undoRedoControls.undo(); } else { undoRedoControls.redo(); }
             refreshUndo();
@@ -1073,6 +1076,7 @@ void MotionEditor::setScopeFullScreen(bool value) {
 
 void MotionEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
     auto& shown = *overlay;
+    shown.setControlLookAndFeel(&dialogStyle.look);
     CommonPluginEditor::showOverlay(std::move(overlay));
     shown.addComponentListener(&dialogStyle);
     motion::style::restyleDialog(shown, dialogStyle.look);
