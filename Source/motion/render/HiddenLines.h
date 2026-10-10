@@ -211,14 +211,28 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 // Cut a hair in front of the near plane, so every corner kept
                 // (the cut's own, rounding included) is in front of it.
                 constexpr auto cut = nearPlane * (1 + 1.0e-6);
+                // What each corner kept was before the chain, to place what
+                // crosses it: nothing bends the face, so a cut point is as far
+                // along its edge before it as after.
                 std::array<Vec3, 4> kept {};
+                std::array<osci::Point, 4> keptSources {};
                 std::size_t count = 0;
                 const std::array<Vec3, 3> around {*a, *b, *c};
+                const std::array<osci::Point, 3> sources {mesh.vertices[triangle[0]], mesh.vertices[triangle[1]], mesh.vertices[triangle[2]]};
                 for (std::size_t index = 0; index < 3; ++index) {
                     const auto& current = around[index];
                     const auto& next = around[(index + 1) % 3];
-                    if (current.z > cut) { kept[count++] = current; }
-                    if ((current.z > cut) != (next.z > cut)) { kept[count++] = current + (next - current) * ((cut - current.z) / (next.z - current.z)); }
+                    if (current.z > cut) {
+                        keptSources[count] = sources[index];
+                        kept[count++] = current;
+                    }
+                    if ((current.z > cut) != (next.z > cut)) {
+                        const auto along = (cut - current.z) / (next.z - current.z);
+                        const auto& from = sources[index];
+                        const auto& to = sources[(index + 1) % 3];
+                        keptSources[count] = osci::Point(static_cast<float>(from.x + (to.x - from.x) * along), static_cast<float>(from.y + (to.y - from.y) * along), static_cast<float>(from.z + (to.z - from.z) * along));
+                        kept[count++] = current + (next - current) * along;
+                    }
                 }
                 std::array<Screen, 4> at {};
                 bool seen = count >= 3;
@@ -229,10 +243,14 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 }
                 if (seen) { depth.triangle(at[0], at[1], at[2]); }
                 if (seen && count == 4) { depth.triangle(at[0], at[2], at[3]); }
-                // Crossings are only found in front of the eye.
-                if (surfaces > 1 && count == 3 && a->z > nearPlane && b->z > nearPlane && c->z > nearPlane) {
-                    surfaceTriangles.push_back({{*a, *b, *c}, surface});
-                    surfaceSources.push_back({mesh.vertices[triangle[0]], mesh.vertices[triangle[1]], mesh.vertices[triangle[2]]});
+                // Crossings are found in front of the eye, so a face cut at
+                // the near plane joins the search as the pieces kept: a floor
+                // reaching back past the eye still meets what stands on it.
+                if (surfaces > 1 && seen) {
+                    for (std::size_t piece = 2; piece < count; ++piece) {
+                        surfaceTriangles.push_back({{kept[0], kept[piece - 1], kept[piece]}, surface});
+                        surfaceSources.push_back({keptSources[0], keptSources[piece - 1], keptSources[piece]});
+                    }
                 }
                 continue;
             }

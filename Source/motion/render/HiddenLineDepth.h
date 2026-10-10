@@ -120,7 +120,7 @@ public:
         const auto dwdx = ((b.w - a.w) * (cy - ay) - (c.w - a.w) * (by - ay)) * inverseArea;
         const auto dwdy = ((c.w - a.w) * (bx - ax) - (b.w - a.w) * (cx - ax)) * inverseArea;
         const auto slope = std::abs(dwdx) + std::abs(dwdy);
-        const auto push = insidePush * slope + depthPush * std::max({a.w, b.w, c.w});
+        const auto push = insidePush * slope;
         const auto sign = area > 0 ? 1.0 : -1.0;
         // Each edge's test is linear across the pixels, as is depth. A row of
         // a wider triangle visits only the span its edges allow (a pixel wider
@@ -169,7 +169,7 @@ public:
         const auto& plane = planes[static_cast<std::size_t>(here.owner)];
         const auto outside = plane.outside(px, py);
         // Inside the triangle nearest at the pixel's centre: its depth there.
-        if (outside <= 0) { return point.w >= plane.at(px, py); }
+        if (outside <= 0) { return inFront(point, plane.at(px, py)); }
         // Past its edge (a pixel its edge crosses): any triangle nearest at a
         // pixel around this one that covers the point decides. A triangle
         // seen edge on can have the centre of a pixel its edge just crosses;
@@ -183,16 +183,20 @@ public:
                 const auto& other = planes[static_cast<std::size_t>(near.owner)];
                 if (other.outside(px, py) > 0) { continue; }
                 covered = true;
-                if (point.w < other.at(px, py)) { return false; }
+                if (!inFront(point, other.at(px, py))) { return false; }
             }
         }
         if (covered) { return true; }
         // None does: the nearest triangle carried past its edge, pushed back
         // by its slope across as far as the point is outside.
-        return point.w >= plane.at(px, py) - plane.slope * outside;
+        return inFront(point, plane.at(px, py) - plane.slope * outside);
     }
 
 private:
+    // Whether a point is in front of a surface at `w` there, or on it: within
+    // a small part of its own depth, so a surface reaching far nearer the eye
+    // elsewhere is not pushed back further for it.
+    static bool inFront(Screen point, double w) { return point.w * (1 + depthPush) >= w; }
     double toPixelX(double value) const { return (value + originX) * (1 / pixel); }
     double toPixelY(double value) const { return (value + originY) * (1 / pixel); }
     // Which side of the edge from (x0, y0) to (x1, y1) a pixel centre is on:

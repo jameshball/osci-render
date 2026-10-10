@@ -192,6 +192,53 @@ public:
             expectEquals(newLines(withSmallCube("position.x", 3.0f)), 0, "a cube apart from it adds nothing");
         }
 
+        beginTest("A floor reaching back past the eye hides the foot of what is sunk in it, and meets it in a line");
+        {
+            // A cube (about a unit across, as imports are) standing a little
+            // way down through a floor that runs from far behind the camera
+            // to far in front of it.
+            auto standing = cubeProject(true);
+            auto cubeClip = standing.tracks[0].clips[0];
+            cubeClip.properties["rotation.x"] = motion::Curve(0);
+            motion::Track cubeTrack;
+            cubeTrack.id = 10;
+            cubeTrack.insert(cubeClip, standing.tempo());
+            standing.tracks.clear();
+            standing.tracks.push_back(cubeTrack);
+            auto floor = std::make_shared<motion::Asset>();
+            floor->id = 2;
+            floor->name = "Floor.obj";
+            floor->extension = ".obj";
+            const juce::String quad = "v -1 0 -1\nv 1 0 -1\nv 1 0 1\nv -1 0 1\nf 1 2 3 4\n";
+            floor->data.append(quad.toRawUTF8(), quad.getNumBytesAsUTF8());
+            motion::decodeAsset(*floor);
+            standing.assets.push_back(floor);
+            auto floorClip = motion::Document::makeClip(21, *floor, 0);
+            floorClip.duration = 2;
+            floorClip.properties["scale.x"] = motion::Curve(100);
+            floorClip.properties["scale.z"] = motion::Curve(100);
+            floorClip.properties["position.y"] = motion::Curve(-.4);
+            motion::Track floorTrack;
+            floorTrack.id = 11;
+            floorTrack.insert(floorClip, standing.tempo());
+            standing.tracks.push_back(floorTrack);
+            const motion::PreparedComposition prepared(standing);
+            motion::hidden::Workspace workspace;
+            const auto frame = motion::hidden::cull(prepared, 1, workspace);
+            const auto* cube = frame->drawing(0);
+            expect(cube != nullptr, "the floor hides part of the cube");
+            // Heights in the scene, where the floor is.
+            const auto height = [&](osci::Shape& shape, float t) { return prepared.clips[0].processPoint(shape.nextVector(t), 1).y; };
+            int below = 0, crossings = 0;
+            for (std::size_t index = 0; cube != nullptr && index < cube->shapeCount(); ++index) {
+                auto* shape = cube->shape(index);
+                crossings += std::abs(height(*shape, 0) + .4f) < 1.0e-3f && std::abs(height(*shape, 1) + .4f) < 1.0e-3f ? 1 : 0;
+                for (int step = 0; step <= 20; ++step) { below += height(*shape, step / 20.0f) < -.45f ? 1 : 0; }
+            }
+            expectEquals(below, 0, "nothing of the cube below the floor shows");
+            expect(crossings > 0, "where the cube comes up through the floor is drawn");
+        }
+
         beginTest("Hidden lines are removed out to the Scope's edges, a little past the frame");
         {
             // The Scope shows a unit of signal across less than half its

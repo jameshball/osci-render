@@ -123,6 +123,22 @@ void edgeOnNeighbour() {
     check(depth.shows({centre + .3 * pixel, 0, .26}), "and one in front of that face shows");
 }
 
+void reachingPastTheEye() {
+    // A floor a unit under the eye, from just in front of it (cut at the
+    // near plane, its nearest corners a hundred times nearer than its
+    // middle) to far away: a line on it shows, and one 1% further along the
+    // same sight lines, under it, is hidden. Its nearest corners push it back
+    // no further where it is far.
+    const Point3 corners[4] {{-.5, -1, .05}, {.5, -1, .05}, {20, -1, 25}, {-20, -1, 25}};
+    DepthBuffer depth;
+    depth.triangle(project(corners[0]), project(corners[1]), project(corners[2]));
+    depth.triangle(project(corners[0]), project(corners[2]), project(corners[3]));
+    const auto onFloor = [&](double t, double x) { return lerp(lerp(corners[0], corners[3], t), lerp(corners[1], corners[2], t), x); };
+    const auto under = [](Point3 p) { return Point3 {p.x * 1.01, p.y * 1.01, p.z * 1.01}; };
+    check(shown(depth, onFloor(.2, .3), onFloor(.2, .7)) == 1, "a line on a floor reaching past the eye shows");
+    check(shown(depth, under(onFloor(.2, .3)), under(onFloor(.2, .7))) == 0, "one just under it is hidden");
+}
+
 void matchesRayCasting() {
     // Random triangles and points: the buffer agrees with ray casting except
     // within a pixel or two of an edge.
@@ -187,6 +203,7 @@ int main() {
     edgeOn();
     wideCanvas();
     edgeOnNeighbour();
+    reachingPastTheEye();
     matchesRayCasting();
     benchmark();
     std::cout << "Hidden line depth tests passed\n";
