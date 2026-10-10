@@ -104,6 +104,25 @@ void wideCanvas() {
     check(depth.shows(project(behind)), "a square canvas shows nothing there, so nothing there is hidden");
 }
 
+void edgeOnNeighbour() {
+    // A face seen nearly edge on, nearest at a pixel's centre, its edge
+    // passing between that centre and a point just past it; the point lies
+    // just behind a face-on square. The square hides the point though the
+    // edge-on face, not the square, has the pixel.
+    DepthBuffer depth;
+    const auto square = [](double x, double y) { return Screen {x, y, .25}; };
+    depth.triangle(square(-.5, -.5), square(.5, -.5), square(.5, .5));
+    depth.triangle(square(-.5, -.5), square(.5, .5), square(-.5, .5));
+    const auto pixel = DepthBuffer::pixel;
+    const auto centre = (512 + .5) * pixel - DepthBuffer::overscan;
+    const auto edge = centre + .15 * pixel;
+    // Nearest at its edge, rising steeply toward the eye leftward.
+    depth.triangle({edge, -.3, .3}, {edge, .3, .3}, {edge - 5 * pixel, 0, 3});
+    const Screen behind {centre + .3 * pixel, 0, .24};
+    check(!depth.shows(behind), "a point past an edge-on face's edge is still hidden by the face that covers it");
+    check(depth.shows({centre + .3 * pixel, 0, .26}), "and one in front of that face shows");
+}
+
 void matchesRayCasting() {
     // Random triangles and points: the buffer agrees with ray casting except
     // within a pixel or two of an edge.
@@ -167,6 +186,7 @@ int main() {
     cube();
     edgeOn();
     wideCanvas();
+    edgeOnNeighbour();
     matchesRayCasting();
     benchmark();
     std::cout << "Hidden line depth tests passed\n";

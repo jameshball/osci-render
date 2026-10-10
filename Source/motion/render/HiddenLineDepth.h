@@ -14,14 +14,16 @@ struct Screen {
 };
 
 // How far from the middle the Scope shows, in output units: -1 to 1 across a
-// square canvas, and further across the longer side of one that is not.
+// square canvas, and further across the longer side of one that is not; all
+// of it divided by the Scope's gain (a unit of signal spans less than half
+// the canvas, so the Scope shows a little past 1).
 struct Reach {
     double x = 1, y = 1;
 
-    static Reach ofCanvas(int width, int height) {
-        if (width <= 0 || height <= 0) { return {}; }
+    static Reach ofCanvas(int width, int height, double gain = 1) {
+        if (width <= 0 || height <= 0 || !(gain > 0)) { return {}; }
         const auto aspect = static_cast<double>(width) / height;
-        return {std::max(1.0, aspect), std::max(1.0, 1 / aspect)};
+        return {std::max(1.0, aspect) / gain, std::max(1.0, 1 / aspect) / gain};
     }
     bool operator==(const Reach&) const = default;
 };
@@ -52,6 +54,8 @@ public:
     static constexpr double pixel = 2 * overscan / 1024;
     // In squared pixels: far less than a pixel, far more than rounding.
     static constexpr double edgeSlack = 1.0e-6;
+    // How near an edge, in pixels, a point is on it.
+    static constexpr double onEdge = 1.0e-3;
     // How far a plane is pushed back: this much of its depth (a line this
     // close to a surface, two parts touching, is on it, however steeply the
     // surface is seen); its depth slope across this many pixels, for surfaces
@@ -124,7 +128,7 @@ public:
         // short for finding spans to pay. Every pixel visited is tested exactly.
         const Edge edges[3] {Edge::of(ax, ay, bx, by, sign), Edge::of(bx, by, cx, cy, sign), Edge::of(cx, cy, ax, ay, sign)};
         const auto index = static_cast<std::int32_t>(planes.size());
-        planes.push_back({a.w - dwdx * ax - dwdy * ay - push, dwdx, dwdy, slopePush * slope, {edges[0], edges[1], edges[2]}});
+        planes.push_back({a.w - dwdx * ax - dwdy * ay - push, dwdx, dwdy, slopePush * slope, {edges[0].normalised(), edges[1].normalised(), edges[2].normalised()}});
         const auto narrow = right - left < 6;
         const auto spans = narrow ? std::optional<Spans>() : std::optional<Spans>(Spans(edges));
         for (auto y = bottom; y <= top; ++y) {
@@ -163,16 +167,32 @@ public:
         const auto& here = pixels[cell];
         if (here.w == 0) { return true; }
         const auto& plane = planes[static_cast<std::size_t>(here.owner)];
-        const auto inside = plane.at(px, py);
-        if (point.w >= inside) { return true; }
-        // The pixel's centre is inside the triangle, so the point is at most
-        // half its diagonal outside: further behind than that, it is hidden.
-        if (point.w < inside - plane.slope * halfDiagonal) { return false; }
-        return point.w >= inside - plane.slope * plane.outside(px, py);
+        const auto outside = plane.outside(px, py);
+        // Inside the triangle nearest at the pixel's centre: its depth there.
+        if (outside <= 0) { return point.w >= plane.at(px, py); }
+        // Past its edge (a pixel its edge crosses): any triangle nearest at a
+        // pixel around this one that covers the point decides. A triangle
+        // seen edge on can have the centre of a pixel its edge just crosses;
+        // carried past that edge, its steep plane falls away, and whatever
+        // covers the point instead would be lost.
+        bool covered = false;
+        for (auto row = std::max(0, y - 1); row <= std::min(height - 1, y + 1); ++row) {
+            for (auto column = std::max(0, x - 1); column <= std::min(width - 1, x + 1); ++column) {
+                const auto& near = pixels[static_cast<std::size_t>(row) * static_cast<std::size_t>(width) + static_cast<std::size_t>(column)];
+                if (near.w == 0 || near.owner == here.owner) { continue; }
+                const auto& other = planes[static_cast<std::size_t>(near.owner)];
+                if (other.outside(px, py) > 0) { continue; }
+                covered = true;
+                if (point.w < other.at(px, py)) { return false; }
+            }
+        }
+        if (covered) { return true; }
+        // None does: the nearest triangle carried past its edge, pushed back
+        // by its slope across as far as the point is outside.
+        return point.w >= plane.at(px, py) - plane.slope * outside;
     }
 
 private:
-    static constexpr double halfDiagonal = .7072;
     double toPixelX(double value) const { return (value + originX) * (1 / pixel); }
     double toPixelY(double value) const { return (value + originY) * (1 / pixel); }
     // Which side of the edge from (x0, y0) to (x1, y1) a pixel centre is on:
@@ -183,10 +203,10 @@ private:
             return {-sign * (y1 - y0), sign * (x1 - x0), sign * ((y1 - y0) * x0 - (x1 - x0) * y0)};
         }
         double at(double x, double y) const { return stepX * x + stepY * y + offset; }
-        // How far outside the edge a point is, in pixels.
-        double outside(double x, double y) const {
-            const auto side = at(x, y);
-            return side < 0 ? -side / std::hypot(stepX, stepY) : 0.0;
+        // Scaled so that it is the distance from the edge, in pixels.
+        Edge normalised() const {
+            const auto length = std::hypot(stepX, stepY);
+            return length > 0 ? Edge {stepX / length, stepY / length, offset / length} : *this;
         }
     };
     // The pixels of a row that can be inside all three edges. Where an edge
@@ -229,8 +249,12 @@ private:
         double w, dwdx, dwdy, slope;
         Edge edges[3];
         double at(double x, double y) const { return w + dwdx * x + dwdy * y; }
-        // How many pixels outside the triangle a point is.
-        double outside(double x, double y) const { return std::max({edges[0].outside(x, y), edges[1].outside(x, y), edges[2].outside(x, y)}); }
+        // How many pixels outside the triangle a point is: none for a point
+        // on an edge to well within a pixel (a line drawn along it).
+        double outside(double x, double y) const {
+            const auto distance = -std::min({edges[0].at(x, y), edges[1].at(x, y), edges[2].at(x, y)});
+            return distance > onEdge ? distance : 0.0;
+        }
     };
 
     // The inverse depth nearest at a pixel's centre, and whose it is.

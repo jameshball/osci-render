@@ -27,7 +27,7 @@ public:
         waitForThreadToExit(-1);
     }
     // Publisher/message thread only; previous pending work is replaced.
-    std::uint64_t request(const Project& project, double sampleRate, hidden::Reach reach = {}) {
+    std::uint64_t request(const Project& project, double sampleRate, hidden::Reach reach = squareScope()) {
         auto next = std::make_shared<Request>(project, sampleRate, reach, ++revision);
         std::shared_ptr<Request> replaced;
         {

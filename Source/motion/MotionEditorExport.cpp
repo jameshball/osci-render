@@ -104,7 +104,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                 result = temporary->directory.createDirectory();
                 if (result.wasOk() && !state->cancelled.load()) {
                     const auto rate = state->sampleRate;
-                    const motion::PreparedComposition prepared(project, rate, &state->cancelled, motion::CompositionPurpose::signal, motion::hidden::Reach::ofCanvas(config.renderSize.width, config.renderSize.height));
+                    const motion::PreparedComposition prepared(project, rate, &state->cancelled, motion::CompositionPurpose::signal, motion::hidden::Reach::ofCanvas(config.renderSize.width, config.renderSize.height, VisualiserGeometry::signalGain));
                     picture = std::make_shared<const motion::PreparedBeam>(prepared.beam);
                     result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress);
                     if (result.wasOk() && config.includeAudio) {

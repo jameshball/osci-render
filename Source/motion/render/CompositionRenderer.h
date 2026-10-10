@@ -11,6 +11,7 @@
 #include "../model/Vec3.h"
 #include "../live/LiveSourceFrames.h"
 #include "HiddenLineBake.h"
+#include "../../../modules/osci_gui/visualiser/osci_VisualiserGeometry.h"
 #include "../model/PropertySchema.h"
 #include "../model/LuaClipBake.h"
 #include "SampleClock.h"
@@ -373,8 +374,11 @@ struct PreparedBeam {
     }
 };
 
+// What the Scope shows of a square canvas: a little past -1 to 1.
+inline hidden::Reach squareScope() { return hidden::Reach::ofCanvas(1, 1, VisualiserGeometry::signalGain); }
+
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = {}) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = squareScope()) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         // Editor geometry is rebuilt during drags; loudness modulation only
         // matters to the signal, so the envelope is built there alone.

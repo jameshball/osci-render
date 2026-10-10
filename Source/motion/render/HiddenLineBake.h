@@ -46,7 +46,7 @@ struct Frame {
 // yet baked. Frames are kept until the bake is destroyed.
 class Bake {
 public:
-    Bake(std::shared_ptr<const Project> snapshot, double frameRate, double duration, Reach shown = {})
+    Bake(std::shared_ptr<const Project> snapshot, double frameRate, double duration, Reach shown)
         : project(std::move(snapshot)), reach(shown), rate(std::isfinite(frameRate) && frameRate > 0 ? frameRate : 60),
           count(std::isfinite(duration) && duration > 0 ? static_cast<std::size_t>(std::ceil(duration * rate - 1.0e-9)) + 1 : 1),
           slots(std::make_unique<std::atomic<const Frame*>[]>(count)) {

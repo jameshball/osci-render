@@ -18,7 +18,7 @@ public:
     // What the Scope shows across the output canvas; message thread.
     motion::hidden::Reach canvasReach() {
         const auto size = recordingParameters.getCanvasSize();
-        return motion::hidden::Reach::ofCanvas(size.width, size.height);
+        return motion::hidden::Reach::ofCanvas(size.width, size.height, VisualiserGeometry::signalGain);
     }
     enum class OutputMode { soundtrack, xy, xyrgb };
     // Pausing the Scope or sharing its picture are view settings, not edits.

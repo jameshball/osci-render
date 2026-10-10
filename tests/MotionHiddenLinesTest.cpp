@@ -192,6 +192,20 @@ public:
             expectEquals(newLines(withSmallCube("position.x", 3.0f)), 0, "a cube apart from it adds nothing");
         }
 
+        beginTest("Hidden lines are removed out to the Scope's edges, a little past the frame");
+        {
+            // The Scope shows a unit of signal across less than half its
+            // canvas: a little past -1 to 1. A composition's hidden lines
+            // reach as far, and a face there hides what is behind it.
+            const motion::PreparedComposition prepared(cubeProject(true));
+            const auto shown = 1.0 / VisualiserGeometry::signalGain;
+            expect(prepared.hiddenLineReach.x >= shown && prepared.hiddenLineReach.y >= shown, "the bake covers what the Scope shows");
+            motion::hidden::DepthBuffer depth(prepared.hiddenLineReach);
+            const auto at = [](double x, double y) { return motion::hidden::Screen {x, y, .25}; };
+            depth.triangle(at(1.08, -.1), at(1.12, -.1), at(1.12, .1));
+            expect(!depth.shows({1.11, -.05, .2}), "a face just inside the Scope's edge hides what is behind it");
+        }
+
         beginTest("A camera among a mesh's faces, some passing behind it, culls them cut at the near plane");
         {
             // The camera a unit in front of the cube's middle: the faces

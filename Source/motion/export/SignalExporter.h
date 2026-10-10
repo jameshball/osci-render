@@ -8,7 +8,7 @@ namespace motion {
 // Synchronous XYRGB worker export, separate from stereo soundtrack audio.
 class SignalExporter {
 public:
-    static juce::Result write(Project snapshot, const juce::File& destination, double sampleRate, const std::atomic<bool>& cancel, std::atomic<double>* progress = nullptr, hidden::Reach reach = {}) try {
+    static juce::Result write(Project snapshot, const juce::File& destination, double sampleRate, const std::atomic<bool>& cancel, std::atomic<double>* progress = nullptr, hidden::Reach reach = squareScope()) try {
         if (progress != nullptr) {
             progress->store(0.0, std::memory_order_relaxed);
         }
