@@ -3,8 +3,15 @@
 #include "EditorCamera.h"
 #include "../model/Group.h"
 #include <array>
+#include <functional>
 
 namespace motion::editor {
+// The value an owner's property is drawn with at a time, given its keyed
+// value: modulation and links add to or replace keys. The Scene supplies it
+// from what it draws, so handles sit on the object as it moves; without it,
+// handles follow keys alone.
+using DrawnValue = std::function<double(Id owner, std::size_t property, double time, double keyed)>;
+
 namespace transform_detail {
 inline Vec3 rotateX(Vec3 value, double angle) {
     const auto c = std::cos(angle), s = std::sin(angle);
@@ -32,12 +39,13 @@ struct Affine {
     }
 };
 template <typename PropertyMap>
-std::optional<Affine> evaluate(const PropertyMap& properties, double time) {
+std::optional<Affine> evaluate(const PropertyMap& properties, double time, Id owner = 0, const DrawnValue& drawn = {}) {
     std::array<double, objectPropertySpecs.size()> values;
     for (std::size_t i = 0; i < values.size(); ++i) {
         const auto found = properties.find(objectPropertySpecs[i].id);
         if (found != properties.end() && !found->second.valid()) { return std::nullopt; }
         values[i] = found == properties.end() ? objectPropertySpecs[i].defaultValue : found->second.evaluate(time);
+        if (drawn) { values[i] = drawn(owner, i, time, values[i]); }
         if (!std::isfinite(values[i])) { return std::nullopt; }
     }
     constexpr auto radians = std::numbers::pi / 180.0;
@@ -79,7 +87,7 @@ struct TransformFrame {
 
     // Carries the frame up through a group and its ancestors.
     template <typename ProjectType>
-    bool addGroups(const ProjectType& project, Id groupId, double projectTime) {
+    bool addGroups(const ProjectType& project, Id groupId, double projectTime, const DrawnValue& drawn = {}) {
         std::array<Id, maximumGroupDepth> seen {};
         std::size_t depth = 0;
         while (groupId != 0) {
@@ -88,7 +96,7 @@ struct TransformFrame {
             }
             const auto* group = findGroup(project, groupId);
             if (group == nullptr) { return false; }
-            const auto parent = transform_detail::evaluate(group->properties, projectTime);
+            const auto parent = transform_detail::evaluate(group->properties, projectTime, groupId, drawn);
             if (!parent.has_value() || parent->scale.x == 0 || parent->scale.y == 0 || parent->scale.z == 0) {
                 return false;
             }
@@ -118,7 +126,7 @@ private:
 // projection. Own clip rotation/scale do not affect its position property's
 // world delta. A zero own scale is therefore valid; zero ancestor scales aren't.
 template <typename ProjectType>
-std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id clipId, double projectTime) {
+std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id clipId, double projectTime, const DrawnValue& drawn = {}) {
     if (clipId == 0 || !std::isfinite(projectTime) || !std::isfinite(project.bpm) || project.bpm <= 0) {
         return std::nullopt;
     }
@@ -128,13 +136,13 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
             if (clip.id != clipId) { continue; }
             const auto local = clip.localTime(projectTime, project.tempo());
             if (!std::isfinite(local)) { return std::nullopt; }
-            const auto own = transform_detail::evaluate(clip.properties, local);
+            const auto own = transform_detail::evaluate(clip.properties, local, clip.id, drawn);
             if (!own.has_value()) { return std::nullopt; }
             TransformFrame frame;
             frame.worldOrigin = own->position;
             frame.hasPostTransformEffects = transform_detail::hasEffects(track.effects, projectTime)
                 || transform_detail::hasEffects(project.effects, projectTime);
-            if (!frame.addGroups(project, track.group, projectTime)) { return std::nullopt; }
+            if (!frame.addGroups(project, track.group, projectTime, drawn)) { return std::nullopt; }
             return frame;
         }
     }
@@ -144,16 +152,16 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
 // A group's own frame: its position in its parent groups' space. Groups run
 // on project time.
 template <typename ProjectType>
-std::optional<TransformFrame> groupTransformFrame(const ProjectType& project, Id groupId, double projectTime) {
+std::optional<TransformFrame> groupTransformFrame(const ProjectType& project, Id groupId, double projectTime, const DrawnValue& drawn = {}) {
     if (!std::isfinite(projectTime)) { return std::nullopt; }
     const auto* group = findGroup(project, groupId);
     if (group == nullptr) { return std::nullopt; }
-    const auto own = transform_detail::evaluate(group->properties, projectTime);
+    const auto own = transform_detail::evaluate(group->properties, projectTime, groupId, drawn);
     if (!own.has_value()) { return std::nullopt; }
     TransformFrame frame;
     frame.worldOrigin = own->position;
     frame.hasPostTransformEffects = transform_detail::hasEffects(group->effects, projectTime) || transform_detail::hasEffects(project.effects, projectTime);
-    if (!frame.addGroups(project, group->parent, projectTime)) { return std::nullopt; }
+    if (!frame.addGroups(project, group->parent, projectTime, drawn)) { return std::nullopt; }
     return frame;
 }
 
@@ -220,14 +228,14 @@ private:
 };
 
 template <typename ProjectType>
-std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id clipId, double projectTime) {
-    const auto parent = clipTransformFrame(project, clipId, projectTime);
+std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id clipId, double projectTime, const DrawnValue& drawn = {}) {
+    const auto parent = clipTransformFrame(project, clipId, projectTime, drawn);
     if (!parent.has_value()) { return std::nullopt; }
     for (const auto& track : project.tracks) {
         if (track.kind != TrackKind::visual) { continue; }
         for (const auto& clip : track.clips) {
             if (clip.id != clipId) { continue; }
-            const auto transform = transform_detail::evaluate(clip.properties, clip.localTime(projectTime, project.tempo()));
+            const auto transform = transform_detail::evaluate(clip.properties, clip.localTime(projectTime, project.tempo()), clip.id, drawn);
             if (!transform.has_value()) { return std::nullopt; }
             return EulerGizmoFrame { *parent, transform->rotation, transform->scale, transform->anchor };
         }
@@ -238,11 +246,11 @@ std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id 
 // The gizmo for whatever is selected: a clip, or a group, which moves all
 // it holds.
 template <typename ProjectType>
-std::optional<EulerGizmoFrame> gizmoFrameFor(const ProjectType& project, Id id, double projectTime) {
+std::optional<EulerGizmoFrame> gizmoFrameFor(const ProjectType& project, Id id, double projectTime, const DrawnValue& drawn = {}) {
     const auto* group = findGroup(project, id);
-    if (group == nullptr) { return gizmoFrameForClip(project, id, projectTime); }
-    const auto parent = groupTransformFrame(project, id, projectTime);
-    const auto transform = transform_detail::evaluate(group->properties, projectTime);
+    if (group == nullptr) { return gizmoFrameForClip(project, id, projectTime, drawn); }
+    const auto parent = groupTransformFrame(project, id, projectTime, drawn);
+    const auto transform = transform_detail::evaluate(group->properties, projectTime, id, drawn);
     if (!parent.has_value() || !transform.has_value()) { return std::nullopt; }
     return EulerGizmoFrame { *parent, transform->rotation, transform->scale, transform->anchor };
 }

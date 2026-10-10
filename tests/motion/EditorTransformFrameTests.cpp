@@ -193,5 +193,24 @@ int main() {
     grouped.groups[1].parent = 5;
     check(!gizmoFrameFor(grouped, 5, 0), "cyclic groups have no gizmo");
     check(groupHolds(grouped, 6, 5) && groupHolds(grouped, 5, 5) && !groupHolds(grouped, 7, 5), "membership follows the parent chain");
+
+    // Handles follow what is drawn: modulation on top of the keys moves a
+    // clip's origin and turns its axes, and a group's carries what it holds.
+    grouped.groups[1].parent = 0;
+    const DrawnValue modulated = [](Id owner, std::size_t property, double, double keyed) {
+        if (owner == 2 && property == 1) { return keyed + .5; }   // position.y
+        if (owner == 2 && property == 5) { return keyed + 90; }   // rotation.z
+        if (owner == 6 && property == 0) { return keyed + 1; }    // the parent group's position.x
+        return keyed;
+    };
+    const auto keyedOnly = gizmoFrameForClip(grouped, 2, 0);
+    const auto drawn = gizmoFrameForClip(grouped, 2, 0, modulated);
+    check(keyedOnly.has_value() && drawn.has_value(), "a modulated clip has a gizmo");
+    // The parent group moves it 1 along X; its own 0.5 up is turned 30 degrees
+    // by its group and stretched 3 times along X by the parent.
+    check(near(drawn->parent.worldOrigin - keyedOnly->parent.worldOrigin, {1 - .5 * std::sin(30 * radians) * 3, .5 * std::cos(30 * radians), 0}), "modulated position and parents move the origin");
+    check(std::abs(drawn->eulerRadians.z - keyedOnly->eulerRadians.z - 90 * radians) < 1.0e-9, "modulated rotation turns the axes");
+    const auto unmoved = gizmoFrameForClip(grouped, 2, 0, [](Id, std::size_t, double, double keyed) { return keyed; });
+    check(near(unmoved->parent.worldOrigin, keyedOnly->parent.worldOrigin) && near(unmoved->eulerRadians, keyedOnly->eulerRadians), "without modulation the handles follow the keys");
     std::cout << "Editor transform frame tests passed\n";
 }
