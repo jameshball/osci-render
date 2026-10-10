@@ -1,4 +1,5 @@
 #include "MotionEditor.h"
+#include "../JucewrightAutomation.h"
 #include "../visualiser/OfflineVisualiserParameters.h"
 #include "export/SignalExporter.h"
 #include "export/SoundtrackExporter.h"
@@ -51,6 +52,12 @@ void MotionEditor::exportVideo() {
             // overlay owns that callback and its captured project snapshot.
             if (settingsOverlay != nullptr) { settingsOverlay->requestDismiss(); }
             if (owner == nullptr) { return; }
+            // Automation names the file itself: a native save panel can't be driven.
+            const auto automated = osci::isJucewrightAutomationLaunch() ? juce::SystemStats::getEnvironmentVariable("OSCI_MOTION_EXPORT_FILE", {}) : juce::String();
+            if (automated.isNotEmpty()) {
+                owner->startVideoExport(state, project, beamSnapshot, renderMode, config, juce::File(automated), {});
+                return;
+            }
             owner->chooser = std::make_unique<juce::FileChooser>("Export composition video",
                 owner->processor.getLastOpenedDirectory().getChildFile("composition." + config.fileExtension), "*." + config.fileExtension);
             owner->chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
