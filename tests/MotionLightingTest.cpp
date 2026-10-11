@@ -51,6 +51,19 @@ public:
             }
         }
 
+        beginTest("A light brighter than the beam can draw keeps its colour");
+        {
+            auto project = scene();
+            addLight(project, "ambientLight", 30, {{"light.intensity", 3}, {"green", .5}, {"blue", .1}});
+            const motion::PreparedComposition prepared(project);
+            motion::hidden::Workspace workspace;
+            const auto colours = coloursOf(cull(prepared, 1, workspace)->drawing(0));
+            expect(!colours.empty(), "the box is lit");
+            for (const auto& colour : colours) {
+                expect(std::abs(colour[0] - 1) < 1.0e-4f && std::abs(colour[1] - .5f) < 1.0e-4f && std::abs(colour[2] - .1f) < 1.0e-4f, "at full brightness in the light's own orange, not white");
+            }
+        }
+
         beginTest("A point light fades with distance, and lights nothing past its range");
         {
             auto project = scene();

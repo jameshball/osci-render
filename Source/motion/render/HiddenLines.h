@@ -193,6 +193,15 @@ public:
         point.r = lit(point.r, 0);
         point.g = lit(point.g, 1);
         point.b = lit(point.b, 2);
+        // Lit brighter than the beam can draw, it is as bright as it can be in
+        // its own colour: every channel scaled alike, not each cut off at full,
+        // which would turn any strong coloured light white.
+        const auto brightest = std::max({point.r, point.g, point.b});
+        if (brightest > 1) {
+            point.r /= brightest;
+            point.g /= brightest;
+            point.b /= brightest;
+        }
         return point;
     }
     void scale(float, float, float) override {}
