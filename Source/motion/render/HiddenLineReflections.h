@@ -71,14 +71,15 @@ private:
     float factor;
 };
 
-// A curve is cut where it has turned by this much on screen (about 8
-// degrees), so the beam is at each cut at a sample of its own: drawn from
-// sample to sample in straight steps, it still draws a curve as a curve.
-inline constexpr double reflectedBend = .14;
+// A curve is cut where a straight line from the last cut would stray from
+// it by more than this, on screen (a third of a pixel), so the beam is at
+// each cut at a sample of its own: drawn from sample to sample in straight
+// steps, it still draws a curve as a curve, with as few as do that.
+inline constexpr double reflectedStray = DepthBuffer::pixel / 3;
 
 // A mirror's drawing as it is traced: runs that meet go on as one line, and
-// a line is cut where it has bent by reflectedBend on screen, or where its
-// share of the beam changes. A whole line too short to read is left out: it
+// a line is cut where it bends (see reflectedStray), or where its share of
+// the beam changes. A whole line too short to read is left out: it
 // would only cost the beam a stroke's samples.
 class ReflectedLines {
 public:
@@ -96,14 +97,10 @@ public:
             pieceWeight = weight;
         } else if (last.has_value()) {
             lineLength += std::hypot(at.x - last->x, at.y - last->y);
-            const auto angle = std::atan2(at.y - last->y, at.x - last->x);
-            if (heading.has_value()) {
-                turned += std::abs(std::remainder(angle - *heading, 2 * 3.14159265358979323846));
-                if (turned > reflectedBend && stops.size() > 1) { cut(); }
-            }
-            heading = angle;
+            if (strays(at) && stops.size() > 1) { cut(); }
         }
         stops.push_back(point);
+        onScreen.push_back(at);
         last = at;
     }
     // The drawing, once every run is in: every join a corner.
@@ -114,6 +111,19 @@ public:
     }
 
 private:
+    // Whether the straight line from where the piece starts to `at` strays
+    // from the points between by more than reflectedStray.
+    bool strays(Screen at) const {
+        const auto& from = onScreen.front();
+        const auto dx = at.x - from.x, dy = at.y - from.y;
+        const auto length = std::hypot(dx, dy);
+        for (std::size_t index = 1; index < onScreen.size(); ++index) {
+            const auto ox = onScreen[index].x - from.x, oy = onScreen[index].y - from.y;
+            const auto off = length > 0 ? std::abs(ox * dy - oy * dx) / length : std::hypot(ox, oy);
+            if (off > reflectedStray) { return true; }
+        }
+        return false;
+    }
     // Ends the piece at the last point, the next going on from it.
     void cut() {
         if (stops.size() > 1) {
@@ -121,8 +131,8 @@ private:
             line.push_back(std::make_unique<ReflectedLine>(std::move(stops)));
             lineWeights.push_back(pieceWeight);
             stops = {join};
+            onScreen = {onScreen.back()};
         }
-        turned = 0;
     }
     void finishLine() {
         if (stops.size() > 1) {
@@ -136,17 +146,16 @@ private:
         line.clear();
         lineWeights.clear();
         stops.clear();
+        onScreen.clear();
         last.reset();
-        heading.reset();
-        turned = 0;
         lineLength = 0;
     }
     std::vector<std::unique_ptr<osci::Shape>> shapes, line;
     std::vector<double> weights, lineWeights;
     std::vector<osci::Point> stops;
+    std::vector<Screen> onScreen;
     std::optional<Screen> last;
-    std::optional<double> heading;
-    double turned = 0, lineLength = 0, pieceWeight = 1;
+    double lineLength = 0, pieceWeight = 1;
 };
 
 // What each surface that reflects shows of the scene, for a frame: every line
@@ -208,7 +217,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
     std::vector<double> shares;
     std::vector<std::optional<Vec3>> seenAt;
     std::vector<std::optional<Screen>> onScreen;
-    std::vector<char> showing, clear;
+    std::vector<char> showing, clear, rimward;
     std::vector<std::array<float, 3>> colours;
     std::vector<double> shades;
     std::vector<std::size_t> kept;
@@ -254,6 +263,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
             onScreen.resize(count);
             showing.resize(count);
             clear.resize(count);
+            rimward.resize(count);
             for (std::size_t step = 0; step < count; ++step) {
                 shares[step] = low + (high - low) * static_cast<double>(step) / steps;
                 seenAt[step] = reflection(pointAt(shares[step]), step > 0 ? seenAt[step - 1] : std::nullopt);
@@ -261,34 +271,53 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 // The eye sees the mirror there, on what the Scope shows.
                 const auto& at = onScreen[step];
                 const auto shown = at.has_value() && std::abs(at->x) <= reach.x * DepthBuffer::overscan && std::abs(at->y) <= reach.y * DepthBuffer::overscan;
-                showing[step] = shown && (depth == nullptr || byRay || depth->shows(*at)) ? 1 : 0;
+                if (!shown || depth == nullptr) {
+                    showing[step] = shown ? 1 : 0;
+                    continue;
+                }
+                // Facing the eye squarely, a ball's faces are where it is;
+                // only near its rim is the line to the eye followed instead.
+                rimward[step] = 0;
+                if (byRay) {
+                    const auto toEye = eye.position - *seenAt[step];
+                    const auto facing = (*seenAt[step] - mirror.sphere->centre).dot(toEye) / (mirror.sphere->radius * toEye.length());
+                    rimward[step] = facing < .3 ? 1 : 0;
+                }
+                showing[step] = rimward[step] != 0 || depth->shows(*at) ? 1 : 0;
             }
             if (byRay) {
-                findSparsely(steps, [&](int step) {
+                findChanges(steps, [&](int step) {
                     const auto index = static_cast<std::size_t>(step);
-                    if (showing[index] == 0) { return; }
+                    if (rimward[index] == 0 || showing[index] == 0) { return true; }
                     const auto apart = (eye.position - *seenAt[index]).length();
-                    showing[index] = rays.blocked(*seenAt[index], eye.position, 1.0e-6 * (1 + apart), 0, reflector.surface) ? 0 : 1;
-                }, [&](int from, int to) { return showing[static_cast<std::size_t>(from)] != showing[static_cast<std::size_t>(to)]; },
-                    [&](int step, int from, int, float) {
-                        auto& here = showing[static_cast<std::size_t>(step)];
-                        here = here != 0 && showing[static_cast<std::size_t>(from)] != 0 ? 1 : 0;
-                    });
+                    const auto seen = !rays.blocked(*seenAt[index], eye.position, 1.0e-6 * (1 + apart), 0, reflector.surface);
+                    showing[index] = seen ? 1 : 0;
+                    return seen;
+                }, [&](int step, bool seen) {
+                    if (!seen) { showing[static_cast<std::size_t>(step)] = 0; }
+                });
             }
             // And the mirror sees the line: nothing between them. A point on
             // a surface is not hidden by it, to within a little of how far it
             // is, as the camera's depth test allows.
-            findSparsely(steps, [&](int step) {
-                const auto index = static_cast<std::size_t>(step);
-                if (!seenAt[index].has_value()) {
-                    clear[index] = 0;
-                    return;
+            // Only where the eye sees the mirror.
+            std::fill(clear.begin(), clear.end(), 0);
+            for (std::size_t start = 0; start < count;) {
+                if (showing[start] == 0) {
+                    ++start;
+                    continue;
                 }
-                const auto point = pointAt(shares[index]);
-                const auto apart = (point - *seenAt[index]).length();
-                clear[index] = rays.blocked(*seenAt[index], point, 1.0e-6 * (1 + apart), 1.0e-6 + DepthBuffer::depthPush * apart, ignored) ? 0 : 1;
-            }, [&](int from, int to) { return clear[static_cast<std::size_t>(from)] != clear[static_cast<std::size_t>(to)]; },
-                [&](int step, int from, int, float) { clear[static_cast<std::size_t>(step)] = clear[static_cast<std::size_t>(from)]; });
+                auto end = start;
+                while (end + 1 < count && showing[end + 1] != 0) { ++end; }
+                findChanges(static_cast<int>(end - start), [&](int step) {
+                    const auto index = start + static_cast<std::size_t>(step);
+                    const auto point = pointAt(shares[index]);
+                    const auto apart = (point - *seenAt[index]).length();
+                    clear[index] = rays.blocked(*seenAt[index], point, 1.0e-6 * (1 + apart), 1.0e-6 + DepthBuffer::depthPush * apart, ignored) ? 0 : 1;
+                    return clear[index] != 0;
+                }, [&](int step, bool answer) { clear[start + static_cast<std::size_t>(step)] = answer ? 1 : 0; });
+                start = end + 1;
+            }
             // Runs of it that show, from halfway to what doesn't either side.
             std::size_t index = 0;
             while (index < count) {

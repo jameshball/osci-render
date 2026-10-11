@@ -66,6 +66,35 @@ void findSparsely(int steps, Find&& find, Differ&& differ, Blend&& blend) {
     }
 }
 
+// Yes-or-no answers at every step from 0 to `steps`, found by `find(step)`
+// at every sixth and, between two that differ, by halving the steps between
+// until the change is found; where two agree, the steps between take their
+// answer (`fill(step, answer)`). For what changes rarely along a line, such
+// as whether something is in the way.
+template <typename Find, typename Fill>
+void findChanges(int steps, Find&& find, Fill&& fill) {
+    constexpr int stride = 6;
+    const auto between = [&](auto&& self, int from, bool before, int to, bool after) -> void {
+        if (to - from < 2) { return; }
+        if (before == after) {
+            for (auto step = from + 1; step < to; ++step) { fill(step, before); }
+            return;
+        }
+        const auto middle = (from + to) / 2;
+        const auto here = find(middle);
+        self(self, from, before, middle, here);
+        self(self, middle, here, to, after);
+    };
+    auto previous = find(0);
+    for (int from = 0; from < steps;) {
+        const auto to = std::min(steps, from + stride);
+        const auto next = find(to);
+        between(between, from, previous, to, next);
+        previous = next;
+        from = to;
+    }
+}
+
 // The light reaching a point of a clip, in each colour: what the lights give
 // it, as far as the clip is lit by lights (at 0 its own colour, 1 in every
 // channel). `shade` is told what shadows take from it.

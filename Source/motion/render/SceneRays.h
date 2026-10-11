@@ -103,11 +103,57 @@ private:
             nodes[at].count = end - begin;
             return;
         }
-        // Halved at the middle triangle along the longest side of their
-        // centres' box, the halves side by side.
-        const auto middle = begin + (end - begin) / 2;
-        std::nth_element(order.begin() + begin, order.begin() + middle, order.begin() + end,
-            [&](std::uint32_t one, std::uint32_t other) { return centres[one][axis] < centres[other][axis]; });
+        // Split where the two halves' boxes would be least often crossed:
+        // by their surface areas times how many triangles each holds,
+        // trying a few cuts along the longest side of the centres' box.
+        constexpr int bins = 12;
+        struct Bin {
+            Vec3 low {largest, largest, largest}, high {-largest, -largest, -largest};
+            std::uint32_t count = 0;
+        };
+        std::array<Bin, bins> binned {};
+        const auto binOf = [&](std::uint32_t triangle) {
+            return std::min(bins - 1, static_cast<int>((centres[triangle][axis] - centreLow[axis]) / extent[axis] * bins));
+        };
+        for (auto index = begin; index < end; ++index) {
+            const auto& face = triangles[order[index]];
+            auto& bin = binned[static_cast<std::size_t>(binOf(order[index]))];
+            ++bin.count;
+            for (const auto& corner : {face.a, face.b, face.c}) {
+                bin.low = {std::min(bin.low.x, corner.x), std::min(bin.low.y, corner.y), std::min(bin.low.z, corner.z)};
+                bin.high = {std::max(bin.high.x, corner.x), std::max(bin.high.y, corner.y), std::max(bin.high.z, corner.z)};
+            }
+        }
+        const auto area = [](Vec3 a, Vec3 b) {
+            const auto size = b - a;
+            return size.x < 0 ? 0.0 : size.x * size.y + size.y * size.z + size.z * size.x;
+        };
+        double best = largest;
+        int cut = bins / 2;
+        for (int split = 1; split < bins; ++split) {
+            Bin left, right;
+            for (int index = 0; index < bins; ++index) {
+                auto& side = index < split ? left : right;
+                const auto& bin = binned[static_cast<std::size_t>(index)];
+                if (bin.count == 0) { continue; }
+                side.count += bin.count;
+                side.low = {std::min(side.low.x, bin.low.x), std::min(side.low.y, bin.low.y), std::min(side.low.z, bin.low.z)};
+                side.high = {std::max(side.high.x, bin.high.x), std::max(side.high.y, bin.high.y), std::max(side.high.z, bin.high.z)};
+            }
+            if (left.count == 0 || right.count == 0) { continue; }
+            const auto cost = area(left.low, left.high) * left.count + area(right.low, right.high) * right.count;
+            if (cost < best) {
+                best = cost;
+                cut = split;
+            }
+        }
+        auto middle = static_cast<std::uint32_t>(std::partition(order.begin() + begin, order.begin() + end, [&](std::uint32_t triangle) { return binOf(triangle) < cut; }) - order.begin());
+        // Every centre in one bin: halved at the middle triangle instead.
+        if (middle == begin || middle == end) {
+            middle = begin + (end - begin) / 2;
+            std::nth_element(order.begin() + begin, order.begin() + middle, order.begin() + end,
+                [&](std::uint32_t one, std::uint32_t other) { return centres[one][axis] < centres[other][axis]; });
+        }
         const auto children = static_cast<std::uint32_t>(nodes.size());
         nodes[at].start = children;
         nodes[at].count = 0;
