@@ -595,7 +595,7 @@ end clickDenyButton
 
         self.app_pid = None
 
-    def launch_app(self, label: str) -> None:
+    def launch_app(self, label: str, env: dict | None = None) -> None:
         self.stop_app()
         time.sleep(0.5)
 
@@ -635,6 +635,8 @@ end clickDenyButton
         # treats it as frontmost); OSCI_AUTOMATION_FOREGROUND=1 brings it forward.
         if sys.platform == "darwin" and os.environ.get("OSCI_AUTOMATION_FOREGROUND") != "1":
             command.append("--background")
+        for name, value in (env or {}).items():
+            command += ["--env", f"{name}={value}"]
 
         prompt_watcher = self.start_audio_permission_prompt_watcher()
         try:
