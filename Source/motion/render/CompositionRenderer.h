@@ -93,6 +93,17 @@ struct TransformPose {
         const auto value = curves[litIndex].evaluate(time) / 100;
         return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 1.0;
     }
+    // How brightly it reflects, 0..1.
+    static double reflectsAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
+        const auto value = curves[reflectsIndex].evaluate(time) / 100;
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
+    }
+    // Whether it may reflect at some time: keys, a link or modulators can
+    // lift it above nothing.
+    static bool mayReflect(const std::array<Curve, objectPropertySpecs.size()>& curves) {
+        const auto& curve = curves[reflectsIndex];
+        return curve.base > 0 || curve.drivers != nullptr || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [](const Keyframe& key) { return key.value > 0; });
+    }
     static double beamAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
         const auto value = curves[beamIndex].evaluate(time);
         return std::isfinite(value) ? std::clamp(value, 0.0, maximumBeam) : 0.0;
@@ -198,6 +209,15 @@ struct PreparedClipStage {
         for (const auto& group : groups) { value *= TransformPose::litAt(group.curves, scopeTime(time)); }
         return value;
     }
+    // Its own Reflects, or a group's holding it, whichever is more.
+    double stageReflects(double time) const {
+        auto value = TransformPose::reflectsAt(curves, localTime(time));
+        for (const auto& group : groups) { value = std::max(value, TransformPose::reflectsAt(group.curves, scopeTime(time))); }
+        return value;
+    }
+    bool stageMayReflect() const {
+        return TransformPose::mayReflect(curves) || std::any_of(groups.begin(), groups.end(), [](const auto& group) { return TransformPose::mayReflect(group.curves); });
+    }
     double stageBeam(double time) const {
         auto value = TransformPose::beamAt(curves, localTime(time));
         for (const auto& group : groups) { value *= group.beam(scopeTime(time)); }
@@ -243,6 +263,16 @@ struct PreparedClip : PreparedClipStage {
         auto value = stageLit(time);
         for (const auto& ancestor : ancestors) { value *= ancestor.stageLit(time); }
         return std::isfinite(value) ? value : 1.0;
+    }
+    // How brightly its surfaces reflect: its own Reflects, or its groups' or
+    // nested placements', whichever is most.
+    double reflects(double time) const {
+        auto value = stageReflects(time);
+        for (const auto& ancestor : ancestors) { value = std::max(value, ancestor.stageReflects(time)); }
+        return value;
+    }
+    bool mayReflect() const {
+        return stageMayReflect() || std::any_of(ancestors.begin(), ancestors.end(), [](const auto& ancestor) { return ancestor.stageMayReflect(); });
     }
     const PreparedSource* resolveSource(const LiveSourceFrames* liveFrames = nullptr) const noexcept {
         if (liveIdentity != nullptr) { return liveFrames != nullptr ? liveFrames->resolve(liveIdentity.get()) : nullptr; }
@@ -585,13 +615,15 @@ struct PreparedComposition {
             clips.clear();
             lights.clear();
         }
-        // Frames whose hidden lines a camera removes, or that lights light,
-        // are baked off the render thread.
+        // Frames whose hidden lines a camera removes, that lights light, or
+        // in which something reflects, are baked off the render thread.
         const auto hides = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.hidesHiddenLines; });
-        if (purpose == CompositionPurpose::signal && preparationError.isEmpty() && (hides || !lights.empty())) {
+        const auto reflective = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayReflect(); });
+        if (purpose == CompositionPurpose::signal && preparationError.isEmpty() && (hides || !lights.empty() || reflective)) {
             hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach);
             hiddenLines->hides = hides;
             hiddenLines->lights = !lights.empty();
+            hiddenLines->reflects = reflective;
         }
     }
 
@@ -655,7 +687,14 @@ struct PreparedComposition {
         if (!std::isfinite(time) || !point.hasFinitePosition()) {
             return std::nullopt;
         }
-        point = applyCompositionEffects(point, time);
+        return projectWorld(applyCompositionEffects(point, time), time);
+    }
+    // A point already in the scene, after every effect, as only the camera
+    // places it: a reflection, found where the scene is seen in a mirror.
+    std::optional<osci::Point> projectWorld(osci::Point point, double time) const {
+        if (!std::isfinite(time) || !point.hasFinitePosition()) {
+            return std::nullopt;
+        }
         const auto& view = views.at(time, [&] {
             const auto* camera = activeCamera(time);
             return View {camera != nullptr, camera != nullptr ? camera->frame(time) : std::nullopt};
@@ -715,6 +754,24 @@ struct PreparedComposition {
     // Whether any light shines at a time: without one, everything is as bright as it is.
     bool lit(double time) const {
         return std::any_of(lights.begin(), lights.end(), [&](const PreparedLight& light) { return light.clip.active(time); });
+    }
+    // Whether anything shown at a time reflects.
+    bool reflects(double time) const {
+        return std::any_of(clips.begin(), clips.end(), [&](const PreparedClip& clip) { return !clip.light && clip.active(time) && clip.visible(time) && clip.reflects(time) > 0; });
+    }
+    // The eye the frame is seen from, in the scene: the active camera's, or
+    // without cameras the fixed framing's, four units in front of the
+    // middle looking back at it.
+    struct Viewpoint {
+        Vec3 position, right, up, forward;
+        double focalLength = 1;
+    };
+    std::optional<Viewpoint> viewpoint(double time) const {
+        const auto* camera = activeCamera(time);
+        if (camera == nullptr) { return Viewpoint {{0, 0, 4}, {1, 0, 0}, {0, 1, 0}, {0, 0, -1}, 4}; }
+        const auto frame = camera->frame(time);
+        if (!frame.has_value()) { return std::nullopt; }
+        return Viewpoint {frame->position, frame->right, frame->up, frame->forward, frame->focalLength};
     }
     // A world point in the active camera's eye space (x right, y up, z along
     // its view), as projectVisible sees it before dividing by depth; none

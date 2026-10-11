@@ -6,6 +6,8 @@
 #include "HiddenLineCrossings.h"
 #include "HiddenLineDepth.h"
 #include "HiddenLineFingerprint.h"
+#include "HiddenLineReflections.h"
+#include "HiddenLineScene.h"
 #include "HiddenLineDicing.h"
 #include "Lighting.h"
 #include "../model/Vec3.h"
@@ -83,17 +85,6 @@ inline bool bends(const PreparedClipStage& stage) {
         || std::any_of(stage.groups.begin(), stage.groups.end(), [](const auto& group) { return bends(group.effects); });
 }
 
-// The shortest run that culling leaves kept, in output units (the frame
-// spans -1 to 1): anything shorter would only draw a dot.
-inline constexpr double shortestOnScreen = .012;
-// Lines are tested every half pixel along their true path.
-inline constexpr double testStep = DepthBuffer::pixel;
-// A piece this short at the end of a cut run (two pixels) is too small to
-// see but would cost the beam a sample of its own, so it is trimmed.
-inline constexpr double sliver = 2 * DepthBuffer::pixel;
-// Nothing nearer the eye than this is drawn or hides anything.
-inline constexpr double nearPlane = Projection::nearPlane;
-
 // A crossing lies on both its surfaces, so one on a triangle nothing can be
 // seen of never shows. Small triangles (every diced piece) none of whose
 // corners, edge middles or middle shows are dropped before crossings are
@@ -117,18 +108,6 @@ inline void dropUnseen(std::vector<crossing::Triangle>& triangles, std::vector<s
     triangles.resize(kept);
     sources.resize(kept);
 }
-
-// A clip of the frame being culled or lit: its drawing at that time (or, for
-// a point source, its frame of points), and whether anything bends it.
-struct SceneItem {
-    std::size_t index;
-    const PreparedClip* clip;
-    std::shared_ptr<const PreparedSource> source;
-    const PreparedDrawing* drawing;
-    const PreparedPointFrames* points;
-    std::size_t frame;
-    bool bent;
-};
 
 // Which of a drawing's faces each of its lines runs along, by triangle: two
 // for an edge between faces, one for an edge of a surface, none for a line on
@@ -183,26 +162,14 @@ public:
     };
     LitPart(std::shared_ptr<osci::Shape> whole, float from, float to, std::vector<Stop> stops) : shape(std::move(whole)), start(from), end(to), lights(std::move(stops)) {}
     osci::Point nextVector(float progress) override {
-        auto point = shape->nextVector(start + (end - start) * progress);
         const auto next = std::upper_bound(lights.begin(), lights.end(), progress, [](float value, const Stop& stop) { return value < stop.at; });
         const auto& after = next == lights.end() ? lights.back() : *next;
         const auto& before = next == lights.begin() ? lights.front() : *(next - 1);
         const auto span = after.at - before.at;
         const auto blend = span > 0 ? std::clamp((progress - before.at) / span, 0.0f, 1.0f) : 0.0f;
-        const auto lit = [&](float own, std::size_t channel) { return (own < 0 ? 1.0f : own) * (before.light[channel] + (after.light[channel] - before.light[channel]) * blend); };
-        point.r = lit(point.r, 0);
-        point.g = lit(point.g, 1);
-        point.b = lit(point.b, 2);
-        // Lit brighter than the beam can draw, it is as bright as it can be in
-        // its own colour: every channel scaled alike, not each cut off at full,
-        // which would turn any strong coloured light white.
-        const auto brightest = std::max({point.r, point.g, point.b});
-        if (brightest > 1) {
-            point.r /= brightest;
-            point.g /= brightest;
-            point.b /= brightest;
-        }
-        return point;
+        std::array<float, 3> light {};
+        for (std::size_t channel = 0; channel < 3; ++channel) { light[channel] = before.light[channel] + (after.light[channel] - before.light[channel]) * blend; }
+        return litColour(shape->nextVector(start + (end - start) * progress), light);
     }
     void scale(float, float, float) override {}
     void translate(float, float, float) override {}
@@ -218,15 +185,6 @@ private:
     float start, end;
     std::vector<Stop> lights;
 };
-
-// How much of the beam's time a lit part takes for its length, beside the
-// rest: less the dimmer its brightest light, down to a little. Drawn more
-// quickly where it is dim, it leaves its time to what is bright, and a part
-// fading out gives its time back as it fades rather than all at once when it
-// goes. Its colour stays the light it takes, so what the light dims evenly is
-// still dimmer; this only shares the beam among the parts.
-inline constexpr double leastLitWeight = .05;
-inline double litWeight(double brightest) { return std::clamp(std::sqrt(std::max(0.0, brightest)), leastLitWeight, 1.0); }
 
 // Every surface's faces (meshes', and flat drawings' fills) drawn into a
 // depth buffer as an eye sees them: a camera, to hide lines, or a light, to
@@ -326,6 +284,8 @@ struct Workspace {
     std::vector<std::pair<double, double>> runs;
     Dicer dicer;
     ShadowBuffers shadows;
+    // What stands between mirrors and what they show.
+    SceneRays rays;
     std::vector<LightView> lights;
     // Which faces each line of a drawing runs along, found once a drawing
     // (whose source is kept alive here, so its address is never another's).
@@ -385,7 +345,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto view = camera != nullptr ? camera->frame(time) : std::nullopt;
     const auto hides = camera != nullptr && camera->hidesHiddenLines && view.has_value();
     const auto lit = composition.lit(time);
-    if (!hides && !lit) { return frame; }
+    const auto reflecting = composition.reflects(time);
+    if (!hides && !lit && !reflecting) { return frame; }
     std::vector<SceneItem> items;
     for (std::size_t index = 0; index < composition.clips.size(); ++index) {
         const auto& clip = composition.clips[index];
@@ -535,7 +496,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     }
     // Hiding lines, a camera that sees no surface hides nothing.
     const auto hiding = hides && !depth.isEmpty();
-    if (!hiding && !lit) { return frame; }
+    if (!hiding && !lit && !reflecting) { return frame; }
 
     // What is hidden, and what would be drawn twice: every line, every pixel
     // along its true path. A point shows where nothing is in front of it and
@@ -892,45 +853,30 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     endsAt = place(item, shape->nextVector(1));
                 }
                 const auto straight = startsAt.has_value() && endsAt.has_value();
-                const auto lightAt = [&](int step) {
+                const auto lightStep = [&](int step) {
                     const auto t = static_cast<double>(step) / steps;
                     const auto at = straight ? std::optional<Vec3>(*startsAt + (*endsAt - *startsAt) * t) : place(item, shape->nextVector(static_cast<float>(t)));
-                    std::array<float, 3> reaching {};
                     double shade = 0;
-                    if (at.has_value()) {
-                        const auto total = illumination(lights, *at, piece.normals, &shade);
-                        for (std::size_t channel = 0; channel < 3; ++channel) { reaching[channel] = 1 + response * (static_cast<float>(total[channel]) - 1); }
-                    }
                     ts[static_cast<std::size_t>(step)] = t;
-                    light[static_cast<std::size_t>(step)] = reaching;
+                    light[static_cast<std::size_t>(step)] = at.has_value() ? lightAt(lights, *at, piece.normals, response, &shade) : std::array<float, 3> {};
                     shades[static_cast<std::size_t>(step)] = at.has_value() ? shade : -1;
                 };
-                // Every few steps first; the steps between are found only
-                // where their ends' shadows differ, either is dark or their
-                // light differs by much, and blended elsewhere: away from a
+                // Found finely only where their ends' shadows differ, either
+                // is dark or their light differs by much: away from a
                 // shadow's edge, light changes smoothly along a line.
-                constexpr int stride = 3;
-                constexpr float alike = 1.0f / 64;
-                lightAt(0);
-                for (int from = 0; from < steps;) {
-                    const auto to = std::min(steps, from + stride);
-                    lightAt(to);
+                findSparsely(steps, lightStep, [&](int from, int to) {
                     const auto& a = light[static_cast<std::size_t>(from)];
                     const auto& b = light[static_cast<std::size_t>(to)];
+                    constexpr float alike = 1.0f / 64;
                     const auto darkEnd = std::max({a[0], a[1], a[2]}) < dark || std::max({b[0], b[1], b[2]}) < dark;
-                    const auto differs = std::abs(shades[static_cast<std::size_t>(from)] - shades[static_cast<std::size_t>(to)]) > 1.0e-6
+                    return darkEnd || std::abs(shades[static_cast<std::size_t>(from)] - shades[static_cast<std::size_t>(to)]) > 1.0e-6
                         || std::abs(a[0] - b[0]) > alike || std::abs(a[1] - b[1]) > alike || std::abs(a[2] - b[2]) > alike;
-                    for (auto step = from + 1; step < to; ++step) {
-                        if (darkEnd || differs) {
-                            lightAt(step);
-                            continue;
-                        }
-                        const auto blend = static_cast<float>(step - from) / static_cast<float>(to - from);
-                        ts[static_cast<std::size_t>(step)] = static_cast<double>(step) / steps;
-                        for (std::size_t channel = 0; channel < 3; ++channel) { light[static_cast<std::size_t>(step)][channel] = a[channel] + (b[channel] - a[channel]) * blend; }
+                }, [&](int step, int from, int to, float share) {
+                    ts[static_cast<std::size_t>(step)] = static_cast<double>(step) / steps;
+                    for (std::size_t channel = 0; channel < 3; ++channel) {
+                        light[static_cast<std::size_t>(step)][channel] = light[static_cast<std::size_t>(from)][channel] + (light[static_cast<std::size_t>(to)][channel] - light[static_cast<std::size_t>(from)][channel]) * share;
                     }
-                    from = to;
-                }
+                });
                 const auto isDark = [&](std::size_t index) { return std::max({light[index][0], light[index][1], light[index][2]}) < dark; };
                 // The parts any light reaches: from halfway to the dark either side.
                 const auto firstMade = litPieces.size();
@@ -993,11 +939,33 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         }
     }
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+        // A mirror shows the scene in place of itself: its own lines are
+        // as much dimmer as it reflects, and gone when it reflects wholly.
+        const auto itself = 1 - items[surface].clip->reflects(time);
+        if (itself < 1) {
+            auto& pieces = keptBy[surface];
+            if (itself > 0) {
+                for (auto& piece : pieces) {
+                    piece.shape = std::make_unique<DimmedShape>(std::move(piece.shape), static_cast<float>(itself));
+                    piece.weight *= litWeight(itself);
+                }
+            } else {
+                pieces.clear();
+            }
+            lostBy[surface] = 1;
+        }
         if (lostBy[surface] == 0) { continue; }
         auto shown = keep(keptBy[surface], *items[surface].clip);
         const auto whole = wholeBy[surface];
         const auto fraction = whole < 0 ? 1.0 : whole > 0 ? shown->length() / whole : 0.0;
         frame->drawings.push_back({items[surface].index, std::move(shown), fraction});
+    }
+    // What mirrors show.
+    const auto viewpoint = reflecting ? composition.viewpoint(time) : std::nullopt;
+    if (viewpoint.has_value()) {
+        auto shown = reflect(composition, time, items, world, place, normalsOf, lights, lit, *viewpoint, composition.hiddenLineReach, hiding ? &depth : nullptr, workspace.rays, cancelled);
+        if (!shown.has_value()) { return nullptr; }
+        frame->reflections = std::move(*shown);
     }
     return frame;
 }

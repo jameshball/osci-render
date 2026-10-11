@@ -51,6 +51,8 @@ public:
         // The vector drawing drawn (hidden lines removed, when baked); none
         // for point frames.
         const PreparedDrawing* drawing = nullptr;
+        // Its points are in the scene already: a clip's reflections.
+        bool world = false;
     };
 
     // Cycles never straddle a frame of the project's frame rate, so exported
@@ -142,6 +144,8 @@ private:
         double shown = 1;
         // Fewer samples that still reach every stroke's ends.
         std::int64_t coarse = 2;
+        // A clip's reflections: points in the scene, placed by the camera alone.
+        bool world = false;
     };
 
     // The beam's travel between two points; a non-finite one counts as far.
@@ -154,8 +158,10 @@ private:
     static osci::Point dark(osci::Point point) { point.r = point.g = point.b = 0; return point; }
     static bool lit(const osci::Point& point) { return point.r > 0 || point.g > 0 || point.b > 0; }
 
-    // A clip's point on screen at the plan time; none behind the camera.
-    std::optional<osci::Point> place(const PreparedComposition& composition, const PreparedClip& clip, const osci::Point& raw) const {
+    // A clip's point on screen at the plan time; none behind the camera. A
+    // reflection's point is in the scene already.
+    std::optional<osci::Point> place(const PreparedComposition& composition, const PreparedClip& clip, const osci::Point& raw, bool world = false) const {
+        if (world) { return composition.projectWorld(raw, planTime); }
         return composition.projectVisible(clip.processPoint(raw, planTime), planTime);
     }
 
@@ -206,6 +212,16 @@ private:
             if (!shown.has_value()) { continue; }
             measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share, shown->drawing, shown->shown, shown->coarse});
         }
+        // What mirrors show, each drawn as part of its clip.
+        const auto* baked = composition.hiddenLines != nullptr ? composition.hiddenLines->at(time) : nullptr;
+        for (std::size_t index = 0; baked != nullptr && index < baked->reflections.size() && layerCount < maximumLayers; ++index) {
+            const auto& reflection = baked->reflections[index];
+            if (reflection.clip >= composition.clips.size() || reflection.drawing == nullptr || reflection.drawing->empty()) { continue; }
+            const auto& clip = composition.clips[reflection.clip];
+            if (clip.light || !clip.active(time) || !clip.visible(time) || !(clip.beam(time) > 0)) { continue; }
+            const auto& drawing = *reflection.drawing;
+            measure(composition, {&clip, nullptr, 0, 0, {}, {}, std::max<std::int64_t>(2, drawing.minimumTraversalSamples()), clip.beam(time), &drawing, 1, std::max<std::int64_t>(2, drawing.coarseTraversalSamples()), true});
+        }
         finishPlan(composition, first, end, rate);
     }
 
@@ -219,7 +235,7 @@ private:
         const auto* vector = layer.drawing;
         // A point source's frame, even as the runs of it that show, is measured
         // as point frames always are, so hiding lines doesn't change its share.
-        const auto exact = vector != nullptr && layer.source->drawingAt(layer.frame) != nullptr;
+        const auto exact = vector != nullptr && (layer.world || layer.source->drawingAt(layer.frame) != nullptr);
         const auto probes = exact ? lengthProbes : pointLengthProbes;
         osci::Point previousRaw, previousPoint;
         double sourceDistance = 0, projectedDistance = 0, litDistance = 0;
@@ -227,7 +243,7 @@ private:
             const auto phase = static_cast<double>(probe) / (probes - 1);
             // A point source is measured on its own frame, as always.
             const auto raw = exact ? vector->sample(phase) : layer.source->sampleFrame(layer.frame, phase);
-            const auto point = place(composition, *layer.clip, raw).value_or(osci::Point(0, 0, 0, 0, 0, 0));
+            const auto point = place(composition, *layer.clip, raw, layer.world).value_or(osci::Point(0, 0, 0, 0, 0, 0));
             if (probe == 0) {
                 layer.start = point;
             } else {
@@ -271,6 +287,7 @@ private:
         // strokes' ends alone, and so on until the rest fit; past that, the
         // heaviest are traced evenly along their length (two samples at
         // least), and only then does the last in the travel order drop.
+        // Reflections go through all that before the rest does.
         std::int64_t budget = 0;
         std::array<std::int64_t, maximumLayers> counts{};
         std::array<std::int64_t, maximumLayers> floors{};
@@ -283,35 +300,42 @@ private:
             std::int64_t minimum = 0;
             for (std::size_t i = 0; i < layerCount; ++i) { minimum += std::min(floors[i], total); }
             if (budget >= minimum || (layerCount == 1 && budget >= 2)) { break; }
-            // The heaviest that can make do with its strokes' ends.
-            std::size_t heaviest = layerCount;
-            for (std::size_t i = 0; i < layerCount; ++i) {
-                if (floors[i] > items[i].coarse && (heaviest == layerCount || floors[i] > floors[heaviest])) { heaviest = i; }
-            }
-            if (heaviest != layerCount) {
-                floors[heaviest] = items[heaviest].coarse;
-                continue;
-            }
-            // Past that, every layer gives up the same share of what its
-            // strokes' ends need, keeping its longest strokes whole (three
-            // samples each at least), so none is starved for the rest and
-            // the frame is never split across cycles.
-            if (budget > 0 && std::any_of(floors.begin(), floors.begin() + static_cast<std::ptrdiff_t>(layerCount), [](std::int64_t floor) { return floor > 3; })) {
+            // What mirrors show gives way first: it is simplified as far as
+            // it can be before anything it shows is.
+            bool eased = false;
+            for (const auto reflectionsOnly : {true, false}) {
+                const auto yields = [&](std::size_t i) { return !reflectionsOnly || items[i].world; };
+                // The heaviest that can make do with its strokes' ends.
+                std::size_t heaviest = layerCount;
+                for (std::size_t i = 0; i < layerCount; ++i) {
+                    if (yields(i) && floors[i] > items[i].coarse && (heaviest == layerCount || floors[i] > floors[heaviest])) { heaviest = i; }
+                }
+                if (heaviest != layerCount) {
+                    floors[heaviest] = items[heaviest].coarse;
+                    eased = true;
+                    break;
+                }
+                // Past that, every layer gives up the same share of what its
+                // strokes' ends need, keeping its longest strokes whole (three
+                // samples each at least), so none is starved for the rest and
+                // the frame is never split across cycles.
+                if (budget <= 0) { break; }
                 std::int64_t fixed = 0, scalable = 0;
                 for (std::size_t i = 0; i < layerCount; ++i) {
-                    if (floors[i] <= 3) { fixed += floors[i]; } else { scalable += floors[i]; }
+                    if (floors[i] <= 3 || !yields(i)) { fixed += floors[i]; } else { scalable += floors[i]; }
                 }
+                if (scalable == 0) { continue; }
                 const auto room = static_cast<double>(std::max<std::int64_t>(0, budget - fixed));
-                const auto scale = scalable > 0 ? std::min(1.0, room / static_cast<double>(scalable)) : 1.0;
-                bool changed = false;
+                const auto scale = std::min(1.0, room / static_cast<double>(scalable));
                 for (std::size_t i = 0; i < layerCount; ++i) {
-                    if (floors[i] <= 3) { continue; }
+                    if (floors[i] <= 3 || !yields(i)) { continue; }
                     const auto next = std::max<std::int64_t>(3, static_cast<std::int64_t>(std::floor(static_cast<double>(floors[i]) * scale)));
-                    changed = changed || next != floors[i];
+                    eased = eased || next != floors[i];
                     floors[i] = next;
                 }
-                if (changed) { continue; }
+                if (eased) { break; }
             }
+            if (eased) { continue; }
             --layerCount;
         }
         if (layerCount == 0) {
@@ -396,7 +420,7 @@ private:
             }
             const auto& layer = items[i];
             if (layer.drawing != nullptr && layer.drawing->coarseTraversalSamples() > counts[i]) { planSimplified = true; }
-            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing});
+            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing, layer.world});
             cursor += counts[i];
         }
         hold(exitOf(layerCount - 1), dwell);
@@ -537,7 +561,7 @@ private:
                     raw = drawing != nullptr ? drawing->sample(static_cast<double>(step) * span, span) : segment->source->sampleFrame(segment->frame, static_cast<double>(step) * span, span);
                 }
                 // Behind the camera there is no position: hold dark at the entry.
-                return place(composition, *segment->clip, raw).value_or(dark(segment->from));
+                return place(composition, *segment->clip, raw, segment->world).value_or(dark(segment->from));
             }
         }
         return {0, 0, 0, 0, 0, 0};

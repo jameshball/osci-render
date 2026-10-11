@@ -27,8 +27,11 @@ public:
     // their ends, for drawings whose strokes end where something hides them.
     // `weights`, one per shape when given: how much of the beam's time each
     // takes for its length, so a dimly lit part is drawn quickly and a bright
-    // one slowly (1 is as any line).
-    explicit PreparedDrawing(std::vector<std::unique_ptr<osci::Shape>> source, bool fadeOpenEnds = false, const std::vector<double>& weights = {}) : fading(fadeOpenEnds), shapes(std::move(source)) {
+    // one slowly (1 is as any line). `joinsTurn`: every shape meets the next
+    // at a corner, so the beam is at each join at a sample of its own, for a
+    // curve cut into pieces where it bends.
+    explicit PreparedDrawing(std::vector<std::unique_ptr<osci::Shape>> source, bool fadeOpenEnds = false, const std::vector<double>& weights = {}, bool joinsTurn = false)
+        : fading(fadeOpenEnds), turning(joinsTurn), shapes(std::move(source)) {
         ends.reserve(shapes.size());
         osci::Point firstStart, previousEnd;
         bool havePositive = false;
@@ -161,7 +164,7 @@ public:
 
 private:
     Mesh meshFaces;
-    bool fading = false;
+    bool fading = false, turning = false;
     // A run of a stroke walked as one: shapes joined smoothly, from where the
     // stroke starts or turns a corner to the next.
     struct TraversalSegment {
@@ -233,7 +236,7 @@ private:
                 detailed.strokes.push_back({detailed.segments.size(), detailed.segments.size(), false});
                 detailed.segments.push_back({index, index, 0, before, ends[index]});
                 strokeStart = start;
-            } else if (corner(previousShape, index)) {
+            } else if (turning || corner(previousShape, index)) {
                 detailed.segments.push_back({index, index, 0, before, ends[index]});
             } else {
                 // Joined smoothly: the run goes on through it.

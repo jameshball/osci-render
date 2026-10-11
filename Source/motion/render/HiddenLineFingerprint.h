@@ -8,13 +8,15 @@ namespace motion::hidden {
 // numbers: the active camera and its view, each light, then for each clip
 // whether it plays and shows, which drawing of its source it shows, and every
 // pose and effect setting along its chain (its colour aside: that is applied
-// as the beam draws, after what is baked). Two times with equal
+// as the beam draws, after what is baked, except where a mirror shows it,
+// which bakes its colour into the reflection). Two times with equal
 // fingerprints cull to the same frame, so a bake can reuse one for the other:
 // a still stretch of a project costs one frame.
 class Fingerprint {
 public:
     void take(const PreparedComposition& composition, double time) {
         values.clear();
+        colours = composition.reflects(time);
         const auto* camera = composition.activeCamera(time);
         add(camera != nullptr ? static_cast<double>(camera - composition.cameras.data()) : -1.0);
         if (camera != nullptr) {
@@ -38,7 +40,7 @@ public:
             const auto active = clip.active(time);
             add(active ? 1.0 : 0.0);
             if (!active) { continue; }
-            add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0, clip.lit(time));
+            add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0, clip.lit(time), clip.reflects(time));
             // The drawing it shows (frames that repeat one are the same), or
             // for a point source the frame.
             const auto frame = clip.source != nullptr ? clip.source->frameIndex(clip.localTime(time)) : 0;
@@ -56,6 +58,7 @@ private:
     void addPose(const TransformPose& pose) {
         for (std::size_t axis = 0; axis < 3; ++axis) { add(pose.scale[axis], pose.translation[axis], pose.anchor[axis]); }
         for (const auto& row : pose.rotation) { add(row[0], row[1], row[2]); }
+        if (colours) { add(pose.colour[0], pose.colour[1], pose.colour[2]); }
     }
     void addEffects(const std::vector<PreparedEffect>& effects, double time) {
         for (const auto& effect : effects) {
@@ -79,5 +82,7 @@ private:
     }
 
     std::vector<double> values;
+    // Whether colours count: when something reflects.
+    bool colours = false;
 };
 }

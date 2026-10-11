@@ -50,6 +50,8 @@
             resource="0" file="tests/MotionGeneratorsTest.cpp"/>
       <FILE id="MotionLighting" name="MotionLightingTest.cpp" compile="1"
             resource="0" file="tests/MotionLightingTest.cpp"/>
+      <FILE id="MotionReflection" name="MotionReflectionTest.cpp" compile="1"
+            resource="0" file="tests/MotionReflectionTest.cpp"/>
       <FILE id="MotionEffectMove" name="MotionEffectMoveTest.cpp" compile="1"
             resource="0" file="tests/MotionEffectMoveTest.cpp"/>
       <FILE id="MotionTypography" name="MotionTypographyTest.cpp" compile="1"

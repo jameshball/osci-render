@@ -27,6 +27,10 @@ struct Frame {
         double shown = 1;
     };
     std::vector<Entry> drawings;
+    // What each reflecting clip shows of the scene: its drawing's points are
+    // in the scene, coloured as they are drawn, and only the camera places
+    // them. Drawn as part of that clip, with its share of the beam.
+    std::vector<Entry> reflections;
 
     const Entry* entry(std::size_t clip) const {
         for (const auto& item : drawings) {
@@ -62,8 +66,9 @@ public:
     // shows of it, for the bake's workers.
     const std::shared_ptr<const Project> project;
     const Reach reach;
-    // What it bakes: lines a camera hides, light from lights, or both.
-    bool hides = true, lights = false;
+    // What it bakes: lines a camera hides, light from lights, reflections,
+    // or any of them together.
+    bool hides = true, lights = false, reflects = false;
 
     double frameRate() const { return rate; }
     std::size_t frameCount() const { return count; }

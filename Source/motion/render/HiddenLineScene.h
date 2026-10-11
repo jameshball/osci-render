@@ -1,0 +1,95 @@
+#pragma once
+
+#include "CompositionRenderer.h"
+#include "HiddenLineDepth.h"
+#include "Lighting.h"
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <memory>
+
+// What culling, lighting and reflecting a frame share: the clips in it, how
+// finely lines are walked, and how light colours them.
+namespace motion::hidden {
+// The shortest run that culling leaves kept, in output units (the frame
+// spans -1 to 1): anything shorter would only draw a dot.
+inline constexpr double shortestOnScreen = .012;
+// Lines are tested every half pixel along their true path.
+inline constexpr double testStep = DepthBuffer::pixel;
+// A piece this short at the end of a cut run (two pixels) is too small to
+// see but would cost the beam a sample of its own, so it is trimmed.
+inline constexpr double sliver = 2 * DepthBuffer::pixel;
+// Nothing nearer the eye than this is drawn or hides anything.
+inline constexpr double nearPlane = Projection::nearPlane;
+
+// A clip of the frame being culled or lit: its drawing at that time (or, for
+// a point source, its frame of points), and whether anything bends it.
+struct SceneItem {
+    std::size_t index;
+    const PreparedClip* clip;
+    std::shared_ptr<const PreparedSource> source;
+    const PreparedDrawing* drawing;
+    const PreparedPointFrames* points;
+    std::size_t frame;
+    bool bent;
+};
+
+// How much of the beam's time a lit part takes for its length, beside the
+// rest: less the dimmer its brightest light, down to a little. Drawn more
+// quickly where it is dim, it leaves its time to what is bright, and a part
+// fading out gives its time back as it fades rather than all at once when it
+// goes. Its colour stays the light it takes, so what the light dims evenly is
+// still dimmer; this only shares the beam among the parts.
+inline constexpr double leastLitWeight = .05;
+inline double litWeight(double brightest) { return std::clamp(std::sqrt(std::max(0.0, brightest)), leastLitWeight, 1.0); }
+
+// Values at every step from 0 to `steps`, found by `find(step)` at every
+// third, and at those between only where `differ(from, to)` says the found
+// ones either side need them; elsewhere `blend(step, from, to, share)` fills
+// them in. For what changes smoothly almost everywhere along a line.
+template <typename Find, typename Differ, typename Blend>
+void findSparsely(int steps, Find&& find, Differ&& differ, Blend&& blend) {
+    constexpr int stride = 3;
+    find(0);
+    for (int from = 0; from < steps;) {
+        const auto to = std::min(steps, from + stride);
+        find(to);
+        const auto fine = differ(from, to);
+        for (auto step = from + 1; step < to; ++step) {
+            if (fine) {
+                find(step);
+            } else {
+                blend(step, from, to, static_cast<float>(step - from) / static_cast<float>(to - from));
+            }
+        }
+        from = to;
+    }
+}
+
+// The light reaching a point of a clip, in each colour: what the lights give
+// it, as far as the clip is lit by lights (at 0 its own colour, 1 in every
+// channel). `shade` is told what shadows take from it.
+inline std::array<float, 3> lightAt(const std::vector<LightView>& lights, Vec3 point, const Normals& normals, float response, double* shade = nullptr) {
+    const auto total = illumination(lights, point, normals, shade);
+    std::array<float, 3> light {};
+    for (std::size_t channel = 0; channel < 3; ++channel) { light[channel] = 1 + response * (static_cast<float>(total[channel]) - 1); }
+    return light;
+}
+
+// A point's own colour (white where it has none) times the light reaching
+// it. Lit brighter than the beam can draw, it is as bright as it can be in
+// its own colour: every channel scaled alike, not each cut off at full,
+// which would turn any strong coloured light white.
+inline osci::Point litColour(osci::Point point, const std::array<float, 3>& light) {
+    point.r = (point.r < 0 ? 1.0f : point.r) * light[0];
+    point.g = (point.g < 0 ? 1.0f : point.g) * light[1];
+    point.b = (point.b < 0 ? 1.0f : point.b) * light[2];
+    const auto brightest = std::max({point.r, point.g, point.b});
+    if (brightest > 1) {
+        point.r /= brightest;
+        point.g /= brightest;
+        point.b /= brightest;
+    }
+    return point;
+}
+}

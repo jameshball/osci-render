@@ -31,8 +31,10 @@ inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
 // beam's time: 2x draws it twice as slowly (brighter on a scope) and takes the
 // time from the others; 0 leaves it out. Lit by lights is how far lights light
 // it: at 0 it draws in its own colour whatever lights shine, as a flame or a
-// screen gives off its own light.
-inline constexpr std::array<PropertySpec, 18> objectPropertySpecs {{
+// screen gives off its own light. Reflects is how brightly its surfaces show
+// the rest of the scene, as a mirror does: at 100 a perfect mirror. A group's
+// makes what it holds reflect at least as much.
+inline constexpr std::array<PropertySpec, 19> objectPropertySpecs {{
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.y", "Position Y", "Position", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.z", "Position Z", "Position", "Z", -unbounded, unbounded, 0, .01, 3, ""},
@@ -51,13 +53,14 @@ inline constexpr std::array<PropertySpec, 18> objectPropertySpecs {{
     {"anchor.z", "Anchor Z", "Anchor", "Z", -unbounded, unbounded, 0, .01, 3, ""},
     {"beam", "Beam", "Beam", "", 0, maximumBeam, 1, .01, 2, "×"},
     {"lit", "Lit by lights", "Lit by lights", "", 0, 100, 100, 1, 0, "%"},
+    {"reflects", "Reflects", "Reflects", "", 0, 100, 0, 1, 0, "%"},
 }};
-inline constexpr std::size_t opacityIndex = 12, anchorIndex = 13, beamIndex = 16, litIndex = 17;
+inline constexpr std::size_t opacityIndex = 12, anchorIndex = 13, beamIndex = 16, litIndex = 17, reflectsIndex = 18;
 
 // The same properties as Properties shows them: the anchor closes Transform.
 inline constexpr auto objectInspectorSpecs = [] {
-    constexpr std::array<std::size_t, 18> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 16};
-    std::array<PropertySpec, 18> result {};
+    constexpr std::array<std::size_t, 19> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 18, 16};
+    std::array<PropertySpec, 19> result {};
     for (std::size_t index = 0; index < order.size(); ++index) { result[index] = objectPropertySpecs[order[index]]; }
     return result;
 }();
