@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "../model/LightPresets.h"
 #include "ViewNavigation.h"
 #include "TrackHeader.h"
 #include "TrackLayout.h"
@@ -353,6 +354,8 @@ private:
 
     void showClipMenu(motion::Id id);
     void createGroup(motion::Id trackId, motion::Id parent);
+    // Puts a preset on a light clip, or takes its preset off.
+    void applyLightPreset(motion::Id id, std::optional<motion::LightPreset> preset);
 public:
     // Tracks and groups picked together by their headers (Cmd or Shift),
     // for grouping them in one go (Cmd+G).

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../CommonPluginEditor.h"
+#include "model/LightPresets.h"
 #include "MotionProcessor.h"
 #include "ui/TimelineView.h"
 #include "ui/BeamShares.h"
@@ -142,7 +143,8 @@ private:
     void closeSceneEditor();
     void showDrawingEditor(motion::Id asset);
     // A generator's source, and a clip of it at the playhead on a new track.
-    void addGenerator(const motion::GeneratorDefinition& definition);
+    // A generator's clip; a light's with a preset on it, named for the preset.
+    void addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset = std::nullopt);
     void previewDrawing();
     motion::Id drawingAsset = 0;
     // Text sources are written in the Scene, with the Scope previewing them.

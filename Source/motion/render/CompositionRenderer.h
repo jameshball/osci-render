@@ -88,6 +88,11 @@ struct TransformPose {
         const auto value = curves[opacityIndex].evaluate(time) / 100;
         return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
     }
+    // How far lights light it, 0..1.
+    static double litAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
+        const auto value = curves[litIndex].evaluate(time) / 100;
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 1.0;
+    }
     static double beamAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
         const auto value = curves[beamIndex].evaluate(time);
         return std::isfinite(value) ? std::clamp(value, 0.0, maximumBeam) : 0.0;
@@ -188,6 +193,11 @@ struct PreparedClipStage {
         if (!(TransformPose::opacityAt(curves, local) > 0) || !(TransformPose::beamAt(curves, local) > 0)) { return false; }
         return std::all_of(groups.begin(), groups.end(), [&](const auto& group) { return group.visible(scopeTime(time)); });
     }
+    double stageLit(double time) const {
+        auto value = TransformPose::litAt(curves, localTime(time));
+        for (const auto& group : groups) { value *= TransformPose::litAt(group.curves, scopeTime(time)); }
+        return value;
+    }
     double stageBeam(double time) const {
         auto value = TransformPose::beamAt(curves, localTime(time));
         for (const auto& group : groups) { value *= group.beam(scopeTime(time)); }
@@ -210,6 +220,8 @@ struct PreparedClip : PreparedClipStage {
     std::shared_ptr<const PreparedSource> source;
     std::vector<PreparedClipStage> ancestors; // inner-to-outer
     Id rootTrack = 0; // the main timeline track this clip plays on
+    // A light, pictured in the Scene: the beam never draws it.
+    bool light = false;
 
     Id editorId() const { return ancestors.empty() ? id : ancestors.back().id; }
     bool active(double time) const { return time >= start && time < end; }
@@ -224,6 +236,13 @@ struct PreparedClip : PreparedClipStage {
         auto value = stageBeam(time);
         for (const auto& ancestor : ancestors) { value *= ancestor.stageBeam(time); }
         return std::isfinite(value) ? value : 0.0;
+    }
+    // How far lights light it: its own Lit by lights times its groups' and
+    // its nested placements'.
+    double lit(double time) const {
+        auto value = stageLit(time);
+        for (const auto& ancestor : ancestors) { value *= ancestor.stageLit(time); }
+        return std::isfinite(value) ? value : 1.0;
     }
     const PreparedSource* resolveSource(const LiveSourceFrames* liveFrames = nullptr) const noexcept {
         if (liveIdentity != nullptr) { return liveFrames != nullptr ? liveFrames->resolve(liveIdentity.get()) : nullptr; }
@@ -558,6 +577,7 @@ struct PreparedComposition {
                 lights.push_back(std::move(light));
                 return;
             }
+            item.light = generator != nullptr && generator->category == GeneratorCategory::light;
             clips.push_back(std::move(item));
         }, cancel);
         if (!expanded) { preparationError = expanded.error; }
@@ -593,12 +613,12 @@ struct PreparedComposition {
     BeamSelection selectBeam(double time, double phase) const {
         double allocation = 0.0;
         for (const auto& clip : clips) {
-            if (clip.active(time) && clip.visible(time)) { allocation += clip.beam(time); }
+            if (!clip.light && clip.active(time) && clip.visible(time)) { allocation += clip.beam(time); }
         }
         if (!(allocation > 0.0)) { return {}; }
         auto cursor = phase * allocation;
         for (const auto& clip : clips) {
-            if (!clip.active(time) || !clip.visible(time)) { continue; }
+            if (clip.light || !clip.active(time) || !clip.visible(time)) { continue; }
             const auto share = clip.beam(time);
             if (cursor < share) { return {&clip, cursor / share, allocation / share}; }
             cursor -= share;

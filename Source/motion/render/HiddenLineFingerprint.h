@@ -38,7 +38,7 @@ public:
             const auto active = clip.active(time);
             add(active ? 1.0 : 0.0);
             if (!active) { continue; }
-            add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0);
+            add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0, clip.lit(time));
             // The drawing it shows (frames that repeat one are the same), or
             // for a point source the frame.
             const auto frame = clip.source != nullptr ? clip.source->frameIndex(clip.localTime(time)) : 0;

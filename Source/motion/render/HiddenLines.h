@@ -798,6 +798,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             if (cancelled()) { return nullptr; }
             const auto& item = items[surface];
             std::vector<Kept> litPieces;
+            // What lights do to it: at 0 it keeps its own colour, lit or not.
+            const auto response = static_cast<float>(item.clip->lit(time));
             for (auto& piece : keptBy[surface]) {
                 std::shared_ptr<osci::Shape> shape = std::move(piece.shape);
                 // Its length in the frame, from a few points of it.
@@ -817,7 +819,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     std::array<float, 3> reaching {};
                     if (at.has_value()) {
                         const auto total = illumination(lights, *at, piece.normals);
-                        for (std::size_t channel = 0; channel < 3; ++channel) { reaching[channel] = static_cast<float>(total[channel]); }
+                        for (std::size_t channel = 0; channel < 3; ++channel) { reaching[channel] = 1 + response * (static_cast<float>(total[channel]) - 1); }
                     }
                     ts.push_back(t);
                     light.push_back(reaching);

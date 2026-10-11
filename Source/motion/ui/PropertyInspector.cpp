@@ -85,9 +85,9 @@ void MotionPropertyInspector::refresh() {
         const auto* generator = targetGenerator();
         if (generator != nullptr) { specList.assign(generator->parameters.begin(), generator->parameters.end()); }
         const auto base = motion::propertySpecs(*found);
-        // A light takes no share of the beam: it draws nothing.
+        // A light draws nothing: it takes no share of the beam, and lights nothing of itself.
         const auto light = generator != nullptr && generator->category == motion::GeneratorCategory::light;
-        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [light](const auto& spec) { return !light || spec.id != "beam"; });
+        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [light](const auto& spec) { return !light || (spec.id != "beam" && spec.id != "lit"); });
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
     }
     const auto specs = std::span<const motion::PropertySpec>(specList);
@@ -358,7 +358,7 @@ juce::String MotionPropertyInspector::sectionOf(const juce::String& group) const
         return juce::String(generator->name.data(), generator->name.size());
     }
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
-    if (group == "Colour" || group == "Opacity" || group == "Beam") { return "Appearance"; }
+    if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Beam") { return "Appearance"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }

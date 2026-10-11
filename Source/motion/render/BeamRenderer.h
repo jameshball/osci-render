@@ -187,7 +187,7 @@ private:
         return culled != nullptr ? std::pair {culled->drawing.get(), culled->shown} : std::pair {whole, 1.0};
     }
     static std::optional<Visible> visible(const PreparedComposition& composition, const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
-        if (!clip.active(time) || !clip.visible(time)) { return std::nullopt; }
+        if (clip.light || !clip.active(time) || !clip.visible(time)) { return std::nullopt; }
         const auto share = clip.beam(time);
         if (!(share > 0)) { return std::nullopt; }
         const auto* source = clip.resolveSource(liveFrames);

@@ -489,6 +489,15 @@ void MotionEditor::setUpLibrary() {
             entry.image = motion::ui::generatorIcon(definition, icons::ink());
             lights.addItem(std::move(entry));
         }
+        // A point light already moving on its own, named for how.
+        lights.addSectionHeader("Presets");
+        for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) {
+            const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
+            juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
+            entry.itemID = 2000 + static_cast<int>(index);
+            entry.image = motion::ui::generatorIcon(*motion::findGenerator("pointLight"), icons::ink());
+            lights.addItem(std::move(entry));
+        }
         menu.addSubMenu("Light", lights, true, icons::stroked(icons::glyph::bulb(), icons::ink()));
         menu.addItem(item(1, "Import file...", icons::glyph::folder()));
         menu.addItem(item(2, "Blender live source...", icons::glyph::live()));
@@ -521,6 +530,7 @@ void MotionEditor::setUpLibrary() {
             if (choice == 2) { owner->showBlenderSettings(); }
             if (choice == 3) { owner->showDrawingEditor(0); }
             if (choice >= 1000 && choice - 1000 < static_cast<int>(motion::generatorDefinitions.size())) { owner->addGenerator(motion::generatorDefinitions[static_cast<std::size_t>(choice - 1000)]); }
+            if (choice >= 2000 && choice - 2000 < static_cast<int>(motion::lightPresets.size())) { owner->addGenerator(*motion::findGenerator("pointLight"), motion::lightPresets[static_cast<std::size_t>(choice - 2000)]); }
             if (choice >= 100 && choice - 100 < static_cast<int>(resources.size())) { owner->importExample(resources[static_cast<std::size_t>(choice - 100)]); }
         });
     };

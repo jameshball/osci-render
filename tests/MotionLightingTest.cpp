@@ -2,6 +2,8 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/HiddenLines.h"
+#include "../Source/motion/model/LightPresets.h"
+#include "../Source/motion/render/BeamRenderer.h"
 
 // Lights: clips that light what the Scope draws. Without one, everything is
 // as bright as it always was; with one, each line takes the light reaching
@@ -21,6 +23,11 @@ public:
             expect(signal.hiddenLines != nullptr, "lit frames are baked though no camera hides lines");
             const motion::PreparedComposition editor(project, 48000, nullptr, motion::CompositionPurpose::editorGeometry);
             expectEquals(static_cast<int>(editor.clips.size()), 3, "the Scene draws its picture");
+            motion::BeamRenderer beam;
+            beam.planCycle(editor, 1, 48000);
+            bool drawsLight = false;
+            for (const auto& segment : beam.plannedSegments()) { drawsLight = drawsLight || (segment.clip != nullptr && segment.clip->light); }
+            expect(!drawsLight, "but the beam's share of time never goes to it");
             const motion::PreparedComposition unlit(scene());
             expect(unlit.hiddenLines == nullptr, "with no light and no camera hiding lines, nothing is baked");
         }
@@ -62,6 +69,30 @@ public:
             for (const auto& colour : colours) {
                 expect(std::abs(colour[0] - 1) < 1.0e-4f && std::abs(colour[1] - .5f) < 1.0e-4f && std::abs(colour[2] - .1f) < 1.0e-4f, "at full brightness in the light's own orange, not white");
             }
+        }
+
+        beginTest("Lit by lights at 0, a clip draws in its own colour, as a flame gives off its own light");
+        {
+            const auto litBy = [&](double amount) {
+                auto project = scene();
+                auto box = project.tracks[0].clips[0];
+                box.properties["lit"] = motion::Curve(amount);
+                motion::Track track;
+                track.id = project.tracks[0].id;
+                track.insert(box, project.tempo());
+                auto rest = project.tracks;
+                project.tracks.clear();
+                project.tracks.push_back(track);
+                for (std::size_t index = 1; index < rest.size(); ++index) { project.tracks.push_back(rest[index]); }
+                addLight(project, "ambientLight", 30, {{"light.intensity", .4}, {"green", 0}, {"blue", 0}});
+                const motion::PreparedComposition prepared(project);
+                motion::hidden::Workspace workspace;
+                return coloursOf(cull(prepared, 1, workspace)->drawing(0));
+            };
+            const auto own = litBy(0), half = litBy(50);
+            expect(!own.empty() && !half.empty(), "the box is drawn either way");
+            for (const auto& colour : own) { expect(colour[0] == 1 && colour[1] == 1 && colour[2] == 1, "unlit, it keeps its own white"); }
+            for (const auto& colour : half) { expect(std::abs(colour[0] - .7f) < 1.0e-4f && std::abs(colour[1] - .5f) < 1.0e-4f, "half lit, it is halfway between its own colour and the light's"); }
         }
 
         beginTest("A point light fades with distance, and lights nothing past its range");
@@ -165,6 +196,39 @@ public:
             const auto* litBox = lit->drawing(0);
             const auto* hiddenBox = hidden->drawing(0);
             expect(litBox != nullptr && hiddenBox != nullptr && std::abs(litBox->length() - hiddenBox->length()) < hiddenBox->length() * .02, "the lit box draws what the unlit one does");
+        }
+
+        beginTest("A preset makes a light move on its own, and another replaces it");
+        {
+            auto project = scene();
+            addLight(project, "pointLight", 30, {{"position.y", 1.5}});
+            motion::Id next = 1000;
+            const auto newId = [&] { return ++next; };
+            expect(motion::applyLightPreset(project, 30, motion::LightPreset::fire, newId), "fire goes on a light");
+            expectEquals(static_cast<int>(project.modulators.size()), 6, "as six ways it moves");
+            expectEquals(static_cast<int>(project.routes.size()), 6, "each routed to the light");
+            expect(project.modulators.front().name.starts_with("Point light \xc2\xb7 Fire"), "named for the light and the preset");
+            {
+                const motion::PreparedComposition prepared(project);
+                std::vector<double> intensities;
+                double lowest = 1.0e9, highest = 0, drift = 0;
+                for (int step = 0; step < 60; ++step) {
+                    const auto state = prepared.lightAt(prepared.lights.front(), step / 20.0);
+                    expect(state.has_value());
+                    lowest = std::min(lowest, state->intensity);
+                    highest = std::max(highest, state->intensity);
+                    drift = std::max(drift, std::abs(state->position.y - 1.5));
+                }
+                expect(highest - lowest > .3, "a fire's intensity flickers");
+                expect(drift > .005 && drift < .2, "and it sways a little where it is");
+                const auto state = prepared.lightAt(prepared.lights.front(), 0);
+                expect(state->colour[0] > state->colour[2] * 2, "in a fire's orange");
+            }
+            expect(motion::applyLightPreset(project, 30, motion::LightPreset::candle, newId), "a candle goes on in its place");
+            expectEquals(static_cast<int>(project.modulators.size()), 3, "the fire's modulators are gone");
+            expectEquals(static_cast<int>(project.routes.size()), 3, "and its routes");
+            expect(motion::removeLightPreset(project, 30) && project.modulators.empty() && project.routes.empty(), "and the candle comes off cleanly");
+            expect(!motion::removeLightPreset(project, 30), "a light with no preset has none to take off");
         }
 
         beginTest("A light keyed and coloured changes the frames it lights");

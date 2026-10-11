@@ -477,11 +477,12 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     });
 }
 
-void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition) {
+void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset) {
     auto& document = processor.document;
     auto asset = std::make_shared<motion::Asset>();
     asset->id = document.newId();
-    asset->name = motion::Document::uniqueAssetName(document.mainProject(), juce::String(definition.name.data(), definition.name.size()));
+    const auto named = preset.has_value() ? motion::lightPresetName(*preset) : definition.name;
+    asset->name = motion::Document::uniqueAssetName(document.mainProject(), juce::String(named.data(), named.size()));
     asset->extension = juce::String(motion::generatorExtension.data(), motion::generatorExtension.size());
     asset->data.append(definition.id.data(), definition.id.size());
     // Drawn at its defaults at once: there is nothing to read or wait for.
@@ -497,10 +498,15 @@ void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition) {
     track.id = document.newId();
     track.name = asset->name.toStdString();
     track.insert(clip, document.project().tempo());
-    document.edit("Add " + juce::String(definition.name.data(), definition.name.size()).toLowerCase(), [&](motion::Project& project) {
+    // A preset's modulators and routes in the same edit, their ids made first.
+    std::vector<motion::Id> ids;
+    for (int index = 0; preset.has_value() && index < 16; ++index) { ids.push_back(document.newId()); }
+    document.edit("Add " + juce::String(named.data(), named.size()).toLowerCase(), [&](motion::Project& project) {
         project.assets.push_back(asset);
         project.tracks.push_back(track);
         project.duration = std::max(project.duration, clip.timing(project.tempo()).end());
+        std::size_t used = 0;
+        if (preset.has_value()) { motion::applyLightPreset(project, clip.id, *preset, [&] { return ids[used++]; }); }
     });
     assetLibrary.refresh();
     assetLibrary.selectAsset(asset->id);

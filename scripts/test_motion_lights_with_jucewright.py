@@ -149,6 +149,10 @@ try:
             field(property_id, present=False)
         command("screenshot", "--file", session.artifact_dir / (name.lower().replace(" ", "-") + ".png"))
 
+    # A light already moving on its own, from the presets.
+    add("Light", "Fire")
+    field("light.range")
+
     step("save", "press", "command + s", "--class", "MotionEditor")
     time.sleep(1)
     data = project.read_bytes()
@@ -157,6 +161,10 @@ try:
     if abs(float(cone.get("value") or cone.get("base") or 0) - 90) > 1e-6:
         raise RuntimeError("The cone should save: " + ET.tostring(cone, encoding="unicode"))
     # Lights shine to the end of the composition.
+    fire = [m.get("name") for m in saved.iter("modulator") if m.get("name", "").startswith("Fire \u00b7 ")]
+    routes = [r for r in saved.iter("route") if r.get("property") == "light.intensity"]
+    if len(fire) != 6 or len(routes) < 3:
+        raise RuntimeError("A fire light should save with its six modulators and routes: " + str(fire))
     clips = [clip for clip in saved.iter("clip") if clip.get("name", "").endswith("light")]
     if len(clips) != 4 or any(abs(float(clip.get("start")) + float(clip.get("duration")) - 8) > 1e-6 for clip in clips):
         raise RuntimeError("Four lights, each to the end: " + str([(c.get("name"), c.get("start"), c.get("duration")) for c in clips]))

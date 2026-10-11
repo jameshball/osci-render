@@ -1,6 +1,7 @@
 #include "TimelineView.h"
 #include "MenuIcons.h"
 #include "../model/KeyEdit.h"
+#include "../model/LightPresets.h"
 
 namespace {
 template <typename Keys>
@@ -2942,11 +2943,30 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
     menu.addItem(motion::style::menuItem(many ? "Ripple delete clips" : "Ripple delete clip", 8, "Shift+Delete").setEnabled(!locked));
     const auto references = motion::sourceReferenceCount(processor.document.mainProject(), asset);
     if (definition == 0) { menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1); }
+    // A light's presets: ways it moves on its own.
+    const auto* generator = motion::generatorFor(processor.document.project(), id);
+    if (generator != nullptr && generator->category == motion::GeneratorCategory::light) {
+        const auto* clip = motion::findClip(processor.document.project(), id);
+        const auto prefix = clip != nullptr ? motion::lightPresetPrefix(*clip) : std::string();
+        const auto& modulators = processor.document.project().modulators;
+        const auto hasPreset = std::any_of(modulators.begin(), modulators.end(), [&](const auto& modulator) { return modulator.name.starts_with(prefix); });
+        juce::PopupMenu presets;
+        for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) {
+            const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
+            presets.addItem(40 + static_cast<int>(index), juce::String(definition.name.data(), definition.name.size()), !locked);
+        }
+        presets.addSeparator();
+        presets.addItem(39, "No preset", !locked && hasPreset);
+        menu.addSeparator();
+        menu.addSubMenu("Light preset", presets);
+    }
     menu.addSeparator();
     menu.addItem(4, "Create composition from selection", !locked && !selectedClips.empty());
     if (definition != 0) { menu.addItem(5, "Open composition"); menu.addItem(6, "Make composition unique", !locked); }
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
-        if (result >= 20 && result < 24 && onCommand) {
+        if (result >= 39 && result < 40 + static_cast<int>(motion::lightPresets.size())) {
+            applyLightPreset(id, result == 39 ? std::nullopt : std::optional(motion::lightPresets[static_cast<std::size_t>(result - 40)]));
+        } else if (result >= 20 && result < 24 && onCommand) {
             const std::array<const char*, 4> names {"Cut", "Copy", "Paste", "Split at playhead"};
             onCommand(names[static_cast<std::size_t>(result - 20)]);
         } else if (result == 1) {
@@ -2980,6 +3000,23 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
             refreshTracks();
         }
     });
+}
+
+void MotionTimelineView::applyLightPreset(motion::Id id, std::optional<motion::LightPreset> preset) {
+    auto& document = processor.document;
+    // Ids made first: the edit's copy of the project makes none of its own.
+    std::vector<motion::Id> ids;
+    for (int index = 0; index < 16; ++index) { ids.push_back(document.newId()); }
+    const auto name = preset.has_value() ? "Apply " + juce::String(motion::lightPresetName(*preset).data()).toLowerCase() + " preset" : juce::String("Remove light preset");
+    document.edit(name, [id, preset, ids](motion::Project& project) {
+        std::size_t used = 0;
+        if (preset.has_value()) {
+            motion::applyLightPreset(project, id, *preset, [&] { return ids[used++]; });
+        } else {
+            motion::removeLightPreset(project, id);
+        }
+    });
+    refreshTracks();
 }
 
 void MotionTimelineView::createGroup(motion::Id trackId, motion::Id parent) {
