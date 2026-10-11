@@ -121,26 +121,44 @@ public:
         // its light over its first step and goes down over its last. Every
         // sample is as bright as any other, so a sample bunched in near an
         // end would draw a bead there; a stroke whose end segment has a
-        // single sample keeps it lit, so it is not lost.
-        const auto ramps = [&](std::size_t segmentIndex) {
-            const auto [previousEnd, segmentEnd] = bounds(segmentIndex);
-            return stroke->fades && segmentEnd - previousEnd >= 2;
+        // single sample keeps it lit, so it is not lost. How far it ramps
+        // follows the samples its end segment gets for its length, not the
+        // whole samples it happens to get, so a short stroke does not flick
+        // between lit and dim as a budget moves by a sample.
+        const auto ramp = [&](std::size_t segmentIndex) {
+            if (!stroke->fades) { return 0.0f; }
+            const auto& segment = segments[segmentIndex];
+            const auto expected = 1 + (segment.lengthEnd - segment.lengthStart) * static_cast<double>(extra) / total;
+            return static_cast<float>(std::clamp(expected - 1, 0.0, 1.0));
+        };
+        const auto dim = [](osci::Point point, float by) {
+            point.r *= 1 - by;
+            point.g *= 1 - by;
+            point.b *= 1 - by;
+            return point;
         };
         if (index <= start + 1) {
             auto point = shapes[first.firstShape]->nextVector(0);
-            if (index == start || ramps(stroke->first)) { point.r = point.g = point.b = 0; }
-            return point;
+            return index == start ? dim(point, 1) : dim(point, ramp(stroke->first));
         }
-        if (index == end || (index == end - 1 && ramps(stroke->last))) {
-            auto point = shapes[last.lastShape]->nextVector(1);
-            point.r = point.g = point.b = 0;
-            return point;
-        }
+        if (index == end) { return dim(shapes[last.lastShape]->nextVector(1), 1); }
         const auto segment = std::lower_bound(segments.begin() + stroke->first, segments.begin() + stroke->last + 1, index,
             [&](const TraversalSegment& item, std::int64_t value) { return item.baseEnd + extraThrough(item, extra) < value; });
         const auto [previousEnd, segmentEnd] = bounds(static_cast<std::size_t>(segment - segments.begin()));
         const auto progress = static_cast<double>(index - previousEnd) / static_cast<double>(segmentEnd - previousEnd);
-        return pointAlong(*segment, segment->lengthStart + (segment->lengthEnd - segment->lengthStart) * progress);
+        auto point = pointAlong(*segment, segment->lengthStart + (segment->lengthEnd - segment->lengthStart) * progress);
+        if (index == end - 1) {
+            // Ramping out: drawn toward the end, as dark as it ramps.
+            const auto by = ramp(stroke->last);
+            if (by > 0) {
+                const auto corner = shapes[last.lastShape]->nextVector(1);
+                point.x += (corner.x - point.x) * by;
+                point.y += (corner.y - point.y) * by;
+                point.z += (corner.z - point.z) * by;
+                point = dim(point, by);
+            }
+        }
+        return point;
     }
 
     bool empty() const { return shapes.empty() || total <= 0.0; }
