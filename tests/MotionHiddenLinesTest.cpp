@@ -123,9 +123,10 @@ public:
             behind.assets.push_back(square);
             auto squareClip = motion::Document::makeClip(22, *square, 0);
             squareClip.duration = 2;
-            squareClip.properties["position.z"] = motion::Curve(1.5);
-            squareClip.properties["scale.x"] = motion::Curve(1.2);
-            squareClip.properties["scale.y"] = motion::Curve(1.2);
+            // In front of the cube, and all of it on the Scope.
+            squareClip.properties["position.z"] = motion::Curve(1);
+            squareClip.properties["scale.x"] = motion::Curve(.9);
+            squareClip.properties["scale.y"] = motion::Curve(.9);
             motion::Track squareTrack;
             squareTrack.id = 12;
             squareTrack.insert(squareClip, behind.tempo());

@@ -562,9 +562,11 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         const auto steps = std::clamp(static_cast<int>(std::ceil(length / testStep)), 1, 65536);
         samples.clear();
         for (int step = 0; step <= steps; ++step) { samples.push_back(at(static_cast<double>(step) / steps)); }
+        // What the Scope doesn't show is dropped too: drawn, it would only
+        // take the beam's time from what it does.
         const auto showing = [&](int step) {
             const auto& point = samples[static_cast<std::size_t>(step)];
-            if (!point.has_value() || !depth.shows(*point)) { return false; }
+            if (!point.has_value() || std::abs(point->x) > reach.x * DepthBuffer::overscan || std::abs(point->y) > reach.y * DepthBuffer::overscan || !depth.shows(*point)) { return false; }
             const auto& before = samples[static_cast<std::size_t>(std::max(0, step - 1))];
             const auto& after = samples[static_cast<std::size_t>(std::min(steps, step + 1))];
             return !before.has_value() || !after.has_value() || !coverage.covers(*point, after->x - before->x, after->y - before->y);
