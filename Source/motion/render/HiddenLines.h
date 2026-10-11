@@ -219,6 +219,15 @@ private:
     std::vector<Stop> lights;
 };
 
+// How much of the beam's time a lit part takes for its length, beside the
+// rest: less the dimmer its brightest light, down to a little. Drawn more
+// quickly where it is dim, it leaves its time to what is bright, and a part
+// fading out gives its time back as it fades rather than all at once when it
+// goes. Its colour stays the light it takes, so what the light dims evenly is
+// still dimmer; this only shares the beam among the parts.
+inline constexpr double leastLitWeight = .05;
+inline double litWeight(double brightest) { return std::clamp(std::sqrt(std::max(0.0, brightest)), leastLitWeight, 1.0); }
+
 // Every surface's faces (meshes', and flat drawings' fills) drawn into a
 // depth buffer as an eye sees them: a camera, to hide lines, or a light, to
 // find its shadows. `world` holds each item's mesh corners in the scene;
@@ -548,6 +557,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         std::unique_ptr<osci::Shape> shape;
         bool cut;
         Normals normals;
+        double weight = 1;
     };
     // A run culling cut too short to see would only draw a dot: it is
     // dropped. Runs culling left whole stay as they are. The beam spends a
@@ -577,6 +587,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     };
     const auto keep = [&](std::vector<Kept>& pieces, const PreparedClip& clip) {
         std::vector<std::unique_ptr<osci::Shape>> shapes;
+        std::vector<double> weights;
         std::size_t first = 0;
         while (first < pieces.size()) {
             auto last = first + 1;
@@ -590,26 +601,32 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             first = last;
             const auto cut = std::any_of(run.begin(), run.end(), [](const auto& piece) { return piece.cut; });
             if (!cut) {
-                for (auto& piece : run) { shapes.push_back(std::move(piece.shape)); }
+                for (auto& piece : run) {
+                    shapes.push_back(std::move(piece.shape));
+                    weights.push_back(piece.weight);
+                }
                 continue;
             }
             while (run.size() > 1 && onScreen(*run.front().shape, clip) < sliver) { run.erase(run.begin()); }
             while (run.size() > 1 && onScreen(*run.back().shape, clip) < sliver) { run.pop_back(); }
             std::vector<std::unique_ptr<osci::Shape>> joined;
+            std::vector<double> joinedWeights;
             for (auto& piece : run) {
                 if (!joined.empty() && joinable(*joined.back(), *piece.shape, clip)) {
                     joined.back() = std::make_unique<osci::Line>(joined.back()->nextVector(0), piece.shape->nextVector(1));
                 } else {
                     joined.push_back(std::move(piece.shape));
+                    joinedWeights.push_back(piece.weight);
                 }
             }
             double length = 0;
             for (auto& shape : joined) { length += onScreen(*shape, clip); }
             if (length >= shortestOnScreen) {
                 for (auto& shape : joined) { shapes.push_back(std::move(shape)); }
+                weights.insert(weights.end(), joinedWeights.begin(), joinedWeights.end());
             }
         }
-        return std::make_shared<const PreparedDrawing>(std::move(shapes), true);
+        return std::make_shared<const PreparedDrawing>(std::move(shapes), true, weights);
     };
     const auto mix = [](const osci::Point& a, const osci::Point& b, double t) {
         const auto f = static_cast<float>(t);
@@ -871,7 +888,10 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     const auto positionOf = [&](std::size_t sample) { return sample == index ? from : sample == last ? to : ts[sample]; };
                     std::vector<LitPart::Stop> stops;
                     for (const auto at : breaks) { stops.push_back({static_cast<float>((positionOf(at) - from) / std::max(to - from, 1.0e-12)), light[at]}); }
-                    litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(from), static_cast<float>(to), std::move(stops)), piece.cut, {}});
+                    float brightest = 0;
+                    for (auto sample = index; sample <= last; ++sample) { brightest = std::max({brightest, light[sample][0], light[sample][1], light[sample][2]}); }
+                    const auto weight = litWeight(brightest);
+                    litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(from), static_cast<float>(to), std::move(stops)), piece.cut, {}, weight});
                     index = last + 1;
                 }
                 if (partial) {

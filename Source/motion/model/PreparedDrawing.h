@@ -25,13 +25,19 @@ public:
 
     // `fadeOpenEnds`: open strokes fade in and out rather than dwell lit at
     // their ends, for drawings whose strokes end where something hides them.
-    explicit PreparedDrawing(std::vector<std::unique_ptr<osci::Shape>> source, bool fadeOpenEnds = false) : fading(fadeOpenEnds), shapes(std::move(source)) {
+    // `weights`, one per shape when given: how much of the beam's time each
+    // takes for its length, so a dimly lit part is drawn quickly and a bright
+    // one slowly (1 is as any line).
+    explicit PreparedDrawing(std::vector<std::unique_ptr<osci::Shape>> source, bool fadeOpenEnds = false, const std::vector<double>& weights = {}) : fading(fadeOpenEnds), shapes(std::move(source)) {
         ends.reserve(shapes.size());
         osci::Point firstStart, previousEnd;
         bool havePositive = false;
         for (std::size_t index = 0; index < shapes.size(); ++index) {
             auto& shape = shapes[index];
-            const auto length = shape != nullptr ? static_cast<double>(shape->length()) : 0.0;
+            const auto weight = index < weights.size() && std::isfinite(weights[index]) ? std::max(0.0, weights[index]) : 1.0;
+            const auto geometric = shape != nullptr ? static_cast<double>(shape->length()) : 0.0;
+            if (std::isfinite(geometric)) { drawn += std::max(0.0, geometric); }
+            const auto length = geometric * weight;
             const auto start = total;
             total += std::isfinite(length) ? std::max(0.0, length) : 0.0;
             ends.push_back(total);
@@ -138,7 +144,10 @@ public:
     }
 
     bool empty() const { return shapes.empty() || total <= 0.0; }
-    double length() const { return total; }
+    // How long its lines are; and how much of the beam's time they take,
+    // in the same units, once each is weighted (see the constructor).
+    double length() const { return drawn; }
+    double beamLength() const { return total; }
     // The exact geometry, for drawing and picking. Evaluating a shape leaves
     // it unchanged (lengths are cached at construction), as sample() relies on.
     std::size_t shapeCount() const { return shapes.size(); }
@@ -281,7 +290,7 @@ private:
     std::vector<double> ends;
     std::vector<double> discontinuities;
     std::size_t lastPositive = 0;
-    double total = 0.0;
+    double total = 0.0, drawn = 0.0;
 };
 
 }

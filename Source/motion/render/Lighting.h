@@ -78,21 +78,34 @@ struct LightView {
     LightState state;
     std::vector<ShadowView> views;
 
+    bool casts() const { return !views.empty() && state.shadows > 0; }
+    // The view a point is seen through: a point light's cube face along the
+    // axis the point is furthest along, else its only one.
+    const ShadowView& viewOf(Vec3 world) const {
+        if (views.size() != 6) { return views.front(); }
+        const auto offset = world - state.position;
+        std::size_t best = 0;
+        for (std::size_t face = 1; face < views.size(); ++face) {
+            if (offset.dot(views[face].eye.forward) > offset.dot(views[best].eye.forward)) { best = face; }
+        }
+        return views[best];
+    }
+    // How wide a pixel of its shadows is at a point, in the scene.
+    double texel(Vec3 world) const {
+        const auto& view = viewOf(world);
+        const auto size = view.depth->pixelSize() / std::max(1.0e-9, view.projection.focalLength);
+        return view.projection.parallel ? size : size * std::max(Projection::nearPlane, view.eye.see(world).z);
+    }
+
     // How much of the light reaches a point (1 where nothing blocks it), as
     // the shadows' strength allows.
     double reaching(Vec3 world) const {
-        if (views.empty() || !(state.shadows > 0)) { return 1; }
-        const auto* view = &views.front();
-        if (views.size() == 6) {
-            // The cube face the point is seen through: the axis it is furthest along.
-            const auto offset = world - state.position;
-            const auto x = std::abs(offset.x), y = std::abs(offset.y), z = std::abs(offset.z);
-            const auto face = x >= y && x >= z ? (offset.x > 0 ? 0 : 1) : y >= z ? (offset.y > 0 ? 2 : 3) : (offset.z > 0 ? 4 : 5);
-            view = &views[static_cast<std::size_t>(face)];
-        }
-        const auto at = view->projection(view->eye.see(world));
-        if (!at.has_value() || view->depth->shows(*at)) { return 1; }
-        return 1 - state.shadows;
+        if (!casts()) { return 1; }
+        const auto& view = viewOf(world);
+        const auto at = view.projection(view.eye.see(world));
+        if (!at.has_value()) { return 1; }
+        // A soft share at the shadow's edge, so it keeps still as the light moves.
+        return 1 - state.shadows * (1 - view.depth->shownShare(*at));
     }
 };
 
@@ -120,6 +133,8 @@ inline std::optional<Vec3> normalOf(Vec3 a, Vec3 b, Vec3 c) { return (b - a).cro
 // either side: an open surface is lit from both; a closed one's far side is
 // in its own shadow), and less where something blocks it. A line on no face
 // takes a light whichever way it comes from.
+// How far, in shadow pixels, a line's shadow test is lifted off its faces.
+inline constexpr double normalLift = 1.5;
 inline std::array<double, 3> illumination(const std::vector<LightView>& lights, Vec3 point, const Normals& normals) {
     std::array<double, 3> total {};
     for (const auto& light : lights) {
@@ -151,13 +166,27 @@ inline std::array<double, 3> illumination(const std::vector<LightView>& lights, 
                     }
                 }
             }
+            // Each face a line runs along takes the light as squarely as it
+            // faces it, times what reaches it there. A line lies on its
+            // faces, so each is tested a little off its own face toward the
+            // light: one turned to the light is then clear of itself, and
+            // one turned away is inside what it bounds and in its shadow. An
+            // edge on the line where a solid turns from the light so fades
+            // out as its lit face turns edge on, rather than flicking between
+            // lit and dark as the light moves.
             if (normals.count > 0) {
-                double facing = 0;
-                for (int index = 0; index < normals.count; ++index) { facing += std::abs(normals.values[static_cast<std::size_t>(index)].dot(toward)); }
-                strength *= facing / normals.count;
+                const auto lift = light.casts() ? normalLift * light.texel(point) : 0.0;
+                double reached = 0;
+                for (int index = 0; index < normals.count; ++index) {
+                    const auto& normal = normals.values[static_cast<std::size_t>(index)];
+                    const auto facing = normal.dot(toward);
+                    if (facing == 0) { continue; }
+                    reached += std::abs(facing) * light.reaching(point + normal * (facing > 0 ? lift : -lift));
+                }
+                strength *= reached / normals.count;
+            } else {
+                strength *= light.reaching(point);
             }
-            if (!(strength > 0)) { continue; }
-            strength *= light.reaching(point);
         }
         for (std::size_t channel = 0; channel < 3; ++channel) { total[channel] += state.colour[channel] * strength; }
     }

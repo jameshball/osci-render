@@ -196,6 +196,39 @@ public:
         return inFront(point, plane.at(px, py) - plane.slope * outside);
     }
 
+    // How much of a point the surfaces round it leave in view, from 0 to 1:
+    // each pixel within a pixel and a half asks whether its nearest surface,
+    // carried to where the point is, is in front of it, weighted by how near
+    // its centre is. The share changes smoothly as the point or what hides it
+    // moves, rather than a whole pixel at a time, so a light's shadows keep
+    // still edges from frame to frame. A surface the point is on is never in
+    // front of it there, so none shadows itself.
+    double shownShare(Screen point) const {
+        if (empty) { return 1; }
+        constexpr double reach = 1.5;
+        const auto px = toPixelX(point.x), py = toPixelY(point.y);
+        const auto cx = px - .5, cy = py - .5;
+        const auto x0 = static_cast<int>(std::floor(cx - reach)) + 1, y0 = static_cast<int>(std::floor(cy - reach)) + 1;
+        double shown = 0, total = 0;
+        for (auto y = y0; y < y0 + 3; ++y) {
+            const auto wy = reach - std::abs(y - cy);
+            if (!(wy > 0)) { continue; }
+            for (auto x = x0; x < x0 + 3; ++x) {
+                const auto wx = reach - std::abs(x - cx);
+                if (!(wx > 0)) { continue; }
+                const auto weight = wx * wy;
+                total += weight;
+                if (x < 0 || y < 0 || x >= width || y >= height) {
+                    shown += weight;
+                    continue;
+                }
+                const auto& here = pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+                if (here.w == 0 || inFront(point, planes[static_cast<std::size_t>(here.owner)].at(px, py))) { shown += weight; }
+            }
+        }
+        return total > 0 ? shown / total : 1;
+    }
+
 private:
     // Whether a point is in front of a surface at `w` there, or on it: within
     // a small part of its own depth, so a surface reaching far nearer the eye

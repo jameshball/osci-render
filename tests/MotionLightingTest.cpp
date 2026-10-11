@@ -231,6 +231,50 @@ public:
             expect(!motion::removeLightPreset(project, 30), "a light with no preset has none to take off");
         }
 
+        beginTest("A face the light turns from fades out, rather than flicking between lit and dark");
+        {
+            // An upright ring, a point light beside it turning past where the
+            // ring's flat faces stand edge on to it: a hair's move of the
+            // light changes how much of the ring is lit only a little.
+            const auto litAt = [this](double degrees) {
+                motion::Project project;
+                project.duration = 1;
+                addClip(project, generatorAsset(1, "torus"), 10, {{"position.x", 1}, {"position.y", .72}, {"rotation.x", 90}, {"generator.radius", .3}, {"generator.thickness", .07}});
+                const auto angle = degrees * juce::MathConstants<double>::pi / 180;
+                addLight(project, "pointLight", 30, {{"position.x", std::cos(angle)}, {"position.y", .72}, {"position.z", std::sin(angle)}, {"light.range", 3.2}, {"light.intensity", 1.6}});
+                motion::Camera camera;
+                camera.id = 40;
+                camera.target = 10;
+                camera.hideHiddenLines = true;
+                camera.properties["position.x"] = motion::Curve(2.2);
+                camera.properties["position.y"] = motion::Curve(1.3);
+                camera.properties["position.z"] = motion::Curve(1.6);
+                project.cameras.push_back(camera);
+                const motion::PreparedComposition prepared(project);
+                motion::hidden::Workspace workspace;
+                const auto frame = cull(prepared, .5, workspace);
+                double lit = 0;
+                const auto* drawing = frame->drawing(0);
+                for (std::size_t index = 0; drawing != nullptr && index < drawing->shapeCount(); ++index) {
+                    auto* shape = drawing->shape(index);
+                    double light = 0;
+                    for (int step = 0; step < 4; ++step) {
+                        const auto point = shape->nextVector((step + .5f) / 4);
+                        light += (point.r + point.g + point.b) / 12.0;
+                    }
+                    lit += shape->length() * light;
+                }
+                return lit;
+            };
+            double largest = 0, previous = litAt(244);
+            for (double degrees = 244.25; degrees <= 247.01; degrees += .25) {
+                const auto next = litAt(degrees);
+                largest = std::max(largest, std::abs(next - previous) / std::max(previous, next));
+                previous = next;
+            }
+            expect(largest < .1, "lit within a tenth of itself a quarter of a degree on, at most " + juce::String(largest, 3));
+        }
+
         beginTest("A light keyed and coloured changes the frames it lights");
         {
             auto project = scene();

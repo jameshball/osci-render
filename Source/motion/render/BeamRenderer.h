@@ -253,7 +253,7 @@ private:
         }
         if (exact) {
             const auto scale = sourceDistance > 1.0e-9 ? projectedDistance / sourceDistance : 1.0;
-            layer.length = vector->length() * (std::isfinite(scale) ? scale : 1.0);
+            layer.length = vector->beamLength() * (std::isfinite(scale) ? scale : 1.0);
         } else {
             layer.length = litDistance * layer.shown;
             // Its runs, though, start and end where the shown part does.
