@@ -828,9 +828,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     previous = next;
                 }
                 const auto steps = std::clamp(static_cast<int>(std::ceil(length * 1.25 / litStep)), 1, 4096);
-                ts.clear();
-                light.clear();
-                for (int step = 0; step <= steps; ++step) {
+                ts.resize(static_cast<std::size_t>(steps) + 1);
+                light.resize(static_cast<std::size_t>(steps) + 1);
+                const auto lightAt = [&](int step) {
                     const auto t = static_cast<double>(step) / steps;
                     const auto at = place(item, shape->nextVector(static_cast<float>(t)));
                     std::array<float, 3> reaching {};
@@ -838,8 +838,32 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                         const auto total = illumination(lights, *at, piece.normals);
                         for (std::size_t channel = 0; channel < 3; ++channel) { reaching[channel] = 1 + response * (static_cast<float>(total[channel]) - 1); }
                     }
-                    ts.push_back(t);
-                    light.push_back(reaching);
+                    ts[static_cast<std::size_t>(step)] = t;
+                    light[static_cast<std::size_t>(step)] = reaching;
+                };
+                // Every few steps first; the steps between are found only
+                // where their ends' light differs or either is dark, and
+                // blended elsewhere, where the light changes smoothly.
+                constexpr int stride = 3;
+                constexpr float alike = 1.0f / 256;
+                lightAt(0);
+                for (int from = 0; from < steps;) {
+                    const auto to = std::min(steps, from + stride);
+                    lightAt(to);
+                    const auto& a = light[static_cast<std::size_t>(from)];
+                    const auto& b = light[static_cast<std::size_t>(to)];
+                    const auto darkEnd = std::max({a[0], a[1], a[2]}) < dark || std::max({b[0], b[1], b[2]}) < dark;
+                    const auto differs = std::abs(a[0] - b[0]) > alike || std::abs(a[1] - b[1]) > alike || std::abs(a[2] - b[2]) > alike;
+                    for (auto step = from + 1; step < to; ++step) {
+                        if (darkEnd || differs) {
+                            lightAt(step);
+                            continue;
+                        }
+                        const auto blend = static_cast<float>(step - from) / static_cast<float>(to - from);
+                        ts[static_cast<std::size_t>(step)] = static_cast<double>(step) / steps;
+                        for (std::size_t channel = 0; channel < 3; ++channel) { light[static_cast<std::size_t>(step)][channel] = a[channel] + (b[channel] - a[channel]) * blend; }
+                    }
+                    from = to;
                 }
                 const auto isDark = [&](std::size_t index) { return std::max({light[index][0], light[index][1], light[index][2]}) < dark; };
                 // The parts any light reaches: from halfway to the dark either side.
