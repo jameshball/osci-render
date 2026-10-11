@@ -251,10 +251,12 @@ public:
             const auto count = faded.minimumTraversalSamples() + 20;
             std::vector<osci::Point> points;
             for (std::int64_t index = 0; index < count; ++index) { points.push_back(faded.sampleTraversal(index, count)); }
-            expect(dark(points[1]) && dark(points[static_cast<std::size_t>(count - 2)]), "its first and last steps ramp from and to dark");
-            expect(!dark(points[2]) && !dark(points[static_cast<std::size_t>(count - 3)]), "and it is lit between");
+            const auto last = static_cast<std::size_t>(count - 1);
+            expect(dark(points[0]) && dark(points[last]), "it starts and ends dark");
+            expect(!dark(points[1]) && !dark(points[last - 1]), "and it is lit between");
+            expect(points[1].x > 0 && points[last - 1].x < 2, "its first and last lit samples are inside it, never where a dark one is");
             float shortest = 10, longest = 0;
-            for (std::size_t index = 2; index + 2 < points.size(); ++index) {
+            for (std::size_t index = 2; index + 1 < points.size(); ++index) {
                 const auto step = points[index].x - points[index - 1].x;
                 shortest = std::min(shortest, step);
                 longest = std::max(longest, step);

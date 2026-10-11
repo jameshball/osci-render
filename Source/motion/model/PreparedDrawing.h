@@ -112,52 +112,36 @@ public:
         const auto beforeExtra = stroke->first == 0 ? 0 : extraThrough(segments[stroke->first - 1], extra);
         const auto start = first.baseEnd - 2 + beforeExtra;
         const auto end = last.baseEnd + 1 + extraThrough(last, extra);
+        const auto dark = [](osci::Point point) {
+            point.r = point.g = point.b = 0;
+            return point;
+        };
         // Where a segment's samples start and end.
         const auto bounds = [&](std::size_t segmentIndex) {
             const auto previousEnd = segmentIndex == stroke->first ? start + 1 : segments[segmentIndex - 1].baseEnd + extraThrough(segments[segmentIndex - 1], extra);
             return std::pair {previousEnd, segments[segmentIndex].baseEnd + extraThrough(segments[segmentIndex], extra)};
         };
-        // A fading stroke is dark where it starts and ends, and comes up to
-        // its light over its first step and goes down over its last. Every
-        // sample is as bright as any other, so a sample bunched in near an
-        // end would draw a bead there; a stroke whose end segment has a
-        // single sample keeps it lit, so it is not lost. How far it ramps
-        // follows the samples its end segment gets for its length, not the
-        // whole samples it happens to get, so a short stroke does not flick
-        // between lit and dim as a budget moves by a sample.
-        const auto ramp = [&](std::size_t segmentIndex) {
-            if (!stroke->fades) { return 0.0f; }
-            const auto& segment = segments[segmentIndex];
-            const auto expected = 1 + (segment.lengthEnd - segment.lengthStart) * static_cast<double>(extra) / total;
-            return static_cast<float>(std::clamp(expected - 1, 0.0, 1.0));
-        };
-        const auto dim = [](osci::Point point, float by) {
-            point.r *= 1 - by;
-            point.g *= 1 - by;
-            point.b *= 1 - by;
-            return point;
-        };
-        if (index <= start + 1) {
-            auto point = shapes[first.firstShape]->nextVector(0);
-            return index == start ? dim(point, 1) : dim(point, ramp(stroke->first));
-        }
-        if (index == end) { return dim(shapes[last.lastShape]->nextVector(1), 1); }
+        // A fading stroke is dark where it starts and ends, and its first and
+        // last lit samples sit half a step in from its ends, so the beam comes
+        // up to its light along the stroke rather than standing at its end:
+        // no sample is lit where the one before or after it is, which would
+        // draw a bead, and however few samples it gets it is never lost.
+        // Other strokes dwell lit at their ends, so a closed one's seam shows
+        // like any corner.
+        if (index == start) { return dark(shapes[first.firstShape]->nextVector(0)); }
+        if (index == end) { return dark(shapes[last.lastShape]->nextVector(1)); }
         const auto segment = std::lower_bound(segments.begin() + stroke->first, segments.begin() + stroke->last + 1, index,
             [&](const TraversalSegment& item, std::int64_t value) { return item.baseEnd + extraThrough(item, extra) < value; });
-        const auto [previousEnd, segmentEnd] = bounds(static_cast<std::size_t>(segment - segments.begin()));
-        const auto progress = static_cast<double>(index - previousEnd) / static_cast<double>(segmentEnd - previousEnd);
-        auto point = pointAlong(*segment, segment->lengthStart + (segment->lengthEnd - segment->lengthStart) * progress);
-        if (index == end - 1) {
-            // Ramping out: drawn toward the end, as dark as it ramps.
-            const auto by = ramp(stroke->last);
-            if (by > 0) {
-                const auto corner = shapes[last.lastShape]->nextVector(1);
-                point.x += (corner.x - point.x) * by;
-                point.y += (corner.y - point.y) * by;
-                point.z += (corner.z - point.z) * by;
-                point = dim(point, by);
-            }
+        const auto segmentIndex = static_cast<std::size_t>(segment - segments.begin());
+        const auto [previousEnd, segmentEnd] = bounds(segmentIndex);
+        const auto steps = static_cast<double>(segmentEnd - previousEnd);
+        const auto step = static_cast<double>(index - previousEnd);
+        auto progress = step / steps;
+        if (stroke->fades) {
+            const auto opens = segmentIndex == stroke->first, closes = segmentIndex == stroke->last;
+            progress = opens && closes ? (step + .5) / (steps + 1) : opens ? (step + .5) / (steps + .5) : closes ? step / (steps + .5) : progress;
         }
+        auto point = pointAlong(*segment, segment->lengthStart + (segment->lengthEnd - segment->lengthStart) * progress);
         return point;
     }
 
