@@ -554,7 +554,14 @@ void VisualiserComponent::resized() {
         const auto width = controlsPreferredWidth();
         if (width != lastControlsWidth) {
             lastControlsWidth = width;
-            if (onControlsChanged) { onControlsChanged(); }
+            if (onControlsChanged) {
+                onControlsChanged();
+                // The host may have laid this out again in response; that
+                // layout is newer than `area`, so it stands.
+                if (getLocalBounds() != area) {
+                    return;
+                }
+            }
         }
     } else {
         buttonRow = area.removeFromBottom(25);
