@@ -191,7 +191,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     }
     midi.clear();
     beamLayers.store(static_cast<int>(beam.plannedLayers()), std::memory_order_relaxed);
-    beamInterleave.store(static_cast<int>(beam.plannedInterleave()), std::memory_order_relaxed);
+    beamSimplified.store(beam.plannedSimplified(), std::memory_order_relaxed);
     audioTime = static_cast<double>(audioSample) / sampleRate;
     position.store(audioTime);
     const auto picture = prepared->beam.at(audioTime);

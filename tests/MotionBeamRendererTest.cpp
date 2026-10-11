@@ -342,16 +342,18 @@ public:
                     expectEquals(segments[7].count, travel(segments[7]), label + " return");
                 }
             }
-            // Slow displays need more time per jump, so dense scenes span more cycles.
+            // Slow displays need more time per jump, so dense scenes have fewer
+            // samples left to draw with.
             std::vector<Layer> dense;
             for (int i = 0; i < 20; ++i) { dense.push_back({strokes(static_cast<motion::Id>(i + 1), 60), (i % 5) * .4 - .8, (i / 5) * .4 - .6}); }
             auto slow = project(dense), fast = project(dense);
             slow.scope = motion::scopeProfilePresets[1].profile;
             fast.scope = motion::scopeProfilePresets[2].profile;
             motion::BeamRenderer slowBeam, fastBeam;
-            cycle(motion::PreparedComposition(slow, 192000), 192000, 0, slowBeam);
-            cycle(motion::PreparedComposition(fast, 192000), 192000, 0, fastBeam);
-            expect(slowBeam.plannedInterleave() > fastBeam.plannedInterleave(), "laser " + juce::String(slowBeam.plannedInterleave()) + " vs fast " + juce::String(fastBeam.plannedInterleave()));
+            const auto litOf = [](const std::vector<osci::Point>& points) { return std::count_if(points.begin(), points.end(), [](const auto& p) { return !dark(p); }); };
+            const auto slowLit = litOf(cycle(motion::PreparedComposition(slow, 192000), 192000, 0, slowBeam));
+            const auto fastLit = litOf(cycle(motion::PreparedComposition(fast, 192000), 192000, 0, fastBeam));
+            expect(slowLit < fastLit, "laser " + juce::String(slowLit) + " lit samples vs fast " + juce::String(fastLit));
         }
 
         beginTest("Tour improvement never lengthens the greedy tour and shortens a greedy trap");
@@ -419,13 +421,13 @@ public:
                         }));
                     }
                 }
-                logMessage("Dense layers at " + juce::String(rate) + " Hz span " + juce::String(beam.plannedInterleave()) + " cycles; worst lit fraction " + juce::String(worstLit, 3));
+                logMessage("Dense layers at " + juce::String(rate) + " Hz" + (beam.plannedSimplified() ? juce::String(" simplified") : juce::String()) + "; worst lit fraction " + juce::String(worstLit, 3));
                 expect(worstLit > 0.3, "every cycle stays mostly lit");
                 expect(std::all_of(drawn.begin(), drawn.end(), [](int count) { return count > 180; }), "every layer draws its complete strokes");
             }
         }
 
-        beginTest("Oversized content spans cycles and never leaves a cycle dark");
+        beginTest("Oversized content is drawn whole in every cycle, simplified, never split across cycles");
         for (const int count : {1, 2, 3}) {
             std::vector<Layer> layers;
             for (int i = 0; i < count; ++i) { layers.push_back({strokes(static_cast<motion::Id>(i + 1), 400), i * .5 - .5}); }
@@ -435,7 +437,8 @@ public:
                 const auto points = cycle(composition, 48000, c, beam);
                 const auto lit = std::count_if(points.begin(), points.end(), [](const auto& p) { return !dark(p); });
                 expect(lit > 0, juce::String(count) + " oversized layers, cycle " + juce::String(c) + " is lit");
-                expect(beam.plannedInterleave() >= 2 && beam.plannedInterleave() <= motion::BeamRenderer::maximumSpan, "the plan spans several cycles");
+                expect(beam.plannedSimplified(), "it is simplified to fit");
+                expectEquals(static_cast<int>(beam.plannedLayers()), count, "every layer is drawn in it");
             }
         }
 

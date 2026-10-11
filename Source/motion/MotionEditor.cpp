@@ -1177,12 +1177,13 @@ void MotionEditor::timerCallback() {
         const auto rate = processor.exportSampleRate();
         const auto beamRate = motion::beamCycleRate(processor.document.mainProject().frameRate);
         const auto layers = processor.beamLayers.load(std::memory_order_relaxed);
-        const auto interleave = processor.beamInterleave.load(std::memory_order_relaxed);
+        const auto simplified = processor.beamSimplified.load(std::memory_order_relaxed);
         const juce::String dot(juce::CharPointer_UTF8("  \xc2\xb7  "));
         auto statistics = juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + dot + juce::String(beamRate, beamRate == std::floor(beamRate) ? 0 : 2) + " Hz beam";
         if (processor.playing.load() || layers > 0) {
             statistics += dot + "drawing " + juce::String(layers) + (layers == 1 ? " object" : " objects");
-            if (interleave > 1) { statistics += dot + "dense: each object every " + juce::String(interleave) + " cycles"; }
+            // Too much to draw in a cycle: its shortest strokes are left out.
+            if (simplified) { statistics += dot + "dense: simplified to fit (a higher sample rate draws more)"; }
         }
         const auto hiding = processor.hiddenLineProgress();
         const auto hides = processor.hidesHiddenLines(), lights = processor.lightsFrames();

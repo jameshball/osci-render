@@ -95,6 +95,7 @@ public:
     // use each shape's native parameterization. This is not arc-length
     // reparameterization within a curved shape.
     osci::Point sampleTraversal(std::int64_t index, std::int64_t count) const {
+        if (coarse.minimum > 0 && count < coarse.minimum) { return sampleLongest(index, count); }
         const auto& traversal = count >= detailed.minimum ? detailed : coarse;
         if (traversal.minimum == 0 || count < traversal.minimum || index < 0 || index >= count) {
             return osci::Point(0, 0, 0, 0, 0, 0);
@@ -263,6 +264,51 @@ private:
             }
             traversal->minimum = reserved;
         }
+        // Its strokes longest first, for when even their ends do not fit.
+        ranked.resize(coarse.segments.size());
+        for (std::size_t index = 0; index < ranked.size(); ++index) { ranked[index] = index; }
+        std::stable_sort(ranked.begin(), ranked.end(), [&](std::size_t a, std::size_t b) {
+            return coarse.segments[a].lengthEnd - coarse.segments[a].lengthStart > coarse.segments[b].lengthEnd - coarse.segments[b].lengthStart;
+        });
+        rankedLengths.assign(ranked.size() + 1, 0.0);
+        for (std::size_t index = 0; index < ranked.size(); ++index) {
+            const auto& segment = coarse.segments[ranked[index]];
+            rankedLengths[index + 1] = rankedLengths[index] + (segment.lengthEnd - segment.lengthStart);
+        }
+    }
+
+    // Fewer samples than its strokes' ends need: as many whole strokes as
+    // fit, longest first, each dark where it starts and ends with at least a
+    // lit sample between, and samples to spare shared by length among them.
+    // Which strokes are drawn depends only on their lengths, so it holds
+    // still from cycle to cycle rather than tracing every stroke too thinly
+    // to show and letting short ones blink.
+    osci::Point sampleLongest(std::int64_t index, std::int64_t count) const {
+        constexpr std::int64_t least = 3;
+        const auto kept = std::min<std::int64_t>(static_cast<std::int64_t>(ranked.size()), count / least);
+        if (kept <= 0 || index < 0 || index >= count) { return osci::Point(0, 0, 0, 0, 0, 0); }
+        const auto extra = count - least * kept;
+        const auto keptLength = rankedLengths[static_cast<std::size_t>(kept)];
+        const auto startOf = [&](std::int64_t rank) {
+            const auto share = keptLength > 0 ? static_cast<std::int64_t>(rankedLengths[static_cast<std::size_t>(rank)] / keptLength * static_cast<double>(extra)) : 0;
+            return least * rank + std::min(extra, share);
+        };
+        // The kept stroke the sample falls in.
+        std::int64_t low = 0, high = kept - 1;
+        while (low < high) {
+            const auto middle = (low + high + 1) / 2;
+            if (startOf(middle) <= index) { low = middle; } else { high = middle - 1; }
+        }
+        const auto first = startOf(low), samples = (low + 1 == kept ? count : startOf(low + 1)) - first;
+        const auto& segment = coarse.segments[ranked[static_cast<std::size_t>(low)]];
+        const auto step = index - first;
+        if (step == 0 || step == samples - 1) {
+            auto point = step == 0 ? shapes[segment.firstShape]->nextVector(0) : shapes[segment.lastShape]->nextVector(1);
+            point.r = point.g = point.b = 0;
+            return point;
+        }
+        const auto progress = (static_cast<double>(step) - .5) / static_cast<double>(samples - 2);
+        return pointAlong(segment, segment.lengthStart + (segment.lengthEnd - segment.lengthStart) * progress);
     }
 
     static bool connected(const osci::Point& a, const osci::Point& b) {
@@ -293,6 +339,8 @@ private:
     std::vector<double> discontinuities;
     std::size_t lastPositive = 0;
     double total = 0.0, drawn = 0.0;
+    std::vector<std::size_t> ranked;
+    std::vector<double> rankedLengths;
 };
 
 }

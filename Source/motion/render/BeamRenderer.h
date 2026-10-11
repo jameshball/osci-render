@@ -35,7 +35,6 @@ public:
     // Point frames sum lit probe steps. Both run once per cycle per layer.
     static constexpr int lengthProbes = 9, pointLengthProbes = 48;
     static constexpr double minimumLayerLength = 0.05;
-    static constexpr std::int64_t maximumSpan = 8;
     // Tour improvement stops after this many candidate checks and moved
     // layers, bounding planning cost however many layers are visible.
     static constexpr std::int64_t maximumOrderingWork = 8192;
@@ -82,22 +81,12 @@ public:
         const auto cycleRate = composition.beamRate;
         auto first = planFirst, end = planEnd;
         if (!planned || index < planFirst || index >= planEnd || rate != planRate || cycleRate != planCycleRate || generation != planGeneration) {
-            // Dense scenes span several cycles: the window is aligned to its
-            // span k and k is the smallest span that fits the demand measured
-            // at the window's own start, so windows are a pure function of the
-            // cycle index for random access, playback and export alike.
+            // Every cycle draws the whole frame: a dense scene is drawn faster
+            // and simpler (see finishPlan), never shared across cycles, which
+            // would show its parts by turns.
             const auto cycle = cycleOf(index, rate, cycleRate);
-            std::int64_t span = maximumSpan;
-            for (std::int64_t k = 1; k <= maximumSpan; ++k) {
-                const auto window = cycle - ((cycle % k) + k) % k;
-                const auto windowFirst = cycleStart(window, rate, cycleRate);
-                const auto windowTime = advancing ? time - static_cast<double>(index - windowFirst) / rate : time;
-                if (spanFor(composition, windowTime, rate, cycleStart(window + 1, rate, cycleRate) - windowFirst, liveFrames) <= k) { span = k; break; }
-            }
-            const auto window = cycle - ((cycle % span) + span) % span;
-            first = cycleStart(window, rate, cycleRate);
-            end = cycleStart(window + span, rate, cycleRate);
-            planSpan = span;
+            first = cycleStart(cycle, rate, cycleRate);
+            end = cycleStart(cycle + 1, rate, cycleRate);
         }
         // Per-sample transport time carries rounding; half a sample of drift is
         // the same cycle, anything more is a seek.
@@ -116,16 +105,16 @@ public:
     // the beam is shared; read it with plannedSegments().
     void planCycle(const PreparedComposition& composition, double time, double rate, const LiveSourceFrames* liveFrames = nullptr) {
         if (!std::isfinite(rate) || rate <= 0 || !std::isfinite(time)) { segmentCount = 0; layerCount = 0; return; }
-        const auto span = spanFor(composition, time, rate, cycleStart(1, rate, composition.beamRate), liveFrames);
-        plan(composition, time, 0, cycleStart(span, rate, composition.beamRate), rate, liveFrames);
+        plan(composition, time, 0, cycleStart(1, rate, composition.beamRate), rate, liveFrames);
         planned = false;
     }
 
     // Diagnostic view of the current plan, for tests and the editor meter.
     std::span<const Segment> plannedSegments() const { return {segments->data(), segmentCount}; }
     std::size_t plannedLayers() const { return layerCount; }
-    // Cycles the current plan spans: each layer refreshes once per span.
-    std::int64_t plannedInterleave() const { return planSpan; }
+    // Whether the current plan had to leave strokes out to fit the cycle (a
+    // higher sample rate draws them all).
+    bool plannedSimplified() const { return planSimplified; }
 
 private:
     // Scope profile times in samples at the plan's rate.
@@ -209,7 +198,7 @@ private:
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
-        planned = true; planFirst = first; planEnd = end; planRate = rate; planTime = time;
+        planned = true; planFirst = first; planEnd = end; planRate = rate; planTime = time; planSimplified = false;
         segmentCount = 0; layerCount = 0; lastSegment = 0;
         for (const auto& clip : composition.clips) {
             if (layerCount == maximumLayers) { break; }
@@ -294,20 +283,34 @@ private:
             std::int64_t minimum = 0;
             for (std::size_t i = 0; i < layerCount; ++i) { minimum += std::min(floors[i], total); }
             if (budget >= minimum || (layerCount == 1 && budget >= 2)) { break; }
-            // The heaviest that can make do with less: first its strokes'
-            // ends, then tracing.
+            // The heaviest that can make do with its strokes' ends.
             std::size_t heaviest = layerCount;
             for (std::size_t i = 0; i < layerCount; ++i) {
                 if (floors[i] > items[i].coarse && (heaviest == layerCount || floors[i] > floors[heaviest])) { heaviest = i; }
             }
-            if (heaviest == layerCount) {
-                for (std::size_t i = 0; i < layerCount; ++i) {
-                    if (floors[i] > 2 && (heaviest == layerCount || floors[i] > floors[heaviest])) { heaviest = i; }
-                }
-            }
             if (heaviest != layerCount) {
-                floors[heaviest] = floors[heaviest] > items[heaviest].coarse ? items[heaviest].coarse : 2;
+                floors[heaviest] = items[heaviest].coarse;
                 continue;
+            }
+            // Past that, every layer gives up the same share of what its
+            // strokes' ends need, keeping its longest strokes whole (three
+            // samples each at least), so none is starved for the rest and
+            // the frame is never split across cycles.
+            if (budget > 0 && std::any_of(floors.begin(), floors.begin() + static_cast<std::ptrdiff_t>(layerCount), [](std::int64_t floor) { return floor > 3; })) {
+                std::int64_t fixed = 0, scalable = 0;
+                for (std::size_t i = 0; i < layerCount; ++i) {
+                    if (floors[i] <= 3) { fixed += floors[i]; } else { scalable += floors[i]; }
+                }
+                const auto room = static_cast<double>(std::max<std::int64_t>(0, budget - fixed));
+                const auto scale = scalable > 0 ? std::min(1.0, room / static_cast<double>(scalable)) : 1.0;
+                bool changed = false;
+                for (std::size_t i = 0; i < layerCount; ++i) {
+                    if (floors[i] <= 3) { continue; }
+                    const auto next = std::max<std::int64_t>(3, static_cast<std::int64_t>(std::floor(static_cast<double>(floors[i]) * scale)));
+                    changed = changed || next != floors[i];
+                    floors[i] = next;
+                }
+                if (changed) { continue; }
             }
             --layerCount;
         }
@@ -392,6 +395,7 @@ private:
                 hold(entryOf(i), dwell + settle);
             }
             const auto& layer = items[i];
+            if (layer.drawing != nullptr && layer.drawing->coarseTraversalSamples() > counts[i]) { planSimplified = true; }
             push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing});
             cursor += counts[i];
         }
@@ -402,26 +406,6 @@ private:
             cursor += back;
         }
         hold(entryOf(0), end - cursor);
-    }
-
-    // Cycles needed to reach every stroke of every visible layer once, from
-    // the samples each stroke's ends need plus dwell, settle and a unit of
-    // travel per jump, capped at the maximum span. Cheap: no geometry is
-    // transformed.
-    static std::int64_t spanFor(const PreparedComposition& composition, double time, double rate, std::int64_t cycleSamples, const LiveSourceFrames* liveFrames) {
-        if (cycleSamples <= 0) { return 1; }
-        const auto timing = timingFor(composition.scope, rate);
-        const auto jump = 2 * timing.dwell + timing.settle + timing.travel(1.0);
-        double demand = static_cast<double>(timing.dwell + timing.settle);
-        std::size_t counted = 0;
-        for (const auto& clip : composition.clips) {
-            if (counted == maximumLayers) { break; }
-            const auto shown = visible(composition, clip, time, liveFrames);
-            if (!shown.has_value()) { continue; }
-            demand += static_cast<double>(shown->coarse + jump);
-            ++counted;
-        }
-        return std::clamp<std::int64_t>(static_cast<std::int64_t>(std::ceil(demand / static_cast<double>(cycleSamples))), 1, maximumSpan);
     }
 
     // Greedy nearest-neighbour order from the first layer, allowing either
@@ -546,7 +530,7 @@ private:
                 const auto step = segment->reversed ? n - 1 - j : j;
                 const auto* drawing = segment->drawing;
                 osci::Point raw;
-                if (drawing != nullptr && drawing->coarseTraversalSamples() > 0 && n >= drawing->coarseTraversalSamples()) {
+                if (drawing != nullptr && drawing->coarseTraversalSamples() > 0 && n >= 3) {
                     raw = drawing->sampleTraversal(step, n);
                 } else {
                     const auto span = n > 1 ? 1.0 / static_cast<double>(n - 1) : 1.0;
@@ -566,7 +550,7 @@ private:
     struct Ends { double entryX, entryY, exitX, exitY; };
     std::array<Ends, maximumLayers> ends{};
     std::size_t segmentCount = 0, layerCount = 0, lastSegment = 0;
-    std::int64_t planSpan = 1;
+    bool planSimplified = false;
     bool planned = false, planAdvancing = true, improving = true;
     std::int64_t planFirst = 0, planEnd = 0;
     double planRate = 0, planTime = 0, planCycleRate = 0;

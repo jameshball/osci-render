@@ -100,7 +100,7 @@ private:
 public:
     // Last beam plan, for the status bar. Written by the audio thread.
     std::atomic<int> beamLayers {0};
-    std::atomic<int> beamInterleave {1};
+    std::atomic<bool> beamSimplified {false};
 private:
     // The Scope's picture at the last audio block, applied by the visualiser
     // through its external modulation hook (see ScopeBeam.h).
