@@ -181,6 +181,53 @@ public:
             expect(none[0] > 0, "with no shadows, the floor under it is lit too");
         }
 
+        beginTest("Shadows kept from one frame to the next follow the light and what it shines on");
+        {
+            // Over a point light, which moves at 1 s; then the box moves, at 2 s.
+            const auto steps = [](std::initializer_list<std::pair<double, double>> keys) {
+                motion::Curve curve(keys.begin()->second);
+                for (const auto& [time, value] : keys) {
+                    motion::Keyframe key;
+                    key.time = time;
+                    key.value = value;
+                    curve.setKey(key);
+                }
+                return curve;
+            };
+            auto project = scene();
+            addLight(project, "pointLight", 30, {{"position.y", 1.5}, {"position.z", 0}, {"light.range", 6}});
+            // Its tracks again, with one clip moving along the x axis.
+            const auto moving = [&](std::size_t index, motion::Curve x) {
+                auto clip = project.tracks[index].clips[0];
+                clip.properties["position.x"] = std::move(x);
+                motion::Track track;
+                track.id = project.tracks[index].id;
+                track.insert(clip, project.tempo());
+                auto tracks = project.tracks;
+                project.tracks.clear();
+                for (std::size_t other = 0; other < tracks.size(); ++other) { project.tracks.push_back(other == index ? track : tracks[other]); }
+            };
+            moving(0, steps({{0, 0}, {2, 0}, {2.2, .6}}));
+            moving(project.tracks.size() - 1, steps({{0, -.8}, {1, -.8}, {1.2, .8}}));
+            const motion::PreparedComposition prepared(project);
+            const auto floorAt = [&](double time, motion::hidden::Workspace& workspace) {
+                const auto frame = motion::hidden::cull(prepared, time, workspace);
+                return std::pair {pointsOf(prepared, 1, frame->drawing(1)).size(), coloursOf(frame->drawing(1))};
+            };
+            motion::hidden::Workspace kept;
+            const auto floorAfter = [&](double time, const char* what) {
+                const auto seen = floorAt(time, kept);
+                motion::hidden::Workspace fresh;
+                expect(seen == floorAt(time, fresh), what);
+                return seen;
+            };
+            const auto still = floorAfter(.2, "the first frame casts its shadows");
+            expect(floorAfter(.8, "a frame where nothing moved keeps them") == still);
+            const auto lightMoved = floorAfter(1.5, "a light that moves casts them anew");
+            expect(lightMoved != still, "where it now casts them");
+            expect(floorAfter(2.5, "a surface that moves casts its shadow anew") != lightMoved, "where it now falls");
+        }
+
         beginTest("Lit with a camera hiding lines, what is hidden stays hidden");
         {
             auto project = scene();

@@ -7,6 +7,7 @@
 namespace motion {
 struct Vec3 {
     double x = 0, y = 0, z = 0;
+    bool operator==(const Vec3&) const = default;
     Vec3 operator+(Vec3 other) const { return { x + other.x, y + other.y, z + other.z }; }
     Vec3 operator-(Vec3 other) const { return { x - other.x, y - other.y, z - other.z }; }
     Vec3 operator*(double scalar) const { return { x * scalar, y * scalar, z * scalar }; }

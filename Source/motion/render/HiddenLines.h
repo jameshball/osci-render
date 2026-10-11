@@ -342,6 +342,17 @@ struct Workspace {
         }
         return found->second.faces;
     }
+    // What the lights' shadows were last drawn from: each light's place, and
+    // every surface's drawing (its source kept alive, so its address is
+    // never another's) and corners. While none changes, nor bends, the
+    // shadows are the same and are kept.
+    struct ShadowsDrawnFrom {
+        bool valid = false;
+        std::vector<LightState> lights;
+        std::vector<std::shared_ptr<const PreparedSource>> sources;
+        std::vector<const PreparedDrawing*> drawings;
+        std::vector<std::vector<std::optional<Vec3>>> world;
+    } shadowsDrawnFrom;
 };
 
 // One frame as the active camera sees it, with hidden lines removed when it
@@ -411,9 +422,38 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
 
     // The lights shining, and what each sees, to find its shadows.
     auto& lights = workspace.lights;
-    lights.clear();
-    workspace.shadows.reset();
-    if (lit) {
+    auto& drawnFrom = workspace.shadowsDrawnFrom;
+    // Kept from the last frame while every light casting shadows is where it
+    // was and they fall on just the same surfaces.
+    const auto sameShadows = [&] {
+        if (!drawnFrom.valid || drawnFrom.drawings.size() != items.size() || drawnFrom.world != world) { return false; }
+        for (std::size_t surface = 0; surface < items.size(); ++surface) {
+            const auto& item = items[surface];
+            if (drawnFrom.drawings[surface] != item.drawing || (item.bent && item.drawing != nullptr && !item.drawing->faces().empty())) { return false; }
+        }
+        std::size_t index = 0;
+        for (const auto& light : composition.lights) {
+            const auto state = composition.lightAt(light, time);
+            if (!state.has_value()) { continue; }
+            if (index >= drawnFrom.lights.size()) { return false; }
+            const auto& was = drawnFrom.lights[index++];
+            if (was.kind != state->kind || was.casts() != state->casts() || was.position != state->position || was.direction != state->direction || was.cone != state->cone) { return false; }
+        }
+        return index == drawnFrom.lights.size();
+    };
+    const auto keepShadows = lit && sameShadows();
+    if (keepShadows) {
+        std::size_t index = 0;
+        for (const auto& light : composition.lights) {
+            const auto state = composition.lightAt(light, time);
+            if (state.has_value()) { lights[index++].state = *state; }
+        }
+    } else {
+        lights.clear();
+        workspace.shadows.reset();
+        drawnFrom.valid = false;
+    }
+    if (lit && !keepShadows) {
         for (const auto& light : composition.lights) {
             const auto state = composition.lightAt(light, time);
             if (!state.has_value()) { continue; }
@@ -460,6 +500,16 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             }
             if (!done) { return nullptr; }
         }
+        drawnFrom.lights.clear();
+        for (const auto& light : lights) { drawnFrom.lights.push_back(light.state); }
+        drawnFrom.sources.clear();
+        drawnFrom.drawings.clear();
+        for (const auto& item : items) {
+            drawnFrom.sources.push_back(item.source);
+            drawnFrom.drawings.push_back(item.drawing);
+        }
+        drawnFrom.world = world;
+        drawnFrom.valid = true;
     }
 
     // What hides, over what the Scope shows. Its triangles are kept too when
