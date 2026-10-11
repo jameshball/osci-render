@@ -91,17 +91,18 @@ struct LightView {
         return views[best];
     }
     // How wide a pixel of its shadows is at a point, in the scene.
-    double texel(Vec3 world) const {
-        const auto& view = viewOf(world);
+    double texel(Vec3 world) const { return texel(world, viewOf(world)); }
+    double texel(Vec3 world, const ShadowView& view) const {
         const auto size = view.depth->pixelSize() / std::max(1.0e-9, view.projection.focalLength);
         return view.projection.parallel ? size : size * std::max(Projection::nearPlane, view.eye.see(world).z);
     }
 
     // How much of the light reaches a point (1 where nothing blocks it), as
     // the shadows' strength allows.
-    double reaching(Vec3 world) const {
-        if (!casts()) { return 1; }
-        const auto& view = viewOf(world);
+    double reaching(Vec3 world) const { return casts() ? reaching(world, viewOf(world)) : 1; }
+    // Through a given view: one a point near this one is seen through (the
+    // buffer reaches a little past its view, so it still sees the point).
+    double reaching(Vec3 world, const ShadowView& view) const {
         const auto at = view.projection(view.eye.see(world));
         if (!at.has_value()) { return 1; }
         // A soft share at the shadow's edge, so it keeps still as the light moves.
@@ -175,13 +176,15 @@ inline std::array<double, 3> illumination(const std::vector<LightView>& lights, 
             // out as its lit face turns edge on, rather than flicking between
             // lit and dark as the light moves.
             if (normals.count > 0) {
-                const auto lift = light.casts() ? normalLift * light.texel(point) : 0.0;
+                const auto casts = light.casts();
+                const auto* view = casts ? &light.viewOf(point) : nullptr;
+                const auto lift = casts ? normalLift * light.texel(point, *view) : 0.0;
                 double reached = 0;
                 for (int index = 0; index < normals.count; ++index) {
                     const auto& normal = normals.values[static_cast<std::size_t>(index)];
                     const auto facing = normal.dot(toward);
                     if (facing == 0) { continue; }
-                    reached += std::abs(facing) * light.reaching(point + normal * (facing > 0 ? lift : -lift));
+                    reached += std::abs(facing) * (casts ? light.reaching(point + normal * (facing > 0 ? lift : -lift), *view) : 1.0);
                 }
                 strength *= reached / normals.count;
             } else {
