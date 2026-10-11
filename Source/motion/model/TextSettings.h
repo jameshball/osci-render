@@ -13,7 +13,7 @@ struct TextSettings {
     int alignment = 0; // Left, centre, right; explicit line breaks are preserved.
     double lineSpacing = 1.2;
     double tracking = 0.0; // Additional advance in em units.
-    // Per-character animation, baked into frames at 30 fps. Each visible
+    // Per-character animation, baked into frames at 60 fps. Each visible
     // character starts `characterDelay` seconds after the previous one and
     // takes `characterDuration`; the last pose then holds for `hold` seconds
     // before the source loops. `amount` scales the offsets (1 = one em).

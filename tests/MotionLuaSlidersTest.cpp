@@ -159,11 +159,11 @@ public:
             text->textSettings.characterDelay = 0.1; text->textSettings.characterDuration = 0.2; text->textSettings.hold = 1;
             expect(motion::decodeAsset(*text).wasOk());
             const auto& source = *text->source;
-            expectEquals(static_cast<int>(source.frameCount()), 48); // (0.4 + 0.2 + 1) s at 30 fps
+            expectEquals(static_cast<int>(source.frameCount()), 96); // (0.4 + 0.2 + 1) s at 60 fps
             expect(source.drawingAt(40) == source.drawingAt(47), "hold frames share one drawing");
             expect(source.drawingAt(0) != source.drawingAt(10));
             text->textSettings.hold = 30; text->textSettings.characterDelay = 30;
-            expect(motion::decodeAsset(*text).failed(), "over 120 seconds is refused, not truncated");
+            expect(motion::decodeAsset(*text).failed(), "over 60 seconds is refused, not truncated");
         }
     }
 };
