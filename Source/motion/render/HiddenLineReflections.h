@@ -412,11 +412,12 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         if (mirror.sphere.has_value()) {
             const auto rim = mirror.sphere->rimFrom(eye.position);
             if (rim.has_value()) {
+                // Round from its lowest point, where a ball rests on what is
+                // under it, so where the loop meets itself is least seen.
+                const auto lowest = std::atan2(-rim->second.y, -rim->first.y);
                 constexpr int around = 256;
-                for (int stretch = 0; stretch < around; ++stretch) {
-                    const auto turn = 2 * 3.14159265358979323846 / around;
-                    trace(rim->at(stretch * turn), rim->at((stretch + 1) * turn), 0.0, 1.0, atItself, reflector.surface, ownColour);
-                }
+                const auto turn = 2 * 3.14159265358979323846 / around;
+                for (int stretch = 0; stretch < around; ++stretch) { trace(rim->at(lowest + stretch * turn), rim->at(lowest + (stretch + 1) * turn), 0.0, 1.0, atItself, reflector.surface, ownColour); }
             }
         } else {
             for (const auto& flat : mirror.flats) {
