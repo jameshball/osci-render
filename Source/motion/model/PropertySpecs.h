@@ -97,7 +97,7 @@ inline constexpr std::array<PropertySpec, 7> cameraPropertySpecs {{
 
 // The Scope's picture: one row each, in the visualiser's own ranges.
 inline constexpr std::array<PropertySpec, 9> beamPropertySpecs {{
-    {"intensity", "Intensity", "Intensity", "", 0, 10, 5, .02, 2, ""},
+    {"intensity", "Intensity", "Intensity", "", 0, 50, 5, .02, 2, ""},
     {"focus", "Focus", "Focus", "", .3, 10, 1, .02, 2, ""},
     {"persistence", "Persistence", "Persistence", "", 0, 6, .5, .01, 2, ""},
     {"afterglow", "Afterglow", "Afterglow", "", 0, 10, 1, .02, 2, ""},

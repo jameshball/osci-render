@@ -35,9 +35,9 @@ using enum ModulationMode;
 // sways where it is so its shadows lick; a candle does the same, gently.
 inline constexpr std::array<Definition, 5> definitions {{
     {LightPreset::fire, "Fire", "Surges, flickers and crackles, and sways so its shadows lick", {1, .55, .18}, {{
-        {"Surge", noiseSmooth, 1.7, "light.intensity", .28, multiply},
-        {"Flicker", noiseSmooth, 7.3, "light.intensity", .2, multiply},
-        {"Crackle", noiseHold, 19, "light.intensity", .07, multiply},
+        {"Surge", noiseSmooth, 1.7, "light.intensity", .42, multiply},
+        {"Flicker", noiseSmooth, 7.3, "light.intensity", .3, multiply},
+        {"Crackle", noiseHold, 19, "light.intensity", .1, multiply},
         {"Flare", noiseSmooth, 2.9, "green", .09, add},
         {"Sway", noiseSmooth, 2.3, "position.x", .03, add},
         {"Lick", noiseSmooth, 3.1, "position.y", .04, add},
