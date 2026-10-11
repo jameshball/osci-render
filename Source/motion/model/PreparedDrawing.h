@@ -130,8 +130,8 @@ public:
         // up to its light along the stroke rather than standing at its end:
         // no sample is lit where the one before or after it is, which would
         // draw a bead, and however few samples it gets it is never lost.
-        // Other strokes dwell lit at their ends, so a closed one's seam shows
-        // like any corner.
+        // Other strokes dwell lit at their ends, so a closed one's seam (a
+        // corner) shows like any corner.
         if (index == start) { return dark(shapes[first.firstShape]->nextVector(0)); }
         if (index == end) { return dark(shapes[last.lastShape]->nextVector(1)); }
         const auto segment = std::lower_bound(segments.begin() + stroke->first, segments.begin() + stroke->last + 1, index,
@@ -173,8 +173,9 @@ private:
         double lengthStart, lengthEnd;
     };
     // A stroke dwells lit where it starts and ends, so a closed one's seam
-    // shows like any corner. In a fading drawing an open one fades in and out
-    // over a short way at its ends instead, so they draw no dot.
+    // shows like any corner. In a fading drawing an open one, or a closed one
+    // whose seam is smooth, fades in and out over a short way at its ends
+    // instead, so they draw no dot.
     struct TraversalStroke { std::size_t first, last; bool fades; };
     struct Traversal {
         std::vector<TraversalSegment> segments;
@@ -215,12 +216,20 @@ private:
         // Turning by more than about 25 degrees.
         return leaving[0] * arriving[0] + leaving[1] * arriving[1] + leaving[2] * arriving[2] < .9;
     }
+    // Whether a stroke from `firstShape` (starting at `start`) to `lastShape`
+    // (ending at `end`) fades in and out at its ends: in a fading drawing an
+    // open one does, and a closed one whose seam is smooth (a circle's, not a
+    // square's corner), where dwelling lit would draw a dot.
+    bool fades(osci::Point end, std::size_t lastShape, osci::Point start, std::size_t firstShape) const {
+        if (!fading) { return false; }
+        return !connected(end, start) || !corner(lastShape, firstShape);
+    }
     void prepareTraversal() {
         if (!(total > 0) || !std::isfinite(total)
             || shapes.size() > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max() / 4)) { return; }
         osci::Point previous, strokeStart;
         bool havePrevious = false;
-        std::size_t previousShape = 0;
+        std::size_t previousShape = 0, strokeFirstShape = 0;
         for (std::size_t index = 0; index < shapes.size(); ++index) {
             const auto before = index == 0 ? 0.0 : ends[index - 1];
             if (!(ends[index] > before)) { continue; }
@@ -232,10 +241,11 @@ private:
                 return;
             }
             if (!havePrevious || !connected(previous, start)) {
-                if (havePrevious) { detailed.strokes.back().fades = fading && !connected(previous, strokeStart); }
+                if (havePrevious) { detailed.strokes.back().fades = fades(previous, previousShape, strokeStart, strokeFirstShape); }
                 detailed.strokes.push_back({detailed.segments.size(), detailed.segments.size(), false});
                 detailed.segments.push_back({index, index, 0, before, ends[index]});
                 strokeStart = start;
+                strokeFirstShape = index;
             } else if (turning || corner(previousShape, index)) {
                 detailed.segments.push_back({index, index, 0, before, ends[index]});
             } else {
@@ -249,7 +259,7 @@ private:
             havePrevious = true;
         }
         if (!havePrevious) { return; }
-        detailed.strokes.back().fades = fading && !connected(previous, strokeStart);
+        detailed.strokes.back().fades = fades(previous, previousShape, strokeStart, strokeFirstShape);
         // Coarse: each stroke one run, end to end.
         for (const auto& stroke : detailed.strokes) {
             const auto& first = detailed.segments[stroke.first];
