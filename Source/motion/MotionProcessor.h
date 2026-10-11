@@ -118,6 +118,7 @@ public:
     std::optional<double> hiddenLineProgress() const { return publishedBake != nullptr && !publishedBake->complete() ? std::optional<double>(publishedBake->progress()) : std::nullopt; }
     bool hidesHiddenLines() const { return publishedBake != nullptr && publishedBake->hides; }
     bool lightsFrames() const { return publishedBake != nullptr && publishedBake->lights; }
+    bool reflectsFrames() const { return publishedBake != nullptr && publishedBake->reflects; }
 private:
     // Removes the lines cameras can't see, off the audio thread, from the
     // playhead out. Last, so its workers stop before the rest is destroyed.

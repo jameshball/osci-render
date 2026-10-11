@@ -499,6 +499,16 @@ void MotionEditor::setUpLibrary() {
             lights.addItem(std::move(entry));
         }
         menu.addSubMenu("Light", lights, true, icons::stroked(icons::glyph::bulb(), icons::ink()));
+        // Mirrors: surfaces that show the rest of the scene.
+        juce::PopupMenu mirrors;
+        for (std::size_t index = 0; index < motion::mirrorPresets.size(); ++index) {
+            const auto& preset = motion::mirrorPresets[index];
+            juce::PopupMenu::Item entry(juce::String(preset.name.data(), preset.name.size()));
+            entry.itemID = 2100 + static_cast<int>(index);
+            entry.image = motion::ui::generatorIcon(*motion::findGenerator(preset.generator), icons::ink());
+            mirrors.addItem(std::move(entry));
+        }
+        menu.addSubMenu("Mirror", mirrors, true, motion::ui::generatorIcon(*motion::findGenerator("sphere"), icons::ink()));
         menu.addItem(item(1, "Import file...", icons::glyph::folder()));
         menu.addItem(item(2, "Blender live source...", icons::glyph::live()));
         // The examples that ship with osci-motion, by kind, each pictured as
@@ -531,6 +541,10 @@ void MotionEditor::setUpLibrary() {
             if (choice == 3) { owner->showDrawingEditor(0); }
             if (choice >= 1000 && choice - 1000 < static_cast<int>(motion::generatorDefinitions.size())) { owner->addGenerator(motion::generatorDefinitions[static_cast<std::size_t>(choice - 1000)]); }
             if (choice >= 2000 && choice - 2000 < static_cast<int>(motion::lightPresets.size())) { owner->addGenerator(*motion::findGenerator("pointLight"), motion::lightPresets[static_cast<std::size_t>(choice - 2000)]); }
+            if (choice >= 2100 && choice - 2100 < static_cast<int>(motion::mirrorPresets.size())) {
+                const auto& preset = motion::mirrorPresets[static_cast<std::size_t>(choice - 2100)];
+                owner->addGenerator(*motion::findGenerator(preset.generator), std::nullopt, preset.name, {{"reflects", motion::Curve(100)}});
+            }
             if (choice >= 100 && choice - 100 < static_cast<int>(resources.size())) { owner->importExample(resources[static_cast<std::size_t>(choice - 100)]); }
         });
     };
@@ -1185,13 +1199,20 @@ void MotionEditor::timerCallback() {
             // Too much to draw in a cycle: its shortest strokes are left out.
             if (simplified) { statistics += dot + "dense: simplified to fit (a higher sample rate draws more)"; }
         }
+        // What the frames are baked for: "hiding lines, lighting and
+        // reflecting 40%" while baking, "hidden lines removed, lit, reflected"
+        // once done.
         const auto hiding = processor.hiddenLineProgress();
-        const auto hides = processor.hidesHiddenLines(), lights = processor.lightsFrames();
-        if (hiding.has_value()) {
-            const auto doing = hides && lights ? "hiding lines and lighting " : lights ? "lighting " : "hiding lines ";
-            statistics += dot + doing + juce::String(juce::roundToInt(*hiding * 100)) + "%";
-        } else if (hides || lights) {
-            statistics += dot + (hides && lights ? "hidden lines removed, lit" : lights ? "lit" : "hidden lines removed");
+        juce::StringArray doing, done;
+        if (processor.hidesHiddenLines()) { doing.add("hiding lines"); done.add("hidden lines removed"); }
+        if (processor.lightsFrames()) { doing.add("lighting"); done.add("lit"); }
+        if (processor.reflectsFrames()) { doing.add("reflecting"); done.add("reflected"); }
+        if (hiding.has_value() && !doing.isEmpty()) {
+            const auto last = doing.strings.getLast();
+            doing.remove(doing.size() - 1);
+            statistics += dot + (doing.isEmpty() ? last : doing.joinIntoString(", ") + " and " + last) + " " + juce::String(juce::roundToInt(*hiding * 100)) + "%";
+        } else if (!done.isEmpty()) {
+            statistics += dot + done.joinIntoString(", ");
         }
         statusBar.setStatistics(statistics);
     }

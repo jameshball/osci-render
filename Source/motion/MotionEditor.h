@@ -2,6 +2,7 @@
 
 #include "../CommonPluginEditor.h"
 #include "model/LightPresets.h"
+#include "model/MirrorPresets.h"
 #include "MotionProcessor.h"
 #include "ui/TimelineView.h"
 #include "ui/BeamShares.h"
@@ -144,7 +145,9 @@ private:
     void showDrawingEditor(motion::Id asset);
     // A generator's source, and a clip of it at the playhead on a new track.
     // A generator's clip; a light's with a preset on it, named for the preset.
-    void addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset = std::nullopt);
+    // A generator's clip, named for a preset when it has one, starting with
+    // `settings` over its defaults.
+    void addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset = std::nullopt, std::string_view named = {}, const motion::PropertyMap& settings = {});
     void previewDrawing();
     motion::Id drawingAsset = 0;
     // Text sources are written in the Scene, with the Scope previewing them.

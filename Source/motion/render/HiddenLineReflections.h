@@ -156,8 +156,9 @@ private:
 // camera hides a line; where something stands between the mirror and a line,
 // the line is hidden in it, as it would be seen from there. Each part is
 // drawn in the colour the line is drawn in where it is (lit as it is lit),
-// times how brightly the mirror reflects and its own colour. A surface's
-// lines are never seen in itself.
+// times how brightly the mirror reflects and how bright it is (its opacity,
+// or a dim colour), whatever colour it is. A surface's lines are never seen
+// in itself.
 //
 // `place(item, point)` puts a point of a clip in the scene; `normalsOf(item,
 // shape)` gives the faces a line runs along, to light it by; `depth` is the
@@ -215,10 +216,14 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
     for (const auto& reflector : reflectors) {
         if (cancelled()) { return std::nullopt; }
         const auto& mirror = reflector.mirror;
-        // Its own colour (and opacity) tints what it shows.
-        const auto tint = composition.applyCompositionEffects(items[reflector.surface].clip->processPoint(osci::Point(0, 0, 0, -1, -1, -1), time), time);
-        const auto amount = static_cast<float>(reflector.amount);
-        const std::array<float, 3> gain {std::max(0.0f, tint.r) * amount, std::max(0.0f, tint.g) * amount, std::max(0.0f, tint.b) * amount};
+        // What it shows keeps its own colours, as bright as the mirror
+        // reflects and is (its opacity, or a dim colour, dims it); its edges
+        // are in its own colour.
+        const auto own = composition.applyCompositionEffects(items[reflector.surface].clip->processPoint(osci::Point(0, 0, 0, -1, -1, -1), time), time);
+        const std::array<float, 3> tint {std::max(0.0f, own.r), std::max(0.0f, own.g), std::max(0.0f, own.b)};
+        const auto brightness = std::max({tint[0], tint[1], tint[2]});
+        const auto amount = static_cast<float>(reflector.amount) * brightness;
+        const std::array<float, 3> gain {amount, amount, amount};
         ReflectedLines lines;
 
         // A straight stretch of line from `from` to `to` in the scene, where
@@ -370,7 +375,9 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         };
         // What it shows is seen where `reflection` says; its edges where they are.
         const auto atItself = [](Vec3 point, std::optional<Vec3>) { return std::optional<Vec3>(point); };
-        const auto ownColour = [](double, double&, float&) { return std::array<float, 3> {1, 1, 1}; };
+        const auto ownColour = [&](double, double&, float&) {
+            return brightness > 0 ? std::array<float, 3> {tint[0] / brightness, tint[1] / brightness, tint[2] / brightness} : std::array<float, 3> {};
+        };
 
         // Its edges: a ball's rim, round, or each flat piece's outline.
         if (mirror.sphere.has_value()) {

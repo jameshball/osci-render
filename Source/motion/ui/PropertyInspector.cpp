@@ -85,9 +85,13 @@ void MotionPropertyInspector::refresh() {
         const auto* generator = targetGenerator();
         if (generator != nullptr) { specList.assign(generator->parameters.begin(), generator->parameters.end()); }
         const auto base = motion::propertySpecs(*found);
-        // A light draws nothing: it takes no share of the beam, and lights nothing of itself.
+        // A light draws nothing: it takes no share of the beam, and lights or
+        // reflects nothing of itself. A curve has no surface to reflect with.
         const auto light = generator != nullptr && generator->category == motion::GeneratorCategory::light;
-        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [light](const auto& spec) { return !light || (spec.id != "beam" && spec.id != "lit"); });
+        const auto surfaceless = light || (generator != nullptr && generator->category == motion::GeneratorCategory::curve);
+        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [light, surfaceless](const auto& spec) {
+            return !(light && (spec.id == "beam" || spec.id == "lit")) && !(surfaceless && spec.id == "reflects");
+        });
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
     }
     const auto specs = std::span<const motion::PropertySpec>(specList);
@@ -358,7 +362,7 @@ juce::String MotionPropertyInspector::sectionOf(const juce::String& group) const
         return juce::String(generator->name.data(), generator->name.size());
     }
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
-    if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Beam") { return "Appearance"; }
+    if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Reflects" || group == "Beam") { return "Appearance"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }

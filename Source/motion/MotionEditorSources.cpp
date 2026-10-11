@@ -477,11 +477,11 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     });
 }
 
-void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset) {
+void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset, std::string_view named, const motion::PropertyMap& settings) {
     auto& document = processor.document;
     auto asset = std::make_shared<motion::Asset>();
     asset->id = document.newId();
-    const auto named = preset.has_value() ? motion::lightPresetName(*preset) : definition.name;
+    if (named.empty()) { named = preset.has_value() ? motion::lightPresetName(*preset) : definition.name; }
     asset->name = motion::Document::uniqueAssetName(document.mainProject(), juce::String(named.data(), named.size()));
     asset->extension = juce::String(motion::generatorExtension.data(), motion::generatorExtension.size());
     asset->data.append(definition.id.data(), definition.id.size());
@@ -492,6 +492,7 @@ void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition, s
         return;
     }
     auto clip = motion::Document::makeClip(document.newId(), *asset, document.project().frameTime(processor.position.load()));
+    for (const auto& [property, curve] : settings) { clip.properties[property] = curve; }
     // A light shines to the end, rather than going out partway through.
     if (definition.category == motion::GeneratorCategory::light && document.project().duration - clip.start > 1.0e-3) { clip.duration = document.project().duration - clip.start; }
     motion::Track track;
