@@ -234,6 +234,10 @@ class BrowserSession:
             "--parallel",
             jobs,
         ], cwd=self.root_dir)
+        # The session uses the executable just built from here on.
+        self.jucewright = None
+        if not self.find_jucewright():
+            raise StepError(f"jucewright was built but not found in {self.jucewright_build_dir}")
 
     def open_project(self, path, editor_class: str = "MotionEditor") -> None:
         """Opens a project in the running app: as Finder does on macOS, by dropping
