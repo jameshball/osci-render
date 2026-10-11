@@ -214,6 +214,27 @@ public:
             expect(dark(actual) == dark(expected));
         }
 
+        beginTest("A fading open stroke comes up from dark and goes down to it, its samples evenly spaced");
+        {
+            // Every sample is as bright as any other: one bunched in at an end would draw a bead.
+            std::vector<std::unique_ptr<osci::Shape>> pieces;
+            pieces.push_back(std::make_unique<osci::Line>(osci::Point(0, 0, 0), osci::Point(1, 0, 0)));
+            pieces.push_back(std::make_unique<osci::Line>(osci::Point(1, 0, 0), osci::Point(2, 0, 0)));
+            const motion::PreparedDrawing faded(std::move(pieces), true);
+            const auto count = faded.minimumTraversalSamples() + 20;
+            std::vector<osci::Point> points;
+            for (std::int64_t index = 0; index < count; ++index) { points.push_back(faded.sampleTraversal(index, count)); }
+            expect(dark(points[1]) && dark(points[static_cast<std::size_t>(count - 2)]), "its first and last steps ramp from and to dark");
+            expect(!dark(points[2]) && !dark(points[static_cast<std::size_t>(count - 3)]), "and it is lit between");
+            float shortest = 10, longest = 0;
+            for (std::size_t index = 2; index + 2 < points.size(); ++index) {
+                const auto step = points[index].x - points[index - 1].x;
+                shortest = std::min(shortest, step);
+                longest = std::max(longest, step);
+            }
+            expect(shortest > .5f * longest, "no lit sample is bunched in near an end");
+        }
+
         beginTest("Traversal ignores zero lengths and rejects missing or insufficient budgets");
         expectEquals(zeroFiltered.minimumTraversalSamples(), std::int64_t(5));
         expectEquals(empty.minimumTraversalSamples(), std::int64_t(0));

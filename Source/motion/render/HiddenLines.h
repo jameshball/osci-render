@@ -171,14 +171,25 @@ inline std::vector<std::array<std::int32_t, 2>> facesAlong(const PreparedDrawing
 }
 
 // A shape, or part of one, lit: it draws its own colours (white where it has
-// none) times the light reaching it, blended from one end to the other.
+// none) times the light reaching it, blended between the light at stops along
+// it. One shape for a whole run of light, however its light changes, so the
+// beam walks it in even steps: every shape's end takes a sample of its own,
+// and many short pieces of one line would bunch samples into beads.
 class LitPart final : public osci::Shape {
 public:
-    LitPart(std::shared_ptr<osci::Shape> whole, float from, float to, std::array<float, 3> lightFrom, std::array<float, 3> lightTo)
-        : shape(std::move(whole)), start(from), end(to), first(lightFrom), last(lightTo) {}
+    struct Stop {
+        float at;
+        std::array<float, 3> light;
+    };
+    LitPart(std::shared_ptr<osci::Shape> whole, float from, float to, std::vector<Stop> stops) : shape(std::move(whole)), start(from), end(to), lights(std::move(stops)) {}
     osci::Point nextVector(float progress) override {
         auto point = shape->nextVector(start + (end - start) * progress);
-        const auto lit = [&](float own, std::size_t channel) { return (own < 0 ? 1.0f : own) * (first[channel] + (last[channel] - first[channel]) * progress); };
+        const auto next = std::upper_bound(lights.begin(), lights.end(), progress, [](float value, const Stop& stop) { return value < stop.at; });
+        const auto& after = next == lights.end() ? lights.back() : *next;
+        const auto& before = next == lights.begin() ? lights.front() : *(next - 1);
+        const auto span = after.at - before.at;
+        const auto blend = span > 0 ? std::clamp((progress - before.at) / span, 0.0f, 1.0f) : 0.0f;
+        const auto lit = [&](float own, std::size_t channel) { return (own < 0 ? 1.0f : own) * (before.light[channel] + (after.light[channel] - before.light[channel]) * blend); };
         point.r = lit(point.r, 0);
         point.g = lit(point.g, 1);
         point.b = lit(point.b, 2);
@@ -196,7 +207,7 @@ public:
 private:
     std::shared_ptr<osci::Shape> shape;
     float start, end;
-    std::array<float, 3> first, last;
+    std::vector<Stop> lights;
 };
 
 // Every surface's faces (meshes', and flat drawings' fills) drawn into a
@@ -764,8 +775,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     }
 
     // Lit: each piece kept, a couple of pixels at a time, the light reaching
-    // it found; pieces of it no light reaches dropped, and the rest drawn in
-    // as few parts as keep its light within a little of what it is all along.
+    // it found; pieces of it no light reaches dropped, and each run of the
+    // rest drawn as one shape, its light blended between as few stops as keep
+    // it within a little of what it is all along.
     if (lit) {
         constexpr double litStep = 2 * DepthBuffer::pixel;
         constexpr float dark = 1.0f / 512;
@@ -846,14 +858,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     const auto from = index == 0 ? 0.0 : (ts[index - 1] + ts[index]) * .5;
                     const auto to = last + 1 == ts.size() ? 1.0 : (ts[last] + ts[last + 1]) * .5;
                     const auto positionOf = [&](std::size_t sample) { return sample == index ? from : sample == last ? to : ts[sample]; };
-                    if (breaks.size() == 1) {
-                        // One lit sample: a part as wide as it.
-                        litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(from), static_cast<float>(to), light[index], light[index]), true, {}});
-                    }
-                    for (std::size_t part = 1; part < breaks.size(); ++part) {
-                        const auto a = breaks[part - 1], b = breaks[part];
-                        litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(positionOf(a)), static_cast<float>(positionOf(b)), light[a], light[b]), piece.cut, {}});
-                    }
+                    std::vector<LitPart::Stop> stops;
+                    for (const auto at : breaks) { stops.push_back({static_cast<float>((positionOf(at) - from) / std::max(to - from, 1.0e-12)), light[at]}); }
+                    litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(from), static_cast<float>(to), std::move(stops)), piece.cut, {}});
                     index = last + 1;
                 }
                 if (partial) {

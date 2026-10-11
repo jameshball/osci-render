@@ -103,24 +103,25 @@ public:
             const auto previousEnd = segmentIndex == stroke->first ? start + 1 : segments[segmentIndex - 1].baseEnd + extraThrough(segments[segmentIndex - 1], extra);
             return std::pair {previousEnd, segments[segmentIndex].baseEnd + extraThrough(segments[segmentIndex], extra)};
         };
-        // A fading stroke's ends are reached half a step in from them (a
-        // quarter of a lone step), so it fades in and out over that, however
-        // few samples it has, and draws lit between.
-        const auto fadeIn = [&](std::size_t segmentIndex) {
+        // A fading stroke is dark where it starts and ends, and comes up to
+        // its light over its first step and goes down over its last. Every
+        // sample is as bright as any other, so a sample bunched in near an
+        // end would draw a bead there; a stroke whose end segment has a
+        // single sample keeps it lit, so it is not lost.
+        const auto ramps = [&](std::size_t segmentIndex) {
             const auto [previousEnd, segmentEnd] = bounds(segmentIndex);
-            return static_cast<float>(std::min(.25, .5 / static_cast<double>(segmentEnd - previousEnd)));
+            return stroke->fades && segmentEnd - previousEnd >= 2;
         };
         if (index <= start + 1) {
-            auto point = shapes[first.shape]->nextVector(stroke->fades && index > start ? fadeIn(stroke->first) : 0.0f);
-            if (index == start) { point.r = point.g = point.b = 0; }
+            auto point = shapes[first.shape]->nextVector(0);
+            if (index == start || ramps(stroke->first)) { point.r = point.g = point.b = 0; }
             return point;
         }
-        if (index == end) {
+        if (index == end || (index == end - 1 && ramps(stroke->last))) {
             auto point = shapes[last.shape]->nextVector(1);
             point.r = point.g = point.b = 0;
             return point;
         }
-        if (stroke->fades && index == end - 1) { return shapes[last.shape]->nextVector(1.0f - fadeIn(stroke->last)); }
         const auto segment = std::lower_bound(segments.begin() + stroke->first, segments.begin() + stroke->last + 1, index,
             [&](const TraversalSegment& item, std::int64_t value) { return item.baseEnd + extraThrough(item, extra) < value; });
         const auto [previousEnd, segmentEnd] = bounds(static_cast<std::size_t>(segment - segments.begin()));
