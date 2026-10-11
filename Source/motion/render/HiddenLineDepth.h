@@ -141,17 +141,27 @@ public:
             if (first > last) { continue; }
             const auto firstX = first + .5;
             // Inside, edges included (with room for rounding, which can put a
-            // pixel on a shared edge just outside both neighbours).
-            auto e0 = edges[0].at(firstX, py), e1 = edges[1].at(firstX, py), e2 = edges[2].at(firstX, py);
-            auto w = a.w + dwdx * (firstX - ax) + dwdy * (py - ay);
-            const auto offset = static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(first);
-            auto* cell = pixels.data() + offset;
-            for (auto x = first; x <= last; ++x, ++cell) {
-                if (e0 >= -edgeSlack && e1 >= -edgeSlack && e2 >= -edgeSlack && w > cell->w) { *cell = {static_cast<float>(w), index}; }
-                e0 += edges[0].stepX;
-                e1 += edges[1].stepX;
-                e2 += edges[2].stepX;
-                w += dwdx;
+            // pixel on a shared edge just outside both neighbours): each edge
+            // allows a run of the row's pixels, found once, so the pixels
+            // between are only compared in depth.
+            auto from = 0.0, to = static_cast<double>(last - first);
+            for (const auto& edge : edges) {
+                const auto room = edge.at(firstX, py) + edgeSlack;
+                if (edge.stepX > 0) {
+                    from = std::max(from, std::ceil(-room / edge.stepX));
+                } else if (edge.stepX < 0) {
+                    to = std::min(to, std::floor(-room / edge.stepX));
+                } else if (room < 0) {
+                    to = -1;
+                }
+            }
+            if (from > to) { continue; }
+            const auto start = static_cast<int>(from), end = static_cast<int>(to);
+            const auto w = a.w + dwdx * (firstX - ax) + dwdy * (py - ay);
+            auto* cell = pixels.data() + static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(first);
+            for (auto step = start; step <= end; ++step) {
+                const auto here = static_cast<float>(w + dwdx * step);
+                if (here > cell[step].w) { cell[step] = {here, index}; }
             }
         }
         drawnLeft = std::min(drawnLeft, left);
