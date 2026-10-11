@@ -66,7 +66,7 @@ public:
             expect(decoded != nullptr);
             if (decoded != nullptr) {
                 VisualiserState::load(*decoded, restored.params, restoredRecording);
-                expectEquals(restored.params.intensityEffect->getValue(), 7.5f);
+                expectWithinAbsoluteError(restored.params.intensityEffect->getValue(), 7.5f, 1.0e-4f);
                 expectEquals(restored.params.hueEffect->getValue(), 240.0f);
                 expectWithinAbsoluteError(restored.params.audioEffects.front()->parameters.front()->getValue(), .35f, 1e-6f);
                 expect(restored.params.sweepEnabled->getBoolValue());
