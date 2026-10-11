@@ -136,7 +136,9 @@ inline std::optional<Vec3> normalOf(Vec3 a, Vec3 b, Vec3 c) { return (b - a).cro
 // takes a light whichever way it comes from.
 // How far, in shadow pixels, a line's shadow test is lifted off its faces.
 inline constexpr double normalLift = 1.5;
-inline std::array<double, 3> illumination(const std::vector<LightView>& lights, Vec3 point, const Normals& normals) {
+// `shade`, when given, is told how much the shadows took from it: the
+// shadow tests' shortfalls, added up (none where nothing blocks a light).
+inline std::array<double, 3> illumination(const std::vector<LightView>& lights, Vec3 point, const Normals& normals, double* shade = nullptr) {
     std::array<double, 3> total {};
     for (const auto& light : lights) {
         const auto& state = light.state;
@@ -184,11 +186,15 @@ inline std::array<double, 3> illumination(const std::vector<LightView>& lights, 
                     const auto& normal = normals.values[static_cast<std::size_t>(index)];
                     const auto facing = normal.dot(toward);
                     if (facing == 0) { continue; }
-                    reached += std::abs(facing) * (casts ? light.reaching(point + normal * (facing > 0 ? lift : -lift), *view) : 1.0);
+                    const auto through = casts ? light.reaching(point + normal * (facing > 0 ? lift : -lift), *view) : 1.0;
+                    if (shade != nullptr) { *shade += 1 - through; }
+                    reached += std::abs(facing) * through;
                 }
                 strength *= reached / normals.count;
             } else {
-                strength *= light.reaching(point);
+                const auto through = light.reaching(point);
+                if (shade != nullptr) { *shade += 1 - through; }
+                strength *= through;
             }
         }
         for (std::size_t channel = 0; channel < 3; ++channel) { total[channel] += state.colour[channel] * strength; }

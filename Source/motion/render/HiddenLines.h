@@ -810,6 +810,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         constexpr double tolerance = 1.0 / 64;
         std::vector<double> ts;
         std::vector<std::array<float, 3>> light;
+        std::vector<double> shades;
         std::vector<std::size_t> breaks;
         for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
             if (cancelled()) { return nullptr; }
@@ -830,22 +831,26 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 const auto steps = std::clamp(static_cast<int>(std::ceil(length * 1.25 / litStep)), 1, 4096);
                 ts.resize(static_cast<std::size_t>(steps) + 1);
                 light.resize(static_cast<std::size_t>(steps) + 1);
+                shades.resize(static_cast<std::size_t>(steps) + 1);
                 const auto lightAt = [&](int step) {
                     const auto t = static_cast<double>(step) / steps;
                     const auto at = place(item, shape->nextVector(static_cast<float>(t)));
                     std::array<float, 3> reaching {};
+                    double shade = 0;
                     if (at.has_value()) {
-                        const auto total = illumination(lights, *at, piece.normals);
+                        const auto total = illumination(lights, *at, piece.normals, &shade);
                         for (std::size_t channel = 0; channel < 3; ++channel) { reaching[channel] = 1 + response * (static_cast<float>(total[channel]) - 1); }
                     }
                     ts[static_cast<std::size_t>(step)] = t;
                     light[static_cast<std::size_t>(step)] = reaching;
+                    shades[static_cast<std::size_t>(step)] = at.has_value() ? shade : -1;
                 };
                 // Every few steps first; the steps between are found only
-                // where their ends' light differs or either is dark, and
-                // blended elsewhere, where the light changes smoothly.
+                // where their ends' shadows differ, either is dark or their
+                // light differs by much, and blended elsewhere: away from a
+                // shadow's edge, light changes smoothly along a line.
                 constexpr int stride = 3;
-                constexpr float alike = 1.0f / 256;
+                constexpr float alike = 1.0f / 64;
                 lightAt(0);
                 for (int from = 0; from < steps;) {
                     const auto to = std::min(steps, from + stride);
@@ -853,7 +858,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     const auto& a = light[static_cast<std::size_t>(from)];
                     const auto& b = light[static_cast<std::size_t>(to)];
                     const auto darkEnd = std::max({a[0], a[1], a[2]}) < dark || std::max({b[0], b[1], b[2]}) < dark;
-                    const auto differs = std::abs(a[0] - b[0]) > alike || std::abs(a[1] - b[1]) > alike || std::abs(a[2] - b[2]) > alike;
+                    const auto differs = std::abs(shades[static_cast<std::size_t>(from)] - shades[static_cast<std::size_t>(to)]) > 1.0e-6
+                        || std::abs(a[0] - b[0]) > alike || std::abs(a[1] - b[1]) > alike || std::abs(a[2] - b[2]) > alike;
                     for (auto step = from + 1; step < to; ++step) {
                         if (darkEnd || differs) {
                             lightAt(step);
