@@ -882,9 +882,17 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 ts.resize(static_cast<std::size_t>(steps) + 1);
                 light.resize(static_cast<std::size_t>(steps) + 1);
                 shades.resize(static_cast<std::size_t>(steps) + 1);
+                // A straight piece nothing bends is straight in the scene too:
+                // its points there are blended between its ends'.
+                std::optional<Vec3> startsAt, endsAt;
+                if (!item.bent && dynamic_cast<osci::Line*>(shape.get()) != nullptr) {
+                    startsAt = place(item, shape->nextVector(0));
+                    endsAt = place(item, shape->nextVector(1));
+                }
+                const auto straight = startsAt.has_value() && endsAt.has_value();
                 const auto lightAt = [&](int step) {
                     const auto t = static_cast<double>(step) / steps;
-                    const auto at = place(item, shape->nextVector(static_cast<float>(t)));
+                    const auto at = straight ? std::optional<Vec3>(*startsAt + (*endsAt - *startsAt) * t) : place(item, shape->nextVector(static_cast<float>(t)));
                     std::array<float, 3> reaching {};
                     double shade = 0;
                     if (at.has_value()) {
