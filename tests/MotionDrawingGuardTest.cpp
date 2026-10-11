@@ -214,6 +214,33 @@ public:
             expect(dark(actual) == dark(expected));
         }
 
+        beginTest("A smooth curve of many short lines needs samples only at its ends; corners keep one each");
+        {
+            // A circle as 200 lines: no corners, so walked by length from end to end.
+            std::vector<std::unique_ptr<osci::Shape>> circle;
+            for (int step = 0; step < 200; ++step) {
+                const auto at = [](int k) { const auto a = 2 * juce::MathConstants<float>::pi * static_cast<float>(k) / 200; return osci::Point(std::cos(a), std::sin(a), 0); };
+                circle.push_back(std::make_unique<osci::Line>(at(step), at(step + 1)));
+            }
+            const motion::PreparedDrawing round(std::move(circle));
+            expect(round.minimumTraversalSamples() <= 4, "a circle of 200 lines needs " + juce::String(round.minimumTraversalSamples()) + " samples, not 200");
+            const auto count = round.minimumTraversalSamples() + 40;
+            float largest = 0;
+            for (std::int64_t index = 2; index + 1 < count; ++index) {
+                const auto a = round.sampleTraversal(index - 1, count), b = round.sampleTraversal(index, count);
+                expectWithinAbsoluteError(std::hypot(b.x, b.y), 1.0f, 1.0e-3f, "every sample on the circle");
+                largest = std::max(largest, std::hypot(b.x - a.x, b.y - a.y));
+            }
+            expect(largest < 2 * juce::MathConstants<float>::pi / 40 * 1.3f, "spread evenly round it");
+            // A square: four corners, each its own sample, so they stay sharp.
+            std::vector<std::unique_ptr<osci::Shape>> sides;
+            const std::array<osci::Point, 5> corners {osci::Point(0, 0, 0), osci::Point(1, 0, 0), osci::Point(1, 1, 0), osci::Point(0, 1, 0), osci::Point(0, 0, 0)};
+            for (std::size_t side = 0; side < 4; ++side) { sides.push_back(std::make_unique<osci::Line>(corners[side], corners[side + 1])); }
+            const motion::PreparedDrawing square(std::move(sides));
+            expectEquals(square.minimumTraversalSamples(), std::int64_t(7), "a square: dark start, lit start, four corners, dark end");
+            expectEquals(square.coarseTraversalSamples(), std::int64_t(4), "or just its ends");
+        }
+
         beginTest("A fading open stroke comes up from dark and goes down to it, its samples evenly spaced");
         {
             // Every sample is as bright as any other: one bunched in at an end would draw a bead.

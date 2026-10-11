@@ -21,9 +21,12 @@ namespace motion {
 // colour, without taking beam time from the others. Layers are ordered to minimise
 // dark travel, and every jump dwells dark at both ends, then settles, so
 // reconstruction filters and slow scopes arrive before the next stroke lights;
-// the project's scope profile calibrates those times. When complete
-// strokes do not fit one cycle, a plan spans several aligned cycles instead of
-// undersampling, trading refresh rate for complete, unbroken drawings.
+// the project's scope profile calibrates those times. Every layer is drawn
+// every cycle whenever it can be: a drawing's complete strokes take a sample at
+// each end and corner, and when those do not all fit, the layers needing the
+// most make do with their strokes' ends. Only content with more separate
+// strokes than one cycle can blank on and off spans several aligned cycles,
+// trading refresh rate for drawings that show at all.
 class BeamRenderer {
 public:
     static constexpr std::size_t maximumLayers = 256;
@@ -148,6 +151,8 @@ private:
         double share = 1;
         const PreparedDrawing* drawing = nullptr;
         double shown = 1;
+        // Fewer samples that still reach every stroke's ends.
+        std::int64_t coarse = 2;
     };
 
     // The beam's travel between two points; a non-finite one counts as far.
@@ -165,8 +170,8 @@ private:
         return composition.projectVisible(clip.processPoint(raw, planTime), planTime);
     }
 
-    // A clip drawn at `time`: its source frame and the fewest samples that
-    // draw its strokes completely.
+    // A clip drawn at `time`: its source frame, the fewest samples that draw
+    // its strokes completely, and the fewest that reach their ends.
     struct Visible {
         const PreparedSource* source;
         std::size_t frame;
@@ -174,6 +179,7 @@ private:
         double share;
         const PreparedDrawing* drawing;
         double shown;
+        std::int64_t coarse;
     };
     // A clip's vector drawing at a frame: with the lines its camera can't see
     // removed once that frame is baked, a point source's frame as the runs of
@@ -198,7 +204,8 @@ private:
         if (drawing != nullptr && drawing->empty()) { return std::nullopt; }
         // A point source's runs keep its own budget: no floor per corner.
         const auto floored = drawing != nullptr && source->drawingAt(frame) != nullptr;
-        return Visible {source, frame, std::max<std::int64_t>(2, floored ? drawing->minimumTraversalSamples() : 2), share, drawing, shown};
+        return Visible {source, frame, std::max<std::int64_t>(2, floored ? drawing->minimumTraversalSamples() : 2), share, drawing, shown,
+            std::max<std::int64_t>(2, floored ? drawing->coarseTraversalSamples() : 2)};
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
@@ -208,7 +215,7 @@ private:
             if (layerCount == maximumLayers) { break; }
             const auto shown = visible(composition, clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
-            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share, shown->drawing, shown->shown});
+            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share, shown->drawing, shown->shown, shown->coarse});
         }
         finishPlan(composition, first, end, rate);
     }
@@ -270,17 +277,38 @@ private:
         const auto dwell = timing.dwell, settle = timing.settle;
         order();
         improveOrder();
-        // Too many layers for this cycle drop from the end of the travel order.
+        // Each layer's floor: the samples its complete strokes need. When the
+        // floors do not all fit, the layer needing the most makes do with its
+        // strokes' ends alone, and so on until the rest fit; past that, the
+        // heaviest are traced evenly along their length (two samples at
+        // least), and only then does the last in the travel order drop.
         std::int64_t budget = 0;
         std::array<std::int64_t, maximumLayers> counts{};
+        std::array<std::int64_t, maximumLayers> floors{};
+        for (std::size_t i = 0; i < layerCount; ++i) { floors[i] = items[i].minimum; }
         while (layerCount > 0) {
             std::int64_t overhead = dwell + settle;
             for (std::size_t i = 1; i < layerCount; ++i) { overhead += 2 * dwell + settle + timing.travel(exitOf(i - 1), entryOf(i)); }
             overhead += dwell + timing.travel(exitOf(layerCount - 1), entryOf(0));
             budget = total - overhead;
             std::int64_t minimum = 0;
-            for (std::size_t i = 0; i < layerCount; ++i) { minimum += std::min(items[i].minimum, total); }
+            for (std::size_t i = 0; i < layerCount; ++i) { minimum += std::min(floors[i], total); }
             if (budget >= minimum || (layerCount == 1 && budget >= 2)) { break; }
+            // The heaviest that can make do with less: first its strokes'
+            // ends, then tracing.
+            std::size_t heaviest = layerCount;
+            for (std::size_t i = 0; i < layerCount; ++i) {
+                if (floors[i] > items[i].coarse && (heaviest == layerCount || floors[i] > floors[heaviest])) { heaviest = i; }
+            }
+            if (heaviest == layerCount) {
+                for (std::size_t i = 0; i < layerCount; ++i) {
+                    if (floors[i] > 2 && (heaviest == layerCount || floors[i] > floors[heaviest])) { heaviest = i; }
+                }
+            }
+            if (heaviest != layerCount) {
+                floors[heaviest] = floors[heaviest] > items[heaviest].coarse ? items[heaviest].coarse : 2;
+                continue;
+            }
             --layerCount;
         }
         if (layerCount == 0) {
@@ -297,7 +325,7 @@ private:
             std::int64_t total = 0;
             for (std::size_t i = 0; i < layerCount; ++i) {
                 const auto ideal = std::floor(items[i].length * density);
-                total += std::max<std::int64_t>(std::min(items[i].minimum, budget), std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : 0);
+                total += std::max<std::int64_t>(std::min(floors[i], budget), std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : 0);
             }
             return total;
         };
@@ -309,7 +337,7 @@ private:
         std::int64_t used = 0;
         for (std::size_t i = 0; i < layerCount; ++i) {
             const auto ideal = std::floor(items[i].length * low);
-            const auto least = std::min(items[i].minimum, budget);
+            const auto least = std::min(floors[i], budget);
             counts[i] = std::max<std::int64_t>(least, std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : least);
             used += counts[i];
         }
@@ -318,7 +346,7 @@ private:
             std::size_t largest = layerCount;
             std::int64_t surplus = 0;
             for (std::size_t i = 0; i < layerCount; ++i) {
-                const auto above = counts[i] - std::max<std::int64_t>(2, std::min(items[i].minimum, budget));
+                const auto above = counts[i] - std::max<std::int64_t>(2, std::min(floors[i], budget));
                 if (above > surplus) { surplus = above; largest = i; }
             }
             if (largest == layerCount) { break; }
@@ -376,9 +404,10 @@ private:
         hold(entryOf(0), end - cursor);
     }
 
-    // Cycles needed to draw every visible layer's complete strokes once,
-    // from minimum traversal budgets plus dwell, settle and a unit of travel
-    // per jump, capped at the maximum span. Cheap: no geometry is transformed.
+    // Cycles needed to reach every stroke of every visible layer once, from
+    // the samples each stroke's ends need plus dwell, settle and a unit of
+    // travel per jump, capped at the maximum span. Cheap: no geometry is
+    // transformed.
     static std::int64_t spanFor(const PreparedComposition& composition, double time, double rate, std::int64_t cycleSamples, const LiveSourceFrames* liveFrames) {
         if (cycleSamples <= 0) { return 1; }
         const auto timing = timingFor(composition.scope, rate);
@@ -389,7 +418,7 @@ private:
             if (counted == maximumLayers) { break; }
             const auto shown = visible(composition, clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
-            demand += static_cast<double>(shown->minimum + jump);
+            demand += static_cast<double>(shown->coarse + jump);
             ++counted;
         }
         return std::clamp<std::int64_t>(static_cast<std::int64_t>(std::ceil(demand / static_cast<double>(cycleSamples))), 1, maximumSpan);
@@ -517,7 +546,7 @@ private:
                 const auto step = segment->reversed ? n - 1 - j : j;
                 const auto* drawing = segment->drawing;
                 osci::Point raw;
-                if (drawing != nullptr && drawing->minimumTraversalSamples() > 0 && n >= drawing->minimumTraversalSamples()) {
+                if (drawing != nullptr && drawing->coarseTraversalSamples() > 0 && n >= drawing->coarseTraversalSamples()) {
                     raw = drawing->sampleTraversal(step, n);
                 } else {
                     const auto span = n > 1 ? 1.0 / static_cast<double>(n - 1) : 1.0;
