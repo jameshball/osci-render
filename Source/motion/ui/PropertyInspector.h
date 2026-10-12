@@ -3,6 +3,7 @@
 #include "MotionIcons.h"
 #include "PreviewGesture.h"
 #include "Chip.h"
+#include "TileGrid.h"
 
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
@@ -117,9 +118,20 @@ private:
         void paint(juce::Graphics& g) override;
     };
     static constexpr int sectionGap = 10, sectionHeading = 26;
+    // How a surface draws itself, as tiles: its edges, outline, patterns and
+    // mirror, each on or off at a click, its rows below only for those on.
+    std::unique_ptr<motion::ui::TileGrid> surfaceTiles;
+    // A light's presets, as tiles: steady, or moving on its own.
+    std::unique_ptr<motion::ui::TileGrid> presetTiles;
+    // The surface tiles' properties, in their order.
+    static const std::array<std::string_view, 8>& surfaceProperties();
+    // Puts the tiles in step with the target at `time`, and shows the
+    // Surface rows that are on; true when which show changed.
+    bool refreshTiles(const motion::PropertyTarget& found, double time);
     // Which heading a property group sits under.
-    juce::String sectionOf(const juce::String& group) const;
-    bool isGeneratorGroup(const juce::String& group) const;
+    juce::String sectionOf(const motion::PropertySpec& spec) const;
+    // A generator's own number: what makes it.
+    bool isGeneratorSpec(const motion::PropertySpec& spec) const;
 
     // Driven by a link or a shared modulator route.
     bool isModulated(const std::string& property) const;

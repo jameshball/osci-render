@@ -152,6 +152,16 @@ try:
     # A light already moving on its own, from the presets.
     add("Light", "Fire")
     field("light.range")
+    # Its preset, one of a row of them in Properties, changed at a click.
+    preset = lambda name: find(lambda n: n.get("name") == "Light presets: " + name)
+    if not preset("Fire").get("checked") or preset("Steady").get("checked"):
+        raise RuntimeError("A fire light shows its preset")
+    step("candle", "click", "--name", "Light presets: Candle", "--exact")
+    session.wait_for_undo("Apply candle preset")
+    if not preset("Candle").get("checked") or preset("Fire").get("checked"):
+        raise RuntimeError("One preset at a time")
+    step("fire again", "click", "--name", "Light presets: Fire", "--exact")
+    session.wait_for_undo("Apply fire preset")
 
     step("save", "press", "command + s", "--class", "MotionEditor")
     time.sleep(1)

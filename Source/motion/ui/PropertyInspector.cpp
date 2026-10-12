@@ -1,5 +1,6 @@
 #include "PropertyInspector.h"
 #include "../model/KeyEdit.h"
+#include "../model/LightPresets.h"
 #include "../../parser/FileFormatRegistry.h"
 
 MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : processor(owner) {
@@ -191,6 +192,7 @@ void MotionPropertyInspector::refreshValues() {
             row->swatch->setColour(juce::Colour::fromFloatRGBA(static_cast<float>(rgb[0]), static_cast<float>(rgb[1]), static_cast<float>(rgb[2]), 1.0f));
         }
     }
+    if (refreshTiles(*found, time)) { layoutContent(); }
 }
 
 void MotionPropertyInspector::setModulatorDrag(bool active) {
@@ -352,20 +354,21 @@ void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
     }
 }
 
-bool MotionPropertyInspector::isGeneratorGroup(const juce::String& group) const {
+bool MotionPropertyInspector::isGeneratorSpec(const motion::PropertySpec& spec) const {
     const auto* generator = targetGenerator();
     if (generator == nullptr) { return false; }
-    return std::any_of(generator->parameters.begin(), generator->parameters.end(), [&](const auto& spec) { return group == juce::String(spec.group.data(), spec.group.size()); });
+    return std::any_of(generator->parameters.begin(), generator->parameters.end(), [&](const auto& own) { return own.id == spec.id; });
 }
 
-juce::String MotionPropertyInspector::sectionOf(const juce::String& group) const {
-    if (isGeneratorGroup(group)) {
+juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec) const {
+    const juce::String group(spec.group.data(), spec.group.size());
+    if (isGeneratorSpec(spec)) {
         const auto* generator = targetGenerator();
         return juce::String(generator->name.data(), generator->name.size());
     }
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
-    if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Reflects" || group == "Beam") { return "Appearance"; }
-    if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Hilbert curve" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail" || group == "Noise phase" || group == "Noise flow") { return "Lines"; }
+    if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Beam") { return "Appearance"; }
+    if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Hilbert curve" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail" || group == "Noise phase" || group == "Noise flow" || group == "Mirror") { return "Surface"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }
@@ -386,11 +389,12 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
     if (lead != nullptr) { content.addChildComponent(lead); }
     if (trail != nullptr) { content.addChildComponent(trail); }
     for (const auto& spec : specs) {
-        if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size())) {
+        // A generator's own Rings is not the Rings pattern.
+        if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size()) || rows.back()->first != isGeneratorSpec(spec)) {
             auto row = std::make_unique<Row>();
             row->group = juce::String(spec.group.data(), spec.group.size());
-            row->section = sectionOf(row->group);
-            row->first = isGeneratorGroup(row->group);
+            row->section = sectionOf(spec);
+            row->first = isGeneratorSpec(spec);
             row->key.setName("Key " + row->group.toLowerCase());
             // Keys are neutral: filled on a key, outlined off one.
             row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
@@ -486,7 +490,91 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         rows.back()->addAndMakeVisible(editor);
         rows.back()->fields.push_back(std::move(field));
     }
+    surfaceTiles.reset();
+    presetTiles.reset();
+    if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return motion::isLinesProperty(spec.id); })) {
+        using motion::ui::pictures::SurfaceLook;
+        const auto picture = [](SurfaceLook look) { return motion::ui::pictures::surfacePicture(look); };
+        surfaceTiles = std::make_unique<motion::ui::TileGrid>("Surface styles", std::vector<motion::ui::TileGrid::Choice> {
+            {"Edges", "Its own edges, as it is made", picture(SurfaceLook::edges)},
+            {"Outline", "Its outline, where it turns from the eye", picture(SurfaceLook::outline)},
+            {"Spiral", "A spiral round it, from bottom to top", picture(SurfaceLook::spiral)},
+            {"Hilbert", "A Hilbert curve laid over it", picture(SurfaceLook::hilbert)},
+            {"Noise", "Contours of noise, which can morph as it plays (Noise flow)", picture(SurfaceLook::noise)},
+            {"Slices", "Level slices through it", picture(SurfaceLook::slices)},
+            {"Rings", "Rings round its front", picture(SurfaceLook::rings)},
+            {"Mirror", "It reflects the rest of the scene", picture(SurfaceLook::mirror)}}, 4);
+        surfaceTiles->onClick = [this](std::size_t index) {
+            const auto on = surfaceTiles->tile(index).getToggleState();
+            const auto name = surfaceTiles->nameOf(index);
+            commitValue(std::string(surfaceProperties()[index]), on ? 0.0 : 100.0, (on ? "Turn off " : "Turn on ") + name);
+        };
+        content.addAndMakeVisible(*surfaceTiles);
+    }
+    const auto* generator = targetGenerator();
+    if (generator != nullptr && generator->category == motion::GeneratorCategory::light) {
+        std::vector<motion::ui::TileGrid::Choice> choices {{"Steady", "No preset: it shines as you set it", {motion::ui::pictures::lightPresetPicture(std::nullopt), {}}}};
+        for (const auto preset : motion::lightPresets) {
+            const auto& definition = motion::lightPresetDefinition(preset);
+            const juce::String name(definition.name.data(), definition.name.size());
+            choices.push_back({motion::ui::pictures::lightPresetShortName(preset), name + ": it moves on its own, as a " + name.toLowerCase() + " does (its modulators are in the Graph)", {motion::ui::pictures::lightPresetPicture(preset), {}}});
+        }
+        // One at a time, in a row.
+        presetTiles = std::make_unique<motion::ui::TileGrid>("Light presets", std::move(choices), 3, motion::ui::TileGrid::Look::chips, true);
+        presetTiles->onClick = [this](std::size_t index) {
+            const auto preset = index == 0 ? std::nullopt : std::optional(motion::lightPresets[index - 1]);
+            if (preset == motion::currentLightPreset(processor.document.project(), target)) { return; }
+            motion::editLightPreset(processor.document, target, preset);
+        };
+        content.addAndMakeVisible(*presetTiles);
+    }
     layoutContent();
+}
+
+const std::array<std::string_view, 8>& MotionPropertyInspector::surfaceProperties() {
+    static const std::array<std::string_view, 8> properties {"edges", "outline", "spiral", "hilbert", "noise", "slices", "rings", "reflects"};
+    return properties;
+}
+
+bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, double time) {
+    if (presetTiles != nullptr) {
+        const auto current = motion::currentLightPreset(processor.document.project(), target);
+        presetTiles->setState(0, !current.has_value());
+        for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) { presetTiles->setState(index + 1, current == motion::lightPresets[index]); }
+        presetTiles->setLocked(found.locked);
+    }
+    if (surfaceTiles == nullptr) { return false; }
+    const auto valueOf = [&](std::string_view property) {
+        const auto* curve = found.curve(std::string(property));
+        if (curve != nullptr) { return curve->evaluateBase(time); }
+        const auto spec = std::find_if(specList.begin(), specList.end(), [&](const auto& candidate) { return candidate.id == property; });
+        return spec != specList.end() ? spec->defaultValue : 0.0;
+    };
+    // Whether a property is in play: on, or keyed or driven to be.
+    const auto live = [&](std::string_view property) {
+        const auto* curve = found.curve(std::string(property));
+        return valueOf(property) > 0 || (curve != nullptr && curve->animated()) || isModulated(std::string(property));
+    };
+    for (std::size_t index = 0; index < surfaceProperties().size(); ++index) {
+        const auto value = valueOf(surfaceProperties()[index]);
+        const auto* curve = found.curve(std::string(surfaceProperties()[index]));
+        const auto moving = (curve != nullptr && curve->animated()) || isModulated(std::string(surfaceProperties()[index]));
+        surfaceTiles->setState(index, value > 0, moving ? juce::String("~") : value > 0 && value < 99.5 ? juce::String(juce::roundToInt(value)) + "%" : juce::String());
+    }
+    surfaceTiles->setLocked(found.locked);
+    const auto patterned = std::any_of(surfaceProperties().begin() + 2, surfaceProperties().begin() + 7, live);
+    bool changed = false;
+    for (auto& row : rows) {
+        if (row->section != "Surface" || row->fields.empty()) { continue; }
+        const auto property = row->fields.front()->spec.id;
+        const auto noiseMotion = property == "noisePhase" || property == "noiseFlow";
+        const auto shown = property == "fillDetail" ? patterned : noiseMotion ? live("noise") || valueOf(property) != 0 : live(property);
+        if (row->isVisible() != shown) {
+            row->setVisible(shown);
+            changed = true;
+        }
+    }
+    return changed;
 }
 
 void MotionPropertyInspector::layoutContent() {
@@ -495,6 +583,7 @@ void MotionPropertyInspector::layoutContent() {
     int y = 0;
     // Rows from `from` up to `to`, each group opening with a hairline and its
     // heading; `after` when something is above them.
+    const auto inner = width - motion::style::padding * 2;
     const auto place = [&](std::size_t from, std::size_t to, bool after) {
         for (auto index = from; index < to; ++index) {
             auto& row = rows[index];
@@ -502,16 +591,34 @@ void MotionPropertyInspector::layoutContent() {
                 if (index > from || after) { y += motion::style::gap; }
                 content.sections.emplace_back(y, row->section);
                 y += sectionHeading + motion::style::gap;
+                // Surface opens with its tiles; its rows below are those on.
+                if (row->section == "Surface" && surfaceTiles != nullptr) {
+                    const auto height = surfaceTiles->heightFor(inner);
+                    surfaceTiles->setBounds(motion::style::padding, y, inner, height);
+                    y += height + motion::style::padding;
+                }
             }
-            row->setBounds(motion::style::padding, y, width - motion::style::padding * 2, row->preferredHeight());
+            if (!row->isVisible()) { continue; }
+            row->setBounds(motion::style::padding, y, inner, row->preferredHeight());
             // One-line values stack closer, as a list.
-            const auto nextCompact = index + 1 < to && rows[index + 1]->compact();
+            auto next = index + 1;
+            while (next < to && !rows[next]->isVisible() && rows[next]->section == row->section) { ++next; }
+            const auto nextCompact = next < to && rows[next]->compact() && rows[next]->section == row->section;
             y += row->preferredHeight() + (row->compact() && nextCompact ? motion::style::gap : motion::style::padding);
         }
     };
     std::size_t first = 0;
     while (first < rows.size() && rows[first]->first) { ++first; }
     place(0, first, false);
+    // A light's presets, under what it is.
+    if (presetTiles != nullptr) {
+        if (first > 0) { y += motion::style::gap; }
+        content.sections.emplace_back(y, "Preset");
+        y += sectionHeading + motion::style::gap;
+        const auto height = presetTiles->heightFor(inner);
+        presetTiles->setBounds(motion::style::padding, y, inner, height);
+        y += height + motion::style::padding;
+    }
     const auto leading = lead != nullptr && leadHeight ? leadHeight() : 0;
     if (leading > 0) {
         // A rule, then the lead's own heading on the same rhythm as the

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Line styles: a ball drawn by its outline and a pattern rather than its edges, from Lines in Properties (not on a curve), shown on the Scope and saved."""
+"""Line styles: a ball drawn by its outline and a pattern rather than its edges, from the Surface tiles in Properties (not on a curve), shown on the Scope and saved."""
 import json
 import struct
 import subprocess
@@ -47,11 +47,24 @@ def field(property_id, present=True):
     """A Properties field, by the property it edits."""
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
-        found = find(lambda n: n.get("componentName") == property_id and "ScrubField" in n.get("class", ""))
+        found = find(lambda n: n.get("componentName") == property_id and "ScrubField" in n.get("class", "") and n.get("visible"))
         if (found is not None) == present:
             return found
         time.sleep(.2)
     raise RuntimeError(property_id + (" is not in Properties" if present else " should not be in Properties"))
+
+
+def tile(name):
+    """A Surface style tile: on (checked) or off."""
+    found = find(lambda n: n.get("name") == "Surface styles: " + name)
+    if found is None:
+        raise RuntimeError(name + " is not among the Surface styles")
+    return found
+
+
+def toggle(name, undo):
+    step(name, "click", "--name", "Surface styles: " + name, "--exact")
+    session.wait_for_undo(undo)
 
 
 def add(menu, name):
@@ -101,33 +114,49 @@ try:
     scope = next(n["bounds"] for n in nodes(tree) if n.get("class") == "VisualiserComponent")
 
     add("Generate", "Sphere")
-    if not str(field("edges").get("value", "")).startswith("100"):
-        raise RuntimeError("A surface draws its edges wholly until asked otherwise: " + str(field("edges").get("value")))
+    if not tile("Edges").get("checked") or tile("Outline").get("checked"):
+        raise RuntimeError("A surface draws its edges until asked otherwise")
+    # Only what is on has a row for how much.
+    field("edges")
+    field("outline", present=False)
     time.sleep(3)
     edged = scope_lit("edges.png")
 
     # By its outline and a spiral over it, not its edges.
-    set_field("edges", "0", "Change Edges")
-    set_field("outline", "100", "Change Outline")
-    set_field("spiral", "100", "Change Spiral")
+    toggle("Edges", "Turn off Edges")
+    toggle("Outline", "Turn on Outline")
+    toggle("Spiral", "Turn on Spiral")
+    field("edges", present=False)
+    field("outline")
+    field("fillDetail")
+    field("noiseFlow", present=False)
     time.sleep(3)
     styled = scope_lit("outline-spiral.png")
     if abs(styled - edged) < 20:
         raise RuntimeError("Its style should change what the ball draws: " + str((edged, styled)))
-    # Edges at 0 and nothing else: nothing at all.
-    set_field("outline", "0", "Change Outline")
-    set_field("spiral", "0", "Change Spiral")
+    # Nothing on: nothing drawn.
+    toggle("Outline", "Turn off Outline")
+    toggle("Spiral", "Turn off Spiral")
     time.sleep(3)
     blank = scope_lit("nothing.png")
     if blank > edged // 4:
         raise RuntimeError("With no lines asked for, the ball draws none: " + str((blank, edged)))
-    set_field("outline", "100", "Change Outline")
+    toggle("Outline", "Turn on Outline")
+    toggle("Hilbert", "Turn on Hilbert")
     set_field("hilbert", "60", "Change Hilbert curve")
+    if tile("Hilbert").get("checked") is not True:
+        raise RuntimeError("Part-way on is on")
+    # Noise brings how it morphs.
+    toggle("Noise", "Turn on Noise")
+    field("noisePhase")
+    field("noiseFlow")
+    toggle("Noise", "Turn off Noise")
     command("screenshot", "--file", session.artifact_dir / "lines.png")
 
     # A curve has no surface to draw lines on.
     add("Generate", "Arc")
-    field("outline", present=False)
+    if find(lambda n: str(n.get("name", "")).startswith("Surface styles: ") and n.get("visible")) is not None:
+        raise RuntimeError("A curve has no Surface styles")
 
     step("save", "press", "command + s", "--class", "MotionEditor")
     time.sleep(1)

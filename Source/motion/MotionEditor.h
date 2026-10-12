@@ -46,7 +46,8 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void openProject(const juce::File& file) override;
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
-    void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor);
+    // `below`: under the anchor, wherever there is more room.
+    void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, bool below = false);
     static void dismissPopover(juce::Component* content);
     using PopoverEdit = std::function<juce::Result(motion::Document&)>;
     std::function<void(PopoverEdit)> popoverEdit(juce::Component* panel, std::function<void(const juce::String&)> showError = {});
@@ -274,6 +275,10 @@ private:
     void showSceneMenu();
 
     juce::TextButton importButton { "Add source" };
+    // Lights and mirrors, a click away: each opens its pictures to choose from.
+    juce::TextButton addLightButton { "+ Light" }, addMirrorButton { "+ Mirror" };
+    void showAddLight();
+    void showAddMirror();
     motion::icons::Button playButton { "Play", motion::icons::Icon::play };
     motion::icons::Button startButton { "Go to start", motion::icons::Icon::start };
     motion::icons::Button endButton { "Go to end", motion::icons::Icon::end };

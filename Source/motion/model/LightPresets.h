@@ -72,6 +72,19 @@ inline constexpr std::array<LightPreset, 5> lightPresets {LightPreset::fire, Lig
 // The prefix of the modulators a preset makes for a light.
 inline std::string lightPresetPrefix(const Clip& light) { return light.name + " \xc2\xb7 "; }
 
+// The preset a light has, if any: by its modulators' names.
+inline std::optional<LightPreset> currentLightPreset(const Composition& composition, Id light) {
+    const auto* clip = findClip(composition, light);
+    if (clip == nullptr) { return std::nullopt; }
+    const auto prefix = lightPresetPrefix(*clip);
+    for (const auto preset : lightPresets) {
+        const auto named = prefix + std::string(lightPresetName(preset)) + " ";
+        const auto has = std::any_of(composition.modulators.begin(), composition.modulators.end(), [&](const Modulator& modulator) { return modulator.name.starts_with(named); });
+        if (has) { return preset; }
+    }
+    return std::nullopt;
+}
+
 // Takes off whatever preset a light has: its modulators' routes to it, and
 // the modulators once nothing else uses them. False when it had none.
 inline bool removeLightPreset(Composition& composition, Id light) {
@@ -124,5 +137,21 @@ inline bool applyLightPreset(Composition& composition, Id light, LightPreset pre
         composition.routes.push_back(route);
     }
     return true;
+}
+
+// Puts a preset on a light (none takes its preset off), as one undoable edit.
+inline void editLightPreset(Document& document, Id light, std::optional<LightPreset> preset) {
+    // Ids made first: the edit's copy of the project makes none of its own.
+    std::vector<Id> ids;
+    for (int index = 0; index < 16; ++index) { ids.push_back(document.newId()); }
+    const auto name = preset.has_value() ? "Apply " + juce::String(lightPresetName(*preset).data()).toLowerCase() + " preset" : juce::String("Remove light preset");
+    document.edit(name, [light, preset, ids](Project& project) {
+        std::size_t used = 0;
+        if (preset.has_value()) {
+            applyLightPreset(project, light, *preset, [&] { return ids[used++]; });
+        } else {
+            removeLightPreset(project, light);
+        }
+    });
 }
 }

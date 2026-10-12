@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mirrors: a box beside a mirror ball from Add source > Mirror, its reflection on the Scope, Reflects in Properties (and not on a curve), all saved."""
+"""Mirrors: a box beside a mirror ball from Add source > Mirror, its reflection on the Scope, Mirror in Properties (and not on a curve), all saved."""
 import json
 import struct
 import subprocess
@@ -47,11 +47,24 @@ def field(property_id, present=True):
     """A Properties field, by the property it edits."""
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
-        found = find(lambda n: n.get("componentName") == property_id and "ScrubField" in n.get("class", ""))
+        found = find(lambda n: n.get("componentName") == property_id and "ScrubField" in n.get("class", "") and n.get("visible"))
         if (found is not None) == present:
             return found
         time.sleep(.2)
     raise RuntimeError(property_id + (" is not in Properties" if present else " should not be in Properties"))
+
+
+def tile(name):
+    """A Surface style tile: on (checked) or off."""
+    found = find(lambda n: n.get("name") == "Surface styles: " + name)
+    if found is None:
+        raise RuntimeError(name + " is not among the Surface styles")
+    return found
+
+
+def toggle(name, undo):
+    step(name, "click", "--name", "Surface styles: " + name, "--exact")
+    session.wait_for_undo(undo)
 
 
 def add(menu, name):
@@ -102,8 +115,9 @@ try:
 
     add("Generate", "Box")
     set_field("position.x", "-.6", "Change Position X")
-    if str(field("reflects").get("value")) not in ("0", "0.0", "0%", "0 %"):
-        raise RuntimeError("A box doesn't reflect until asked: " + str(field("reflects").get("value")))
+    if tile("Mirror").get("checked"):
+        raise RuntimeError("A box doesn't reflect until asked")
+    field("reflects", present=False)
 
     add("Mirror", "Mirror ball")
     if not str(field("reflects").get("value", "")).startswith("100"):
@@ -115,18 +129,23 @@ try:
         raise RuntimeError("The status bar says the frames reflect: " + status())
 
     # Not reflecting, it draws its own lines, and nothing of the box.
-    set_field("reflects", "0", "Change Reflects")
+    toggle("Mirror", "Turn off Mirror")
     time.sleep(3)
     plain = scope_lit("plain-ball.png")
     if abs(plain - mirrored) < 20:
         raise RuntimeError("Reflecting should change what the ball draws: " + str((plain, mirrored)))
-    set_field("reflects", "100", "Change Reflects")
+    toggle("Mirror", "Turn on Mirror")
 
     # A curve has no surface to reflect with.
     add("Generate", "Arc")
     field("reflects", present=False)
+    if find(lambda n: str(n.get("name", "")).startswith("Surface styles: ") and n.get("visible")) is not None:
+        raise RuntimeError("A curve has no Surface styles")
     # A flat mirror, ready to place.
-    add("Mirror", "Flat mirror")
+    # The quick way: + Mirror, then its picture.
+    step("open mirrors", "click", "--name", "+ Mirror", "--exact")
+    step("add flat mirror", "click", "--name", "Add a mirror: Flat mirror", "--exact")
+    session.wait_for_undo("Add flat mirror")
     if not str(field("reflects").get("value", "")).startswith("100"):
         raise RuntimeError("A flat mirror reflects wholly")
     command("screenshot", "--file", session.artifact_dir / "mirrors.png")

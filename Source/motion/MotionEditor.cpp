@@ -1,6 +1,7 @@
 #include "MotionEditor.h"
 #include "ui/CanvasSizeEditor.h"
 #include "ui/MarkerPanel.h"
+#include "ui/AddPicker.h"
 #include "ui/GeneratorIcons.h"
 #include "ui/MenuIcons.h"
 #include "../components/menu/InternalSampleRateMenu.h"
@@ -39,7 +40,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     for (auto* header : { &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
     }
-    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
+    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &addLightButton, &addMirrorButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
         addAndMakeVisible(component);
     }
     addChildComponent(scopeBack);
@@ -448,6 +449,8 @@ void MotionEditor::setUpLibrary() {
     libraryTabs.onSelectionChanged = [this](int index) {
         assetLibrary.setVisible(index == 0);
         importButton.setVisible(index == 0);
+        addLightButton.setVisible(index == 0);
+        addMirrorButton.setVisible(index == 0);
         effectLibrary.setVisible(index == 1);
         modulatorLibrary.setVisible(index == 2);
         if (index == 2) { modulatorLibrary.refresh(); }
@@ -548,6 +551,10 @@ void MotionEditor::setUpLibrary() {
             if (choice >= 100 && choice - 100 < static_cast<int>(resources.size())) { owner->importExample(resources[static_cast<std::size_t>(choice - 100)]); }
         });
     };
+    addLightButton.setTooltip("Add a light: what the Scope draws is lit by it");
+    addMirrorButton.setTooltip("Add a mirror: a surface that reflects the rest of the scene");
+    addLightButton.onClick = [this] { showAddLight(); };
+    addMirrorButton.onClick = [this] { showAddMirror(); };
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
     assetLibrary.onEditDrawing = [this](motion::Id id) { showDrawingEditor(id); };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {
@@ -956,7 +963,10 @@ void MotionEditor::resized() {
     libraryTabs.setBounds(library.removeFromTop(30));
     effectLibrary.setBounds(library.reduced(4, 0));
     modulatorLibrary.setBounds(library);
-    importButton.setBounds(library.removeFromTop(42).reduced(8, 6));
+    importButton.setBounds(library.removeFromTop(42).reduced(8, 6).withTrimmedBottom(-2));
+    auto quick = library.removeFromTop(34).reduced(8, 4);
+    addLightButton.setBounds(quick.removeFromLeft((quick.getWidth() - motion::style::gap) / 2));
+    addMirrorButton.setBounds(quick.withTrimmedLeft(motion::style::gap));
     assetLibrary.setBounds(library.reduced(4, 0));
     area.removeFromLeft(3);
     inspectorBounds = area.removeFromRight(std::clamp(300 + extra * 3 / 20, 300, 420));
@@ -1074,11 +1084,47 @@ void MotionEditor::paint(juce::Graphics& graphics) {
 
 // Small edits (a marker, a tempo change, the canvas) open in a panel that
 // points at what was clicked instead of covering the window.
-void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor) {
+void MotionEditor::showAddLight() {
+    std::vector<motion::ui::TileGrid::Choice> lights, moving;
+    const std::array<const char*, 4> kinds {"pointLight", "spotLight", "directionalLight", "ambientLight"};
+    for (const auto* kind : kinds) {
+        const auto& definition = *motion::findGenerator(kind);
+        const juce::String name(definition.name.data(), definition.name.size());
+        lights.push_back({name.upToLastOccurrenceOf(" light", false, true), "Add a " + name.toLowerCase(), motion::ui::pictures::ofGenerator(definition)});
+    }
+    // A point light already moving on its own.
+    for (const auto preset : motion::lightPresets) {
+        const juce::String name(motion::lightPresetName(preset).data());
+        moving.push_back({motion::ui::pictures::lightPresetShortName(preset), "Add a point light that moves as a " + name.toLowerCase() + " does", {motion::ui::pictures::lightPresetPicture(preset), {}}});
+    }
+    std::vector<motion::ui::AddPicker::Section> sections {{"Lights", std::move(lights), 2}, {"Moving on its own", std::move(moving), 2}};
+    showPopover(std::make_unique<motion::ui::AddPicker>("Add a light", std::move(sections), [this, kinds](std::size_t section, std::size_t index) {
+        if (section == 0) {
+            addGenerator(*motion::findGenerator(kinds[index]));
+        } else {
+            addGenerator(*motion::findGenerator("pointLight"), motion::lightPresets[index]);
+        }
+    }), getLocalArea(&addLightButton, addLightButton.getLocalBounds()), true);
+}
+
+void MotionEditor::showAddMirror() {
+    std::vector<motion::ui::TileGrid::Choice> choices {
+        {"Flat mirror", "Add a flat mirror: a pane to stand things before", motion::ui::pictures::flatMirror()},
+        {"Mirror ball", "Add a mirror ball: the whole scene, round on its surface", motion::ui::pictures::mirrorBall()}};
+    std::vector<motion::ui::AddPicker::Section> sections {{{}, std::move(choices), 2}};
+    showPopover(std::make_unique<motion::ui::AddPicker>("Add a mirror", std::move(sections), [this](std::size_t, std::size_t index) {
+        const auto& preset = motion::mirrorPresets[index];
+        addGenerator(*motion::findGenerator(preset.generator), std::nullopt, preset.name, {{"reflects", motion::Curve(100)}});
+    }), getLocalArea(&addMirrorButton, addMirrorButton.getLocalBounds()), true);
+}
+
+void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, bool below) {
     auto* panel = content.get();
     motion::style::styleFields(*panel);
     auto& box = juce::CallOutBox::launchAsynchronously(std::move(content), anchor, this);
     box.setArrowSize(9.0f);
+    // Below its button, though wider than the column it is in.
+    if (below) { box.updatePosition(anchor, getLocalBounds().withTop(anchor.getBottom())); }
     popover = &box;
     // Escape in a field closes the popover, as it does anywhere else in it.
     std::vector<juce::TextEditor*> fields;

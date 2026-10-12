@@ -3003,19 +3003,7 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
 }
 
 void MotionTimelineView::applyLightPreset(motion::Id id, std::optional<motion::LightPreset> preset) {
-    auto& document = processor.document;
-    // Ids made first: the edit's copy of the project makes none of its own.
-    std::vector<motion::Id> ids;
-    for (int index = 0; index < 16; ++index) { ids.push_back(document.newId()); }
-    const auto name = preset.has_value() ? "Apply " + juce::String(motion::lightPresetName(*preset).data()).toLowerCase() + " preset" : juce::String("Remove light preset");
-    document.edit(name, [id, preset, ids](motion::Project& project) {
-        std::size_t used = 0;
-        if (preset.has_value()) {
-            motion::applyLightPreset(project, id, *preset, [&] { return ids[used++]; });
-        } else {
-            motion::removeLightPreset(project, id);
-        }
-    });
+    motion::editLightPreset(processor.document, id, preset);
     refreshTracks();
 }
 
