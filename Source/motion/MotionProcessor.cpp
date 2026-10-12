@@ -104,6 +104,18 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     juce::ScopedNoDenormals noDenormals;
     lastCallbackMs.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
     buffer.clear();
+    midi.clear();
+    // A host may send more than it said it would: drawn in pieces no longer
+    // than was prepared for (each referring to the buffer, allocating nothing).
+    const auto capacity = signal.getNumSamples();
+    if (capacity <= 0) { return; }
+    for (int start = 0; start < buffer.getNumSamples(); start += capacity) {
+        juce::AudioBuffer<float> part(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), start, std::min(capacity, buffer.getNumSamples() - start));
+        processChunk(part);
+    }
+}
+
+void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
     const auto* prepared = composition.acquire();
     const auto* liveBlock = liveSources.acquire();
     const auto* liveFrames = liveBlock != nullptr ? liveBlock->frames.get() : nullptr;
@@ -113,13 +125,13 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     }
     const auto sampleRate = getEffectiveSampleRate();
     const auto count = buffer.getNumSamples();
-    if (count > signal.getNumSamples()) { midi.clear(); return; }
     // Shared output gain/clip buffers are allocated during prepareToPlay, but
     // must be populated each block before music monitoring or physical XY output.
     volumeEffect->animateValues(count, nullptr);
     thresholdEffect->animateValues(count, nullptr);
-    if (prepared == nullptr || prepared->preparationError.isNotEmpty() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
-        midi.clear();
+    const auto durationIndex = prepared != nullptr && std::isfinite(sampleRate) && sampleRate > 0 ? motion::sampleIndex(prepared->duration, sampleRate) : std::nullopt;
+    // Nothing to play: the beam rests dark, and the Scope still hears so.
+    if (prepared == nullptr || prepared->preparationError.isNotEmpty() || prepared->sampleRate != sampleRate || !durationIndex.has_value() || *durationIndex < 1) {
         transitionGuard.begin();
         for (int i = 0; i < count; ++i) {
             const auto point = transitionGuard.apply({0, 0, 0, 0, 0, 0});
@@ -133,11 +145,6 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     if (prepared->publicationRevision != previousRevision) {
         previousRevision = prepared->publicationRevision;
         transitionGuard.begin();
-    }
-    const auto durationIndex = motion::sampleIndex(prepared->duration, sampleRate);
-    if (!durationIndex.has_value() || *durationIndex < 1) {
-        midi.clear();
-        return;
     }
     const auto durationSamples = *durationIndex;
     // Plans hold pointers into the composition and live frames; either change replans.
@@ -192,7 +199,6 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
             }
         }
     }
-    midi.clear();
     beamLayers.store(static_cast<int>(beam.plannedLayers()), std::memory_order_relaxed);
     beamSimplified.store(beam.plannedSimplified(), std::memory_order_relaxed);
     audioTime = static_cast<double>(audioSample) / sampleRate;

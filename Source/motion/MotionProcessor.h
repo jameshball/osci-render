@@ -132,6 +132,8 @@ private:
     juce::int64 audioSample = 0;
 public:
     void processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override;
+    // One piece of a block, no longer than was prepared for.
+    void processChunk(juce::AudioBuffer<float>& buffer);
     juce::AudioProcessorEditor* createEditor() override;
     void getStateInformation(juce::MemoryBlock& destination) override;
     void setStateInformation(const void* data, int size) override;
