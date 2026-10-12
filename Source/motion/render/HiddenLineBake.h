@@ -34,11 +34,10 @@ struct Frame {
     // The camera's hatching on each surface it shades, likewise in the scene.
     std::vector<Entry> hatching;
 
+    // Drawings are listed in clip order, so found by halving.
     const Entry* entry(std::size_t clip) const {
-        for (const auto& item : drawings) {
-            if (item.clip == clip) { return &item; }
-        }
-        return nullptr;
+        const auto found = std::lower_bound(drawings.begin(), drawings.end(), clip, [](const Entry& item, std::size_t value) { return item.clip < value; });
+        return found != drawings.end() && found->clip == clip ? &*found : nullptr;
     }
     const PreparedDrawing* drawing(std::size_t clip) const {
         const auto* found = entry(clip);

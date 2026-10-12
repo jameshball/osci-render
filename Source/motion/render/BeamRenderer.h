@@ -18,15 +18,18 @@ namespace motion {
 // projected path length, so every layer keeps the same brightness per unit
 // length, then scaled by each layer's Beam: a layer at 2x takes twice its even
 // share from the others, with no floor. Opacity dims a layer through its
-// colour, without taking beam time from the others. Layers are ordered to minimise
-// dark travel, and every jump dwells dark at both ends, then settles, so
-// reconstruction filters and slow scopes arrive before the next stroke lights;
-// the project's scope profile calibrates those times. Every layer is drawn
-// every cycle whenever it can be: a drawing's complete strokes take a sample at
-// each end and corner, and when those do not all fit, the layers needing the
-// most make do with their strokes' ends. Only content with more separate
-// strokes than one cycle can blank on and off spans several aligned cycles,
-// trading refresh rate for drawings that show at all.
+// colour, without taking beam time from the others. Layers are ordered to
+// minimise dark travel, and every jump dwells dark at both ends, then settles,
+// so reconstruction filters and slow scopes arrive before the next stroke
+// lights; the project's scope profile calibrates those times. Every layer is
+// drawn every cycle: a drawing's complete strokes take a sample at each end
+// and corner, and when those do not all fit, the layers needing the most make
+// do with their strokes' ends, then with their longest strokes, and only then
+// does the last layer in the tour drop.
+//
+// A display with no brightness input (the scope profile's XY only) shows
+// every sample: the beam never waits, its samples are all drawn at full
+// brightness, and opacity takes beam time instead of dimming.
 class BeamRenderer {
 public:
     static constexpr std::size_t maximumLayers = 256;
@@ -54,13 +57,18 @@ public:
         // The vector drawing drawn (hidden lines removed, when baked); none
         // for point frames.
         const PreparedDrawing* drawing = nullptr;
-        // Its points are in the scene already: a clip's reflections.
+        // Its points are in the scene already: what a mirror shows, or the
+        // camera's hatching.
         bool world = false;
+        // Whether its drawing is traced stroke by stroke (complete strokes
+        // where they fit), or else by phase (a point source's runs).
+        bool floored = true;
         // How bright it is drawn (see finishPlan).
         float gain = 1;
         // On a display with no brightness input (XY only), every sample
-        // shows: the colour it shows in, at full brightness.
-        std::array<float, 3> hue {1, 1, 1};
+        // shows: the colour it shows in, at full brightness. Dark where
+        // nothing is drawn.
+        std::array<float, 3> hue {0, 0, 0};
     };
 
     // Cycles never straddle a frame of the project's frame rate, so exported
@@ -135,7 +143,8 @@ private:
         std::int64_t travel(double length) const { return std::max<std::int64_t>(1, static_cast<std::int64_t>(std::ceil(length * travelSeconds * rate))); }
     };
     static Timing timingFor(const ScopeProfile& requested, double rate) {
-        const auto profile = requested.valid() ? requested : ScopeProfile{};
+        auto profile = requested.valid() ? requested : ScopeProfile{};
+        profile.xyOnly = requested.xyOnly;
         const auto samples = [rate](double micros) { return static_cast<std::int64_t>(std::llround(micros / 1.0e6 * rate)); };
         // A beam that can't go dark has nothing to wait for: holding still
         // would only draw a dot.
@@ -155,8 +164,13 @@ private:
         double shown = 1;
         // Fewer samples that still reach every stroke's ends.
         std::int64_t coarse = 2;
-        // A clip's reflections: points in the scene, placed by the camera alone.
+        // Points in the scene, placed by the camera alone: what a mirror
+        // shows, or the camera's hatching.
         bool world = false;
+        // Traced stroke by stroke (see Segment::floored).
+        bool floored = true;
+        // Its colour at full brightness, for an XY-only display.
+        std::array<float, 3> hue {1, 1, 1};
     };
 
     // The beam's travel between two points; a non-finite one counts as far.
@@ -197,56 +211,64 @@ private:
         const PreparedDrawing* drawing;
         double shown;
         std::int64_t coarse;
+        bool floored;
     };
     // A clip's vector drawing at a frame: with the lines its camera can't see
     // removed once that frame is baked, a point source's frame as the runs of
     // it that show.
-    static std::pair<const PreparedDrawing*, double> shownDrawing(const PreparedComposition& composition, const PreparedClip& clip, const PreparedSource& source, std::size_t frame, double time) {
+    static std::pair<const PreparedDrawing*, double> shownDrawing(const PreparedComposition& composition, const hidden::Frame* baked, const PreparedClip& clip, const PreparedSource& source, std::size_t frame) {
         const auto* whole = source.drawingAt(frame);
-        if (composition.hiddenLines == nullptr || clip.liveIdentity != nullptr) { return {whole, 1.0}; }
-        const auto* baked = composition.hiddenLines->at(time);
-        if (baked == nullptr) { return {whole, 1.0}; }
+        if (baked == nullptr || clip.liveIdentity != nullptr) { return {whole, 1.0}; }
         const auto* culled = baked->entry(static_cast<std::size_t>(&clip - composition.clips.data()));
         return culled != nullptr ? std::pair {culled->drawing.get(), culled->shown} : std::pair {whole, 1.0};
     }
-    static std::optional<Visible> visible(const PreparedComposition& composition, const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
-        if (clip.light || !clip.active(time) || !clip.visible(time)) { return std::nullopt; }
+    // A clip's share of the beam at `time`, none when it isn't drawn. Lights
+    // are drawn only where the editor shows them (its geometry keeps them
+    // among the clips); a signal's composition has moved them aside.
+    static double shareOf(const PreparedComposition& composition, const PreparedClip& clip, double time) {
+        if (clip.light || !clip.active(time) || !clip.visible(time)) { return 0; }
         // With no brightness to dim, opacity takes beam time instead.
         const auto share = clip.beam(time) * (composition.scope.xyOnly ? clip.opacity(time) : 1.0);
+        return share > 0 ? share : 0.0;
+    }
+    static std::optional<Visible> visible(const PreparedComposition& composition, const hidden::Frame* baked, const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
+        const auto share = shareOf(composition, clip, time);
         if (!(share > 0)) { return std::nullopt; }
         const auto* source = clip.resolveSource(liveFrames);
         if (source == nullptr || source->frameCount() == 0) { return std::nullopt; }
         const auto frame = source->frameIndex(clip.localTime(time));
-        const auto [drawing, shown] = shownDrawing(composition, clip, *source, frame, time);
+        const auto [drawing, shown] = shownDrawing(composition, baked, clip, *source, frame);
         // Wholly hidden behind meshes.
         if (drawing != nullptr && drawing->empty()) { return std::nullopt; }
         // A point source's runs keep its own budget: no floor per corner.
         const auto floored = drawing != nullptr && source->drawingAt(frame) != nullptr;
         return Visible {source, frame, std::max<std::int64_t>(2, floored ? drawing->minimumTraversalSamples() : 2), share, drawing, shown,
-            std::max<std::int64_t>(2, floored ? drawing->coarseTraversalSamples() : 2)};
+            std::max<std::int64_t>(2, floored ? drawing->coarseTraversalSamples() : 2), floored};
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
         planned = true; planFirst = first; planEnd = end; planRate = rate; planTime = time; planSimplified = false;
         segmentCount = 0; layerCount = 0; lastSegment = 0;
+        const auto* baked = composition.hiddenLines != nullptr ? composition.hiddenLines->at(time) : nullptr;
         for (const auto& clip : composition.clips) {
             if (layerCount == maximumLayers) { break; }
-            const auto shown = visible(composition, clip, time, liveFrames);
+            const auto shown = visible(composition, baked, clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
-            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share, shown->drawing, shown->shown, shown->coarse});
+            measure(composition, {.clip = &clip, .source = shown->source, .frame = shown->frame, .length = 0, .start = {}, .end = {}, .minimum = shown->minimum, .share = shown->share,
+                .drawing = shown->drawing, .shown = shown->shown, .coarse = shown->coarse, .floored = shown->floored});
         }
         // What mirrors show, and the camera's hatching, each drawn as part
         // of its clip.
-        const auto* baked = composition.hiddenLines != nullptr ? composition.hiddenLines->at(time) : nullptr;
         for (const auto* entries : {baked != nullptr ? &baked->reflections : nullptr, baked != nullptr ? &baked->hatching : nullptr}) {
             for (std::size_t index = 0; entries != nullptr && index < entries->size() && layerCount < maximumLayers; ++index) {
                 const auto& entry = (*entries)[index];
                 if (entry.clip >= composition.clips.size() || entry.drawing == nullptr || entry.drawing->empty()) { continue; }
+                const auto share = shareOf(composition, composition.clips[entry.clip], time);
+                if (!(share > 0)) { continue; }
                 const auto& clip = composition.clips[entry.clip];
-                if (clip.light || !clip.active(time) || !clip.visible(time) || !(clip.beam(time) > 0)) { continue; }
                 const auto& drawing = *entry.drawing;
-                const auto share = clip.beam(time) * (composition.scope.xyOnly ? clip.opacity(time) : 1.0);
-                measure(composition, {&clip, nullptr, 0, 0, {}, {}, std::max<std::int64_t>(2, drawing.minimumTraversalSamples()), share, &drawing, 1, std::max<std::int64_t>(2, drawing.coarseTraversalSamples()), true});
+                measure(composition, {.clip = &clip, .source = nullptr, .frame = 0, .length = 0, .start = {}, .end = {}, .minimum = std::max<std::int64_t>(2, drawing.minimumTraversalSamples()), .share = share,
+                    .drawing = &drawing, .shown = 1, .coarse = std::max<std::int64_t>(2, drawing.coarseTraversalSamples()), .world = true});
             }
         }
         finishPlan(composition, first, end, rate);
@@ -302,7 +324,7 @@ private:
         auto& items = *layers;
         const auto total = end - first;
         if (layerCount == 0 || total <= 0) {
-            push({Kind::hold, first, std::max<std::int64_t>(0, total), nullptr, nullptr, 0, false, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}});
+            push({.kind = Kind::hold, .first = first, .count = std::max<std::int64_t>(0, total)});
             return;
         }
         const auto timing = timingFor(composition.scope, rate);
@@ -312,8 +334,8 @@ private:
         // Each layer's floor: the samples its complete strokes need. When the
         // floors do not all fit, the layer needing the most makes do with its
         // strokes' ends alone, and so on until the rest fit; past that, the
-        // heaviest are traced evenly along their length (two samples at
-        // least), and only then does the last in the travel order drop.
+        // heaviest keep their longest strokes (three samples each at least),
+        // and only then does the last in the travel order drop.
         // Reflections go through all that before the rest does.
         std::int64_t budget = 0;
         std::array<std::int64_t, maximumLayers> counts{};
@@ -328,10 +350,17 @@ private:
         for (std::size_t i = 0; i < layerCount; ++i) {
             if (items[i].world && items[i].coarse < floors[i]) { floors[i] = items[i].coarse; }
         }
+        // The jumps between layers in travel order: the order stays as it
+        // is while floors ease, and only the last layers drop, so each is
+        // found once.
+        std::array<std::int64_t, maximumLayers> jumps{};
+        std::int64_t between = 0;
+        for (std::size_t i = 1; i < layerCount; ++i) {
+            jumps[i] = 2 * dwell + settle + timing.travel(exitOf(i - 1), entryOf(i));
+            between += jumps[i];
+        }
         while (layerCount > 0) {
-            std::int64_t overhead = dwell + settle;
-            for (std::size_t i = 1; i < layerCount; ++i) { overhead += 2 * dwell + settle + timing.travel(exitOf(i - 1), entryOf(i)); }
-            overhead += dwell + timing.travel(exitOf(layerCount - 1), entryOf(0));
+            const auto overhead = dwell + settle + between + dwell + timing.travel(exitOf(layerCount - 1), entryOf(0));
             budget = total - overhead;
             std::int64_t minimum = 0;
             for (std::size_t i = 0; i < layerCount; ++i) { minimum += std::min(floors[i], total); }
@@ -373,9 +402,10 @@ private:
             }
             if (eased) { continue; }
             --layerCount;
+            if (layerCount > 0) { between -= jumps[layerCount]; }
         }
         if (layerCount == 0) {
-            push({Kind::hold, first, total, nullptr, nullptr, 0, false, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}});
+            push({.kind = Kind::hold, .first = first, .count = total});
             return;
         }
         // Even brightness above the floors: every layer gets the same samples
@@ -439,7 +469,8 @@ private:
         }
         // Beam scales each layer's even share with no floor: what one layer
         // gives up goes to the others, and their total stays the same. Below
-        // its complete-stroke budget a layer is traced by phase instead.
+        // its complete strokes' samples a drawing makes do with their ends,
+        // then its longest strokes (see PreparedDrawing::sampleTraversal).
         double scaled = 0;
         bool even = true;
         for (std::size_t i = 0; i < layerCount; ++i) {
@@ -462,46 +493,63 @@ private:
             --counts[largest]; --used;
         }
         // A beam that can't go dark (XY only) would draw a dot where it held
-        // still at the end of the cycle: what is left goes to the drawing,
-        // by how much each already has.
-        if (composition.scope.xyOnly && used < budget && used > 0) {
+        // still at the end of the cycle: what is left goes to the drawings,
+        // by their length's share, as the rest was.
+        if (composition.scope.xyOnly && used < budget) {
             const auto spare = budget - used;
+            double weighed = 0;
+            for (std::size_t i = 0; i < layerCount; ++i) { weighed += items[i].length * items[i].share; }
             std::int64_t given = 0;
-            for (std::size_t i = 0; i < layerCount; ++i) {
-                const auto more = spare * counts[i] / used;
-                counts[i] += more;
-                given += more;
+            std::array<double, maximumLayers> remainders{};
+            for (std::size_t i = 0; i < layerCount && weighed > 0; ++i) {
+                const auto quota = static_cast<double>(spare) * items[i].length * items[i].share / weighed;
+                const auto whole = static_cast<std::int64_t>(std::floor(quota));
+                counts[i] += whole;
+                given += whole;
+                remainders[i] = quota - static_cast<double>(whole);
             }
-            for (std::size_t i = 0; given < spare && layerCount > 0; i = (i + 1) % layerCount) {
-                ++counts[i];
+            // What rounding leaves, to the largest remainders.
+            while (given < spare) {
+                std::size_t largest = 0;
+                for (std::size_t i = 1; i < layerCount; ++i) {
+                    if (remainders[i] > remainders[largest]) { largest = i; }
+                }
+                ++counts[largest];
+                remainders[largest] = -1;
                 ++given;
             }
             used += given;
+            // Each layer's colour, once: every sample on such a display shows.
+            for (std::size_t i = 0; i < layerCount; ++i) { items[i].hue = hueOf(items[i].clip); }
         }
         auto cursor = first;
-        const auto hueAt = [&](std::size_t i) { return hueOf(items[i].clip); };
-        const auto hold = [&](const osci::Point& at, std::int64_t count, std::array<float, 3> hue) {
-            if (count > 0) { push({Kind::hold, cursor, count, nullptr, nullptr, 0, false, dark(at), dark(at), nullptr, false, 1, hue}); cursor += count; }
+        const auto hold = [&](const osci::Point& at, std::int64_t count, std::size_t layer) {
+            if (count <= 0) { return; }
+            push({.kind = Kind::hold, .first = cursor, .count = count, .from = dark(at), .to = dark(at), .hue = items[layer].hue});
+            cursor += count;
         };
-        const auto move = [&](const osci::Point& from, const osci::Point& to, std::int64_t count, std::array<float, 3> hue) {
-            if (count > 0) { push({Kind::move, cursor, count, nullptr, nullptr, 0, false, dark(from), dark(to), nullptr, false, 1, hue}); cursor += count; }
+        const auto move = [&](const osci::Point& from, const osci::Point& to, std::int64_t count, std::size_t layer) {
+            if (count <= 0) { return; }
+            push({.kind = Kind::move, .first = cursor, .count = count, .from = dark(from), .to = dark(to), .hue = items[layer].hue});
+            cursor += count;
         };
         // The beam arrives from the previous cycle's return jump.
-        hold(entryOf(0), dwell + settle, hueAt(0));
+        hold(entryOf(0), dwell + settle, 0);
         for (std::size_t i = 0; i < layerCount; ++i) {
             if (i > 0) {
-                hold(exitOf(i - 1), dwell, hueAt(i - 1));
-                move(exitOf(i - 1), entryOf(i), timing.travel(exitOf(i - 1), entryOf(i)), hueAt(i));
-                hold(entryOf(i), dwell + settle, hueAt(i));
+                hold(exitOf(i - 1), dwell, i - 1);
+                move(exitOf(i - 1), entryOf(i), timing.travel(exitOf(i - 1), entryOf(i)), i);
+                hold(entryOf(i), dwell + settle, i);
             }
             const auto& layer = items[i];
-            if (layer.drawing != nullptr && layer.drawing->coarseTraversalSamples() > counts[i]) { planSimplified = true; }
-            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing, layer.world, gains[i], hueAt(i)});
+            if (layer.coarse > counts[i]) { planSimplified = true; }
+            push({.kind = Kind::draw, .first = cursor, .count = counts[i], .clip = layer.clip, .source = layer.source, .frame = layer.frame, .reversed = reversedFlags[i],
+                .from = layer.start, .to = layer.end, .drawing = layer.drawing, .world = layer.world, .floored = layer.floored, .gain = gains[i], .hue = layer.hue});
             cursor += counts[i];
         }
-        hold(exitOf(layerCount - 1), dwell, hueAt(layerCount - 1));
-        move(exitOf(layerCount - 1), entryOf(0), std::min(end - cursor, timing.travel(exitOf(layerCount - 1), entryOf(0))), hueAt(0));
-        hold(entryOf(0), end - cursor, hueAt(0));
+        hold(exitOf(layerCount - 1), dwell, layerCount - 1);
+        move(exitOf(layerCount - 1), entryOf(0), std::min(end - cursor, timing.travel(exitOf(layerCount - 1), entryOf(0))), 0);
+        hold(entryOf(0), end - cursor, 0);
     }
 
     // Greedy nearest-neighbour order from the first layer, allowing either
@@ -609,50 +657,80 @@ private:
     }
 
     osci::Point evaluate(const PreparedComposition& composition, std::int64_t index) {
-        auto point = evaluateSegment(composition, index);
-        if (!composition.scope.xyOnly) { return point; }
-        // A display with no brightness input shows every sample as brightly:
-        // so does this, in the colour it is drawn in, or else its clip's.
         const auto* segment = find(index);
-        const auto hue = fullHue(point).value_or(segment != nullptr ? segment->hue : std::array<float, 3> {1, 1, 1});
+        if (segment == nullptr) { return {0, 0, 0, 0, 0, 0}; }
+        auto point = evaluateSegment(composition, *segment, index);
+        if (!composition.scope.xyOnly) { return point; }
+        // A display with no brightness input shows every sample, as brightly:
+        // so does this, in the colour it is drawn in, or else its clip's.
+        // A blank sample at a stroke's end would sit where the stroke's first
+        // or last lit one does and draw a dot, so it goes on the way to the
+        // next instead, between the samples either side that are drawn.
+        if (segment->kind == Kind::draw && !lit(point)) { point = between(composition, index, point); }
+        const auto hue = fullHue(point).value_or(segment->hue);
         point.r = hue[0];
         point.g = hue[1];
         point.b = hue[2];
         return point;
     }
-    osci::Point evaluateSegment(const PreparedComposition& composition, std::int64_t index) {
-        const auto* segment = find(index);
-        if (segment == nullptr) { return {0, 0, 0, 0, 0, 0}; }
-        const auto j = index - segment->first;
-        switch (segment->kind) {
-            case Kind::hold: return segment->from;
+    // Where a blank sample of a drawing goes on an XY-only display: as far
+    // between the drawn samples either side (a lit one, or the beam's jump)
+    // as it is between them in time.
+    osci::Point between(const PreparedComposition& composition, std::int64_t index, osci::Point point) {
+        constexpr std::int64_t reach = 4;
+        // A cycle repeats: before its start is its end, after its end its start.
+        const auto drawn = [&](std::int64_t at) -> std::optional<osci::Point> {
+            const auto length = planEnd - planFirst;
+            if (length <= 0) { return std::nullopt; }
+            at = planFirst + ((at - planFirst) % length + length) % length;
+            const auto* segment = find(at);
+            if (segment == nullptr) { return std::nullopt; }
+            const auto sample = evaluateSegment(composition, *segment, at);
+            return segment->kind != Kind::draw || lit(sample) ? std::optional(sample) : std::nullopt;
+        };
+        std::optional<osci::Point> before, after;
+        std::int64_t from = index, to = index;
+        for (std::int64_t step = 1; step <= reach && !before.has_value(); ++step) { before = drawn(from = index - step); }
+        for (std::int64_t step = 1; step <= reach && !after.has_value(); ++step) { after = drawn(to = index + step); }
+        find(index);
+        if (!before.has_value() || !after.has_value()) { return point; }
+        const auto share = static_cast<float>(index - from) / static_cast<float>(to - from);
+        point.x = before->x + (after->x - before->x) * share;
+        point.y = before->y + (after->y - before->y) * share;
+        return point;
+    }
+    osci::Point evaluateSegment(const PreparedComposition& composition, const Segment& segment, std::int64_t index) const {
+        const auto j = index - segment.first;
+        switch (segment.kind) {
+            case Kind::hold: return segment.from;
             case Kind::move: {
-                const auto t = static_cast<float>(static_cast<double>(j + 1) / static_cast<double>(segment->count + 1));
-                auto point = segment->from;
-                point.x += (segment->to.x - segment->from.x) * t;
-                point.y += (segment->to.y - segment->from.y) * t;
+                const auto t = static_cast<float>(static_cast<double>(j + 1) / static_cast<double>(segment.count + 1));
+                auto point = segment.from;
+                point.x += (segment.to.x - segment.from.x) * t;
+                point.y += (segment.to.y - segment.from.y) * t;
                 return dark(point);
             }
             case Kind::draw: {
-                const auto n = segment->count;
-                const auto step = segment->reversed ? n - 1 - j : j;
-                const auto* drawing = segment->drawing;
+                const auto n = segment.count;
+                const auto step = segment.reversed ? n - 1 - j : j;
+                const auto* drawing = segment.drawing;
                 osci::Point raw;
-                if (drawing != nullptr && drawing->coarseTraversalSamples() > 0 && n >= 3) {
-                    raw = drawing->sampleTraversal(step, n, segment->world);
+                if (drawing != nullptr && segment.floored && drawing->coarseTraversalSamples() > 0 && n >= 3) {
+                    raw = drawing->sampleTraversal(step, n, segment.world);
                 } else {
                     const auto span = n > 1 ? 1.0 / static_cast<double>(n - 1) : 1.0;
-                    raw = drawing != nullptr ? drawing->sample(static_cast<double>(step) * span, span) : segment->source->sampleFrame(segment->frame, static_cast<double>(step) * span, span);
+                    raw = drawing != nullptr ? drawing->sample(static_cast<double>(step) * span, span) : segment.source->sampleFrame(segment.frame, static_cast<double>(step) * span, span);
                 }
-                // Behind the camera there is no position: hold dark at the entry.
-                auto placed = place(composition, *segment->clip, raw, segment->world);
-                if (!placed.has_value()) { return dark(segment->from); }
-                if (segment->gain < 1) {
+                // Behind the camera there is no position: hold dark where the
+                // layer is entered.
+                auto placed = place(composition, *segment.clip, raw, segment.world);
+                if (!placed.has_value()) { return dark(segment.reversed ? segment.to : segment.from); }
+                if (segment.gain < 1) {
                     // Uncoloured is white, as a clip's colour takes it.
                     const auto uncoloured = placed->r < 0;
-                    placed->r = (uncoloured ? 1.0f : placed->r) * segment->gain;
-                    placed->g = (uncoloured ? 1.0f : placed->g) * segment->gain;
-                    placed->b = (uncoloured ? 1.0f : placed->b) * segment->gain;
+                    placed->r = (uncoloured ? 1.0f : placed->r) * segment.gain;
+                    placed->g = (uncoloured ? 1.0f : placed->g) * segment.gain;
+                    placed->b = (uncoloured ? 1.0f : placed->b) * segment.gain;
                 }
                 return *placed;
             }

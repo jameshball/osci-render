@@ -198,6 +198,44 @@ public:
             expectEquals(dim, 0, "every sample, jumps too, at full brightness, as the scope will show it");
         }
 
+        beginTest("An XY-only scope shows nothing where nothing is drawn");
+        {
+            auto made = project({{square(1, .2f), 0, 0, 0}});
+            made.scope.xyOnly = true;
+            const motion::PreparedComposition composition(made, 48000);
+            motion::BeamRenderer beam;
+            int lit = 0;
+            for (const auto& point : cycle(composition, 48000, 3, beam)) { lit += dark(point) ? 0 : 1; }
+            expectEquals(lit, 0, "a hidden clip leaves the beam dark, not a dot burning in the middle");
+        }
+
+        beginTest("On an XY-only scope a coloured clip is drawn in its hue, its jumps too, and fills the cycle");
+        {
+            auto made = project({{square(1, .2f), -.5, 0, 100, 2}, {square(2, .2f), .5}});
+            made.scope = {12, 30, 5, true};
+            for (const auto& [name, value] : {std::pair {"red", 1.0}, std::pair {"green", .25}, std::pair {"blue", 0.0}}) {
+                made.tracks.change(0).clips[0].properties[name] = motion::Curve(value);
+                made.tracks.change(1).clips[0].properties[name] = motion::Curve(value);
+            }
+            const motion::PreparedComposition composition(made, 192000);
+            motion::BeamRenderer beam;
+            const auto points = cycle(composition, 192000, 3, beam);
+            int wrong = 0;
+            for (const auto& point : points) { wrong += std::abs(point.r - 1) > 1.0e-4f || std::abs(point.g - .25f) > 1.0e-4f || point.b != 0 ? 1 : 0; }
+            expectEquals(wrong, 0, "every sample in the clips' hue at full brightness");
+            std::int64_t drawn = 0;
+            for (const auto& segment : beam.plannedSegments()) { drawn += segment.count; }
+            expectEquals(drawn, static_cast<std::int64_t>(points.size()), "the plan fills the cycle exactly, Beam 2 and all");
+            // No two samples in a row at one place: a blank one at a stroke's
+            // end would sit on the lit one beside it and draw a dot.
+            int doubled = 0;
+            for (std::size_t index = 0; index < points.size(); ++index) {
+                const auto& previous = points[(index + points.size() - 1) % points.size()];
+                doubled += points[index].x == previous.x && points[index].y == previous.y ? 1 : 0;
+            }
+            expectEquals(doubled, 0, "no sample doubled up into a bead");
+        }
+
         beginTest("On an XY-only scope, opacity takes beam time instead of dimming");
         {
             auto made = project({{square(1, .2f), -.5, 0, 50}, {square(2, .2f), .5}});
