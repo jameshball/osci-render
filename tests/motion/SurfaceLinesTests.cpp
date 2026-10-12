@@ -98,6 +98,29 @@ int main() {
         for (const auto& piece : levels) { heights.insert(std::lround(at(flat, faces[piece.face], piece.from).y * 1.0e4)); }
         check(heights.size() == 8, "eight slices up a flat ball: " + std::to_string(heights.size()));
     }
+    // Two balls apart, one higher: each is climbed from its own lowest
+    // points and wound about its own middle, the higher one as the lower.
+    {
+        std::vector<Vec3> two = corners;
+        std::vector<Face> both = faces;
+        const auto offset = static_cast<std::uint32_t>(two.size());
+        for (const auto& corner : corners) { two.push_back(corner + Vec3 {3, 2, 0}); }
+        for (const auto& face : faces) { both.push_back({face[0] + offset, face[1] + offset, face[2] + offset}); }
+        const auto pieces = pattern(two, both, Pattern::spiral, 8);
+        std::vector<double> slopes;
+        for (const auto& piece : pieces) {
+            if (piece.face < faces.size()) { continue; }
+            const auto from = at(two, both[piece.face], piece.from), to = at(two, both[piece.face], piece.to);
+            if (std::abs(from.y - 2) < .3) {
+                const auto across = std::hypot(to.x - from.x, to.z - from.z);
+                if (across > 1.0e-6) { slopes.push_back(std::abs(to.y - from.y) / across); }
+            }
+        }
+        check(!slopes.empty(), "the higher ball has a spiral");
+        std::sort(slopes.begin(), slopes.end());
+        const auto slope = slopes[slopes.size() / 2];
+        check(slope > .1 && slope < .45, "climbing round the higher ball as round the lower: " + std::to_string(std::atan(slope) * 180 / 3.14159265358979323846));
+    }
     // A flat square, lying down or standing up: a spiral across it is one
     // line, winding in from its edges as a record's groove does, not many
     // starts crowded together.

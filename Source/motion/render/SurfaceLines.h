@@ -239,11 +239,17 @@ namespace detail {
 // comes back to its start (zero for a surface with nothing round it). A
 // surface flat across its height (`flat`) is climbed in from its rim (its
 // edges no other face shares), or from its outermost points if it has none.
+// Each part of it (faces joined to no others) is climbed from its own.
 struct Climb {
     int cuts = 1;
     std::vector<std::vector<std::uint32_t>> grids;
     std::vector<double> up;
     double highest = 0, round = 0;
+    // Each part's bounds, and the part each face is of (none for a face
+    // with no area).
+    static constexpr std::uint32_t none = std::numeric_limits<std::uint32_t>::max();
+    std::vector<Bounds> parts;
+    std::vector<std::uint32_t> faceParts;
 
     static Climb over(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Bounds& bounds, int cuts, bool flat) {
         Climb climb;
@@ -305,14 +311,46 @@ struct Climb {
                 }
             }
         }
-        const auto middle = bounds.middle();
-        const auto outFrom = [&](std::uint32_t point) { return std::hypot(points[point].x - middle.x, points[point].z - middle.z); };
-        double outermost = 0;
-        for (std::uint32_t point = 0; point < points.size(); ++point) { outermost = std::max(outermost, outFrom(point)); }
-        const auto hasRim = std::any_of(rim.begin(), rim.end(), [](char on) { return on != 0; });
+        // The parts, each point's, and what each holds.
+        std::vector<std::uint32_t> partOf(points.size(), none);
+        std::vector<std::uint32_t> reached;
+        for (std::uint32_t seed = 0; seed < points.size(); ++seed) {
+            if (partOf[seed] != none) { continue; }
+            const auto part = static_cast<std::uint32_t>(climb.parts.size());
+            auto& box = climb.parts.emplace_back(Bounds {points[seed], points[seed]});
+            partOf[seed] = part;
+            reached.assign(1, seed);
+            while (!reached.empty()) {
+                const auto point = reached.back();
+                reached.pop_back();
+                const auto& p = points[point];
+                box.low = {std::min(box.low.x, p.x), std::min(box.low.y, p.y), std::min(box.low.z, p.z)};
+                box.high = {std::max(box.high.x, p.x), std::max(box.high.y, p.y), std::max(box.high.z, p.z)};
+                for (const auto& [other, length] : next[point]) {
+                    if (partOf[other] != none) { continue; }
+                    partOf[other] = part;
+                    reached.push_back(other);
+                }
+            }
+        }
+        climb.faceParts.assign(faces.size(), none);
+        for (std::size_t index = 0; index < faces.size(); ++index) {
+            if (!climb.grids[index].empty()) { climb.faceParts[index] = partOf[climb.grids[index].front()]; }
+        }
+        const auto outFrom = [&](std::uint32_t point) {
+            const auto middle = climb.parts[partOf[point]].middle();
+            return std::hypot(points[point].x - middle.x, points[point].z - middle.z);
+        };
+        std::vector<double> outermost(climb.parts.size(), 0.0);
+        std::vector<char> hasRim(climb.parts.size(), 0);
+        for (std::uint32_t point = 0; point < points.size(); ++point) {
+            outermost[partOf[point]] = std::max(outermost[partOf[point]], outFrom(point));
+            hasRim[partOf[point]] |= rim[point];
+        }
         const auto lowest = [&](std::uint32_t point) {
-            if (!flat) { return points[point].y <= bounds.low.y + 1.0e-4 * bounds.size(); }
-            return hasRim ? rim[point] != 0 : outFrom(point) >= outermost - 1.0e-4 * bounds.size();
+            const auto part = partOf[point];
+            if (!flat) { return points[point].y <= climb.parts[part].low.y + 1.0e-4 * bounds.size(); }
+            return hasRim[part] != 0 ? rim[point] != 0 : outFrom(point) >= outermost[part] - 1.0e-4 * bounds.size();
         };
         // Whether a side may be climbed: not from the lowest points more
         // inward than up (under a tube, not up a cone). Across a flat
@@ -443,9 +481,19 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     // like a screw's thread: as many side by side as keep them `climbing`
     // apart, each a turn further up for every turn round. Across a flat
     // surface it is one line, a record's groove.
-    const auto around = std::max(bounds.high.x - bounds.low.x, bounds.high.z - bounds.low.z) / 2;
-    const auto starts = level ? 1.0 : std::max(1.0, std::round(2 * 3.14159265358979323846 * around * std::tan(18 * 3.14159265358979323846 / 180) / climbing));
+    // Each part winds about its own middle.
+    const auto startsRound = [&](const detail::Bounds& part) {
+        const auto around = std::max(part.high.x - part.low.x, part.high.z - part.low.z) / 2;
+        return level ? 1.0 : std::max(1.0, std::round(2 * 3.14159265358979323846 * around * std::tan(18 * 3.14159265358979323846 / 180) / climbing));
+    };
+    std::vector<double> partStarts;
+    if (climb.has_value()) {
+        for (const auto& part : climb->parts) { partStarts.push_back(startsRound(part)); }
+    }
     const auto middle = bounds.middle();
+    // The part of the face being found, as the spiral winds round it.
+    auto axis = middle;
+    auto starts = startsRound(bounds);
     constexpr double whole = 2 * 3.14159265358979323846;
     // Noise morphs as three fields mixed by a point going round a circle of
     // the sphere of their mixes, tipped off its middle: as strong all the way
@@ -458,7 +506,8 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     // a face, and on its axis, where it has none, is `from`.
     const auto valueAt = [&](Vec3 point, double from, double up) {
         const auto p = point - middle;
-        const auto onAxis = std::hypot(p.x, p.z) < 1.0e-9 * bounds.size();
+        const auto round = point - axis;
+        const auto onAxis = std::hypot(round.x, round.z) < 1.0e-9 * bounds.size();
         switch (kind) {
             // Half a spacing in from the ends, so none is lost at a tip.
             case Pattern::slices: return (p.y + middle.y - bounds.low.y) / along + .5;
@@ -469,7 +518,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
                 return 2.5 * (mix[0] * detail::noise(at + Vec3 {17.3, 5.1, 9.7}) + mix[1] * detail::noise(at + Vec3 {-41.7, 23.9, 3.3}) + mix[2] * detail::noise(at + Vec3 {8.1, -29.3, 61.7}));
             }
             case Pattern::spiral:
-            default: return up / climbing + .5 - starts * (onAxis ? from : from + std::remainder(std::atan2(p.z, p.x) - from, whole)) / whole;
+            default: return up / climbing + .5 - starts * (onAxis ? from : from + std::remainder(std::atan2(round.z, round.x) - from, whole)) / whole;
         }
     };
     // Found on the faces cut finely (a few times to a spacing), so the
@@ -488,7 +537,10 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         // level, are straight across a flat face already.
         const auto apart = kind == Pattern::spiral ? std::min(spacing, climbing) : spacing;
         const auto cuts = kind == Pattern::slices ? 1 : std::clamp(static_cast<int>(std::ceil(longest / (apart / 6))), 1, 32);
-        const auto centre = (a + b + c) / 3.0 - middle;
+        const auto part = climb.has_value() ? climb->faceParts[index] : detail::Climb::none;
+        axis = part != detail::Climb::none ? climb->parts[part].middle() : middle;
+        starts = part != detail::Climb::none ? partStarts[part] : startsRound(bounds);
+        const auto centre = (a + b + c) / 3.0 - axis;
         const auto from = std::atan2(centre.z, centre.x);
         // Its points by weights, row by row from the first corner.
         const auto first = static_cast<std::uint32_t>(fine.size());
