@@ -5,6 +5,7 @@
 #include "PreviewGesture.h"
 
 #include "../MotionProcessor.h"
+#include "../render/ScenePreview.h"
 #include "EditorCamera.h"
 #include "EditorTransformFrame.h"
 #include "MotionPath.h"
@@ -97,7 +98,7 @@ public:
     void setViewPreset(ViewPreset preset);
 
     std::function<void(motion::Id)> onSelection;
-    void refresh() { pathDirty = true; prepared = std::make_unique<motion::PreparedComposition>(processor.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry); ++preparedSerial; prunePicked(); repaint(); if (onPrepared) { onPrepared(); } }
+    void refresh() { preview(processor.document.project()); }
     // What the Scene shows, prepared; others read it (the beam's shares) and
     // hear when it changes.
     const motion::PreparedComposition* preparedComposition() const { return prepared.get(); }
@@ -203,6 +204,7 @@ private:
     struct PiecesKey {
         std::uint64_t prepared;
         const motion::LiveSourceFrames* live;
+        const motion::ScenePreview::Shown* lighting;
         double time, x, y, z, yaw, pitch, fov;
         motion::Id selected;
         int width, height;
@@ -215,7 +217,17 @@ private:
     std::uint64_t preparedSerial = 0;
     // A clip's geometry: a vector source's exact shapes (lines straight,
     // curves divided finely enough to look smooth), otherwise its traced beam.
-    void forEachPiece(const motion::PreparedClip& clip, double time, const CameraView& view, const motion::LiveSourceFrames* live, const std::function<void(const Piece&)>& visit) const;
+    // `lit`, when the Scene preview has one, is the clip's drawing as the
+    // Scope draws it: lit, a mirror's own lines given way.
+    void forEachPiece(const motion::PreparedClip& clip, double time, const CameraView& view, const motion::LiveSourceFrames* live, const std::function<void(const Piece&)>& visit, const motion::PreparedDrawing* lit = nullptr) const;
+    // Lighting and reflections as this view sees them, worked out off the
+    // message thread for the project shown; the latest result, kept while
+    // the pieces built from it are.
+    std::shared_ptr<const motion::Project> shownProject;
+    std::unique_ptr<motion::ScenePreview> scenePreview;
+    mutable std::shared_ptr<const motion::ScenePreview::Shown> lighting;
+    mutable std::optional<std::tuple<std::uint64_t, double, double, double, double, double, double, double, int, int>> lightingAsked;
+    void askForLighting(double time) const;
     double clipTime(const motion::PreparedClip& clip, double time) const;
     float depthFade(double depth) const;
     // Effects anywhere above the clip may bend straight lines.

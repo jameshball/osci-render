@@ -36,6 +36,29 @@ public:
             expectEquals(towardBox, inside, "and inside its edge what it shows is the box");
         }
 
+        beginTest("Seen from another eye (an editor's view), mirrors show what they would to it");
+        {
+            const motion::PreparedComposition prepared(scene(100));
+            motion::hidden::Workspace workspace;
+            // Off to one side and higher than the camera, looking at the middle.
+            const motion::Vec3 position {2.5, 2, 2.5};
+            const auto forward = (motion::Vec3 {} - position).normalized().value();
+            const auto right = forward.cross({0, 1, 0}).normalized().value();
+            const motion::hidden::OtherEye other {{position, right, right.cross(forward), forward, 2}, {1.5, 1.5}};
+            const auto frame = motion::hidden::cull(prepared, 1, workspace, nullptr, &other);
+            int seen = 0, towardBox = 0;
+            for (const auto& point : pointsOf(reflectionOf(*frame, floorClip))) {
+                if (std::abs(std::abs(point.x) - 1.5) < 1.0e-4 || std::abs(std::abs(point.z) - 1.5) < 1.0e-4) { continue; }
+                ++seen;
+                auto direction = (point - position).normalized().value();
+                direction.y = -direction.y;
+                towardBox += meetsBox(point, direction, {0, boxHeight, 0}, boxSize / 2 + 1.0e-3) ? 1 : 0;
+            }
+            expect(seen > 20, "the floor shows the box to it");
+            expectEquals(towardBox, seen, "where that eye would see it");
+            expect(frame->drawing(0) == nullptr, "and nothing is hidden from it: the box draws whole");
+        }
+
         beginTest("Reflects is how bright what a mirror shows is, and how much its own lines give way");
         {
             const auto brightness = [&](double reflects) {

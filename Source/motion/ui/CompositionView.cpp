@@ -18,6 +18,11 @@ MotionCompositionView::MotionCompositionView(MotionProcessor& processor) : proce
     extractButton.onClick = [this] { extractPicked(); };
     addChildComponent(partCount);
     addChildComponent(extractButton);
+    scenePreview = std::make_unique<motion::ScenePreview>([owner = juce::Component::SafePointer<MotionCompositionView>(this)] {
+        juce::MessageManager::callAsync([owner] {
+            if (owner != nullptr) { owner->repaint(); }
+        });
+    });
 }
 
 MotionCompositionView::~MotionCompositionView() {
@@ -149,6 +154,7 @@ void MotionCompositionView::setViewPreset(ViewPreset preset) {
 void MotionCompositionView::preview(const motion::Project& project) {
     pathDirty = true;
     prepared = std::make_unique<motion::PreparedComposition>(project, 48000, nullptr, motion::CompositionPurpose::editorGeometry);
+    shownProject = std::make_shared<const motion::Project>(project);
     ++preparedSerial;
     prunePicked();
     repaint();
@@ -217,7 +223,7 @@ void MotionCompositionView::paint(juce::Graphics& g) {
             hoveredLines.add(piece.line, juce::Colours::white);
         } else {
             // Unpicked parts are neutral and quiet, so picked and hovered ones stand out.
-            lines.add(piece.line, pickable ? osci::Colours::text().withAlpha(.38f * depthFade(piece.depth)) : piece.colour.withAlpha(alpha));
+            lines.add(piece.line, pickable ? osci::Colours::text().withAlpha(.38f * depthFade(piece.depth)) : piece.colour.withMultipliedAlpha(alpha));
         }
     }
     lines.stroke(g, 1.0f);
@@ -243,24 +249,84 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     }
 }
 
+void MotionCompositionView::askForLighting(double time) const {
+    const auto view = camera.view();
+    if (scenePreview == nullptr || shownProject == nullptr || prepared == nullptr || !view.has_value() || getWidth() <= 0 || getHeight() <= 0) { return; }
+    // Only a scene with a light, or something that may reflect, looks any
+    // different lit.
+    if (std::none_of(prepared->clips.begin(), prepared->clips.end(), [](const motion::PreparedClip& clip) { return clip.light || clip.mayReflect(); })) { return; }
+    const auto asked = std::tuple {preparedSerial, time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, getWidth(), getHeight()};
+    if (lightingAsked == asked) { return; }
+    lightingAsked = asked;
+    // The view's lens as a camera's: its screen spans the aspect across and 1 up.
+    const auto aspect = static_cast<double>(getWidth()) / getHeight();
+    const motion::hidden::OtherEye eye {{view->position, view->right, view->up, view->forward, 1 / view->tangent}, {aspect * 1.1, 1.1}};
+    scenePreview->request(shownProject, preparedSerial, time, eye);
+}
+
 const std::vector<MotionCompositionView::ScreenPiece>& MotionCompositionView::screenPieces() const {
     auto live = processor.liveSourcePreview();
     const auto time = editingTime();
-    const PiecesKey key {preparedSerial, live.get(), time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, selected, getWidth(), getHeight()};
+    askForLighting(time);
+    // The latest lighting for what is shown, at whatever time and from
+    // wherever it was worked out: it catches up as the view moves.
+    auto latest = scenePreview != nullptr ? scenePreview->latest() : nullptr;
+    if (latest != nullptr && latest->revision != preparedSerial) { latest.reset(); }
+    const PiecesKey key {preparedSerial, live.get(), latest.get(), time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, selected, getWidth(), getHeight()};
     if (pieceKey == key) { return pieceCache; }
     pieceKey = key;
     // Held so a later set of live frames cannot reuse this one's address.
     pieceLive = std::move(live);
+    lighting = std::move(latest);
     pieceCache.clear();
     if (prepared == nullptr) { return pieceCache; }
     const auto view = camera.view();
+    // A clip's index in the lighting's preparation, by who it is.
+    const auto litIndex = [&](const motion::PreparedClip& clip) -> std::optional<std::size_t> {
+        if (lighting == nullptr) { return std::nullopt; }
+        const auto identity = motion::ScenePreview::identityOf(clip);
+        const auto found = std::find(lighting->clips.begin(), lighting->clips.end(), identity);
+        return found == lighting->clips.end() ? std::nullopt : std::optional(static_cast<std::size_t>(found - lighting->clips.begin()));
+    };
     for (const auto& clip : prepared->clips) {
         const auto sampleTime = clipTime(clip, time);
         if (!clip.active(sampleTime)) { continue; }
-        forEachPiece(clip, sampleTime, view, pieceLive.get(), [&](const Piece& piece) {
-            const auto line = screenLine(view, piece.a, piece.b);
-            if (line.has_value()) { pieceCache.push_back({*line, piece.a, piece.b, piece.colour, &clip, piece.shape, static_cast<float>(view->toEye((piece.a + piece.b) * .5).z)}); }
-        });
+        // Lit as the Scope draws it, except while picking parts (picked by
+        // the source's own shapes). Its own lines stay, faintly, so what is
+        // dark (or a mirror that shows nothing of itself) can still be seen
+        // and picked.
+        const auto index = partMode ? std::nullopt : litIndex(clip);
+        const auto* entry = index.has_value() ? lighting->frame.entry(*index) : nullptr;
+        const auto add = [&](const motion::PreparedDrawing* drawing, float fade) {
+            forEachPiece(clip, sampleTime, view, pieceLive.get(), [&](const Piece& piece) {
+                const auto line = screenLine(view, piece.a, piece.b);
+                if (line.has_value()) { pieceCache.push_back({*line, piece.a, piece.b, piece.colour.withMultipliedAlpha(fade), &clip, piece.shape, static_cast<float>(view->toEye((piece.a + piece.b) * .5).z)}); }
+            }, drawing);
+        };
+        add(nullptr, entry != nullptr ? .2f : 1.0f);
+        if (entry != nullptr && !entry->drawing->empty()) { add(entry->drawing.get(), 1.0f); }
+    }
+    // What mirrors show from this view, as part of the mirror (not pickable
+    // shape by shape); in the scene already.
+    for (const auto& reflection : lighting != nullptr && !partMode ? lighting->frame.reflections : std::vector<motion::hidden::Frame::Entry> {}) {
+        if (reflection.clip >= lighting->clips.size() || reflection.drawing == nullptr) { continue; }
+        const auto mirror = std::find_if(prepared->clips.begin(), prepared->clips.end(), [&](const motion::PreparedClip& clip) { return motion::ScenePreview::identityOf(clip) == lighting->clips[reflection.clip]; });
+        if (mirror == prepared->clips.end()) { continue; }
+        auto& drawing = *reflection.drawing;
+        for (std::size_t index = 0; index < drawing.shapeCount(); ++index) {
+            auto* shape = drawing.shape(index);
+            constexpr int steps = 8;
+            auto previous = shape->nextVector(0);
+            for (int step = 1; step <= steps; ++step) {
+                const auto next = shape->nextVector(static_cast<float>(step) / steps);
+                const motion::Vec3 a {previous.x, previous.y, previous.z}, b {next.x, next.y, next.z};
+                const auto line = screenLine(view, a, b);
+                if (line.has_value() && (next.r > 0 || next.g > 0 || next.b > 0)) {
+                    pieceCache.push_back({*line, a, b, juce::Colour::fromFloatRGBA(next.r, next.g, next.b, 1.0f), &*mirror, -1, static_cast<float>(view->toEye((a + b) * .5).z)});
+                }
+                previous = next;
+            }
+        }
     }
     return pieceCache;
 }
@@ -282,12 +348,12 @@ bool MotionCompositionView::warps(const motion::PreparedClip& clip) const {
     return (prepared != nullptr && prepared->hasCompositionEffects()) || stage(clip) || std::any_of(clip.ancestors.begin(), clip.ancestors.end(), stage);
 }
 
-void MotionCompositionView::forEachPiece(const motion::PreparedClip& clip, double time, const CameraView& view, const motion::LiveSourceFrames* live, const std::function<void(const Piece&)>& visit) const {
+void MotionCompositionView::forEachPiece(const motion::PreparedClip& clip, double time, const CameraView& view, const motion::LiveSourceFrames* live, const std::function<void(const Piece&)>& visit, const motion::PreparedDrawing* litDrawing) const {
     const auto* source = clip.resolveSource(live);
     if (source == nullptr || !view.has_value()) { return; }
     const auto lit = [](const osci::Point& point) { return point.r != 0 || point.g != 0 || point.b != 0; };
     const auto colourOf = [](const osci::Point& point) { return juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1.0f); };
-    const auto* drawing = source->drawingAt(source->frameIndex(clip.localTime(time)));
+    const auto* drawing = litDrawing != nullptr ? litDrawing : source->drawingAt(source->frameIndex(clip.localTime(time)));
     if (drawing == nullptr) {
         // Traced sources walk their stored points at native density, so
         // short lit runs stay visible. Output uses its audio rate.

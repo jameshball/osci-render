@@ -337,13 +337,20 @@ struct Workspace {
 // pixels at a time: each part draws its own colour times the light reaching
 // it, and parts no light reaches are dropped as hidden ones are.
 // None when `cancel` is set partway.
-inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel = nullptr) {
+// An eye to see a frame from other than its camera: an editor's view. From
+// it nothing is hidden (it shows every line, as an editor does); lights
+// light as ever, and mirrors show what they would to it, over `reach`.
+struct OtherEye {
+    PreparedComposition::Viewpoint eye;
+    Reach reach;
+};
+inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel = nullptr, const OtherEye* from = nullptr) {
     auto& depth = workspace.depth;
     const auto cancelled = [cancel] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
     auto frame = std::make_unique<Frame>();
     const auto* camera = composition.activeCamera(time);
     const auto view = camera != nullptr ? camera->frame(time) : std::nullopt;
-    const auto hides = camera != nullptr && camera->hidesHiddenLines && view.has_value();
+    const auto hides = from == nullptr && camera != nullptr && camera->hidesHiddenLines && view.has_value();
     const auto lit = composition.lit(time);
     const auto reflecting = composition.reflects(time);
     if (!hides && !lit && !reflecting) { return frame; }
@@ -961,9 +968,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         frame->drawings.push_back({items[surface].index, std::move(shown), fraction});
     }
     // What mirrors show.
-    const auto viewpoint = reflecting ? composition.viewpoint(time) : std::nullopt;
+    const auto viewpoint = !reflecting ? std::nullopt : from != nullptr ? std::optional(from->eye) : composition.viewpoint(time);
     if (viewpoint.has_value()) {
-        auto shown = reflect(composition, time, items, world, place, normalsOf, lights, lit, *viewpoint, composition.hiddenLineReach, hiding ? &depth : nullptr, workspace.rays, cancelled);
+        auto shown = reflect(composition, time, items, world, place, normalsOf, lights, lit, *viewpoint, from != nullptr ? from->reach : composition.hiddenLineReach, hiding ? &depth : nullptr, workspace.rays, cancelled);
         if (!shown.has_value()) { return nullptr; }
         frame->reflections = std::move(*shown);
     }
