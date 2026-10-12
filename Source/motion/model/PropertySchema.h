@@ -15,6 +15,23 @@ inline std::span<const PropertySpec> propertySpecs(const PropertyTarget& target)
     return objectInspectorSpecs;
 }
 
+// Whether a clip made by `generator` (none for other sources) has a property
+// of the object specs. A light draws nothing: it takes no share of the beam,
+// lights or reflects nothing of itself, and has no size; it has a place
+// (point and spot) and a way it shines (spot and directional), no more. A
+// curve has no surface to reflect with or draw lines on.
+inline bool hasProperty(const GeneratorDefinition* generator, std::string_view id) {
+    const auto category = generator != nullptr ? std::optional(generator->category) : std::nullopt;
+    const auto onSurface = id == "reflects" || isLinesProperty(id);
+    if (category == GeneratorCategory::curve) { return !onSurface; }
+    if (category != GeneratorCategory::light) { return true; }
+    if (onSurface || id == "beam" || id == "lit" || id.starts_with("scale.") || id.starts_with("anchor.")) { return false; }
+    const auto kind = generator->kind;
+    if (id.starts_with("position.")) { return kind == GeneratorKind::pointLight || kind == GeneratorKind::spotLight; }
+    if (id.starts_with("rotation.")) { return kind == GeneratorKind::spotLight || kind == GeneratorKind::directionalLight; }
+    return true;
+}
+
 inline const PropertySpec* findPropertySpec(std::span<const PropertySpec> specs, std::string_view id) {
     for (const auto& spec : specs) {
         if (spec.id == id) { return &spec; }

@@ -86,15 +86,7 @@ void MotionPropertyInspector::refresh() {
         const auto* generator = targetGenerator();
         if (generator != nullptr) { specList.assign(generator->parameters.begin(), generator->parameters.end()); }
         const auto base = motion::propertySpecs(*found);
-        // A light draws nothing: it takes no share of the beam, and lights or
-        // reflects nothing of itself. A curve has no surface to reflect with,
-        // or to draw lines on.
-        const auto light = generator != nullptr && generator->category == motion::GeneratorCategory::light;
-        const auto surfaceless = light || (generator != nullptr && generator->category == motion::GeneratorCategory::curve);
-        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [light, surfaceless](const auto& spec) {
-            const auto onSurface = spec.id == "reflects" || motion::isLinesProperty(spec.id);
-            return !(light && (spec.id == "beam" || spec.id == "lit")) && !(surfaceless && onSurface);
-        });
+        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [generator](const auto& spec) { return motion::hasProperty(generator, spec.id); });
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
     }
     const auto specs = std::span<const motion::PropertySpec>(specList);
