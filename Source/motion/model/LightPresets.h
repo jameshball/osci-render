@@ -1,16 +1,21 @@
 #pragma once
 
 #include "Document.h"
+#include <algorithm>
 #include <array>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace motion {
 // Ways a light can move on its own, applied in one go: a light's colour, and
 // modulators routed to its intensity, colour and where it is. They are plain
-// modulators and routes, named for the light, so they can be changed, keyed
-// against or removed like any other.
+// modulators and routes, named for the light and the preset ("Lamp · Fire
+// Surge"), so they can be changed, keyed against or removed like any other. A
+// light has a preset while modulators routed to it are named for every way
+// that preset moves.
 enum class LightPreset { fire, candle, flickeringBulb, pulse, strobe };
 
 namespace light_preset_detail {
@@ -68,33 +73,58 @@ inline const light_preset_detail::Definition& lightPresetDefinition(LightPreset 
 }
 inline std::string_view lightPresetName(LightPreset preset) { return lightPresetDefinition(preset).name; }
 inline constexpr std::array<LightPreset, 5> lightPresets {LightPreset::fire, LightPreset::candle, LightPreset::flickeringBulb, LightPreset::pulse, LightPreset::strobe};
+// How many ids putting any preset on a light takes: a modulator and a route
+// for each way it moves.
+inline constexpr std::size_t lightPresetIds = 2 * std::tuple_size_v<decltype(light_preset_detail::Definition::drives)>;
 
-// The prefix of the modulators a preset makes for a light.
-inline std::string lightPresetPrefix(const Clip& light) { return light.name + " \xc2\xb7 "; }
+namespace light_preset_detail {
+// What a preset names a light's modulator for one way it moves: "Fire Surge".
+inline std::string driveName(const Definition& definition, const Drive& drive) { return std::string(definition.name) + " " + std::string(drive.role); }
+inline bool namedFor(const Modulator& modulator, const Definition& definition, const Drive& drive) {
+    return modulator.name.ends_with(" \xc2\xb7 " + driveName(definition, drive));
+}
+// The modulators routed to a light that are named for a way some preset
+// moves: those its preset made, whatever the light is called now.
+inline std::vector<Id> presetModulators(const Composition& composition, Id light) {
+    std::vector<Id> found;
+    for (const auto& route : composition.routes) {
+        if (route.target != light) { continue; }
+        const auto modulator = std::find_if(composition.modulators.begin(), composition.modulators.end(), [&](const Modulator& item) { return item.id == route.modulator; });
+        if (modulator == composition.modulators.end()) { continue; }
+        const auto named = std::any_of(definitions.begin(), definitions.end(), [&](const Definition& definition) {
+            return std::any_of(definition.drives.begin(), definition.drives.begin() + static_cast<std::ptrdiff_t>(definition.driveCount), [&](const Drive& drive) { return namedFor(*modulator, definition, drive); });
+        });
+        if (named && std::find(found.begin(), found.end(), modulator->id) == found.end()) { found.push_back(modulator->id); }
+    }
+    return found;
+}
+}
 
-// The preset a light has, if any: by its modulators' names.
+// The preset a light has, if any: the one every way of moving of which has a
+// modulator routed to it.
 inline std::optional<LightPreset> currentLightPreset(const Composition& composition, Id light) {
-    const auto* clip = findClip(composition, light);
-    if (clip == nullptr) { return std::nullopt; }
-    const auto prefix = lightPresetPrefix(*clip);
-    for (const auto preset : lightPresets) {
-        const auto named = prefix + std::string(lightPresetName(preset)) + " ";
-        const auto has = std::any_of(composition.modulators.begin(), composition.modulators.end(), [&](const Modulator& modulator) { return modulator.name.starts_with(named); });
-        if (has) { return preset; }
+    const auto owned = light_preset_detail::presetModulators(composition, light);
+    if (owned.empty()) { return std::nullopt; }
+    for (const auto& definition : light_preset_detail::definitions) {
+        const auto complete = std::all_of(definition.drives.begin(), definition.drives.begin() + static_cast<std::ptrdiff_t>(definition.driveCount), [&](const light_preset_detail::Drive& drive) {
+            return std::any_of(owned.begin(), owned.end(), [&](Id id) {
+                const auto modulator = std::find_if(composition.modulators.begin(), composition.modulators.end(), [&](const Modulator& item) { return item.id == id; });
+                return modulator != composition.modulators.end() && light_preset_detail::namedFor(*modulator, definition, drive);
+            });
+        });
+        if (complete) { return definition.preset; }
     }
     return std::nullopt;
 }
+// Whether a light has any of a preset's modulators routed to it, all of a
+// preset's or not.
+inline bool hasLightPreset(const Composition& composition, Id light) { return !light_preset_detail::presetModulators(composition, light).empty(); }
 
 // Takes off whatever preset a light has: its modulators' routes to it, and
 // the modulators once nothing else uses them. False when it had none.
 inline bool removeLightPreset(Composition& composition, Id light) {
-    const auto* clip = findClip(composition, light);
-    if (clip == nullptr) { return false; }
-    const auto prefix = lightPresetPrefix(*clip);
-    std::vector<Id> owned;
-    for (const auto& modulator : composition.modulators) {
-        if (modulator.name.starts_with(prefix)) { owned.push_back(modulator.id); }
-    }
+    if (findClip(composition, light) == nullptr) { return false; }
+    const auto owned = light_preset_detail::presetModulators(composition, light);
     const auto ownedBy = [&](Id modulator) { return std::find(owned.begin(), owned.end(), modulator) != owned.end(); };
     const auto before = composition.routes.size();
     std::erase_if(composition.routes, [&](const ModulationRoute& route) { return route.target == light && ownedBy(route.modulator); });
@@ -115,12 +145,11 @@ inline bool applyLightPreset(Composition& composition, Id light, LightPreset pre
     clip->properties["red"] = Curve(definition.colour[0]);
     clip->properties["green"] = Curve(definition.colour[1]);
     clip->properties["blue"] = Curve(definition.colour[2]);
-    const auto prefix = lightPresetPrefix(*clip);
     for (std::size_t index = 0; index < definition.driveCount; ++index) {
         const auto& drive = definition.drives[index];
         Modulator modulator;
         modulator.id = newId();
-        modulator.name = prefix + std::string(definition.name) + " " + std::string(drive.role);
+        modulator.name = clip->name + " \xc2\xb7 " + light_preset_detail::driveName(definition, drive);
         modulator.shape.enabled = true;
         modulator.shape.waveform = drive.waveform;
         modulator.shape.rateHz = drive.rateHz;
@@ -139,19 +168,16 @@ inline bool applyLightPreset(Composition& composition, Id light, LightPreset pre
     return true;
 }
 
-// Puts a preset on a light (none takes its preset off), as one undoable edit.
-inline void editLightPreset(Document& document, Id light, std::optional<LightPreset> preset) {
+// Puts a preset on a light (none takes its preset off), as one undoable
+// edit; false, recording nothing, when there was nothing to do.
+inline bool editLightPreset(Document& document, Id light, std::optional<LightPreset> preset) {
     // Ids made first: the edit's copy of the project makes none of its own.
     std::vector<Id> ids;
-    for (int index = 0; index < 16; ++index) { ids.push_back(document.newId()); }
+    for (std::size_t index = 0; preset.has_value() && index < lightPresetIds; ++index) { ids.push_back(document.newId()); }
     const auto name = preset.has_value() ? "Apply " + juce::String(lightPresetName(*preset).data()).toLowerCase() + " preset" : juce::String("Remove light preset");
-    document.edit(name, [light, preset, ids](Project& project) {
+    return document.tryEdit(name, [light, preset, ids](Project& project) {
         std::size_t used = 0;
-        if (preset.has_value()) {
-            applyLightPreset(project, light, *preset, [&] { return ids[used++]; });
-        } else {
-            removeLightPreset(project, light);
-        }
+        return preset.has_value() ? applyLightPreset(project, light, *preset, [&] { return ids[used++]; }) : removeLightPreset(project, light);
     });
 }
 }

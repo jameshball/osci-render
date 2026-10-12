@@ -278,6 +278,23 @@ public:
             expect(!motion::removeLightPreset(project, 30), "a light with no preset has none to take off");
         }
 
+        beginTest("A light's preset is the one routed to it, whatever the light is called");
+        {
+            auto project = scene();
+            addLight(project, "pointLight", 30, {{"position.y", 1.5}});
+            addLight(project, "pointLight", 31, {{"position.y", 1.5}});
+            motion::Id next = 1000;
+            const auto newId = [&] { return ++next; };
+            expect(motion::applyLightPreset(project, 30, motion::LightPreset::candle, newId));
+            expect(motion::currentLightPreset(project, 30) == motion::LightPreset::candle, "the light given a candle has one");
+            expect(!motion::currentLightPreset(project, 31).has_value() && !motion::hasLightPreset(project, 31), "another of the same name has none");
+            motion::changeClip(project, 30)->name = "Lamp";
+            expect(motion::currentLightPreset(project, 30) == motion::LightPreset::candle, "renamed, it keeps its preset");
+            expect(motion::applyLightPreset(project, 31, motion::LightPreset::pulse, newId));
+            expect(motion::currentLightPreset(project, 30) == motion::LightPreset::candle && motion::currentLightPreset(project, 31) == motion::LightPreset::pulse, "each its own");
+            expect(motion::removeLightPreset(project, 31) && motion::currentLightPreset(project, 30) == motion::LightPreset::candle, "taking one off leaves the other's");
+        }
+
         beginTest("A face the light turns from fades out, rather than flicking between lit and dark");
         {
             // An upright ring, a point light beside it turning past where the

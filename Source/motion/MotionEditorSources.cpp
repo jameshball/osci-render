@@ -502,7 +502,7 @@ void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition, s
     track.insert(clip, document.project().tempo());
     // A preset's modulators and routes in the same edit, their ids made first.
     std::vector<motion::Id> ids;
-    for (int index = 0; preset.has_value() && index < 16; ++index) { ids.push_back(document.newId()); }
+    for (std::size_t index = 0; preset.has_value() && index < motion::lightPresetIds; ++index) { ids.push_back(document.newId()); }
     document.edit("Add " + juce::String(named.data(), named.size()).toLowerCase(), [&](motion::Project& project) {
         project.assets.push_back(asset);
         project.tracks.push_back(track);

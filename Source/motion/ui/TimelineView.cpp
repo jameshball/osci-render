@@ -2946,10 +2946,7 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
     // A light's presets: ways it moves on its own.
     const auto* generator = motion::generatorFor(processor.document.project(), id);
     if (generator != nullptr && generator->category == motion::GeneratorCategory::light) {
-        const auto* clip = motion::findClip(processor.document.project(), id);
-        const auto prefix = clip != nullptr ? motion::lightPresetPrefix(*clip) : std::string();
-        const auto& modulators = processor.document.project().modulators;
-        const auto hasPreset = std::any_of(modulators.begin(), modulators.end(), [&](const auto& modulator) { return modulator.name.starts_with(prefix); });
+        const auto hasPreset = motion::hasLightPreset(processor.document.project(), id);
         juce::PopupMenu presets;
         for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) {
             const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
