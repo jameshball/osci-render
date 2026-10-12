@@ -572,6 +572,9 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         shadingTiles->setState(1, amount > 0 && !onFrame, onFrame ? juce::String() : badge);
         shadingTiles->setState(2, amount > 0 && onFrame, onFrame ? badge : juce::String());
         shadingTiles->setLocked(found.locked);
+        // An XY-only scope shows brightness as the beam's time.
+        shadingTiles->tile(0).setTooltip(processor.document.project().scope.xyOnly ? "Light shows as how bright each line is: on this XY-only scope, by how slowly the beam draws it"
+            : "Light shows as how bright each line is drawn");
         // Hatching's rows only while it hatches, or is keyed or driven to;
         // where it hatches is chosen by the tiles, so has a row only when
         // keyed or driven.

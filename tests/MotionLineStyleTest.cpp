@@ -101,6 +101,31 @@ public:
             expect(std::abs(brightest(100) - 1) < 1.0e-3f, "as they are at 100");
         }
 
+        beginTest("On an XY-only scope, light shows as the beam's time: the dim side is drawn faster");
+        {
+            // The share of the beam's time the lit top half of a ball takes,
+            // lit from above.
+            const auto topShare = [&](bool xyOnly) {
+                auto project = scene({{"edges", 100}});
+                addClip(project, generatorAsset(5, "directionalLight"), 50, {{"rotation.x", -60}, {"rotation.y", 0}});
+                project.scope.xyOnly = xyOnly;
+                const motion::PreparedComposition prepared(project);
+                motion::hidden::Workspace workspace;
+                const auto frame = motion::hidden::cull(prepared, 1, workspace);
+                const auto* drawn = frame->drawing(0);
+                int top = 0, all = 0;
+                for (int step = 0; drawn != nullptr && step < 4000; ++step) {
+                    const auto point = drawn->sample((step + .5) / 4000);
+                    ++all;
+                    top += point.y > 0 ? 1 : 0;
+                }
+                return static_cast<double>(top) / std::max(1, all);
+            };
+            const auto withBrightness = topShare(false), xyOnly = topShare(true);
+            expect(xyOnly > withBrightness + .02, "the lit half takes more of the beam with no brightness to show it by: "
+                + juce::String(xyOnly, 3) + " against " + juce::String(withBrightness, 3));
+        }
+
         beginTest("Patterns lie on the surface, and are lit as it is");
         {
             for (const auto* pattern : {"spiral", "noise", "slices", "rings"}) {

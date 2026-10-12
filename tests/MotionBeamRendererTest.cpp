@@ -179,6 +179,41 @@ public:
             expect(ratio < 1.6, "as bright by length: " + juce::String(ratio, 2) + "x (" + juce::String(tiny, 0) + " for the zigzag, " + juce::String(big, 0) + " for the square)");
         }
 
+        beginTest("An XY-only scope's beam never holds still, and every sample is as bright");
+        {
+            auto made = project({{square(1, .2f), -.5}, {square(2, .2f), .5}});
+            made.scope = {12, 0, 5, true};
+            const motion::PreparedComposition composition(made, 192000);
+            motion::BeamRenderer beam;
+            const auto points = cycle(composition, 192000, 3, beam);
+            int holds = 0, longestMove = 0;
+            for (const auto& segment : beam.plannedSegments()) {
+                holds += segment.kind == motion::BeamRenderer::Kind::hold && segment.count > 0 ? 1 : 0;
+                if (segment.kind == motion::BeamRenderer::Kind::move) { longestMove = std::max(longestMove, static_cast<int>(segment.count)); }
+            }
+            expectEquals(holds, 0, "no dwell or settle: holding still would draw a dot");
+            expectEquals(longestMove, 1, "with no travel time, a jump is one sample");
+            int dim = 0;
+            for (const auto& point : points) { dim += std::abs(std::max({point.r, point.g, point.b}) - 1.0f) > 1.0e-4f ? 1 : 0; }
+            expectEquals(dim, 0, "every sample, jumps too, at full brightness, as the scope will show it");
+        }
+
+        beginTest("On an XY-only scope, opacity takes beam time instead of dimming");
+        {
+            auto made = project({{square(1, .2f), -.5, 0, 50}, {square(2, .2f), .5}});
+            made.scope.xyOnly = true;
+            const motion::PreparedComposition composition(made, 192000);
+            motion::BeamRenderer beam;
+            cycle(composition, 192000, 3, beam);
+            std::int64_t half = 0, whole = 0;
+            for (const auto& segment : beam.plannedSegments()) {
+                if (segment.kind != motion::BeamRenderer::Kind::draw) { continue; }
+                (segment.clip == &composition.clips[0] ? half : whole) += segment.count;
+            }
+            const auto ratio = static_cast<double>(half) / static_cast<double>(whole);
+            expect(std::abs(ratio - .5) < .05, "half as opaque, half the time: " + juce::String(ratio, 3));
+        }
+
         beginTest("Opacity dims a layer through its colour; the beam time stays the same for every layer");
         {
             const auto shape = square(1, .15f);

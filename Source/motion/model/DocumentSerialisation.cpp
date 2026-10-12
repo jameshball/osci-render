@@ -584,6 +584,7 @@ juce::XmlElement Document::save() const {
     xml.setAttribute("scopeDwell", exactNumber(state.scope.dwellMicros));
     xml.setAttribute("scopeTravel", exactNumber(state.scope.travelMicrosPerUnit));
     xml.setAttribute("scopeSettle", exactNumber(state.scope.settleMicros));
+    if (state.scope.xyOnly) { xml.setAttribute("scopeXYOnly", true); }
     auto* beam = xml.createNewChildElement("scopeBeam");
     saveProperties(*beam, state.beam.properties);
     for (const auto& asset : state.assets) {
@@ -669,6 +670,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     project.scope.dwellMicros = xml.getDoubleAttribute("scopeDwell", defaults.dwellMicros);
     project.scope.travelMicrosPerUnit = xml.getDoubleAttribute("scopeTravel", defaults.travelMicrosPerUnit);
     project.scope.settleMicros = xml.getDoubleAttribute("scopeSettle", defaults.settleMicros);
+    project.scope.xyOnly = xml.getBoolAttribute("scopeXYOnly", defaults.xyOnly);
     if (!project.scope.valid()) { return juce::Result::fail("Invalid scope timing profile."); }
     // The Scope's identity is reserved before anything else claims one.
     std::set<Id> identities {beamIdentity}, compositionIds;

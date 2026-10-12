@@ -46,8 +46,14 @@ struct SceneItem {
 // fading out gives its time back as it fades rather than all at once when it
 // goes. Its colour stays the light it takes, so what the light dims evenly is
 // still dimmer; this only shares the beam among the parts.
+// On a display with no brightness input (`xyOnly`), its time is all there is
+// to show its light by: it takes time as it is bright, and its colour is not
+// dimmed.
 inline constexpr double leastLitWeight = .05;
-inline double litWeight(double brightest) { return std::clamp(std::sqrt(std::max(0.0, brightest)), leastLitWeight, 1.0); }
+inline double litWeight(double brightest, bool xyOnly = false) {
+    const auto light = std::max(0.0, brightest);
+    return std::clamp(xyOnly ? light : std::sqrt(light), leastLitWeight, 1.0);
+}
 
 // Values at every step from 0 to `steps`, found by `find(step)` at every
 // third, and at those between only where `differ(from, to)` says the found
@@ -145,6 +151,7 @@ public:
     void translate(float, float, float) override {}
     float length() override { return shape->length(); }
     std::unique_ptr<osci::Shape> clone() override { return std::make_unique<DimmedShape>(shape->clone(), factor); }
+    float gain() const { return factor; }
     std::string type() override { return "Dimmed"; }
 
 private:

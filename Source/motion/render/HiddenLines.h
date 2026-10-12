@@ -415,12 +415,16 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
     // for everything else.
     const auto beamSamples = composition.sampleRate / std::max(1.0, composition.beamRate);
     const auto strokes = hatching::strokes(std::max(reach.x, reach.y), detail, look, static_cast<std::size_t>(std::max(64.0, beamSamples * .5)));
-    // Each surface's strokes, in its clip's colour in the light's.
+    // Each surface's strokes, in its clip's colour in the light's, dimmed by
+    // the hatching's amount and as much as the surface reflects: on a
+    // display with no brightness input, drawn as much more quickly.
     std::vector<std::vector<std::unique_ptr<osci::Shape>>> shapes(items.size());
+    std::vector<std::vector<double>> weights(items.size());
     for (const auto& stroke : strokes) {
         const auto& clip = *items[stroke.surface].clip;
         auto colour = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, 1, 1, 1), time), time);
         const auto itself = static_cast<float>(1 - clip.reflects(time));
+        const auto weight = composition.scope.xyOnly ? std::max(leastLitWeight, itself * amount) : 1.0;
         colour.r *= itself;
         colour.g *= itself;
         colour.b *= itself;
@@ -428,12 +432,15 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
             return osci::Point(static_cast<float>(seen.at.x), static_cast<float>(seen.at.y), static_cast<float>(seen.at.z),
                 std::max(0.0f, colour.r) * seen.hue[0] * static_cast<float>(amount), std::max(0.0f, colour.g) * seen.hue[1] * static_cast<float>(amount), std::max(0.0f, colour.b) * seen.hue[2] * static_cast<float>(amount));
         };
-        for (std::size_t index = 1; index < stroke.points.size(); ++index) { shapes[stroke.surface].push_back(std::make_unique<ColouredLine>(point(stroke.points[index - 1]), point(stroke.points[index]))); }
+        for (std::size_t index = 1; index < stroke.points.size(); ++index) {
+            shapes[stroke.surface].push_back(std::make_unique<ColouredLine>(point(stroke.points[index - 1]), point(stroke.points[index])));
+            weights[stroke.surface].push_back(weight);
+        }
     }
     std::vector<Frame::Entry> entries;
     for (std::size_t surface = 0; surface < items.size(); ++surface) {
         if (shapes[surface].empty()) { continue; }
-        entries.push_back({items[surface].index, std::make_shared<PreparedDrawing>(std::move(shapes[surface]), true), 1});
+        entries.push_back({items[surface].index, std::make_shared<PreparedDrawing>(std::move(shapes[surface]), true, weights[surface]), 1});
     }
     return entries;
 }
@@ -537,6 +544,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto view = camera != nullptr ? camera->frame(time) : std::nullopt;
     const auto hides = from == nullptr && camera != nullptr && camera->hidesHiddenLines && view.has_value();
     const auto lit = composition.lit(time);
+    // A display with no brightness input shows how bright a line is only by
+    // how long the beam takes over it (see litWeight).
+    const auto xyOnly = composition.scope.xyOnly;
     const auto reflecting = composition.reflects(time);
     const auto restyling = composition.restyles(time);
     // How much the camera shades by hatching rather than brightness, laid
@@ -979,6 +989,12 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             lostBy[surface] = lost;
             continue;
         }
+        // How bright the clip's style draws a line (its Edges, Outline or
+        // pattern), as beam time where there is no brightness to dim.
+        const auto amountOf = [&](osci::Shape* shape) -> double {
+            const auto* dimmed = xyOnly ? dynamic_cast<const DimmedShape*>(shape) : nullptr;
+            return dimmed != nullptr ? std::max(static_cast<double>(dimmed->gain()), leastLitWeight) : 1.0;
+        };
         // A line usually starts where the last ended: its end is reused.
         osci::Point lastEnd;
         std::optional<Vec3> lastEye;
@@ -986,7 +1002,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             auto* shape = item.drawing->shape(index);
             if (shape == nullptr || !(shape->length() > 0)) { continue; }
             if (!hiding) {
-                kept.push_back({shape->clone(), false, normalsOf(surface, index)});
+                kept.push_back({shape->clone(), false, normalsOf(surface, index), amountOf(shape)});
                 continue;
             }
             const auto line = dynamic_cast<osci::Line*>(shape) != nullptr;
@@ -1023,15 +1039,15 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 visibleRuns([&](double t) { return screen(eye(*item.clip, shape->nextVector(static_cast<float>(t)))); }, length);
             }
             if (runs.size() == 1 && runs.front().first <= 0 && runs.front().second >= 1) {
-                kept.push_back({shape->clone(), false, normalsOf(surface, index)});
+                kept.push_back({shape->clone(), false, normalsOf(surface, index), amountOf(shape)});
                 continue;
             }
             lost = true;
             for (const auto& [a, b] : runs) {
                 if (line) {
-                    kept.push_back({std::make_unique<osci::Line>(shape->nextVector(static_cast<float>(a)), shape->nextVector(static_cast<float>(b))), true, normalsOf(surface, index).part(a, b)});
+                    kept.push_back({std::make_unique<osci::Line>(shape->nextVector(static_cast<float>(a)), shape->nextVector(static_cast<float>(b))), true, normalsOf(surface, index).part(a, b), amountOf(shape)});
                 } else {
-                    kept.push_back({std::make_unique<ShapePart>(*shape, item.styled != nullptr ? std::shared_ptr<const void>(item.styled->drawing) : std::shared_ptr<const void>(item.source), static_cast<float>(a), static_cast<float>(b)), true, normalsOf(surface, index).part(a, b)});
+                    kept.push_back({std::make_unique<ShapePart>(*shape, item.styled != nullptr ? std::shared_ptr<const void>(item.styled->drawing) : std::shared_ptr<const void>(item.source), static_cast<float>(a), static_cast<float>(b)), true, normalsOf(surface, index).part(a, b), amountOf(shape)});
                 }
             }
         }
@@ -1183,9 +1199,23 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     const auto positionOf = [&](std::size_t sample) { return sample == index ? from : sample == last ? to : ts[sample]; };
                     std::vector<LitPart::Stop> stops;
                     for (const auto at : breaks) { stops.push_back({static_cast<float>((positionOf(at) - from) / std::max(to - from, 1.0e-12)), light[at]}); }
+                    if (xyOnly && breaks.size() >= 2) {
+                        // Its light shown by how fast the beam goes: a piece
+                        // between each pair of breaks, each as slow as it is
+                        // lit there, so a line brightens and fades along it.
+                        const auto lightOf = [&](std::size_t sample) { return std::max({light[sample][0], light[sample][1], light[sample][2]}); };
+                        for (std::size_t stop = 0; stop + 1 < breaks.size(); ++stop) {
+                            const auto a = breaks[stop], b = breaks[stop + 1];
+                            const auto weight = litWeight((lightOf(a) + lightOf(b)) * .5, true) * piece.weight;
+                            std::vector<LitPart::Stop> ends {{0.0f, light[a]}, {1.0f, light[b]}};
+                            litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(positionOf(a)), static_cast<float>(positionOf(b)), std::move(ends)), piece.cut, {}, weight});
+                        }
+                        index = last + 1;
+                        continue;
+                    }
                     float brightest = 0;
                     for (auto sample = index; sample <= last; ++sample) { brightest = std::max({brightest, light[sample][0], light[sample][1], light[sample][2]}); }
-                    const auto weight = litWeight(brightest);
+                    const auto weight = litWeight(brightest, xyOnly) * (xyOnly ? piece.weight : 1.0);
                     litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(from), static_cast<float>(to), std::move(stops)), piece.cut, {}, weight});
                     index = last + 1;
                 }
@@ -1208,7 +1238,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             if (itself > 0) {
                 for (auto& piece : pieces) {
                     piece.shape = std::make_unique<DimmedShape>(std::move(piece.shape), static_cast<float>(itself));
-                    piece.weight *= litWeight(itself);
+                    piece.weight *= litWeight(itself, xyOnly);
                 }
             } else {
                 pieces.clear();

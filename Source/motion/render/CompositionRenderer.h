@@ -209,6 +209,7 @@ struct PreparedGroup {
     }
     bool visible(double time) const { return TransformPose::opacityAt(curves, time) > 0 && TransformPose::beamAt(curves, time) > 0; }
     double beam(double time) const { return TransformPose::beamAt(curves, time); }
+    double opacity(double time) const { return TransformPose::opacityAt(curves, time); }
     LineStyle lines(double time) const {
         LineStyle style;
         style.edges = TransformPose::share(curves, edgesIndex, time);
@@ -287,6 +288,11 @@ struct PreparedClipStage {
         for (const auto& group : groups) { value *= group.beam(scopeTime(time)); }
         return value;
     }
+    double stageOpacity(double time) const {
+        auto value = TransformPose::opacityAt(curves, localTime(time));
+        for (const auto& group : groups) { value *= group.opacity(scopeTime(time)); }
+        return value;
+    }
     osci::Point processStage(osci::Point point, double time) const {
         const auto local = localTime(time);
         const auto& pose = poses.at(local, [&] { return TransformPose::at(curves, local, spatial.get()); });
@@ -320,6 +326,14 @@ struct PreparedClip : PreparedClipStage {
         auto value = stageBeam(time);
         for (const auto& ancestor : ancestors) { value *= ancestor.stageBeam(time); }
         return std::isfinite(value) ? value : 0.0;
+    }
+    // How opaque it is: its own Opacity times its groups' and its nested
+    // placements'. It dims its colour; on a display with no brightness
+    // input (XY only), its share of the beam's time instead.
+    double opacity(double time) const {
+        auto value = stageOpacity(time);
+        for (const auto& ancestor : ancestors) { value *= ancestor.stageOpacity(time); }
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 1.0;
     }
     // How far lights light it: its own Lit by lights times its groups' and
     // its nested placements'.

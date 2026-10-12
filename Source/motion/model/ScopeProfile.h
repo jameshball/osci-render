@@ -9,11 +9,17 @@ namespace motion {
 // beam dark for the dwell at both ends, moves it at the travel rate per unit
 // of screen distance, then waits the settle time before the next stroke
 // lights, so slow scopes and galvos arrive before they draw.
+//
+// A display with no brightness input (`xyOnly`: X and Y alone) can't go
+// dark: every sample shows, so the beam never waits, jumps as fast as the
+// travel allows, and shows how bright a line is by how long it takes to
+// draw it rather than by its colour.
 struct ScopeProfile {
     static constexpr double maximumDwellMicros = 1000, maximumTravelMicrosPerUnit = 2000, maximumSettleMicros = 2000;
     double dwellMicros = 12;
     double travelMicrosPerUnit = 30;
     double settleMicros = 0;
+    bool xyOnly = false;
 
     bool operator==(const ScopeProfile&) const = default;
     bool valid() const {
@@ -27,6 +33,7 @@ struct ScopeProfilePreset {
     ScopeProfile profile;
 };
 
+// Timings alone: a preset leaves whether the display is XY only as it is.
 inline constexpr std::array<ScopeProfilePreset, 3> scopeProfilePresets {{
     {"Analog scope", {12, 30, 0}},
     {"Laser (slow galvo)", {100, 400, 150}},

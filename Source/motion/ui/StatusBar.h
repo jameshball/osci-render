@@ -3,8 +3,9 @@
 #include "MotionStyle.h"
 
 // One quiet line at the foot of the window: the latest message on the left
-// (errors stay until dismissed, notices fade after a few seconds) and live
-// beam statistics on the right.
+// (errors stay until dismissed, notices fade after a few seconds), with a
+// button to act on it when there is something to do, and live beam
+// statistics on the right.
 class MotionStatusBar final : public juce::Component, private juce::Timer {
 public:
     enum class Kind { notice, warning, error };
@@ -23,16 +24,33 @@ public:
         stats.setJustificationType(juce::Justification::centredRight);
         stats.setColour(juce::Label::textColourId, osci::Colours::textSubtle());
         addAndMakeVisible(stats);
+        action.setName("Status action");
+        action.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+        action.setColour(juce::TextButton::textColourOffId, motion::style::accent());
+        action.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        action.onClick = [this] {
+            auto act = std::move(onAction);
+            clear();
+            if (act) { act(); }
+        };
+        addChildComponent(action);
     }
 
-    void show(const juce::String& text, Kind kind = Kind::error) {
+    // `actionLabel` and `act`, when given: a button after the message that
+    // does what it suggests, and clears it.
+    void show(const juce::String& text, Kind kind = Kind::error, const juce::String& actionLabel = {}, std::function<void()> act = {}) {
         if (text.isEmpty()) { clear(); return; }
         current = kind;
+        onAction = std::move(act);
+        action.setButtonText(actionLabel);
+        action.setTitle(actionLabel);
+        action.setVisible(actionLabel.isNotEmpty() && onAction != nullptr);
         message.setText(text, juce::dontSendNotification);
         message.setTooltip(text);
         message.setColour(juce::Label::textColourId, kind == Kind::notice ? osci::Colours::textMuted() : osci::Colours::text().withAlpha(.9f));
         dismiss.setVisible(true);
-        if (kind == Kind::notice) { startTimer(6000); } else { stopTimer(); }
+        // A notice with something to do waits longer for it.
+        if (kind == Kind::notice) { startTimer(action.isVisible() ? 15000 : 6000); } else { stopTimer(); }
         resized();
         repaint();
     }
@@ -40,6 +58,8 @@ public:
         stopTimer();
         message.setText({}, juce::dontSendNotification);
         dismiss.setVisible(false);
+        action.setVisible(false);
+        onAction = nullptr;
         repaint();
     }
     juce::String text() const { return message.getText(); }
@@ -69,12 +89,18 @@ public:
         inside.removeFromLeft(lead);
         if (dismiss.isVisible()) { dismiss.setBounds(inside.removeFromRight(trail).withSizeKeepingCentre(14, 14)); }
         message.setBounds(inside.withY(area.getY()).withHeight(area.getHeight()));
+        if (action.isVisible()) {
+            const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), action.getButtonText())) + 16;
+            action.setBounds(pill.getRight() + motion::style::gap, area.getY() + (area.getHeight() - 20) / 2, std::min(width, std::max(0, area.getRight() - pill.getRight() - motion::style::gap)), 20);
+        }
     }
 
 private:
     void timerCallback() override { clear(); }
 
     juce::Label message, stats;
+    juce::TextButton action;
+    std::function<void()> onAction;
     juce::Rectangle<int> pill;
     osci::CloseButton dismiss {"Dismiss message"};
     Kind current = Kind::notice;

@@ -58,6 +58,9 @@ public:
         bool world = false;
         // How bright it is drawn (see finishPlan).
         float gain = 1;
+        // On a display with no brightness input (XY only), every sample
+        // shows: the colour it shows in, at full brightness.
+        std::array<float, 3> hue {1, 1, 1};
     };
 
     // Cycles never straddle a frame of the project's frame rate, so exported
@@ -134,6 +137,9 @@ private:
     static Timing timingFor(const ScopeProfile& requested, double rate) {
         const auto profile = requested.valid() ? requested : ScopeProfile{};
         const auto samples = [rate](double micros) { return static_cast<std::int64_t>(std::llround(micros / 1.0e6 * rate)); };
+        // A beam that can't go dark has nothing to wait for: holding still
+        // would only draw a dot.
+        if (profile.xyOnly) { return {0, 0, profile.travelMicrosPerUnit / 1.0e6, rate}; }
         return {std::max<std::int64_t>(1, samples(profile.dwellMicros)), std::max<std::int64_t>(0, samples(profile.settleMicros)), profile.travelMicrosPerUnit / 1.0e6, rate};
     }
 
@@ -161,6 +167,17 @@ private:
     }
     static double distance(const osci::Point& a, const osci::Point& b) { return distance(a.x, a.y, b.x, b.y); }
     static osci::Point dark(osci::Point point) { point.r = point.g = point.b = 0; return point; }
+    // A colour at full brightness, its hue kept; none for a dark one.
+    static std::optional<std::array<float, 3>> fullHue(const osci::Point& point) {
+        const auto most = std::max({point.r, point.g, point.b});
+        if (!(most > 0) || !std::isfinite(most)) { return std::nullopt; }
+        return std::array<float, 3> {std::max(0.0f, point.r) / most, std::max(0.0f, point.g) / most, std::max(0.0f, point.b) / most};
+    }
+    // A clip's own colour at full brightness, for its samples on an XY-only display.
+    std::array<float, 3> hueOf(const PreparedClip* clip) const {
+        if (clip == nullptr) { return {1, 1, 1}; }
+        return fullHue(clip->processPoint(osci::Point(0, 0, 0, -1, -1, -1), planTime)).value_or(std::array<float, 3> {1, 1, 1});
+    }
     static bool lit(const osci::Point& point) { return point.r > 0 || point.g > 0 || point.b > 0; }
 
     // A clip's point on screen at the plan time; none behind the camera. A
@@ -194,7 +211,8 @@ private:
     }
     static std::optional<Visible> visible(const PreparedComposition& composition, const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
         if (clip.light || !clip.active(time) || !clip.visible(time)) { return std::nullopt; }
-        const auto share = clip.beam(time);
+        // With no brightness to dim, opacity takes beam time instead.
+        const auto share = clip.beam(time) * (composition.scope.xyOnly ? clip.opacity(time) : 1.0);
         if (!(share > 0)) { return std::nullopt; }
         const auto* source = clip.resolveSource(liveFrames);
         if (source == nullptr || source->frameCount() == 0) { return std::nullopt; }
@@ -227,7 +245,8 @@ private:
                 const auto& clip = composition.clips[entry.clip];
                 if (clip.light || !clip.active(time) || !clip.visible(time) || !(clip.beam(time) > 0)) { continue; }
                 const auto& drawing = *entry.drawing;
-                measure(composition, {&clip, nullptr, 0, 0, {}, {}, std::max<std::int64_t>(2, drawing.minimumTraversalSamples()), clip.beam(time), &drawing, 1, std::max<std::int64_t>(2, drawing.coarseTraversalSamples()), true});
+                const auto share = clip.beam(time) * (composition.scope.xyOnly ? clip.opacity(time) : 1.0);
+                measure(composition, {&clip, nullptr, 0, 0, {}, {}, std::max<std::int64_t>(2, drawing.minimumTraversalSamples()), share, &drawing, 1, std::max<std::int64_t>(2, drawing.coarseTraversalSamples()), true});
             }
         }
         finishPlan(composition, first, end, rate);
@@ -414,7 +433,8 @@ private:
             const auto density = std::max(low, std::isfinite(least) ? least : 0.0);
             for (std::size_t i = 0; i < layerCount; ++i) {
                 const auto fair = brightest * density * items[i].length;
-                gains[i] = counts[i] > 0 && static_cast<double>(counts[i]) > fair ? static_cast<float>(fair / static_cast<double>(counts[i])) : 1.0f;
+                // With no brightness to dim (XY only), samples are brightness.
+                gains[i] = !composition.scope.xyOnly && counts[i] > 0 && static_cast<double>(counts[i]) > fair ? static_cast<float>(fair / static_cast<double>(counts[i])) : 1.0f;
             }
         }
         // Beam scales each layer's even share with no floor: what one layer
@@ -441,32 +461,47 @@ private:
             if (counts[largest] <= 2) { break; }
             --counts[largest]; --used;
         }
+        // A beam that can't go dark (XY only) would draw a dot where it held
+        // still at the end of the cycle: what is left goes to the drawing,
+        // by how much each already has.
+        if (composition.scope.xyOnly && used < budget && used > 0) {
+            const auto spare = budget - used;
+            std::int64_t given = 0;
+            for (std::size_t i = 0; i < layerCount; ++i) {
+                const auto more = spare * counts[i] / used;
+                counts[i] += more;
+                given += more;
+            }
+            for (std::size_t i = 0; given < spare && layerCount > 0; i = (i + 1) % layerCount) {
+                ++counts[i];
+                ++given;
+            }
+            used += given;
+        }
         auto cursor = first;
-        const auto hold = [&](const osci::Point& at, std::int64_t count) {
-            if (count > 0) { push({Kind::hold, cursor, count, nullptr, nullptr, 0, false, dark(at), dark(at)}); cursor += count; }
+        const auto hueAt = [&](std::size_t i) { return hueOf(items[i].clip); };
+        const auto hold = [&](const osci::Point& at, std::int64_t count, std::array<float, 3> hue) {
+            if (count > 0) { push({Kind::hold, cursor, count, nullptr, nullptr, 0, false, dark(at), dark(at), nullptr, false, 1, hue}); cursor += count; }
+        };
+        const auto move = [&](const osci::Point& from, const osci::Point& to, std::int64_t count, std::array<float, 3> hue) {
+            if (count > 0) { push({Kind::move, cursor, count, nullptr, nullptr, 0, false, dark(from), dark(to), nullptr, false, 1, hue}); cursor += count; }
         };
         // The beam arrives from the previous cycle's return jump.
-        hold(entryOf(0), dwell + settle);
+        hold(entryOf(0), dwell + settle, hueAt(0));
         for (std::size_t i = 0; i < layerCount; ++i) {
             if (i > 0) {
-                hold(exitOf(i - 1), dwell);
-                const auto steps = timing.travel(exitOf(i - 1), entryOf(i));
-                push({Kind::move, cursor, steps, nullptr, nullptr, 0, false, dark(exitOf(i - 1)), dark(entryOf(i))});
-                cursor += steps;
-                hold(entryOf(i), dwell + settle);
+                hold(exitOf(i - 1), dwell, hueAt(i - 1));
+                move(exitOf(i - 1), entryOf(i), timing.travel(exitOf(i - 1), entryOf(i)), hueAt(i));
+                hold(entryOf(i), dwell + settle, hueAt(i));
             }
             const auto& layer = items[i];
             if (layer.drawing != nullptr && layer.drawing->coarseTraversalSamples() > counts[i]) { planSimplified = true; }
-            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing, layer.world, gains[i]});
+            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing, layer.world, gains[i], hueAt(i)});
             cursor += counts[i];
         }
-        hold(exitOf(layerCount - 1), dwell);
-        const auto back = std::min(end - cursor, timing.travel(exitOf(layerCount - 1), entryOf(0)));
-        if (back > 0) {
-            push({Kind::move, cursor, back, nullptr, nullptr, 0, false, dark(exitOf(layerCount - 1)), dark(entryOf(0))});
-            cursor += back;
-        }
-        hold(entryOf(0), end - cursor);
+        hold(exitOf(layerCount - 1), dwell, hueAt(layerCount - 1));
+        move(exitOf(layerCount - 1), entryOf(0), std::min(end - cursor, timing.travel(exitOf(layerCount - 1), entryOf(0))), hueAt(0));
+        hold(entryOf(0), end - cursor, hueAt(0));
     }
 
     // Greedy nearest-neighbour order from the first layer, allowing either
@@ -574,6 +609,18 @@ private:
     }
 
     osci::Point evaluate(const PreparedComposition& composition, std::int64_t index) {
+        auto point = evaluateSegment(composition, index);
+        if (!composition.scope.xyOnly) { return point; }
+        // A display with no brightness input shows every sample as brightly:
+        // so does this, in the colour it is drawn in, or else its clip's.
+        const auto* segment = find(index);
+        const auto hue = fullHue(point).value_or(segment != nullptr ? segment->hue : std::array<float, 3> {1, 1, 1});
+        point.r = hue[0];
+        point.g = hue[1];
+        point.b = hue[2];
+        return point;
+    }
+    osci::Point evaluateSegment(const PreparedComposition& composition, std::int64_t index) {
         const auto* segment = find(index);
         if (segment == nullptr) { return {0, 0, 0, 0, 0, 0}; }
         const auto j = index - segment->first;

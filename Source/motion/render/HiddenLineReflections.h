@@ -375,7 +375,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                     const auto halfway = outside < count ? reflection(pointAt((shares[inside] + shares[outside]) / 2), seenAt[inside]) : std::nullopt;
                     return halfway.has_value() ? *halfway : *seenAt[inside];
                 };
-                const auto weight = litWeight(reflector.amount * brightest);
+                const auto weight = litWeight(reflector.amount * brightest, composition.scope.xyOnly);
                 for (std::size_t stop = 0; stop < kept.size(); ++stop) {
                     const auto step = kept[stop];
                     const auto at = first + step;

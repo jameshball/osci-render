@@ -40,9 +40,10 @@ private:
 }
 
 // Below the Scope's animated rows, its few fixed options on the same grid:
-// the overlay drawn over the beam, upsampling, and the project's scope
-// timing (dwell, travel, settle) with presets for common displays. Timing
-// edits are one undo step each; drags preview live and commit once.
+// the overlay drawn over the beam, upsampling, whether the display has a
+// brightness input or is XY only, and the project's scope timing (dwell,
+// travel, settle) with presets for common displays. Timing edits are one
+// undo step each; drags preview live and commit once.
 class MotionScopePanel final : public juce::Component, private juce::ChangeListener, private juce::AudioProcessorParameter::Listener, private juce::AsyncUpdater {
 public:
     explicit MotionScopePanel(MotionProcessor& owner) : processor(owner) {
@@ -51,7 +52,13 @@ public:
             motion::style::inspector::styleHeading(*label, text);
             addAndMakeVisible(*label);
         }
-        for (auto [label, text] : {std::pair {&overlayCaption, "Overlay"}, std::pair {&upsampleCaption, "Upsample"}}) { caption(*label, text); }
+        for (auto [label, text] : {std::pair {&overlayCaption, "Overlay"}, std::pair {&upsampleCaption, "Upsample"}, std::pair {&xyCaption, "XY only"}}) { caption(*label, text); }
+        xyOnly.setName("Scope XY only");
+        xyOnly.setTitle("Scope XY only");
+        xyOnly.setTooltip("The scope has no brightness input, only X and Y: the beam never waits dark (it would draw dots), "
+            "and how bright a line is shows by how long the beam takes over it");
+        xyOnly.onClick = [this] { setXYOnly(xyOnly.getToggleState()); };
+        addAndMakeVisible(xyOnly);
         auto& parameters = processor.visualiserParameters;
         overlay.setName("Scope overlay");
         overlay.setTitle("Scope overlay");
@@ -113,7 +120,7 @@ public:
     // panel, the heading, then rows on the grid.
     static constexpr int rowHeight = motion::style::controlHeight, rowGap = motion::style::gap, valueInset = 5;
     static constexpr int hairline = motion::style::gap, headingTop = 10, headingBlock = 26 + motion::style::gap, sectionEnd = motion::style::padding + motion::style::gap;
-    static constexpr int preferredHeight() { return hairline + headingBlock + 2 * rowHeight + rowGap + sectionEnd + headingBlock + 3 * rowHeight + 2 * rowGap; }
+    static constexpr int preferredHeight() { return hairline + headingBlock + 3 * rowHeight + 2 * rowGap + sectionEnd + headingBlock + 3 * rowHeight + 2 * rowGap; }
     void paint(juce::Graphics& g) override {
         g.setColour(juce::Colours::white.withAlpha(.06f));
         for (const auto y : rules) { g.fillRect(0, y, getWidth(), 1); }
@@ -133,6 +140,13 @@ public:
         overlay.setItemEnabled(static_cast<int>(ScreenOverlay::VectorDisplay), square);
         overlay.setSelectedId(static_cast<int>(parameters.screenOverlay->getValueUnnormalised()), juce::dontSendNotification);
         upsample.setToggleState(parameters.upsamplingEnabled->getBoolValue(), juce::dontSendNotification);
+        xyOnly.setToggleState(scope.xyOnly, juce::dontSendNotification);
+        // With no brightness input the beam never waits dark: only its
+        // travel between strokes means anything.
+        for (const auto index : {std::size_t {0}, std::size_t {2}}) {
+            fields[index].editor.setEnabled(!scope.xyOnly);
+            fields[index].caption.setAlpha(scope.xyOnly ? .4f : 1.0f);
+        }
         updating = false;
     }
 
@@ -159,6 +173,8 @@ public:
         overlay.setBounds(overlayRow.withX(area.getX() + grid.column + motion::style::gap).withRight(area.getX() + grid.value + grid.column));
         auto upsampleRow = line(upsampleCaption);
         upsample.setBounds(upsampleRow.withX(area.getX() + grid.value + grid.column - motion::ui::Switch::width - 2).withWidth(motion::ui::Switch::width + 2));
+        auto xyRow = line(xyCaption);
+        xyOnly.setBounds(xyRow.withX(area.getX() + grid.value + grid.column - motion::ui::Switch::width - 2).withWidth(motion::ui::Switch::width + 2));
         auto title = section(timingTitle, 1);
         presets.setBounds(title.withTrimmedTop(headingTop).withHeight(26 - headingTop).withX(area.getX() + grid.value + grid.column - presets.idealWidth()).withWidth(presets.idealWidth()));
         for (auto& field : fields) { field.editor.setBounds(line(field.caption).withX(area.getX() + grid.value).withWidth(grid.column)); }
@@ -215,22 +231,30 @@ private:
         const auto& current = processor.document.project().scope;
         for (std::size_t index = 0; index < motion::scopeProfilePresets.size(); ++index) {
             const auto& preset = motion::scopeProfilePresets[index];
-            menu.addItem(static_cast<int>(index + 1), juce::String(preset.name.data(), preset.name.size()), true, preset.profile == current);
+            auto profile = preset.profile;
+            profile.xyOnly = current.xyOnly;
+            menu.addItem(static_cast<int>(index + 1), juce::String(preset.name.data(), preset.name.size()), true, profile == current);
         }
         motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(&presets), [this](int result) {
             applyPreset(motion::scopeProfilePresets[static_cast<std::size_t>(result - 1)]);
         });
     }
+    void setXYOnly(bool on) {
+        if (processor.document.project().scope.xyOnly == on) { return; }
+        processor.document.edit(on ? "Set the scope to XY only" : "Give the scope brightness", [on](motion::Project& project) { project.scope.xyOnly = on; });
+    }
     void applyPreset(const motion::ScopeProfilePreset& preset) {
-        if (preset.profile == processor.document.project().scope) { return; }
-        const auto profile = preset.profile;
+        // Timing alone: whether the display is XY only stays as it is.
+        auto profile = preset.profile;
+        profile.xyOnly = processor.document.project().scope.xyOnly;
+        if (profile == processor.document.project().scope) { return; }
         processor.document.edit("Apply " + juce::String(preset.name.data(), preset.name.size()) + " scope timing", [profile](motion::Project& project) { project.scope = profile; });
     }
 
     MotionProcessor& processor;
-    juce::Label displayTitle, timingTitle, overlayCaption, upsampleCaption;
+    juce::Label displayTitle, timingTitle, overlayCaption, upsampleCaption, xyCaption;
     juce::ComboBox overlay;
-    motion::ui::Switch upsample {"Upsample Audio"};
+    motion::ui::Switch upsample {"Upsample Audio"}, xyOnly {"Scope XY only"};
     std::array<int, 2> rules {};
     std::array<Field, 3> fields;
     motion::scope::MenuLink presets {"Presets"};

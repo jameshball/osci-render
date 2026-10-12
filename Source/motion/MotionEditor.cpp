@@ -372,6 +372,15 @@ void MotionEditor::setUpTransport() {
             }
         }
         processor.setOutputMode(mode);
+        // A scope driven by X and Y alone can't show brightness: offer to
+        // draw for it, light shown by the beam's time instead.
+        if (mode == MotionProcessor::OutputMode::xy && !processor.document.project().scope.xyOnly) {
+            statusBar.show("An X/Y scope can't show brightness: lighting, opacity and mirrors draw as if at full", MotionStatusBar::Kind::notice, "Draw for XY only", [this] {
+                if (processor.document.project().scope.xyOnly) { return; }
+                processor.document.edit("Set the scope to XY only", [](motion::Project& project) { project.scope.xyOnly = true; });
+                statusBar.show("Drawing for an XY-only scope: brightness is shown by the beam's time. Scope options change it back.", MotionStatusBar::Kind::notice);
+            });
+        }
     };
     playButton.setTooltip("Play / pause (Space)");
     startButton.setTooltip("Go to start (Home)");
@@ -1240,6 +1249,7 @@ void MotionEditor::timerCallback() {
         const auto simplified = processor.beamSimplified.load(std::memory_order_relaxed);
         const juce::String dot(juce::CharPointer_UTF8("  \xc2\xb7  "));
         auto statistics = juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + dot + juce::String(beamRate, beamRate == std::floor(beamRate) ? 0 : 2) + " Hz beam";
+        if (processor.document.project().scope.xyOnly) { statistics += dot + "XY only"; }
         if (processor.playing.load() || layers > 0) {
             statistics += dot + "drawing " + juce::String(layers) + (layers == 1 ? " object" : " objects");
             // Too much to draw in a cycle: its shortest strokes are left out.
