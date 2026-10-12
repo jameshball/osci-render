@@ -612,7 +612,9 @@ juce::XmlElement Document::save() const {
         } else {
             if (osci::files::isImage(asset->extension)) {
                 auto* raster = item->createNewChildElement("raster");
-                raster->setAttribute("mode", asset->rasterSettings.mode == RasterSettings::Mode::contours ? "contours" : "scanlines");
+                const auto mode = asset->rasterSettings.mode;
+                raster->setAttribute("mode", mode == RasterSettings::Mode::contours ? "contours" : mode == RasterSettings::Mode::scanlines ? "scanlines" : "hilbert");
+                raster->setAttribute("shading", asset->rasterSettings.shading == RasterSettings::Shading::colour ? "colour" : "density");
                 raster->setAttribute("threshold", exactNumber(asset->rasterSettings.threshold));
                 raster->setAttribute("invert", asset->rasterSettings.invert);
                 raster->setAttribute("resolution", asset->rasterSettings.resolution);
@@ -727,8 +729,11 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             const auto* raster = item->getChildByName("raster");
             if (raster == nullptr) { return juce::Result::fail("Image asset is missing its preparation settings."); }
             const auto mode = raster->getStringAttribute("mode");
-            if (mode != "contours" && mode != "scanlines") { return juce::Result::fail("Unknown image preparation mode."); }
-            asset->rasterSettings.mode = mode == "contours" ? RasterSettings::Mode::contours : RasterSettings::Mode::scanlines;
+            if (mode != "contours" && mode != "scanlines" && mode != "hilbert") { return juce::Result::fail("Unknown image preparation mode."); }
+            asset->rasterSettings.mode = mode == "contours" ? RasterSettings::Mode::contours : mode == "scanlines" ? RasterSettings::Mode::scanlines : RasterSettings::Mode::hilbert;
+            const auto shading = raster->getStringAttribute("shading", "density");
+            if (shading != "density" && shading != "colour") { return juce::Result::fail("Unknown image shading."); }
+            asset->rasterSettings.shading = shading == "colour" ? RasterSettings::Shading::colour : RasterSettings::Shading::density;
             asset->rasterSettings.threshold = raster->getDoubleAttribute("threshold", -1);
             asset->rasterSettings.invert = raster->getBoolAttribute("invert");
             asset->rasterSettings.resolution = raster->getIntAttribute("resolution", 0);

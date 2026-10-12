@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
+#include <set>
 
 namespace {
 void check(bool condition, const char* message) {
@@ -135,7 +136,7 @@ int main() {
     for (unsigned bits = 0; bits < 512; ++bits) {
         Image tiny(3, 3);
         for (int i = 0; i < 9; ++i) { if ((bits & (1u << i)) != 0) { tiny.set(i % 3, i / 3); } }
-        for (const auto mode : {motion::RasterSettings::Mode::contours, motion::RasterSettings::Mode::scanlines}) {
+        for (const auto mode : {motion::RasterSettings::Mode::contours, motion::RasterSettings::Mode::scanlines, motion::RasterSettings::Mode::hilbert}) {
             settings.mode = mode;
             verify(tiny.build(settings), 128);
         }
@@ -149,5 +150,61 @@ int main() {
     auto maximumScan = maximum.build(settings);
     verify(maximumScan, 16384);
     check(pathCount(maximumScan) == 512, "maximum raster retains every scanline");
+    // Hilbert: one curve, denser where brighter, in each pixel's hue at full
+    // brightness, as fine as the budget allows.
+    {
+        Image ramp(64, 64);
+        for (int y = 0; y < 64; ++y) { for (int x = 0; x < 64; ++x) { const auto v = static_cast<std::uint8_t>(40 + 215 * x / 63); ramp.set(x, y, {v, static_cast<std::uint8_t>(v / 2), 0, 255}); } }
+        motion::RasterSettings hilbert;
+        hilbert.mode = motion::RasterSettings::Mode::hilbert;
+        hilbert.pointsPerFrame = 2048;
+        const auto result = ramp.build(hilbert);
+        verify(result, 2048);
+        // Distinct places the curve turns at, by side of the picture.
+        std::set<std::pair<long, long>> left, right;
+        int dim = 0, jumps = 0;
+        for (std::size_t i = 0; i < result.points.size(); ++i) {
+            const auto& p = result.points[i];
+            if (dark(p)) { continue; }
+            dim += std::abs(std::max({p.r, p.g, p.b}) - 1.0f) > 1.0e-4f ? 1 : 0;
+            (p.x < 0 ? left : right).insert({std::lround(p.x * 1.0e4), std::lround(p.y * 1.0e4)});
+            const auto& q = result.points[(i + 1) % result.points.size()];
+            jumps += !dark(q) && std::hypot(q.x - p.x, q.y - p.y) > .2f ? 1 : 0;
+        }
+        check(right.size() > 2 * left.size(), "brighter, denser");
+        check(dim == 0, "drawn at full brightness: density shows it");
+        check(jumps == 0, "one line, step by step");
+        check(pathCount(result) == 1, "lit throughout, one curve");
+        // Too fine for the budget, it coarsens evenly rather than failing.
+        hilbert.pointsPerFrame = 256;
+        verify(ramp.build(hilbert), 256);
+        // Below the threshold it is left out.
+        Image half(32, 32);
+        for (int y = 0; y < 32; ++y) { for (int x = 16; x < 32; ++x) { half.set(x, y); } }
+        hilbert.pointsPerFrame = 1024;
+        const auto halved = half.build(hilbert);
+        verify(halved, 1024);
+        int onDark = 0;
+        for (const auto& p : halved.points) { onDark += !dark(p) && p.x < -.06f ? 1 : 0; }
+        check(onDark == 0, "nothing over the dark half");
+        // By colour, for a scope with brightness: as dense all over, the
+        // beam's colour the picture's.
+        hilbert.shading = motion::RasterSettings::Shading::colour;
+        hilbert.pointsPerFrame = 2048;
+        const auto coloured = ramp.build(hilbert);
+        verify(coloured, 2048);
+        std::set<std::pair<long, long>> leftCells, rightCells;
+        double leftRed = 0, rightRed = 0;
+        int leftCount = 0, rightCount = 0;
+        for (const auto& p : coloured.points) {
+            if (dark(p)) { continue; }
+            (p.x < 0 ? leftCells : rightCells).insert({std::lround(p.x * 1.0e4), std::lround(p.y * 1.0e4)});
+            (p.x < 0 ? leftRed : rightRed) += p.r;
+            ++(p.x < 0 ? leftCount : rightCount);
+        }
+        const auto ratio = static_cast<double>(rightCells.size()) / static_cast<double>(std::max<std::size_t>(1, leftCells.size()));
+        check(ratio > .8 && ratio < 1.25, "as dense where dim as where bright");
+        check(rightRed / rightCount > 1.5 * leftRed / leftCount, "its colour the picture's, brighter where it is");
+    }
     std::cout << "RasterBeamBuilder tests passed\n";
 }

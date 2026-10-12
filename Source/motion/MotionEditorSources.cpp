@@ -281,7 +281,8 @@ void MotionEditor::showNextPreparationSettings() {
         request.file.loadFileAsData(data);
     }
     if (raster) {
-        auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video, name, video ? juce::MemoryBlock() : std::move(data));
+        auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video, name,
+            video ? juce::MemoryBlock() : std::move(data), processor.document.project().scope.xyOnly);
         imagePanel = panel.get();
         content = std::move(panel);
     } else if (fractal) {

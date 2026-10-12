@@ -2,8 +2,11 @@
 
 #include "../model/Cancellation.h"
 #include "../model/RasterSettings.h"
+#include "../render/HilbertCurve.h"
+#include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <numeric>
 
 namespace motion {
@@ -11,6 +14,12 @@ namespace motion {
 // Worker-only raster preparation. Pixel edges form closed, four-connected
 // contours; diagonally touching pixels remain separate paths. All vertices are
 // retained, so a small point budget fails rather than cutting across corners.
+// Or horizontal passes over what is lit; or a Hilbert curve over it (see
+// hilbert::curve, as the camera's hatching draws), as finely as the point
+// budget allows: one line wherever the picture is lit. By density, its cells
+// divided finer where the picture is brighter, drawn in each pixel's hue, so
+// it shows its shading by X and Y alone; or by colour, as fine all over, in
+// each pixel's colour, for a scope with brightness.
 class RasterBeamBuilder {
 public:
     struct Result {
@@ -67,7 +76,84 @@ public:
                 paths.push_back(std::move(path));
                 return true;
             };
-            if (settings.mode == RasterSettings::Mode::scanlines) {
+            if (settings.mode == RasterSettings::Mode::hilbert) {
+                // A grid round the picture, single pixels at its finest;
+                // dark outside it.
+                int deepest = 0;
+                while ((1 << deepest) < std::max(width, height)) { ++deepest; }
+                const auto cells = static_cast<std::size_t>(1) << deepest;
+                std::vector<float> brightness(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+                for (int y = 0; y < height; ++y) {
+                    for (int x = 0; x < width; ++x) {
+                        const auto rgb = colour(x, y);
+                        brightness[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] = static_cast<float>(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
+                    }
+                }
+                const auto density = settings.shading == RasterSettings::Shading::density;
+                // By density: how bright each cell is, stretched between the
+                // picture's own darkest and brightest (but the odd pixel), so
+                // the curve's density spans its range, then to the power of
+                // 1.5, as a line on a scope with brightness would show it. By
+                // colour: how much of each cell is lit, the curve as fine
+                // over all of it, its colour showing how bright.
+                auto sorted = brightness;
+                const auto at = [&](double share) {
+                    const auto index = static_cast<std::size_t>(share * static_cast<double>(sorted.size() - 1));
+                    std::nth_element(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(index), sorted.end());
+                    return sorted[index];
+                };
+                const auto darkest = at(.01), brightest = at(.99);
+                const auto stretched = brightest - darkest > .05f;
+                std::vector<float> finest(cells * cells, 0.0f);
+                for (int y = 0; y < height; ++y) {
+                    for (int x = 0; x < width; ++x) {
+                        const auto value = brightness[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+                        const auto lit = value > 0 && value >= settings.threshold;
+                        const auto spread = stretched ? std::clamp((value - darkest) / (brightest - darkest), 0.0f, 1.0f) : value;
+                        finest[static_cast<std::size_t>(y) * cells + static_cast<std::size_t>(x)] = density ? std::pow(spread, 1.5f) : (lit ? 1.0f : 0.0f);
+                    }
+                }
+                const auto pyramid = hilbert::Pyramid::of(std::move(finest), deepest, hilbert::Pyramid::Combine::mean);
+                // Whether a cell of the curve is drawn: by density, bright
+                // enough; by colour, mostly lit.
+                const auto shows = [&](const hilbert::Cell& cell) {
+                    const auto value = pyramid.at(cell.level, cell.row, cell.column);
+                    return density ? value > 0 && value >= settings.threshold : value >= .5f;
+                };
+                const auto curve = [&](double gain, auto&& visit) {
+                    hilbert::curve(deepest, [&](const hilbert::Cell& cell) {
+                        const auto value = pyramid.at(cell.level, cell.row, cell.column);
+                        return value > 0 && cell.size * value * gain > hilbert::threshold(cell.column, cell.row, cell.level);
+                    }, visit);
+                };
+                // As fine as the picture asks, or less, evenly, to fit the
+                // budget: each cell drawn a sample, each run two more.
+                const auto gain = hilbert::fitting(settings.pointsPerFrame, [&](double trying) {
+                    std::size_t count = 0;
+                    bool open = false;
+                    curve(trying, [&](const hilbert::Cell& cell) {
+                        const auto drawn = shows(cell);
+                        count += drawn ? (open ? 1 : 3) : 0;
+                        open = drawn;
+                    });
+                    return count;
+                });
+                if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
+                Path path;
+                path.fullHue = density;
+                bool fits = true;
+                curve(gain, [&](const hilbert::Cell& cell) {
+                    if (shows(cell)) {
+                        path.vertices.push_back({cell.x, cell.y});
+                        return;
+                    }
+                    if (!path.vertices.empty() && fits) { fits = addPath(std::move(path)); }
+                    path = {};
+                    path.fullHue = density;
+                });
+                if (!path.vertices.empty() && fits) { fits = addPath(std::move(path)); }
+                if (!fits) { return tooComplex(); }
+            } else if (settings.mode == RasterSettings::Mode::scanlines) {
                 for (int y = 0; y < height; ++y) {
                     if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                     const int direction = (y & 1) == 0 ? 1 : -1;
@@ -180,13 +266,20 @@ public:
                 output.push_back({static_cast<float>((point.x - width * 0.5) * scale),
                     static_cast<float>((height * 0.5 - point.y) * scale), 0, rgb[0], rgb[1], rgb[2]});
             };
+            // A Hilbert curve shows brightness by how dense it is, so it is
+            // drawn in each pixel's hue at full brightness.
+            const auto shown = [](const Path& path, std::array<float, 3> rgb) {
+                const auto most = std::max({rgb[0], rgb[1], rgb[2]});
+                if (!path.fullHue || !(most > 0)) { return rgb; }
+                return std::array<float, 3> {rgb[0] / most, rgb[1] / most, rgb[2] / most};
+            };
             std::size_t segmentIndex = 0;
             for (const auto& path : paths) {
                 if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                 emit(path.vertices.front(), {0, 0, 0});
                 if (path.vertices.size() == 1) {
                     const auto point = path.vertices.front();
-                    const auto rgb = colour(static_cast<int>(point.x), static_cast<int>(point.y));
+                    const auto rgb = shown(path, colour(static_cast<int>(point.x), static_cast<int>(point.y)));
                     for (std::size_t i = 0; i <= path.dwell; ++i) { emit(point, rgb); }
                 } else {
                     for (std::size_t v = 1; v < path.vertices.size(); ++v) {
@@ -196,8 +289,8 @@ public:
                         const auto segmentColour = [&](double distance) {
                             const auto inset = path.contour ? 0.25 : 0.0;
                             distance = std::clamp(distance, inset, segment.length - inset);
-                            return colour(static_cast<int>(std::floor(a.x + ux * distance - uy * inset)),
-                                static_cast<int>(std::floor(a.y + uy * distance + ux * inset)));
+                            return shown(path, colour(static_cast<int>(std::floor(a.x + ux * distance - uy * inset)),
+                                static_cast<int>(std::floor(a.y + uy * distance + ux * inset))));
                         };
                         // Emit each corner once, using its outgoing foreground.
                         for (std::size_t i = 0; i <= segment.extra; ++i) {
@@ -218,7 +311,7 @@ public:
 
 private:
     struct Vertex { double x, y; };
-    struct Path { std::vector<Vertex> vertices; bool contour = false; std::size_t dwell = 0; };
+    struct Path { std::vector<Vertex> vertices; bool contour = false; std::size_t dwell = 0; bool fullHue = false; };
     static Result tooComplex() { return {{}, "Raster is too complex for this point budget. Increase samples, reduce resolution, or simplify the image."}; }
 };
 }

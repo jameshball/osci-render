@@ -51,6 +51,7 @@ juce::String videoBakeKey(const Asset& asset) {
         metadata.writeInt(settings.resolution);
         metadata.writeDouble(settings.videoFrameRate);
         metadata.writeInt64(static_cast<juce::int64>(settings.pointsPerFrame));
+        if (settings.mode == RasterSettings::Mode::hilbert) { metadata.writeInt(static_cast<int>(settings.shading)); }
     });
 }
 

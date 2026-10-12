@@ -11,17 +11,27 @@
 // first frame beside the settings, updated as they change.
 class MotionRasterSettingsPanel final : public motion::ui::Sheet {
 public:
-    MotionRasterSettingsPanel(motion::RasterSettings initial, bool video, const juce::String& fileName, juce::MemoryBlock image = {})
+    // `xyOnlyScope`: the project's scope has X and Y alone, so a Hilbert
+    // curve shades by its density unless told otherwise; else by colour.
+    MotionRasterSettingsPanel(motion::RasterSettings initial, bool video, const juce::String& fileName, juce::MemoryBlock image = {}, bool xyOnlyScope = false)
         : Sheet(video ? "Prepare video" : "Prepare image", fileName, "Prepare"), settings(initial), isVideo(video), data(std::move(image)) {
         setName("Image preparation settings");
         nameAction(isVideo ? "Prepare video" : "Prepare image");
         detailEdited = initial.resolution != motion::RasterSettings().resolution || initial.mode == motion::RasterSettings::Mode::scanlines;
-        mode.setSelected(initial.mode == motion::RasterSettings::Mode::scanlines ? 1 : 0);
-        mode.setTooltip("Outlines follow image edges. Scanlines fill the visible image with horizontal beam passes.");
+        mode.setSelected(initial.mode == motion::RasterSettings::Mode::scanlines ? 1 : initial.mode == motion::RasterSettings::Mode::hilbert ? 2 : 0);
+        mode.setTooltip("Outlines follow image edges. Scanlines fill the visible image with horizontal beam passes. "
+            "Hilbert draws one curve over it, as dense as the image is bright: shading that shows on any scope, by X and Y alone.");
         mode.onChange = [this](int index) {
             if (!detailEdited) { selectResolution(index == 1 ? 64 : motion::RasterSettings().resolution); }
+            // A curve over the whole picture wants many samples.
+            if (index == 2 && !samplesEdited) { selectSamples(16384); }
             refresh();
         };
+        if (initial.mode != motion::RasterSettings::Mode::hilbert) { settings.shading = xyOnlyScope ? motion::RasterSettings::Shading::density : motion::RasterSettings::Shading::colour; }
+        shading.setSelected(settings.shading == motion::RasterSettings::Shading::colour ? 1 : 0);
+        shading.setTooltip("How the Hilbert curve shows how bright the picture is: by how dense it is, which a scope shows by X and Y alone; "
+            "or by its colour, the curve as dense all over, for a scope with brightness (XYRGB).");
+        shading.onChange = [this](int) { refresh(); };
         threshold.setName("Image threshold");
         threshold.setSpec(thresholdSpec);
         threshold.setValue(std::isfinite(initial.threshold) ? std::clamp(initial.threshold * 100, 0.0, 100.0) : 0);
@@ -43,7 +53,7 @@ public:
             if (strides[i] == initial.pointsPerFrame) { samples.setSelectedId(static_cast<int>(i + 1), juce::dontSendNotification); }
         }
         samples.setTooltip("Beam samples stored per frame. Increase this if the image is too complex.");
-        samples.onChange = [this] { refresh(); };
+        samples.onChange = [this] { samplesEdited = true; refresh(); };
         invert.setToggleState(initial.invert, juce::dontSendNotification);
         invert.setTooltip("Invert image colours before tracing, for dark artwork on a light background. Transparency stays unchanged.");
         invert.onClick = [this] { refresh(); };
@@ -55,11 +65,12 @@ public:
         frameRate.onCommit = frameRate.onChange;
         for (auto* field : {&threshold, &frameRate}) { field->setFill(fieldFill()); }
         mode.fill = fieldFill();
+        shading.fill = fieldFill();
         for (auto* combo : {&detail, &samples}) {
             combo->setColour(juce::ComboBox::backgroundColourId, fieldFill());
             combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
         }
-        for (auto* caption : {&modeLabel, &thresholdLabel, &detailLabel, &samplesLabel, &frameRateLabel, &invertLabel}) { styleCaption(*caption); }
+        for (auto* caption : {&modeLabel, &shadingLabel, &thresholdLabel, &detailLabel, &samplesLabel, &frameRateLabel, &invertLabel}) { styleCaption(*caption); }
         error.setFont(motion::style::body());
         error.setColour(juce::Label::textColourId, motion::style::error());
         error.setBorderSize({});
@@ -73,8 +84,8 @@ public:
                 onPrepare(settings);
             }
         };
-        for (auto* component : std::initializer_list<juce::Component*> {&modeLabel, &thresholdLabel, &detailLabel, &samplesLabel, &invertLabel,
-                &mode, &threshold, &detail, &samples, &invert, &error}) {
+        for (auto* component : std::initializer_list<juce::Component*> {&modeLabel, &shadingLabel, &thresholdLabel, &detailLabel, &samplesLabel, &invertLabel,
+                &mode, &shading, &threshold, &detail, &samples, &invert, &error}) {
             addAndMakeVisible(component);
         }
         if (isVideo) {
@@ -82,7 +93,7 @@ public:
             addAndMakeVisible(frameRate);
         }
         if (hasPreview()) { addAndMakeVisible(preview); }
-        const auto rows = isVideo ? 6 : 5;
+        const auto rows = isVideo ? 7 : 6;
         setSize(widthFor(hasPreview() ? bodyHeight(rows) : 0), heightFor(rows));
         refresh();
     }
@@ -96,6 +107,7 @@ protected:
             area.removeFromLeft(24);
         }
         formRow(area, modeLabel, mode);
+        formRow(area, shadingLabel, shading);
         formRow(area, thresholdLabel, threshold, number);
         formRow(area, detailLabel, detail);
         formRow(area, samplesLabel, samples);
@@ -110,6 +122,10 @@ private:
     static constexpr motion::PropertySpec thresholdSpec {"threshold", "Threshold", "", "", 0, 100, 2, .1, 1, "%"};
     static constexpr motion::PropertySpec frameRateSpec {"frameRate", "Frame rate", "", "", 1, 120, 30, .5, 3, " fps"};
     bool hasPreview() const { return !isVideo && data.getSize() > 0; }
+    void selectSamples(std::size_t count) {
+        const auto found = std::find(strides.begin(), strides.end(), count);
+        if (found != strides.end()) { samples.setSelectedId(static_cast<int>(std::distance(strides.begin(), found) + 1), juce::dontSendNotification); }
+    }
     void selectResolution(int resolution) {
         const auto found = std::find(resolutions.begin(), resolutions.end(), resolution);
         if (found != resolutions.end()) { detail.setSelectedId(static_cast<int>(std::distance(resolutions.begin(), found) + 1), juce::dontSendNotification); }
@@ -122,13 +138,18 @@ private:
         if (detailIndex < 0 || sampleIndex < 0 || static_cast<std::size_t>(detailIndex) >= resolutions.size() || static_cast<std::size_t>(sampleIndex) >= strides.size()) {
             message = "Choose an image detail and samples per frame.";
         } else {
-            next.mode = mode.getSelected() == 0 ? motion::RasterSettings::Mode::contours : motion::RasterSettings::Mode::scanlines;
+            next.mode = mode.getSelected() == 0 ? motion::RasterSettings::Mode::contours : mode.getSelected() == 1 ? motion::RasterSettings::Mode::scanlines : motion::RasterSettings::Mode::hilbert;
             next.resolution = resolutions[static_cast<std::size_t>(detailIndex)];
             next.pointsPerFrame = strides[static_cast<std::size_t>(sampleIndex)];
             next.invert = invert.getToggleState();
+            next.shading = shading.getSelected() == 1 ? motion::RasterSettings::Shading::colour : motion::RasterSettings::Shading::density;
             if (thresholdEdited) { next.threshold = threshold.getValue() / 100.0; }
             message = juce::String(next.validate());
         }
+        // Shading is the Hilbert curve's alone.
+        const auto hilbert = mode.getSelected() == 2;
+        shading.setEnabled(hilbert);
+        shadingLabel.setAlpha(hilbert ? 1.0f : .4f);
         valid = message.isEmpty();
         error.setText(message, juce::dontSendNotification);
         primary.setEnabled(valid && !submitted);
@@ -152,15 +173,16 @@ private:
     motion::RasterSettings settings;
     bool isVideo = false;
     juce::MemoryBlock data;
-    bool valid = false, submitted = false, thresholdEdited = false, detailEdited = false;
+    bool valid = false, submitted = false, thresholdEdited = false, detailEdited = false, samplesEdited = false;
     std::vector<int> resolutions;
     std::vector<std::size_t> strides;
-    motion::ui::SegmentedControl mode {"Image trace mode", {"Outlines", "Scanlines"}};
+    motion::ui::SegmentedControl mode {"Image trace mode", {"Outlines", "Scanlines", "Hilbert"}};
+    motion::ui::SegmentedControl shading {"Image shading", {"Density", "Colour"}};
     motion::ui::ScrubField threshold, frameRate;
     juce::ComboBox detail, samples;
     motion::ui::Switch invert {"Invert image"};
     motion::ui::SourcePreview preview;
-    juce::Label modeLabel {"Image mode caption", "Trace"}, thresholdLabel {"Image threshold caption", "Threshold"};
+    juce::Label modeLabel {"Image mode caption", "Trace"}, shadingLabel {"Image shading caption", "Shading"}, thresholdLabel {"Image threshold caption", "Threshold"};
     juce::Label detailLabel {"Image detail caption", "Detail"}, samplesLabel {"Image samples caption", "Samples per frame"};
     juce::Label frameRateLabel {"Video frame rate caption", "Frame rate"}, invertLabel {"Invert caption", "Invert"};
     juce::Label error;

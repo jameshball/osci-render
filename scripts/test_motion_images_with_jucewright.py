@@ -85,6 +85,26 @@ try:
     wait_undo("Rebuild source cache")
     command("wait", "--ms", 500)
     step("scanline screenshot", "screenshot", "--file", session.artifact_dir / "scanlines.png")
+    # A Hilbert curve over it, as dense as it is bright.
+    step("open image settings for Hilbert", "click", "--name", "Image settings...", "--exact")
+    step("choose Hilbert", "set-value", "--name", "Image trace mode", "--exact", "Hilbert")
+    assert combo_value("Image trace mode") == "Hilbert"
+    # A scope with brightness, so by colour unless told otherwise.
+    assert combo_value("Image shading") == "Colour", combo_value("Image shading")
+    step("Hilbert settings screenshot", "screenshot", "--file", session.artifact_dir / "hilbert-settings.png")
+    step("prepare Hilbert by colour", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
+    wait_undo("Rebuild source cache")
+    command("wait", "--ms", 500)
+    step("Hilbert by colour screenshot", "screenshot", "--file", session.artifact_dir / "hilbert-colour.png")
+    step("open image settings for density", "click", "--name", "Image settings...", "--exact")
+    step("choose density", "set-value", "--name", "Image shading", "--exact", "Density")
+    assert combo_value("Image shading") == "Density"
+    step("prepare Hilbert by density", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
+    wait_undo("Rebuild source cache")
+    command("wait", "--ms", 500)
+    step("Hilbert by density screenshot", "screenshot", "--file", session.artifact_dir / "hilbert-density.png")
+    step("undo Hilbert by density", "click", "--name", "Undo", "--exact")
+    step("undo Hilbert preparation", "click", "--name", "Undo", "--exact")
     step("undo image preparation", "click", "--name", "Undo", "--exact")
     step("inspect restored image settings", "click", "--name", "Image settings...", "--exact")
     assert combo_value("Image trace mode") == "Outlines"
