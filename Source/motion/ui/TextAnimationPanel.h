@@ -141,11 +141,11 @@ private:
         refresh();
     }
 
-    static constexpr std::array<motion::PropertySpec, 4> specs {{
+    static constexpr auto specs = std::to_array<motion::PropertySpec>({
         {"text.characterDelay", "Stagger", "Text animation", "", 0, 30, 0.06, .01, 2, "s"},
         {"text.characterDuration", "Rise time", "Text animation", "", 0.01, 30, 0.35, .01, 2, "s"},
         {"text.hold", "Pause", "Text animation", "", 0, 30, 1.5, .1, 1, "s"},
-        {"text.amount", "Distance", "Text animation", "", -10, 10, 1, .05, 2, ""}}};
+        {"text.amount", "Distance", "Text animation", "", -10, 10, 1, .05, 2, ""}});
     // What each setting is called, and does, in each animation; a setting an
     // animation does not use is not shown.
     struct Naming {

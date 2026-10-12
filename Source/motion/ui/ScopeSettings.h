@@ -183,11 +183,11 @@ public:
 
 private:
     // The fields' text sits this far inside their right edge.
-    static constexpr std::array<motion::PropertySpec, 3> specs {{
+    static constexpr auto specs = std::to_array<motion::PropertySpec>({
         {"dwell", "Dwell", "Scope", "", 0, motion::ScopeProfile::maximumDwellMicros, 12, 1, 1, " µs"},
         {"travel", "Travel", "Scope", "", 0, motion::ScopeProfile::maximumTravelMicrosPerUnit, 30, 1, 1, " µs/u"},
         {"settle", "Settle", "Scope", "", 0, motion::ScopeProfile::maximumSettleMicros, 0, 1, 1, " µs"},
-    }};
+    });
     struct Field {
         juce::Label caption;
         motion::ui::ScrubField editor;

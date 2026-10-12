@@ -32,127 +32,127 @@ struct GeneratorDefinition {
 namespace generator_specs {
 // Sizes are in the frame's units (it spans -1 to 1), angles in degrees, and
 // counts are whole numbers (step 1, no decimals).
-inline constexpr std::array<PropertySpec, 3> rectangle {{
+inline constexpr auto rectangle = std::to_array<PropertySpec>({
     {"generator.width", "Width", "Width", "", 0, 4, 1, .01, 3, ""},
     {"generator.height", "Height", "Height", "", 0, 4, 1, .01, 3, ""},
     {"generator.roundness", "Roundness", "Roundness", "", 0, 100, 0, 1, 0, "%"},
-}};
-inline constexpr std::array<PropertySpec, 2> ellipse {{
+});
+inline constexpr auto ellipse = std::to_array<PropertySpec>({
     {"generator.width", "Width", "Width", "", 0, 4, 1, .01, 3, ""},
     {"generator.height", "Height", "Height", "", 0, 4, 1, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> polygon {{
+});
+inline constexpr auto polygon = std::to_array<PropertySpec>({
     {"generator.sides", "Sides", "Sides", "", 3, 64, 6, 1, 0, ""},
     {"generator.radius", "Radius", "Radius", "", 0, 2, .5, .01, 3, ""},
     {"generator.roundness", "Roundness", "Roundness", "", 0, 100, 0, 1, 0, "%"},
-}};
-inline constexpr std::array<PropertySpec, 4> star {{
+});
+inline constexpr auto star = std::to_array<PropertySpec>({
     {"generator.points", "Points", "Points", "", 3, 64, 5, 1, 0, ""},
     {"generator.radius", "Outer radius", "Outer radius", "", 0, 2, .5, .01, 3, ""},
     {"generator.innerRadius", "Inner radius", "Inner radius", "", 0, 2, .2, .01, 3, ""},
     {"generator.roundness", "Roundness", "Roundness", "", 0, 100, 0, 1, 0, "%"},
-}};
-inline constexpr std::array<PropertySpec, 2> ring {{
+});
+inline constexpr auto ring = std::to_array<PropertySpec>({
     {"generator.radius", "Outer radius", "Outer radius", "", 0, 2, .5, .01, 3, ""},
     {"generator.innerRadius", "Inner radius", "Inner radius", "", 0, 2, .3, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> arc {{
+});
+inline constexpr auto arc = std::to_array<PropertySpec>({
     {"generator.radius", "Radius", "Radius", "", 0, 2, .5, .01, 3, ""},
     {"generator.start", "Start", "Start", "", -360, 360, 0, 1, 1, "°"},
     {"generator.sweep", "Sweep", "Sweep", "", 0, 360, 270, 1, 1, "°"},
-}};
-inline constexpr std::array<PropertySpec, 3> spiral {{
+});
+inline constexpr auto spiral = std::to_array<PropertySpec>({
     {"generator.turns", "Turns", "Turns", "", 0, 32, 4, .01, 2, ""},
     {"generator.innerRadius", "Inner radius", "Inner radius", "", 0, 2, 0, .01, 3, ""},
     {"generator.radius", "Outer radius", "Outer radius", "", 0, 2, .5, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 4> lissajous {{
+});
+inline constexpr auto lissajous = std::to_array<PropertySpec>({
     {"generator.frequencyX", "Frequency X", "Frequency X", "", 1, 32, 3, 1, 0, ""},
     {"generator.frequencyY", "Frequency Y", "Frequency Y", "", 1, 32, 2, 1, 0, ""},
     {"generator.phase", "Phase", "Phase", "", -360, 360, 90, 1, 1, "°"},
     {"generator.radius", "Size", "Size", "", 0, 2, .5, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> spirograph {{
+});
+inline constexpr auto spirograph = std::to_array<PropertySpec>({
     {"generator.teeth", "Gear teeth", "Gear teeth", "", 1, 95, 36, 1, 0, ""},
     {"generator.pen", "Pen", "Pen", "", 0, 100, 80, 1, 0, "%"},
     {"generator.radius", "Size", "Size", "", 0, 2, .5, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 2> rose {{
+});
+inline constexpr auto rose = std::to_array<PropertySpec>({
     {"generator.petals", "Petals", "Petals", "", 1, 24, 5, 1, 0, ""},
     {"generator.radius", "Size", "Size", "", 0, 2, .5, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 4> wave {{
+});
+inline constexpr auto wave = std::to_array<PropertySpec>({
     {"generator.cycles", "Cycles", "Cycles", "", 0, 64, 3, .01, 2, ""},
     {"generator.amplitude", "Amplitude", "Amplitude", "", 0, 2, .25, .01, 3, ""},
     {"generator.width", "Length", "Length", "", 0, 4, 1.6, .01, 3, ""},
     {"generator.phase", "Phase", "Phase", "", -360, 360, 0, 1, 1, "°"},
-}};
-inline constexpr std::array<PropertySpec, 4> grid {{
+});
+inline constexpr auto grid = std::to_array<PropertySpec>({
     {"generator.columns", "Columns", "Columns", "", 1, 64, 8, 1, 0, ""},
     {"generator.rows", "Rows", "Rows", "", 1, 64, 8, 1, 0, ""},
     {"generator.width", "Width", "Width", "", 0, 4, 1.6, .01, 3, ""},
     {"generator.height", "Height", "Height", "", 0, 4, 1.6, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> polarGrid {{
+});
+inline constexpr auto polarGrid = std::to_array<PropertySpec>({
     {"generator.rings", "Rings", "Rings", "", 1, 32, 4, 1, 0, ""},
     {"generator.spokes", "Spokes", "Spokes", "", 0, 64, 12, 1, 0, ""},
     {"generator.radius", "Radius", "Radius", "", 0, 2, .8, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> hexGrid {{
+});
+inline constexpr auto hexGrid = std::to_array<PropertySpec>({
     {"generator.columns", "Columns", "Columns", "", 1, 32, 6, 1, 0, ""},
     {"generator.rows", "Rows", "Rows", "", 1, 32, 5, 1, 0, ""},
     {"generator.radius", "Cell size", "Cell size", "", 0, 1, .15, .005, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> box {{
+});
+inline constexpr auto box = std::to_array<PropertySpec>({
     {"generator.width", "Width", "Width", "", 0, 4, 1, .01, 3, ""},
     {"generator.height", "Height", "Height", "", 0, 4, 1, .01, 3, ""},
     {"generator.depth", "Depth", "Depth", "", 0, 4, 1, .01, 3, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> sphere {{
+});
+inline constexpr auto sphere = std::to_array<PropertySpec>({
     {"generator.radius", "Radius", "Radius", "", 0, 2, .5, .01, 3, ""},
     {"generator.segments", "Segments", "Segments", "", 3, 64, 16, 1, 0, ""},
     {"generator.rings", "Rings", "Rings", "", 2, 32, 8, 1, 0, ""},
-}};
-inline constexpr std::array<PropertySpec, 4> torus {{
+});
+inline constexpr auto torus = std::to_array<PropertySpec>({
     {"generator.radius", "Radius", "Radius", "", 0, 2, .4, .01, 3, ""},
     {"generator.thickness", "Thickness", "Thickness", "", 0, 1, .15, .005, 3, ""},
     {"generator.segments", "Segments", "Segments", "", 3, 64, 24, 1, 0, ""},
     {"generator.sides", "Sides", "Sides", "", 3, 32, 10, 1, 0, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> cylinder {{
+});
+inline constexpr auto cylinder = std::to_array<PropertySpec>({
     {"generator.radius", "Radius", "Radius", "", 0, 2, .4, .01, 3, ""},
     {"generator.height", "Height", "Height", "", 0, 4, 1, .01, 3, ""},
     {"generator.segments", "Segments", "Segments", "", 3, 64, 16, 1, 0, ""},
-}};
-inline constexpr std::array<PropertySpec, 3> cone {{
+});
+inline constexpr auto cone = std::to_array<PropertySpec>({
     {"generator.radius", "Radius", "Radius", "", 0, 2, .45, .01, 3, ""},
     {"generator.height", "Height", "Height", "", 0, 4, 1, .01, 3, ""},
     {"generator.segments", "Segments", "Segments", "", 3, 64, 16, 1, 0, ""},
-}};
+});
 // A light's colour is its clip's Colour, dimmed by its Opacity. Intensity
 // scales it; Range is how far a point or spot light reaches, fading to
 // nothing there; Cone is a spot light's full angle, and Edge softness how much
 // of it fades out toward its edge; Shadows is how dark what something else
 // blocks it from is.
-inline constexpr std::array<PropertySpec, 1> ambientLight {{
+inline constexpr auto ambientLight = std::to_array<PropertySpec>({
     {"light.intensity", "Intensity", "Intensity", "", 0, 4, .25, .01, 2, "×"},
-}};
-inline constexpr std::array<PropertySpec, 2> directionalLight {{
+});
+inline constexpr auto directionalLight = std::to_array<PropertySpec>({
     {"light.intensity", "Intensity", "Intensity", "", 0, 10, 1, .01, 2, "×"},
     {"light.shadows", "Shadows", "Shadows", "", 0, 100, 100, 1, 0, "%"},
-}};
-inline constexpr std::array<PropertySpec, 3> pointLight {{
+});
+inline constexpr auto pointLight = std::to_array<PropertySpec>({
     {"light.intensity", "Intensity", "Intensity", "", 0, 10, 1.5, .01, 2, "×"},
     {"light.range", "Range", "Range", "", .01, 100, 6, .05, 2, ""},
     {"light.shadows", "Shadows", "Shadows", "", 0, 100, 100, 1, 0, "%"},
-}};
-inline constexpr std::array<PropertySpec, 5> spotLight {{
+});
+inline constexpr auto spotLight = std::to_array<PropertySpec>({
     {"light.intensity", "Intensity", "Intensity", "", 0, 10, 1.5, .01, 2, "×"},
     {"light.range", "Range", "Range", "", .01, 100, 8, .05, 2, ""},
     {"light.cone", "Cone", "Cone", "", 1, 170, 60, 1, 1, "°"},
     {"light.softness", "Edge softness", "Edge softness", "", 0, 100, 30, 1, 0, "%"},
     {"light.shadows", "Shadows", "Shadows", "", 0, 100, 100, 1, 0, "%"},
-}};
+});
 }
 
 // A light's picture in the Scene, in its own space (it shines down -Z, as a

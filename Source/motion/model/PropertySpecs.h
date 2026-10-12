@@ -37,7 +37,7 @@ inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
 // a surface draws itself: its own lines (Edges), its outline as the camera
 // sees it, and patterns over it that show its shape, each as bright as set
 // (Fill detail is how many lines across a pattern draws).
-inline constexpr std::array<PropertySpec, 29> objectPropertySpecs {{
+inline constexpr auto objectPropertySpecs = std::to_array<PropertySpec>({
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.y", "Position Y", "Position", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.z", "Position Z", "Position", "Z", -unbounded, unbounded, 0, .01, 3, ""},
@@ -66,12 +66,24 @@ inline constexpr std::array<PropertySpec, 29> objectPropertySpecs {{
     {"fillDetail", "Fill detail", "Fill detail", "", 2, 64, 8, 1, 0, ""},
     {"noisePhase", "Noise phase", "Noise phase", "", -unbounded, unbounded, 0, 1, 0, "°"},
     {"noiseFlow", "Noise flow", "Noise flow", "", -10, 10, 0, .01, 2, "/s"},
-}};
-inline constexpr std::size_t opacityIndex = 12, anchorIndex = 13, beamIndex = 16, litIndex = 17, reflectsIndex = 18;
+});
+// Where a property is in a list of them, found at compile time: a property
+// renamed or gone fails the build rather than reading another.
+template <std::size_t size>
+consteval std::size_t specIndex(const std::array<PropertySpec, size>& specs, std::string_view id) {
+    for (std::size_t index = 0; index < size; ++index) {
+        if (specs[index].id == id) { return index; }
+    }
+    throw "No such property";
+}
+inline constexpr auto opacityIndex = specIndex(objectPropertySpecs, "opacity"), anchorIndex = specIndex(objectPropertySpecs, "anchor.x"), beamIndex = specIndex(objectPropertySpecs, "beam"),
+                      litIndex = specIndex(objectPropertySpecs, "lit"), reflectsIndex = specIndex(objectPropertySpecs, "reflects");
 // The Lines properties: edges, outline, the four patterns (in Pattern order:
 // spiral, noise, slices, rings), the fill's detail, and how
 // the noise morphs: where it is in its loop, and how fast it goes round.
-inline constexpr std::size_t edgesIndex = 19, outlineIndex = 20, patternsIndex = 21, patternCount = 4, fillDetailIndex = 25, noisePhaseIndex = 26, noiseFlowIndex = 27;
+inline constexpr auto edgesIndex = specIndex(objectPropertySpecs, "edges"), outlineIndex = specIndex(objectPropertySpecs, "outline"), patternsIndex = specIndex(objectPropertySpecs, "spiral"),
+                      fillDetailIndex = specIndex(objectPropertySpecs, "fillDetail"), noisePhaseIndex = specIndex(objectPropertySpecs, "noisePhase"), noiseFlowIndex = specIndex(objectPropertySpecs, "noiseFlow");
+inline constexpr std::size_t patternCount = fillDetailIndex - patternsIndex;
 inline bool isLinesProperty(std::string_view id) {
     for (auto index = edgesIndex; index <= noiseFlowIndex; ++index) {
         if (objectPropertySpecs[index].id == id) { return true; }
@@ -82,20 +94,21 @@ inline bool isLinesProperty(std::string_view id) {
 // The same properties as Properties shows them: the anchor closes Transform,
 // and Reflects closes Surface, after how the surface draws itself.
 inline constexpr auto objectInspectorSpecs = [] {
-    constexpr std::array<std::size_t, 28> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 18};
-    std::array<PropertySpec, 28> result {};
+    constexpr auto order = std::to_array<std::size_t>({0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 18});
+    static_assert(order.size() == objectPropertySpecs.size(), "every property, once");
+    std::array<PropertySpec, order.size()> result {};
     for (std::size_t index = 0; index < order.size(); ++index) { result[index] = objectPropertySpecs[order[index]]; }
     return result;
 }();
 
-inline constexpr std::array<PropertySpec, 2> audioPropertySpecs {{
+inline constexpr auto audioPropertySpecs = std::to_array<PropertySpec>({
     {"gain", "Gain", "Gain", "", 0, 4, 1, .01, 2, ""},
     {"pan", "Pan", "Pan", "", -1, 1, 0, .01, 2, ""},
-}};
+});
 
 // A Lua source's sliders (slider_a .. slider_z in the script), 0..1, animated
 // per clip. Changes re-bake that clip's frames in the background.
-inline constexpr std::array<PropertySpec, 26> luaSliderSpecs {{
+inline constexpr auto luaSliderSpecs = std::to_array<PropertySpec>({
     {"slider.a", "Slider A", "Slider A", "", 0, 1, 0, .01, 3, ""}, {"slider.b", "Slider B", "Slider B", "", 0, 1, 0, .01, 3, ""},
     {"slider.c", "Slider C", "Slider C", "", 0, 1, 0, .01, 3, ""}, {"slider.d", "Slider D", "Slider D", "", 0, 1, 0, .01, 3, ""},
     {"slider.e", "Slider E", "Slider E", "", 0, 1, 0, .01, 3, ""}, {"slider.f", "Slider F", "Slider F", "", 0, 1, 0, .01, 3, ""},
@@ -109,12 +122,12 @@ inline constexpr std::array<PropertySpec, 26> luaSliderSpecs {{
     {"slider.u", "Slider U", "Slider U", "", 0, 1, 0, .01, 3, ""}, {"slider.v", "Slider V", "Slider V", "", 0, 1, 0, .01, 3, ""},
     {"slider.w", "Slider W", "Slider W", "", 0, 1, 0, .01, 3, ""}, {"slider.x", "Slider X", "Slider X", "", 0, 1, 0, .01, 3, ""},
     {"slider.y", "Slider Y", "Slider Y", "", 0, 1, 0, .01, 3, ""}, {"slider.z", "Slider Z", "Slider Z", "", 0, 1, 0, .01, 3, ""},
-}};
+});
 
 // Hatching: the scene shaded by a Hilbert curve over the frame, denser where
 // more light falls, rather than by brightness. Hatch detail is how many of
 // its cells span the frame where the light is full.
-inline constexpr std::array<PropertySpec, 9> cameraPropertySpecs {{
+inline constexpr auto cameraPropertySpecs = std::to_array<PropertySpec>({
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.y", "Position Y", "Position", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.z", "Position Z", "Position", "Z", -unbounded, unbounded, 4, .01, 3, ""},
@@ -124,11 +137,11 @@ inline constexpr std::array<PropertySpec, 9> cameraPropertySpecs {{
     {"fov", "Field of view", "Field of view", "", 1, 179, defaultCameraFieldOfView, .5, 1, "°"},
     {"hatching", "Hatching", "Hatching", "", 0, 100, 0, 1, 0, "%"},
     {"hatchDetail", "Hatch detail", "Hatch detail", "", 8, 256, 64, 1, 0, ""},
-}};
-inline constexpr std::size_t cameraHatchingIndex = 7, cameraHatchDetailIndex = 8;
+});
+inline constexpr auto cameraHatchingIndex = specIndex(cameraPropertySpecs, "hatching"), cameraHatchDetailIndex = specIndex(cameraPropertySpecs, "hatchDetail");
 
 // The Scope's picture: one row each, in the visualiser's own ranges.
-inline constexpr std::array<PropertySpec, 9> beamPropertySpecs {{
+inline constexpr auto beamPropertySpecs = std::to_array<PropertySpec>({
     {"intensity", "Intensity", "Intensity", "", 0, 50, 5, .02, 2, ""},
     {"focus", "Focus", "Focus", "", .3, 10, 1, .02, 2, ""},
     {"persistence", "Persistence", "Persistence", "", 0, 6, .5, .01, 2, ""},
@@ -138,7 +151,7 @@ inline constexpr std::array<PropertySpec, 9> beamPropertySpecs {{
     {"lineSaturation", "Saturation", "Saturation", "", 0, 5, 1, .01, 2, ""},
     {"ambient", "Ambient", "Ambient", "", 0, 5, 0, .01, 2, ""},
     {"visualiserSmoothing", "Smoothing", "Smoothing", "", 0, 1, 0, .005, 2, ""},
-}};
+});
 
 // A new target's properties: each spec's default, unanimated.
 template <std::size_t size>
