@@ -956,10 +956,10 @@ void MotionEditor::resized() {
     this->timeline.setBounds(timeline.withTrimmedTop(3));
     auto graph = timeline.withTrimmedTop(3);
     // The three columns stay put with or without a target, so the frame never jumps.
-    curveList.setVisible(timelineTabs.getCurrentTabIndex() == 1);
+    curveList.setVisible(graphShown());
     curveList.setBounds(graph.removeFromLeft(std::clamp(graph.getWidth() / 7, 150, 210)));
     graph.removeFromLeft(2);
-    graphSideViewport.setVisible(timelineTabs.getCurrentTabIndex() == 1);
+    graphSideViewport.setVisible(graphShown());
     graphSideViewport.setBounds(graph.removeFromRight(std::clamp(graph.getWidth() / 4, 230, 285)));
     layoutGraphSide();
     graph.removeFromRight(2);

@@ -49,19 +49,22 @@ void MotionEditor::registerCommands() {
     addCommand(1, "Cut", juce::KeyPress('x', command, 0), "Cmd+X", [this] { copySelection(true); });
     addCommand(1, "Copy", juce::KeyPress('c', command, 0), "Cmd+C", [this] { copySelection(false); });
     addCommand(1, "Paste", juce::KeyPress('v', command, 0), "Cmd+V", [this] { pasteClipboard(); });
-    addCommand(1, "Delete", juce::KeyPress(), "Delete", [this] { timeline.deleteSelection(); });
+    addCommand(1, "Delete", juce::KeyPress(), "Delete", [this] {
+        if (graphShown()) { curveEditor.deleteSelected(); } else { timeline.deleteSelection(); }
+    });
     addCommand(2, "Group tracks", juce::KeyPress('g', command, 0), "Cmd+G", [this] { timeline.groupSelectedTracks(); });
-    // Cut, Copy and Delete act on selected keys or clips; Paste needs a copy.
-    const auto anySelection = [this] { return timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
+    // Cut, Copy and Delete act on what the shown editor has selected: the
+    // Graph's keys, or the timeline's keys or clips. Paste needs a copy.
+    const auto anySelection = [this] { return graphShown() ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
     for (const auto* name : {"Cut", "Copy", "Delete"}) { menus.setMenuItemEnabled(1, name, anySelection); }
     menus.setMenuItemEnabled(1, "Paste", [this] { return !std::holds_alternative<std::monostate>(clipboard); });
     menus.addMenuSeparator(1);
     addCommand(1, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] {
-        if (timelineTabs.getCurrentTabIndex() == 1) { curveEditor.selectAllKeys(); } else { timeline.selectAll(); }
+        if (graphShown()) { curveEditor.selectAllKeys(); } else { timeline.selectAll(); }
     });
     // After Effects' Easy Ease, on the selected keys of the visible editor.
     const auto ease = [this](bool in, bool out) {
-        const auto graph = timelineTabs.getCurrentTabIndex() == 1;
+        const auto graph = graphShown();
         const auto selected = graph ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys();
         if (!selected) {
             statusBar.show("Select keyframes to ease.");
@@ -158,6 +161,13 @@ void MotionEditor::registerCommands() {
 }
 
 void MotionEditor::copySelection(bool cut) {
+    if (graphShown()) {
+        auto keys = curveEditor.copiedKeys();
+        if (keys.empty()) { return; }
+        clipboard = std::move(keys);
+        if (cut) { curveEditor.deleteSelected(); }
+        return;
+    }
     if (timeline.hasSelectedKeys()) {
         clipboard = timeline.copiedKeys();
     } else if (timeline.hasSelectedClips()) {

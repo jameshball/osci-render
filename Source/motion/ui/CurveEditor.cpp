@@ -1,3 +1,4 @@
+#include <limits>
 #include "CurveEditor.h"
 #include "MenuIcons.h"
 
@@ -1380,6 +1381,27 @@ bool MotionCurveEditor::easeSelected(bool in, bool out) {
     });
     refresh();
     return eased;
+}
+
+std::vector<motion::Document::CopiedKey> MotionCurveEditor::copiedKeys() const {
+    std::vector<motion::Document::CopiedKey> result;
+    const auto target = motion::findPropertyTarget(processor.document.project(), targetId);
+    if (!target.has_value()) { return result; }
+    std::vector<std::pair<double, motion::Document::CopiedKey>> timed;
+    double earliest = std::numeric_limits<double>::infinity();
+    for (const auto& key : selection()) {
+        const auto* curve = findCurve(target, key.property);
+        const auto* keyframe = curve != nullptr ? curve->findKey(key.time) : nullptr;
+        if (keyframe == nullptr) { continue; }
+        const auto time = target->projectTime(keyframe->time);
+        earliest = std::min(earliest, time);
+        timed.push_back({time, {key.property, 0, *keyframe}});
+    }
+    for (auto& [time, copied] : timed) {
+        copied.offset = time - earliest;
+        result.push_back(std::move(copied));
+    }
+    return result;
 }
 
 bool MotionCurveEditor::deleteSelected() {

@@ -252,11 +252,15 @@ public:
     // second merge into one undo step. A move onto another key is refused.
     void setActiveKeyTime(double projectTime);
     void setActiveKeyValue(double value);
+    // The selected keys, for the clipboard: each with its time after the
+    // earliest's, as the timeline copies them.
+    std::vector<motion::Document::CopiedKey> copiedKeys() const;
+    // Deletes the selected keys in one undo step; false if none could be.
+    bool deleteSelected();
     // The selection changed (or the keys it holds were edited).
     std::function<void()> onSelectionChanged;
 
 private:
-    bool deleteSelected();
 
     void showKeyMenu();
 

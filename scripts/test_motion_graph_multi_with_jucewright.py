@@ -200,6 +200,13 @@ try:
     restored["position.x"] = [(1.5, -1)] + model["position.x"]
     restored["position.y"] = [(1.5, 0.5)] + model["position.y"]
     expect(keys(saved()), restored, "undo delete")
+    # Cut in the Graph takes its keys, never the clip the Graph is showing.
+    drag("box select for cut", (x_of(1.3), y_of(-1.25)), (x_of(1.7), y_of(0.8)))
+    step("cut keys", "press", "command + x", "--class", "MotionCurveEditor")
+    wait_undo("Delete animation keys")
+    expect(keys(saved()), model, "cut keys, the clip kept")
+    step("undo cut", "click", "--name", "Undo", "--exact")
+    expect(keys(saved()), restored, "undo cut")
 
     # 6. The Key panel types the one selected key's value; the key bar sets
     # its interpolation.

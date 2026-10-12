@@ -193,6 +193,8 @@ private:
     void buildFileMenu(juce::PopupMenu& menu);
     bool fileMenuItemSelected(int id);
     void copySelection(bool cut);
+    // Whether the Graph is showing in place of the timeline.
+    bool graphShown() const { return timelineTabs.getCurrentTabIndex() == 1; }
     void pasteClipboard();
     void stepFrames(int frames);
     void jumpToKey(bool forward);
