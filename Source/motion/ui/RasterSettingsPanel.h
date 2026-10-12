@@ -21,10 +21,12 @@ public:
         mode.setSelected(initial.mode == motion::RasterSettings::Mode::scanlines ? 1 : initial.mode == motion::RasterSettings::Mode::hilbert ? 2 : 0);
         mode.setTooltip("Outlines follow image edges. Scanlines fill the visible image with horizontal beam passes. "
             "Hilbert draws one curve over it, as dense as the image is bright: shading that shows on any scope, by X and Y alone.");
-        mode.onChange = [this](int index) {
+        // Samples the other modes start with, back when leaving Hilbert.
+        const auto otherSamples = initial.mode == motion::RasterSettings::Mode::hilbert ? motion::RasterSettings().pointsPerFrame : initial.pointsPerFrame;
+        mode.onChange = [this, otherSamples](int index) {
             if (!detailEdited) { selectResolution(index == 1 ? 64 : motion::RasterSettings().resolution); }
             // A curve over the whole picture wants many samples.
-            if (index == 2 && !samplesEdited) { selectSamples(16384); }
+            if (!samplesEdited) { selectSamples(index == 2 ? 16384 : otherSamples); }
             refresh();
         };
         if (initial.mode != motion::RasterSettings::Mode::hilbert) { settings.shading = xyOnlyScope ? motion::RasterSettings::Shading::density : motion::RasterSettings::Shading::colour; }
