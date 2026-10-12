@@ -447,10 +447,10 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
 // goes is the scene's size over `detail` (its largest surface's), alike on
 // every surface; it is as fine as the light asks, or less, evenly, to take
 // no more than half of a beam cycle's samples.
-inline std::vector<std::vector<HatchLine>> hatchSurfaces(const PreparedComposition& composition, const std::vector<SceneItem>& items, const std::vector<Styled>& styled,
+inline std::vector<std::vector<hatching::sierpinski::Step>> hatchSurfaces(const PreparedComposition& composition, const std::vector<SceneItem>& items, const std::vector<Styled>& styled,
     const std::vector<char>& placed, const std::vector<LightView>& lights, bool lit, std::optional<Vec3> eye, int detail, double time, Workspace& workspace) {
     namespace sierpinski = hatching::sierpinski;
-    std::vector<std::vector<HatchLine>> lines(items.size());
+    std::vector<std::vector<hatching::sierpinski::Step>> lines(items.size());
     // The finest, in the scene: its largest surface's size over the detail.
     double largest = 0;
     for (std::size_t index = 0; index < items.size(); ++index) {
@@ -524,18 +524,7 @@ inline std::vector<std::vector<HatchLine>> hatchSurfaces(const PreparedCompositi
         gain = low;
     }
     for (std::size_t index = 0; index < items.size(); ++index) {
-        if (!litCurves[index].has_value()) { continue; }
-        const auto& curve = *curves[index];
-        std::optional<std::pair<std::uint32_t, surface::Weights>> previous;
-        litCurves[index]->curveAt(finest, exposure, gain, [&](std::optional<std::uint32_t> node, double light) {
-            if (!node.has_value() || light < hatching::darkest) {
-                previous.reset();
-                return;
-            }
-            const auto middle = curve.middleOf(*node);
-            if (previous.has_value()) { lines[index].push_back({previous->first, middle.first, previous->second, middle.second}); }
-            previous = middle;
-        });
+        if (litCurves[index].has_value()) { lines[index] = litCurves[index]->steps(finest, exposure, gain, hatching::darkest); }
     }
     return lines;
 }
@@ -706,7 +695,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         placed[surface] = 1;
     }
     const auto hatches = hatchOnSurfaces ? hatchSurfaces(composition, items, styled, placed, lights, lit, eyeAt, camera->hatchDetail(time), time, workspace)
-                                         : std::vector<std::vector<HatchLine>>(items.size());
+                                         : std::vector<std::vector<hatching::sierpinski::Step>>(items.size());
     for (std::size_t surface = 0; surface < items.size(); ++surface) {
         if (placed[surface] == 0) { continue; }
         auto& item = items[surface];

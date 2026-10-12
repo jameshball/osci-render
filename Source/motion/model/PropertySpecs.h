@@ -60,7 +60,6 @@ inline constexpr std::array<PropertySpec, 29> objectPropertySpecs {{
     {"edges", "Edges", "Edges", "", 0, 100, 100, 1, 0, "%"},
     {"outline", "Outline", "Outline", "", 0, 100, 0, 1, 0, "%"},
     {"spiral", "Spiral", "Spiral", "", 0, 100, 0, 1, 0, "%"},
-    {"hilbert", "Hilbert curve", "Hilbert curve", "", 0, 100, 0, 1, 0, "%"},
     {"noise", "Noise", "Noise", "", 0, 100, 0, 1, 0, "%"},
     {"slices", "Slices", "Slices", "", 0, 100, 0, 1, 0, "%"},
     {"rings", "Rings", "Rings", "", 0, 100, 0, 1, 0, "%"},
@@ -69,10 +68,10 @@ inline constexpr std::array<PropertySpec, 29> objectPropertySpecs {{
     {"noiseFlow", "Noise flow", "Noise flow", "", -10, 10, 0, .01, 2, "/s"},
 }};
 inline constexpr std::size_t opacityIndex = 12, anchorIndex = 13, beamIndex = 16, litIndex = 17, reflectsIndex = 18;
-// The Lines properties: edges, outline, the five patterns (in Pattern order:
-// spiral, Hilbert curve, noise, slices, rings), the fill's detail, and how
+// The Lines properties: edges, outline, the four patterns (in Pattern order:
+// spiral, noise, slices, rings), the fill's detail, and how
 // the noise morphs: where it is in its loop, and how fast it goes round.
-inline constexpr std::size_t edgesIndex = 19, outlineIndex = 20, patternsIndex = 21, patternCount = 5, fillDetailIndex = 26, noisePhaseIndex = 27, noiseFlowIndex = 28;
+inline constexpr std::size_t edgesIndex = 19, outlineIndex = 20, patternsIndex = 21, patternCount = 4, fillDetailIndex = 25, noisePhaseIndex = 26, noiseFlowIndex = 27;
 inline bool isLinesProperty(std::string_view id) {
     for (auto index = edgesIndex; index <= noiseFlowIndex; ++index) {
         if (objectPropertySpecs[index].id == id) { return true; }
@@ -83,8 +82,8 @@ inline bool isLinesProperty(std::string_view id) {
 // The same properties as Properties shows them: the anchor closes Transform,
 // and Reflects closes Surface, after how the surface draws itself.
 inline constexpr auto objectInspectorSpecs = [] {
-    constexpr std::array<std::size_t, 29> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 18};
-    std::array<PropertySpec, 29> result {};
+    constexpr std::array<std::size_t, 28> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 18};
+    std::array<PropertySpec, 28> result {};
     for (std::size_t index = 0; index < order.size(); ++index) { result[index] = objectPropertySpecs[order[index]]; }
     return result;
 }();

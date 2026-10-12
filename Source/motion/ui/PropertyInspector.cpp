@@ -368,7 +368,7 @@ juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec
     }
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
     if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Beam") { return "Appearance"; }
-    if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Hilbert curve" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail" || group == "Noise phase" || group == "Noise flow" || group == "Mirror") { return "Surface"; }
+    if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail" || group == "Noise phase" || group == "Noise flow" || group == "Mirror") { return "Surface"; }
     if (group == "Hatching" || group == "Hatch detail" || group == "Hatch on frame") { return "Shading"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
@@ -498,7 +498,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         using motion::ui::pictures::Shading;
         shadingTiles = std::make_unique<motion::ui::TileGrid>("Shading", std::vector<motion::ui::TileGrid::Choice> {
             {"Brightness", "Light shows as how bright each line is drawn", motion::ui::pictures::shadingPicture(Shading::brightness)},
-            {"Hatching", "Light shows as how densely a Hilbert curve laid on each surface covers it, moving with it: it reads on any scope, by X and Y alone", motion::ui::pictures::shadingPicture(Shading::hatching)},
+            {"Hatching", "Light shows as how densely a Sierpinski curve laid on each surface covers it, moving with it: it reads on any scope, by X and Y alone", motion::ui::pictures::shadingPicture(Shading::hatching)},
             {"On frame", "Hatching over the frame, fixed to it as things move under it", motion::ui::pictures::shadingPicture(Shading::frameHatching)}},
             3, motion::ui::TileGrid::Look::pictures, true);
         shadingTiles->onClick = [this](std::size_t index) {
@@ -522,7 +522,6 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             {"Edges", "Its own edges, as it is made", picture(SurfaceLook::edges)},
             {"Outline", "Its outline, where it turns from the eye", picture(SurfaceLook::outline)},
             {"Spiral", "A spiral round it, from bottom to top", picture(SurfaceLook::spiral)},
-            {"Hilbert", "A Hilbert curve laid over it", picture(SurfaceLook::hilbert)},
             {"Noise", "Contours of noise, which can morph as it plays (Noise flow)", picture(SurfaceLook::noise)},
             {"Slices", "Level slices through it", picture(SurfaceLook::slices)},
             {"Rings", "Rings round its front", picture(SurfaceLook::rings)},
@@ -554,8 +553,8 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
     layoutContent();
 }
 
-const std::array<std::string_view, 8>& MotionPropertyInspector::surfaceProperties() {
-    static const std::array<std::string_view, 8> properties {"edges", "outline", "spiral", "hilbert", "noise", "slices", "rings", "reflects"};
+const std::array<std::string_view, 7>& MotionPropertyInspector::surfaceProperties() {
+    static const std::array<std::string_view, 7> properties {"edges", "outline", "spiral", "noise", "slices", "rings", "reflects"};
     return properties;
 }
 
@@ -610,7 +609,7 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         surfaceTiles->setState(index, value > 0, moving ? juce::String("~") : value > 0 && value < 99.5 ? juce::String(juce::roundToInt(value)) + "%" : juce::String());
     }
     surfaceTiles->setLocked(found.locked);
-    const auto patterned = std::any_of(surfaceProperties().begin() + 2, surfaceProperties().begin() + 7, live);
+    const auto patterned = std::any_of(surfaceProperties().begin() + 2, surfaceProperties().begin() + 6, live);
     for (auto& row : rows) {
         if (row->section != "Surface" || row->fields.empty()) { continue; }
         const auto property = row->fields.front()->spec.id;

@@ -126,7 +126,7 @@ private:
     // How a camera shades: by brightness, or by hatching.
     std::unique_ptr<motion::ui::TileGrid> shadingTiles;
     // The surface tiles' properties, in their order.
-    static const std::array<std::string_view, 8>& surfaceProperties();
+    static const std::array<std::string_view, 7>& surfaceProperties();
     // Puts the tiles in step with the target at `time`, and shows the
     // Surface rows that are on; true when which show changed.
     bool refreshTiles(const motion::PropertyTarget& found, double time);

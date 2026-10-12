@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <tuple>
@@ -12,8 +13,9 @@
 
 // Lines drawn on a surface: its outline as an eye sees it (where it turns
 // from the eye) and patterns over it that show its shape: a spiral round it,
-// slices through it, rings round its middle, contours of noise, a Hilbert
-// curve laid on it. Each piece lies on one face, between two points given by
+// slices through it, rings round its middle, contours of noise (and a
+// Sierpinski curve, laid by SierpinskiHatching.h). Each piece lies on one
+// face, between two points given by
 // their weights on its corners, so whoever draws it can put it wherever the
 // face's corners go (the source's own space, or the scene). Pieces come in
 // order along each line, end to end. Pure geometry, so it can be tested alone.
@@ -31,7 +33,7 @@ inline Vec3 at(const std::vector<Vec3>& corners, const Face& face, const Weights
     return corners[face[0]] * weights[0] + corners[face[1]] * weights[1] + corners[face[2]] * weights[2];
 }
 
-enum class Pattern { spiral, hilbert, noise, slices, rings };
+enum class Pattern { spiral, noise, slices, rings };
 
 namespace detail {
 // The box round the corners the faces use.
@@ -214,38 +216,188 @@ inline double noise(Vec3 point) {
         lerp(v, lerp(u, g(AA + 1, x, y, z - 1), g(BA + 1, x - 1, y, z - 1)), lerp(u, g(AB + 1, x, y - 1, z - 1), g(BB + 1, x - 1, y - 1, z - 1))));
 }
 
-// The point a Hilbert curve of `order` reaches at step `index`, in cells of
-// a square `1 << order` across (the usual way, rotating quarters).
-inline std::array<int, 2> hilbertPoint(int order, std::int64_t index) {
-    int x = 0, y = 0;
-    auto t = index;
-    for (std::int64_t size = 1; size < (std::int64_t {1} << order); size *= 2) {
-        const auto rx = static_cast<int>(1 & (t / 2));
-        const auto ry = static_cast<int>(1 & (t ^ rx));
-        if (ry == 0) {
-            if (rx == 1) {
-                x = static_cast<int>(size) - 1 - x;
-                y = static_cast<int>(size) - 1 - y;
-            }
-            std::swap(x, y);
-        }
-        x += static_cast<int>(size) * rx;
-        y += static_cast<int>(size) * ry;
-        t /= 4;
-    }
-    return {x, y};
-}
 }
 
 // A pattern over the faces, `across` lines across the surface's largest
-// side. A spiral turns about the surface's own up (y) through its middle,
-// slices run along it, and rings centre on its front (its nearest along z).
+// side, or for slices and the spiral, up its height. A spiral winds about
+// the surface's own up (y) through its middle, slices are level across it,
+// and rings centre on its front (its nearest along z).
 // `turn`: how far round its loop noise has morphed (a whole turn brings it
 // back as it was).
+namespace detail {
+// How far up a surface each point of it is, from its lowest part, over it
+// (see pattern's spiral): found over its faces each cut evenly into a grid,
+// `cuts` across, the same along every side so neighbours' grids meet, and
+// read off the grid inside a face. It climbs outward from the lowest
+// points only, so round a tube (a torus lying down) it climbs up the
+// outside, over the top and down the inside, all the way round, not up both
+// sides to meet at the top: `round` is then how far it is round, where it
+// comes back to its start (zero for a surface with nothing round it).
+struct Climb {
+    int cuts = 1;
+    std::vector<std::vector<std::uint32_t>> grids;
+    std::vector<double> up;
+    double highest = 0, round = 0;
+
+    static Climb over(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Bounds& bounds, int cuts) {
+        Climb climb;
+        climb.cuts = cuts;
+        std::vector<Vec3> points;
+        std::map<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::uint32_t> at;
+        std::vector<std::vector<std::pair<std::uint32_t, double>>> next;
+        const auto pointAt = [&](int row, int column) { return static_cast<std::size_t>(row * (cuts + 1) - row * (row - 1) / 2 + column); };
+        const auto join = [&](std::uint32_t a, std::uint32_t b) {
+            if (a == b) { return; }
+            const auto length = (points[b] - points[a]).length();
+            next[a].emplace_back(b, length);
+            next[b].emplace_back(a, length);
+        };
+        climb.grids.resize(faces.size());
+        for (std::size_t index = 0; index < faces.size(); ++index) {
+            const auto& f = faces[index];
+            const auto a = corners[f[0]], b = corners[f[1]], c = corners[f[2]];
+            const auto pa = placeOf(a), pb = placeOf(b), pc = placeOf(c);
+            if (pa == pb || pb == pc || pc == pa) { continue; }
+            auto& grid = climb.grids[index];
+            for (int row = 0; row <= cuts; ++row) {
+                for (int column = 0; column <= cuts - row; ++column) {
+                    const auto point = a * (static_cast<double>(cuts - row - column) / cuts) + b * (static_cast<double>(column) / cuts) + c * (static_cast<double>(row) / cuts);
+                    const auto [found, added] = at.try_emplace(placeOf(point), static_cast<std::uint32_t>(points.size()));
+                    if (added) {
+                        points.push_back(point);
+                        next.emplace_back();
+                    }
+                    grid.push_back(found->second);
+                }
+            }
+            for (int row = 0; row < cuts; ++row) {
+                for (int column = 0; column < cuts - row; ++column) {
+                    const auto p = grid[pointAt(row, column)], q = grid[pointAt(row, column + 1)], r = grid[pointAt(row + 1, column)];
+                    join(p, q);
+                    join(q, r);
+                    join(r, p);
+                }
+            }
+        }
+        const auto middle = bounds.middle();
+        const auto outFrom = [&](std::uint32_t point) { return std::hypot(points[point].x - middle.x, points[point].z - middle.z); };
+        const auto lowest = [&](std::uint32_t point) { return points[point].y <= bounds.low.y + 1.0e-4 * bounds.size(); };
+        // Whether a side may be climbed: not from the lowest points more
+        // inward than up (under a tube, not up a cone).
+        bool restricted = true;
+        const auto inward = [&](std::uint32_t from, std::uint32_t to) {
+            return restricted && lowest(from) && !lowest(to) && outFrom(from) - outFrom(to) > points[to].y - points[from].y;
+        };
+        auto& up = climb.up;
+        using Reached = std::pair<double, std::uint32_t>;
+        std::vector<Reached> queue;
+        const auto climbFromLowest = [&] {
+            up.assign(points.size(), 1.0e300);
+            queue.clear();
+            for (std::uint32_t point = 0; point < points.size(); ++point) {
+                if (!lowest(point)) { continue; }
+                up[point] = 0;
+                queue.emplace_back(0.0, point);
+            }
+            std::make_heap(queue.begin(), queue.end(), std::greater<>());
+            while (!queue.empty()) {
+                std::pop_heap(queue.begin(), queue.end(), std::greater<>());
+                const auto [distance, point] = queue.back();
+                queue.pop_back();
+                if (distance > up[point]) { continue; }
+                for (const auto& [other, length] : next[point]) {
+                    if (inward(point, other) || !(distance + length < up[other])) { continue; }
+                    up[other] = distance + length;
+                    queue.emplace_back(up[other], other);
+                    std::push_heap(queue.begin(), queue.end(), std::greater<>());
+                }
+            }
+        };
+        climbFromLowest();
+        // What can't be climbed to that way (nothing round it) is climbed to
+        // any way.
+        if (std::any_of(up.begin(), up.end(), [](double value) { return value > 1.0e299; })) {
+            restricted = false;
+            climbFromLowest();
+        }
+        for (auto& value : up) {
+            if (value > 1.0e299) { value = 0; }
+            climb.highest = std::max(climb.highest, value);
+        }
+        // All the way round: back to the lowest points from inside.
+        std::vector<double> back;
+        for (std::uint32_t point = 0; point < points.size(); ++point) {
+            for (const auto& [other, length] : next[point]) {
+                if (inward(point, other)) { back.push_back(up[other] + length); }
+            }
+        }
+        if (!back.empty()) {
+            std::sort(back.begin(), back.end());
+            climb.round = back[back.size() / 2];
+            climb.highest = climb.round;
+        }
+        return climb;
+    }
+
+    // At a point of a face, by its weights. A grid cell across where it
+    // comes back round has its start a whole way round on.
+    double at(std::uint32_t face, const Weights& weights) const {
+        const auto& grid = grids[face];
+        if (grid.empty()) { return 0; }
+        const auto x = std::clamp(weights[1], 0.0, 1.0) * cuts, y = std::clamp(weights[2], 0.0, 1.0) * cuts;
+        const auto row = std::clamp(static_cast<int>(std::floor(y)), 0, cuts - 1);
+        const auto column = std::clamp(static_cast<int>(std::floor(x)), 0, cuts - 1 - row);
+        const auto fx = x - column, fy = y - row;
+        const auto pointAt = [&](int r, int c) { return up[grid[static_cast<std::size_t>(r * (cuts + 1) - r * (r - 1) / 2 + c)]]; };
+        std::array<double, 3> ups, shares;
+        if (fx + fy <= 1 || row + column + 2 > cuts) {
+            ups = {pointAt(row, column), pointAt(row, column + 1), pointAt(row + 1, column)};
+            shares = {1 - fx - fy, fx, fy};
+        } else {
+            ups = {pointAt(row, column + 1), pointAt(row + 1, column), pointAt(row + 1, column + 1)};
+            shares = {1 - fy, 1 - fx, fx + fy - 1};
+        }
+        if (round > 0 && *std::max_element(ups.begin(), ups.end()) - *std::min_element(ups.begin(), ups.end()) > round / 2) {
+            for (auto& value : ups) { value += value < round / 2 ? round : 0.0; }
+        }
+        return ups[0] * shares[0] + ups[1] * shares[1] + ups[2] * shares[2];
+    }
+};
+}
+
 inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Pattern kind, double across, double turn = 0) {
     if (faces.empty() || !(across > 0)) { return {}; }
     const auto bounds = detail::boundsOf(corners, faces);
     const auto spacing = bounds.size() / across;
+    // Slices and the spiral are spaced by its height, so a flat thing (a
+    // torus lying down) has as many across its thickness as a tall one up it.
+    const auto height = std::max(bounds.high.y - bounds.low.y, bounds.size() * 1.0e-3);
+    const auto along = height / across;
+    // The spiral climbs by how far up the surface a point is from its lowest
+    // part, over it (see Climb): first roughly, by its corners, to know how
+    // far apart its lines are, then over its faces cut as finely as that,
+    // so a big flat face (a box's top) is climbed across, and the spiral
+    // winds in across it rather than star-like out from its middle.
+    std::optional<detail::Climb> climb;
+    double highest = 0;
+    if (kind == Pattern::spiral) {
+        const auto rough = detail::Climb::over(corners, faces, bounds, 1);
+        double longest = 0;
+        for (const auto& f : faces) { longest = std::max({longest, (corners[f[1]] - corners[f[0]]).length(), (corners[f[2]] - corners[f[1]]).length(), (corners[f[0]] - corners[f[2]]).length()}); }
+        const auto apart = std::min(spacing, std::max(rough.highest, bounds.size() * 1.0e-3) / across);
+        // Cut to a third of the lines' spacing, within reason: a grid point
+        // per corner of a fine mesh already, a few hundred thousand at most.
+        auto cuts = std::clamp(static_cast<int>(std::ceil(longest / (apart / 3))), 1, 64);
+        while (cuts > 1 && static_cast<double>(faces.size()) * (cuts + 1) * (cuts + 2) / 2 > 3.0e5) { cuts = (cuts + 1) / 2 == cuts ? cuts - 1 : (cuts + 1) / 2; }
+        climb = cuts == 1 ? rough : detail::Climb::over(corners, faces, bounds, cuts);
+        highest = climb->highest;
+    }
+    const auto climbing = std::max(highest, bounds.size() * 1.0e-3) / across;
+    // Its lines climb steeply enough to be seen to (at about 18 degrees),
+    // like a screw's thread: as many side by side as keep them `climbing`
+    // apart, each a turn further up for every turn round.
+    const auto around = std::max(bounds.high.x - bounds.low.x, bounds.high.z - bounds.low.z) / 2;
+    const auto starts = std::max(1.0, std::round(2 * 3.14159265358979323846 * around * std::tan(18 * 3.14159265358979323846 / 180) / climbing));
     const auto middle = bounds.middle();
     constexpr double whole = 2 * 3.14159265358979323846;
     // Noise morphs as three fields mixed by a point going round a circle of
@@ -254,97 +406,15 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     // it comes back only after a whole turn.
     constexpr double tip = .5;
     const std::array<double, 3> mix {std::cos(tip) * std::cos(whole * turn), std::cos(tip) * std::sin(whole * turn), std::sin(tip)};
-    if (kind == Pattern::hilbert) {
-        // Laid on from the side each face looks to most, as a texture laid
-        // on a box round it: a curve on each of its six sides, each face
-        // taking the side it faces most squarely.
-        const auto order = std::clamp(static_cast<int>(std::round(std::log2(across))), 1, 8);
-        const auto cells = 1 << order;
-        std::vector<Piece> pieces;
-        for (std::size_t side = 0; side < 6; ++side) {
-            const auto axis = side / 2;
-            const auto toward = side % 2 == 0 ? 1.0 : -1.0;
-            const auto u = (axis + 1) % 3, v = (axis + 2) % 3;
-            const auto plane = [&](Vec3 point) { return std::array<double, 2> {(point[u] - bounds.low[u]) / bounds.size() * cells - .5, (point[v] - bounds.low[v]) / bounds.size() * cells - .5}; };
-            // The faces turned most toward this axis, by the cells they cover.
-            std::vector<std::uint32_t> facing;
-            for (std::uint32_t index = 0; index < faces.size(); ++index) {
-                const auto& f = faces[index];
-                const auto normal = (corners[f[1]] - corners[f[0]]).cross(corners[f[2]] - corners[f[0]]);
-                const std::array<double, 3> size {std::abs(normal.x), std::abs(normal.y), std::abs(normal.z)};
-                const auto most = size[0] >= size[1] && size[0] >= size[2] ? std::size_t {0} : size[1] >= size[2] ? std::size_t {1} : std::size_t {2};
-                if (most == axis && normal[axis] * toward > 0) { facing.push_back(index); }
-            }
-            if (facing.empty()) { continue; }
-            std::map<std::pair<int, int>, std::vector<std::uint32_t>> grid;
-            for (const auto index : facing) {
-                const auto& f = faces[index];
-                const auto a = plane(corners[f[0]]), b = plane(corners[f[1]]), c = plane(corners[f[2]]);
-                const auto x0 = static_cast<int>(std::floor(std::min({a[0], b[0], c[0]}))), x1 = static_cast<int>(std::ceil(std::max({a[0], b[0], c[0]})));
-                const auto y0 = static_cast<int>(std::floor(std::min({a[1], b[1], c[1]}))), y1 = static_cast<int>(std::ceil(std::max({a[1], b[1], c[1]})));
-                for (auto x = x0; x <= x1; ++x) {
-                    for (auto y = y0; y <= y1; ++y) { grid[{x, y}].push_back(index); }
-                }
-            }
-            // Each step of the curve, cut to each face it crosses there.
-            const auto steps = std::int64_t {1} << (2 * order);
-            auto previous = detail::hilbertPoint(order, 0);
-            for (std::int64_t step = 1; step < steps; ++step) {
-                const auto next = detail::hilbertPoint(order, step);
-                const std::array<double, 2> p {static_cast<double>(previous[0]), static_cast<double>(previous[1])}, q {static_cast<double>(next[0]), static_cast<double>(next[1])};
-                std::vector<std::uint32_t> near;
-                for (const auto& key : {std::pair {previous[0], previous[1]}, std::pair {next[0], next[1]}}) {
-                    const auto found = grid.find(key);
-                    if (found != grid.end()) { near.insert(near.end(), found->second.begin(), found->second.end()); }
-                }
-                std::sort(near.begin(), near.end());
-                near.erase(std::unique(near.begin(), near.end()), near.end());
-                // The step's pieces in order along it.
-                std::vector<std::pair<double, Piece>> along;
-                for (const auto index : near) {
-                    const auto& f = faces[index];
-                    const auto a = plane(corners[f[0]]), b = plane(corners[f[1]]), c = plane(corners[f[2]]);
-                    // The step's span inside the face, by its three sides.
-                    const auto area = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-                    // Seen edge on from this side (or a sliver): another side has it.
-                    if (std::abs(area) < 1.0e-9) { continue; }
-                    const auto weightsAt = [&](const std::array<double, 2>& point) {
-                        const auto wb = ((point[0] - a[0]) * (c[1] - a[1]) - (point[1] - a[1]) * (c[0] - a[0])) / area;
-                        const auto wc = ((b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0])) / area;
-                        return Weights {1 - wb - wc, wb, wc};
-                    };
-                    const auto wp = weightsAt(p), wq = weightsAt(q);
-                    double low = 0, high = 1;
-                    for (std::size_t corner = 0; corner < 3 && low < high; ++corner) {
-                        const auto start = wp[corner], end = wq[corner];
-                        if (start < 0 && end < 0) { high = -1; break; }
-                        if (start < 0) { low = std::max(low, start / (start - end)); }
-                        if (end < 0) { high = std::min(high, start / (start - end)); }
-                    }
-                    if (!(high > low)) { continue; }
-                    const auto mix = [&](double share) {
-                        Weights weights {};
-                        for (std::size_t corner = 0; corner < 3; ++corner) { weights[corner] = wp[corner] + (wq[corner] - wp[corner]) * share; }
-                        return weights;
-                    };
-                    along.emplace_back(low, Piece {index, mix(low), mix(high)});
-                }
-                std::sort(along.begin(), along.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-                for (const auto& [where, piece] : along) { pieces.push_back(piece); }
-                previous = next;
-            }
-        }
-        return pieces;
-    }
     // The pattern's value at a point: its lines are where it is whole. A
     // spiral's angle is unwound from `from`, so it doesn't jump a turn across
     // a face, and on its axis, where it has none, is `from`.
-    const auto valueAt = [&](Vec3 point, double from) {
+    const auto valueAt = [&](Vec3 point, double from, double up) {
         const auto p = point - middle;
         const auto onAxis = std::hypot(p.x, p.z) < 1.0e-9 * bounds.size();
         switch (kind) {
             // Half a spacing in from the ends, so none is lost at a tip.
-            case Pattern::slices: return (p.y + middle.y - bounds.low.y) / spacing + .5;
+            case Pattern::slices: return (p.y + middle.y - bounds.low.y) / along + .5;
             // Round its front (its middle, at its nearest along z): a bullseye seen from in front.
             case Pattern::rings: return (p - Vec3 {0, 0, bounds.high.z - middle.z}).length() / spacing + .5;
             case Pattern::noise: {
@@ -352,7 +422,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
                 return 2.5 * (mix[0] * detail::noise(at + Vec3 {17.3, 5.1, 9.7}) + mix[1] * detail::noise(at + Vec3 {-41.7, 23.9, 3.3}) + mix[2] * detail::noise(at + Vec3 {8.1, -29.3, 61.7}));
             }
             case Pattern::spiral:
-            default: return (p.y + bounds.size() / 2) / spacing - (onAxis ? from : from + std::remainder(std::atan2(p.z, p.x) - from, whole)) / whole;
+            default: return up / climbing + .5 - starts * (onAxis ? from : from + std::remainder(std::atan2(p.z, p.x) - from, whole)) / whole;
         }
     };
     // Found on the faces cut finely (a few times to a spacing), so the
@@ -367,12 +437,17 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         const auto& f = faces[index];
         const auto a = corners[f[0]], b = corners[f[1]], c = corners[f[2]];
         const auto longest = std::max({(b - a).length(), (c - b).length(), (a - c).length()});
-        const auto cuts = std::clamp(static_cast<int>(std::ceil(longest / (spacing / 6))), 1, 32);
+        // As finely as its lines are spaced (by climb for a spiral); slices,
+        // level, are straight across a flat face already.
+        const auto apart = kind == Pattern::spiral ? std::min(spacing, climbing) : spacing;
+        const auto cuts = kind == Pattern::slices ? 1 : std::clamp(static_cast<int>(std::ceil(longest / (apart / 6))), 1, 32);
         const auto centre = (a + b + c) / 3.0 - middle;
         const auto from = std::atan2(centre.z, centre.x);
         // Its points by weights, row by row from the first corner.
         const auto first = static_cast<std::uint32_t>(fine.size());
         std::vector<Weights> weightsOf;
+        // How far up the surface each of its points is.
+        const auto upAt = [&](const Weights& weights) { return climb.has_value() ? climb->at(index, weights) : 0.0; };
         for (int row = 0; row <= cuts; ++row) {
             for (int column = 0; column <= cuts - row; ++column) {
                 const Weights weights {static_cast<double>(cuts - row - column) / cuts, static_cast<double>(column) / cuts, static_cast<double>(row) / cuts};
@@ -385,7 +460,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
             fineFaces.push_back({first + p, first + q, first + r});
             parents.push_back(index);
             placings.push_back({weightsOf[p], weightsOf[q], weightsOf[r]});
-            values.push_back({valueAt(fine[first + p], from), valueAt(fine[first + q], from), valueAt(fine[first + r], from)});
+            values.push_back({valueAt(fine[first + p], from, upAt(weightsOf[p])), valueAt(fine[first + q], from, upAt(weightsOf[q])), valueAt(fine[first + r], from, upAt(weightsOf[r]))});
         };
         for (int row = 0; row < cuts; ++row) {
             for (int column = 0; column < cuts - row; ++column) {
@@ -403,7 +478,36 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         return placed;
     };
     for (auto& piece : pieces) { piece = {parents[piece.face], onParent(piece.face, piece.from), onParent(piece.face, piece.to)}; }
-    return pieces;
+    // Then pieces that follow on over one face joined while they stay near
+    // straight (a fiftieth of the spacing), so a line is as few pieces as
+    // draw it well: the beam has only so many points a cycle.
+    const auto tolerance = (kind == Pattern::spiral ? std::min(spacing, climbing) : kind == Pattern::slices ? std::min(spacing, along) : spacing) * .004;
+    const auto flat = [&](const Piece& piece, const Weights& weights) { return at(corners, faces[piece.face], weights); };
+    std::vector<Piece> joined;
+    joined.reserve(pieces.size());
+    std::size_t start = 0;
+    while (start < pieces.size()) {
+        auto end = start;
+        const auto from = flat(pieces[start], pieces[start].from);
+        // Each next piece on the same face, starting where the last ended,
+        // taken while every point passed stays near the line to its end.
+        while (end + 1 < pieces.size() && pieces[end + 1].face == pieces[start].face && (flat(pieces[end + 1], pieces[end + 1].from) - flat(pieces[end], pieces[end].to)).length() < 1.0e-9 * bounds.size() + 1.0e-12) {
+            const auto to = flat(pieces[end + 1], pieces[end + 1].to);
+            const auto line = to - from;
+            const auto length = line.length();
+            bool straight = true;
+            for (auto passed = start; passed <= end && straight; ++passed) {
+                const auto point = flat(pieces[passed], pieces[passed].to) - from;
+                const auto off = length > 0 ? point.cross(line).length() / length : point.length();
+                straight = off < tolerance;
+            }
+            if (!straight) { break; }
+            ++end;
+        }
+        joined.push_back({pieces[start].face, pieces[start].from, pieces[end].to});
+        start = end + 1;
+    }
+    return joined;
 }
 
 // A surface's normals: each face's own, and at each of its corners the

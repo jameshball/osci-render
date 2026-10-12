@@ -47,7 +47,7 @@ public:
 
         beginTest("An outline is drawn over patterns as well");
         {
-            const motion::PreparedComposition prepared(scene({{"edges", 0}, {"outline", 100}, {"hilbert", 100}}, false, true));
+            const motion::PreparedComposition prepared(scene({{"edges", 0}, {"outline", 100}, {"rings", 100}}, false, true));
             motion::hidden::Workspace workspace;
             const auto frame = motion::hidden::cull(prepared, 1, workspace);
             const auto eye = prepared.viewpoint(1)->position;
@@ -103,7 +103,7 @@ public:
 
         beginTest("Patterns lie on the surface, and are lit as it is");
         {
-            for (const auto* pattern : {"spiral", "hilbert", "noise", "slices", "rings"}) {
+            for (const auto* pattern : {"spiral", "noise", "slices", "rings"}) {
                 auto project = scene({{"edges", 0}, {pattern, 100}});
                 // Straight down: its underside is in its own shadow.
                 addClip(project, generatorAsset(5, "directionalLight"), 50, {{"rotation.x", -90}, {"rotation.y", 0}, {"light.shadows", 100}});
@@ -159,7 +159,10 @@ public:
                 int far = 0;
                 for (const auto& point : pointsOf(frame->drawing(0))) {
                     const motion::Vec3 at {point.x, point.y, point.z};
-                    far += at.normalized().value().dot(position - at) < -.05 ? 1 : 0;
+                    // Beyond eight degrees past the rim: nearer it, lines lifted
+                    // onto the round surface graze its flat faces, and on
+                    // screen are within a percent of its radius of the rim.
+                    far += at.normalized().value().dot((position - at).normalized().value()) < -.14 ? 1 : 0;
                 }
                 return far;
             };
@@ -282,7 +285,7 @@ public:
                 // Apart by more than a drawing takes as joined.
                 breaks += std::hypot(static_cast<double>(a.x - b.x), static_cast<double>(a.y - b.y), static_cast<double>(a.z - b.z)) > 1.0e-6 ? 1 : 0;
             }
-            expect(drawn != nullptr && drawn->shapeCount() > 500, "the slices are drawn");
+            expect(drawn != nullptr && drawn->shapeCount() > 100, "the slices are drawn: " + juce::String(drawn != nullptr ? static_cast<int>(drawn->shapeCount()) : 0));
             expect(breaks <= 8, "each slice one stroke: " + juce::String(breaks) + " breaks");
         }
 

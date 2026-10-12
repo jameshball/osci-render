@@ -17,7 +17,7 @@ struct Picture {
     juce::Path lines, context;
 };
 
-enum class SurfaceLook { edges, outline, spiral, hilbert, noise, slices, rings, mirror };
+enum class SurfaceLook { edges, outline, spiral, noise, slices, rings, mirror };
 
 namespace detail {
 struct Ball {
@@ -173,14 +173,13 @@ inline const Picture& surfacePicture(SurfaceLook look) {
         using hidden::surface::Pattern;
         const auto& ball = detail::ball();
         const auto pattern = [&](Pattern kind, double across) { return detail::laid(hidden::surface::pattern(ball.corners, ball.faces, kind, across, .15)); };
-        std::array<Picture, 8> result;
+        std::array<Picture, 7> result;
         const auto outline = detail::circle();
         auto edges = detail::edges();
         edges.addPath(outline);
         result[static_cast<std::size_t>(SurfaceLook::edges)] = {edges, {}};
         result[static_cast<std::size_t>(SurfaceLook::outline)] = {outline, {}};
         result[static_cast<std::size_t>(SurfaceLook::spiral)] = {pattern(Pattern::spiral, 5), outline};
-        result[static_cast<std::size_t>(SurfaceLook::hilbert)] = {pattern(Pattern::hilbert, 8), outline};
         result[static_cast<std::size_t>(SurfaceLook::noise)] = {pattern(Pattern::noise, 6), outline};
         result[static_cast<std::size_t>(SurfaceLook::slices)] = {pattern(Pattern::slices, 7), outline};
         result[static_cast<std::size_t>(SurfaceLook::rings)] = {pattern(Pattern::rings, 6), outline};
@@ -193,7 +192,7 @@ inline const Picture& surfacePicture(SurfaceLook look) {
 }
 
 // How a camera shades what light falls on: by brightness (a ball's lines
-// bright where it is lit and faint where not), or by hatching (a Hilbert
+// bright where it is lit and faint where not), or by hatching (a Sierpinski
 // curve over it, dense where it is lit).
 enum class Shading { brightness, hatching, frameHatching };
 inline const Picture& shadingPicture(Shading shading) {

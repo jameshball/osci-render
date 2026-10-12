@@ -37,8 +37,8 @@ inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool qua
 // colour gains dimmed by the opacity. Evaluated once, it applies to any number
 // of points.
 // How a surface draws itself: its own lines (edges), its outline as the
-// camera sees it, and patterns over it (in Pattern order: spiral, Hilbert
-// curve, noise, slices, rings), each as a brightness 0..1, and how many
+// camera sees it, and patterns over it (in Pattern order: spiral, noise,
+// slices, rings), each as a brightness 0..1, and how many
 // lines across a pattern draws, and how far round its loop the noise has
 // morphed (turns). Groups dim its edges, add their outline and patterns, and
 // move its noise on by theirs.

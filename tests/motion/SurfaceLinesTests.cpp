@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
 
 using namespace motion;
@@ -61,16 +62,21 @@ int main() {
         }
         check(linesIn(corners, faces, pieces) == 8, "one loop a level, eight across: " + std::to_string(linesIn(corners, faces, pieces)));
     }
-    // A spiral: one line round and round, from bottom to top.
+    // A spiral: lines round and round, side by side as a screw's thread,
+    // climbing steeply enough to be seen to, eight a height apart.
     {
         const auto pieces = pattern(corners, faces, Pattern::spiral, 8);
         check(!pieces.empty(), "a ball has a spiral");
-        check(linesIn(corners, faces, pieces) <= 3, "it runs as one line (poles aside): " + std::to_string(linesIn(corners, faces, pieces)));
-        // How far each line turns (whichever way it runs), together.
+        // How steeply it climbs about the middle of the ball.
+        std::vector<double> slopes;
         double turned = 0, line = 0;
         std::optional<Vec3> last;
         for (const auto& piece : pieces) {
             const auto from = at(corners, faces[piece.face], piece.from), to = at(corners, faces[piece.face], piece.to);
+            if (std::abs(from.y) < .3) {
+                const auto across = std::hypot(to.x - from.x, to.z - from.z);
+                if (across > 1.0e-6) { slopes.push_back(std::abs(to.y - from.y) / across); }
+            }
             if (last.has_value() && (from - *last).length() > 1.0e-5) {
                 turned += std::abs(line);
                 line = 0;
@@ -79,10 +85,21 @@ int main() {
             last = to;
         }
         turned += std::abs(line);
-        check(std::abs(turned) > 2 * 3.14159265358979323846 * 6, "turning round many times as it climbs");
+        std::sort(slopes.begin(), slopes.end());
+        const auto slope = slopes[slopes.size() / 2];
+        check(slope > .2 && slope < .45, "climbing at about 18 degrees: " + std::to_string(std::atan(slope) * 180 / 3.14159265358979323846));
+        check(std::abs(turned) > 2 * 3.14159265358979323846 * 6, "its lines together going round many times");
+        // Level slices a height apart, a spiral's lines too: as many up a
+        // flat ball (squashed to a fifth) as up a round one.
+        std::vector<Vec3> flat = corners;
+        for (auto& corner : flat) { corner.y *= .2; }
+        const auto levels = pattern(flat, faces, Pattern::slices, 8);
+        std::set<long> heights;
+        for (const auto& piece : levels) { heights.insert(std::lround(at(flat, faces[piece.face], piece.from).y * 1.0e4)); }
+        check(heights.size() == 8, "eight slices up a flat ball: " + std::to_string(heights.size()));
     }
     // Rings and noise lie on the surface too.
-    for (const auto kind : {Pattern::rings, Pattern::noise, Pattern::hilbert}) {
+    for (const auto kind : {Pattern::rings, Pattern::noise}) {
         const auto pieces = pattern(corners, faces, kind, 16);
         check(!pieces.empty(), "every pattern draws something on a ball");
         for (const auto& piece : pieces) {
@@ -91,12 +108,6 @@ int main() {
             }
         }
     }
-    // A Hilbert curve laid on runs on, piece after piece, across faces.
-    {
-        const auto pieces = pattern(corners, faces, Pattern::hilbert, 16);
-        check(linesIn(corners, faces, pieces) < static_cast<int>(pieces.size()) / 4, "its pieces mostly meet end to end");
-    }
-
     // A ball's outline from far away is a circle round it, square to the eye.
     {
         const Vec3 eye {0, 0, 50};

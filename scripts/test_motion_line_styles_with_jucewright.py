@@ -142,9 +142,9 @@ try:
     if blank > edged // 4:
         raise RuntimeError("With no lines asked for, the ball draws none: " + str((blank, edged)))
     toggle("Outline", "Turn on Outline")
-    toggle("Hilbert", "Turn on Hilbert")
-    set_field("hilbert", "60", "Change Hilbert curve")
-    if tile("Hilbert").get("checked") is not True:
+    toggle("Rings", "Turn on Rings")
+    set_field("rings", "60", "Change Rings")
+    if tile("Rings").get("checked") is not True:
         raise RuntimeError("Part-way on is on")
     # Noise brings how it morphs.
     toggle("Noise", "Turn on Noise")
@@ -165,8 +165,8 @@ try:
     def saved_value(name):
         found = [p for p in saved.iter("property") if p.get("name") == name]
         return float(found[0].get("value") or found[0].get("base") or 0) if found else None
-    if (saved_value("edges"), saved_value("outline"), saved_value("hilbert")) != (0, 100, 60):
-        raise RuntimeError("The ball's style should save: " + str((saved_value("edges"), saved_value("outline"), saved_value("hilbert"))))
+    if (saved_value("edges"), saved_value("outline"), saved_value("rings")) != (0, 100, 60):
+        raise RuntimeError("The ball's style should save: " + str((saved_value("edges"), saved_value("outline"), saved_value("rings"))))
     print("Motion line styles passed", flush=True)
 finally:
     session.stop_app()

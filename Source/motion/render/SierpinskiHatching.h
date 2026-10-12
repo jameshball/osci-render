@@ -416,6 +416,13 @@ inline Curve Curve::of(const std::vector<Vec3>& corners, const std::vector<surfa
     return curve;
 }
 
+// A step of the curve: from a point of one face to a point of another (or
+// the same), by their weights.
+struct Step {
+    std::uint32_t fromFace, toFace;
+    surface::Weights from, to;
+};
+
 // The curve lit for a frame: each node's width and the most light in it,
 // from its leaves'. Its width is as wide as its area would be square, or as
 // far across as its leaves reach, if more: a long thin run (up one narrow
@@ -470,6 +477,24 @@ struct Lit {
         return lit;
     }
     float brightest() const { return light.empty() ? 0.0f : *std::max_element(light.begin(), light.end()); }
+
+    // The curve as steps from the middle of each node it passes through to
+    // the next's (see curveAt), along each loop, none to or from a node
+    // lit less than `darkest`.
+    std::vector<Step> steps(double finest, double exposure, double gain, double darkest) const {
+        std::vector<Step> found;
+        std::optional<std::pair<std::uint32_t, surface::Weights>> previous;
+        curveAt(finest, exposure, gain, [&](std::optional<std::uint32_t> node, double share) {
+            if (!node.has_value() || share < darkest) {
+                previous.reset();
+                return;
+            }
+            const auto middle = curve->middleOf(*node);
+            if (previous.has_value()) { found.push_back({previous->first, middle.first, previous->second, middle.second}); }
+            previous = middle;
+        });
+        return found;
+    }
 
     // The curve as coarse as the light asks: `visit(node, light)` for each
     // node it passes through in order, a node divided while it is wider than
