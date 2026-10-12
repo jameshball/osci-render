@@ -238,9 +238,6 @@ inline const Picture& shadingPicture(Shading shading) {
                 open = true;
             }
         }
-        // Over the frame: the disc hatched as the frame's grid falls on it,
-        // in its frame.
-        hatched.context.addRectangle(-1.0f, -1.0f, 2.0f, 2.0f);
         result[static_cast<std::size_t>(Shading::hatching)] = hatched;
         return result;
     }();

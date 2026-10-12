@@ -73,8 +73,8 @@ def button_says(text, timeout=5.0):
         time.sleep(0.1)
 
 
-KEY_ALL = "Key all at the playhead"
-REMOVE_KEYS = "Remove keys at the playhead"
+KEY_ALL = "Key all"
+REMOVE_KEYS = "Remove keys"
 
 
 def encoded(data):

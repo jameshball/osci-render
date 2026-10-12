@@ -69,7 +69,7 @@ public:
         }
         updating = false;
         // Which clock the clip keeps, on the heading line.
-        details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "follows tempo" : "fixed in seconds", juce::dontSendNotification);
+        details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "follows tempo" : "ignores tempo", juce::dontSendNotification);
         details.setTooltip(clip != nullptr && clip->timeBase == motion::ClipTimeBase::beats ? "Follows tempo changes" : "Keeps its time when the tempo changes");
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
@@ -81,7 +81,7 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         auto heading = area.removeFromTop(motion::style::inspector::headingHeight);
-        // What clock the clip keeps qualifies the heading: "Timing  fixed in seconds".
+        // What clock the clip keeps qualifies the heading: "Timing  ignores tempo".
         title.setBounds(heading);
         details.setBounds(heading.withTrimmedLeft(juce::roundToInt(juce::TextLayout::getStringWidth(title.getFont(), title.getText())) + 8));
         motion::style::inspector::layoutFields(area, captions, {&values[0], &values[1], &values[2], &values[3]});

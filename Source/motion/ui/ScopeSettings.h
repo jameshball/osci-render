@@ -64,7 +64,8 @@ public:
         overlay.setTitle("Scope overlay");
         overlay.setTooltip("Graticule or screen drawn over the beam");
         auto* screen = parameters.screenOverlay;
-        for (int id = 1; id <= screen->max.load(); ++id) { overlay.addItem(screen->getText(screen->getNormalisedValue(static_cast<float>(id))), id); }
+        // The shared parameter calls no overlay "Empty"; here it is "None".
+        for (int id = 1; id <= screen->max.load(); ++id) { overlay.addItem(id == static_cast<int>(ScreenOverlay::Empty) ? juce::String("None") : screen->getText(screen->getNormalisedValue(static_cast<float>(id))), id); }
         overlay.setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
         overlay.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
         overlay.onChange = [this] {

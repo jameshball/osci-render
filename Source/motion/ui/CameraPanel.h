@@ -78,7 +78,7 @@ public:
         // takes it away again.
         const auto keyed = isKeyed(found);
         keyButton.setEnabled(found != nullptr);
-        keyButton.setButtonText(keyed ? "Remove keys at the playhead" : "Key all at the playhead");
+        keyButton.setButtonText(keyed ? "Remove keys" : "Key all");
         keyButton.setTooltip(keyed ? "Remove the position, rotation and lens keys at the playhead" : "Key position, rotation and lens at the playhead");
     }
     void resized() override {
@@ -101,7 +101,7 @@ public:
         cutButton.setBounds(row.withWidth(cutButton.getBestWidthForHeight(row.getHeight()) + 20));
         row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
         keysLabel.setBounds(row.removeFromLeft(left));
-        keyButton.setBounds(row.withWidth(keyButton.getBestWidthForHeight(row.getHeight()) + 20));
+        keyButton.setBounds(row);
     }
 
 private:
