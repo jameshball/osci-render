@@ -150,7 +150,6 @@ inline bool applyLightPreset(Composition& composition, Id light, LightPreset pre
         Modulator modulator;
         modulator.id = newId();
         modulator.name = clip->name + " \xc2\xb7 " + light_preset_detail::driveName(definition, drive);
-        modulator.shape.enabled = true;
         modulator.shape.waveform = drive.waveform;
         modulator.shape.rateHz = drive.rateHz;
         // Each its own noise, and each light's its own.

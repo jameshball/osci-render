@@ -111,9 +111,6 @@ private:
         if (modulator == scope.modulators.end() || !modulator->valid()) { return nullptr; }
         auto prepared = std::make_shared<PreparedModulator>();
         prepared->shape = modulator->shape;
-        prepared->shape.enabled = true;
-        prepared->shape.amount = 1;
-        prepared->shape.mode = ModulationMode::add;
         prepared->bpm = scope.bpm;
         if (scope.tempoChanges != nullptr) { prepared->tempo = scope.tempo(); }
         if (modulator->shape.waveform == ModulationWaveform::soundtrack && loudness) { prepared->soundtrack = loudness(); }

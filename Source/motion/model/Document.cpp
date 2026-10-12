@@ -517,7 +517,7 @@ juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const A
     if (expected == nullptr || std::find(state.assets.begin(), state.assets.end(), expected) == state.assets.end()) {
         return juce::Result::fail("The source changed while preparing its copy.");
     }
-    const auto references = sourceReferenceCount(mainProject(), expected->id);
+    const auto references = assetUses(expected->id);
     if (references < 2) { return juce::Result::fail("This clip already has its own source."); }
     for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
         const auto& track = state.tracks[trackIndex];
@@ -550,8 +550,7 @@ juce::Result Document::duplicateClip(Id sourceId, Id& duplicateId) {
 }
 
 std::size_t Document::assetUses(Id assetId) const {
-    if (assetId == 0) { return 0; }
-    return countClips(mainProject(), [assetId](const auto& clip) { return clip.asset == assetId; });
+    return sourceReferenceCount(mainProject(), assetId);
 }
 
 bool Document::setTrackHeight(Id trackId, int height) {
@@ -1499,17 +1498,8 @@ juce::Result Document::setCameraRig(Id camera, Id target, Id parent) {
     return juce::Result::ok();
 }
 
-// Route depth lives on routes; the shape's own depth and switch are fixed.
-static void normaliseModulator(Modulator& modulator) {
-    modulator.shape.enabled = true;
-    modulator.shape.amount = 1;
-    modulator.shape.mode = ModulationMode::add;
-    modulator.shape.soundtrack.reset();
-}
-
 juce::Result Document::addModulator(Modulator modulator, Id& id) {
     modulator.id = newId();
-    normaliseModulator(modulator);
     if (!modulator.valid()) { return juce::Result::fail("Invalid modulator settings."); }
     id = modulator.id;
     edit("Add modulator", [modulator](Project& project) { project.modulators.push_back(modulator); });
@@ -1517,7 +1507,6 @@ juce::Result Document::addModulator(Modulator modulator, Id& id) {
 }
 
 juce::Result Document::setModulator(Modulator modulator) {
-    normaliseModulator(modulator);
     const auto& list = project().modulators;
     const auto found = std::find_if(list.begin(), list.end(), [&](const auto& item) { return item.id == modulator.id; });
     if (found == list.end()) { return juce::Result::fail("The modulator no longer exists."); }
@@ -1609,7 +1598,6 @@ std::optional<Project> Document::previewRoute(Id modulator, Id target, const std
 
 juce::Result Document::addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId) {
     modulator.id = newId();
-    normaliseModulator(modulator);
     route.id = newId();
     route.modulator = modulator.id;
     if (!modulator.valid() || !route.valid() || !drivableProperty(project(), route.target, route.property)) {

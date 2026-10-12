@@ -13,8 +13,7 @@ namespace motion {
 struct Modulator {
     Id id = 0;
     std::string name = "Modulator";
-    // The waveform, clock and seed; its amount, mode and enabled flag are
-    // unused (each route carries its own depth).
+    // The waveform, clock and seed (each route carries its own depth).
     Modulation shape;
 
     bool operator==(const Modulator&) const = default;

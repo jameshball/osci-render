@@ -257,7 +257,6 @@ int main() {
         && near(smooth.keyframes()[0].outgoingSlope, 1), "value edits retain the authored interpolation and tangents");
     // The oscillator shared by modulators: pure functions of time.
     motion::Modulation modulation;
-    modulation.enabled = true;
     check(near(modulation.value(0.25), 1) && near(modulation.value(0.75), -1), "a sine cycles once per second");
     modulation.tempoSync = true;
     check(near(modulation.value(0.125, 120), 1) && near(modulation.value(0.25, 60), 1), "tempo sync follows project beats");

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ClipTiming.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -12,8 +11,8 @@ namespace motion {
 enum class ModulationWaveform { sine, triangle, saw, square, noiseSmooth, noiseHold, soundtrack };
 
 // The composition's soundtrack loudness, 0..1, sampled on a fixed grid. Built
-// once per prepared composition; curves reach it through a clock that maps
-// their owner's local time back to project time.
+// once per prepared composition and read by soundtrack modulators, in project
+// time.
 struct SoundtrackEnvelope {
     std::vector<float> values;
     double rate = 240;
@@ -26,38 +25,21 @@ struct SoundtrackEnvelope {
         return values[index] * (1 - fraction) + values[index + 1] * fraction;
     }
 };
-struct SoundtrackClock {
-    std::shared_ptr<const SoundtrackEnvelope> envelope;
-    // project = scope.projectTime(clip.projectTime(local)); the default clocks
-    // are identities.
-    ClipTiming clip, scope;
-    double at(double localTime) const {
-        return envelope == nullptr ? 0 : envelope->at(scope.projectTime(clip.projectTime(localTime)));
-    }
-};
 enum class ModulationMode { add, multiply };
 
+// A modulator's wave and clock: how it moves from -1 to 1 over time (the
+// soundtrack's loudness is read by the prepared modulator instead).
 struct Modulation {
-    bool enabled = false;
     ModulationWaveform waveform = ModulationWaveform::sine;
-    double amount = 0.25;
     double rateHz = 1;
     double phase = 0;
     bool tempoSync = false;
     double beatsPerCycle = 1;
     std::uint32_t seed = 0;
-    ModulationMode mode = ModulationMode::add;
-    // Runtime only: attached to prepared copies, never saved or compared.
-    std::shared_ptr<const SoundtrackClock> soundtrack;
 
-    bool operator==(const Modulation& other) const {
-        return enabled == other.enabled && waveform == other.waveform && amount == other.amount && rateHz == other.rateHz && phase == other.phase
-            && tempoSync == other.tempoSync && beatsPerCycle == other.beatsPerCycle && seed == other.seed && mode == other.mode;
-    }
+    bool operator==(const Modulation&) const = default;
     bool valid() const {
         return static_cast<int>(waveform) >= 0 && static_cast<int>(waveform) <= 6
-            && static_cast<int>(mode) >= 0 && static_cast<int>(mode) <= 1
-            && std::isfinite(amount) && amount >= -1000000 && amount <= 1000000
             && std::isfinite(rateHz) && rateHz >= 0.001 && rateHz <= 1000
             && std::isfinite(phase) && phase >= 0 && phase <= 1
             && std::isfinite(beatsPerCycle) && beatsPerCycle >= 0.0625 && beatsPerCycle <= 64;
@@ -66,19 +48,15 @@ struct Modulation {
     // Pure owner-time evaluation: no oscillator state, random generator,
     // sample-rate dependency or history, including when scrubbing backwards.
     double value(double time, double bpm = 120) const {
-        if (!enabled || !valid() || !std::isfinite(time) || (tempoSync && (!std::isfinite(bpm) || bpm <= 0))) {
+        if (waveform == ModulationWaveform::soundtrack || !valid() || !std::isfinite(time) || (tempoSync && (!std::isfinite(bpm) || bpm <= 0))) {
             return 0;
-        }
-        if (waveform == ModulationWaveform::soundtrack) {
-            // Unipolar loudness: silence leaves the keyed value untouched.
-            return soundtrack != nullptr ? soundtrack->at(time) : 0.0;
         }
         const auto frequency = tempoSync ? bpm / (60 * beatsPerCycle) : rateHz;
         return atCycles(time * frequency + phase);
     }
     // Tempo-synced value at a musical position, for clocks that follow a map.
     double valueAtBeats(double beats) const {
-        if (!enabled || !valid() || !tempoSync || waveform == ModulationWaveform::soundtrack) { return 0; }
+        if (!valid() || !tempoSync || waveform == ModulationWaveform::soundtrack) { return 0; }
         return atCycles(beats / beatsPerCycle + phase);
     }
     double atCycles(double cycles) const {

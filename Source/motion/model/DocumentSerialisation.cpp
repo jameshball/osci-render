@@ -534,8 +534,6 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         if (tempoSync < 0 || tempoSync > 1 || seed < 0 || seed > static_cast<juce::int64>(std::numeric_limits<std::uint32_t>::max())) {
             return juce::Result::fail("Invalid modulator settings.");
         }
-        modulator.shape.enabled = true;
-        modulator.shape.amount = 1;
         modulator.shape.waveform = static_cast<ModulationWaveform>(item->getIntAttribute("waveform", -1));
         modulator.shape.rateHz = item->getDoubleAttribute("rateHz", 1);
         modulator.shape.phase = item->getDoubleAttribute("phase", 0);

@@ -3000,7 +3000,7 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
     menu.addSeparator();
     menu.addItem(motion::style::menuItem(many ? "Delete clips" : "Delete clip", 7, "Delete").setEnabled(!locked));
     menu.addItem(motion::style::menuItem(many ? "Ripple delete clips" : "Ripple delete clip", 8, "Shift+Delete").setEnabled(!locked));
-    const auto references = motion::sourceReferenceCount(processor.document.mainProject(), asset);
+    const auto references = processor.document.assetUses(asset);
     if (definition == 0) { menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1); }
     // A light's presets: ways it moves on its own.
     const auto* generator = motion::generatorFor(processor.document.project(), id);
