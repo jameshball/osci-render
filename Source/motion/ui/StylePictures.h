@@ -5,6 +5,7 @@
 #include "../render/Reflections.h"
 #include "../render/HiddenLineHatching.h"
 #include "../render/SurfaceLines.h"
+#include "GeneratorIcons.h"
 
 // Pictures of how a surface can draw itself, and of a light's presets, for
 // tiles to choose them by. A surface's are a ball drawn that way by the same
@@ -252,16 +253,8 @@ inline juce::String lightPresetShortName(LightPreset preset) {
 // A light's preset, or none: a glyph of how it moves on its own.
 inline juce::Path lightPresetPicture(std::optional<LightPreset> preset) {
     juce::Path path;
-    if (!preset.has_value()) {
-        // A steady light: a small sun.
-        path.addEllipse(-.32f, -.32f, .64f, .64f);
-        for (int ray = 0; ray < 8; ++ray) {
-            const auto angle = juce::MathConstants<float>::twoPi * static_cast<float>(ray) / 8;
-            path.startNewSubPath(std::cos(angle) * .52f, std::sin(angle) * .52f);
-            path.lineTo(std::cos(angle) * .78f, std::sin(angle) * .78f);
-        }
-        return path;
-    }
+    // A steady light is a point light as it is: its glyph.
+    if (!preset.has_value()) { return lightGlyph(GeneratorKind::pointLight); }
     switch (*preset) {
         case LightPreset::fire:
             // Two tongues of flame.
@@ -304,21 +297,23 @@ inline juce::Path lightPresetPicture(std::optional<LightPreset> preset) {
             }
             break;
         case LightPreset::pulse:
-            path.startNewSubPath(-.9f, .1f);
+            // Swelling and fading twice, about the middle.
+            path.startNewSubPath(-.9f, .34f);
             for (int step = 1; step <= 48; ++step) {
                 const auto x = -.9f + 1.8f * static_cast<float>(step) / 48;
-                path.lineTo(x, .1f - .62f * std::pow(std::sin((x + .9f) / 1.8f * juce::MathConstants<float>::pi * 2), 2.0f));
+                path.lineTo(x, .34f - .68f * std::pow(std::sin((x + .9f) / 1.8f * juce::MathConstants<float>::pi * 2), 2.0f));
             }
             break;
         case LightPreset::strobe:
-            path.startNewSubPath(-.9f, .5f);
-            for (const auto x : {-.6f, -.3f, 0.0f, .3f, .6f}) {
-                path.lineTo(x, .5f);
-                path.lineTo(x, -.5f);
-                path.lineTo(x + .1f, -.5f);
-                path.lineTo(x + .1f, .5f);
+            // Short flashes, far apart.
+            path.startNewSubPath(-.9f, .4f);
+            for (const auto x : {-.55f, -.05f, .45f}) {
+                path.lineTo(x, .4f);
+                path.lineTo(x, -.4f);
+                path.lineTo(x + .1f, -.4f);
+                path.lineTo(x + .1f, .4f);
             }
-            path.lineTo(.9f, .5f);
+            path.lineTo(.9f, .4f);
             break;
     }
     return path;

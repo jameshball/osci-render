@@ -507,7 +507,7 @@ void MotionEditor::setUpLibrary() {
             const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
             juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
             entry.itemID = 2000 + static_cast<int>(index);
-            entry.image = motion::ui::generatorIcon(*motion::findGenerator("pointLight"), icons::ink());
+            entry.image = icons::unit(motion::ui::pictures::lightPresetPicture(motion::lightPresets[index]), icons::ink());
             lights.addItem(std::move(entry));
         }
         menu.addSubMenu("Light", lights, true, icons::stroked(icons::glyph::bulb(), icons::ink()));
@@ -517,10 +517,12 @@ void MotionEditor::setUpLibrary() {
             const auto& preset = motion::mirrorPresets[index];
             juce::PopupMenu::Item entry(juce::String(preset.name.data(), preset.name.size()));
             entry.itemID = 2100 + static_cast<int>(index);
-            entry.image = motion::ui::generatorIcon(*motion::findGenerator(preset.generator), icons::ink());
+            // Pictured as the Add a mirror panel pictures them.
+            const auto ball = preset.generator == "sphere";
+            entry.image = icons::unit((ball ? motion::ui::pictures::mirrorBall() : motion::ui::pictures::flatMirror()).lines, icons::ink());
             mirrors.addItem(std::move(entry));
         }
-        menu.addSubMenu("Mirror", mirrors, true, motion::ui::generatorIcon(*motion::findGenerator("sphere"), icons::ink()));
+        menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
         menu.addItem(item(1, "Import file...", icons::glyph::folder()));
         menu.addItem(item(2, "Blender live source...", icons::glyph::live()));
         // The examples that ship with osci-motion, by kind, each pictured as

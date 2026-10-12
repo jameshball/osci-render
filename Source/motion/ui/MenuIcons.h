@@ -54,6 +54,12 @@ inline juce::Path fitted(juce::Path path, float scale = 1) {
     return path;
 }
 
+// A picture drawn in a square from -1 to 1, as an icon.
+inline std::unique_ptr<juce::Drawable> unit(juce::Path path, juce::Colour colour) {
+    path.applyTransform(juce::AffineTransform::scale((size - 2 * margin) / 2).translated(size / 2, size / 2));
+    return stroked(std::move(path), colour);
+}
+
 // The colour icons take beside a menu's text.
 inline juce::Colour ink() { return osci::Colours::text().withAlpha(.85f); }
 
