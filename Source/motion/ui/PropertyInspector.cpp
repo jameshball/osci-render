@@ -526,7 +526,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         for (const auto preset : motion::lightPresets) {
             const auto& definition = motion::lightPresetDefinition(preset);
             const juce::String name(definition.name.data(), definition.name.size());
-            choices.push_back({motion::ui::pictures::lightPresetShortName(preset), name + ": it moves on its own, as a " + name.toLowerCase() + " does (its modulators are in the Graph)", {motion::ui::pictures::lightPresetPicture(preset), {}}});
+            choices.push_back({motion::ui::pictures::lightPresetShortName(preset), name + ": its colour, and it moves on its own as a " + name.toLowerCase() + " does (its modulators are in the Graph)", {motion::ui::pictures::lightPresetPicture(preset), {}}});
         }
         // One at a time, in a row.
         presetTiles = std::make_unique<motion::ui::TileGrid>("Light presets", std::move(choices), 3, motion::ui::TileGrid::Look::chips, true);
