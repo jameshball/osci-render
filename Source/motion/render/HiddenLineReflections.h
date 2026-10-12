@@ -179,10 +179,11 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
     }
     if (reflectors.empty()) { return entries; }
     // Where surfaces cut through each other, anywhere in the scene, with the
-    // surface and face each piece lies on.
+    // surface and face each piece lies on: lines drawn only where the
+    // camera hides lines.
     std::vector<crossing::Triangle> crossingTriangles;
     std::vector<std::pair<std::uint32_t, std::uint32_t>> crossingFaces;
-    for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+    for (std::uint32_t surface = 0; depth != nullptr && surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (item.drawing == nullptr) { continue; }
         const auto& triangles = item.drawing->faces().triangles;
