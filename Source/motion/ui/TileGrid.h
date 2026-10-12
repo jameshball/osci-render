@@ -25,6 +25,7 @@ public:
             tile->setName(name + ": " + tile->choice.name);
             tile->setTitle(tile->getName());
             // Read out as a choice of one, or a switch each.
+            tile->setToggleable(true);
             if (oneOf) { tile->setRadioGroupId(1, juce::dontSendNotification); }
             const auto index = tiles.size();
             tile->onClick = [this, index] {
@@ -40,8 +41,7 @@ public:
     // Whether a tile is on, and (when part-way) how much, as its corner says.
     void setState(std::size_t index, bool on, const juce::String& amount = {}) {
         auto& tile = *tiles[index];
-        if (tile.on == on && tile.amount == amount) { return; }
-        tile.on = on;
+        if (tile.getToggleState() == on && tile.amount == amount) { return; }
         tile.amount = amount;
         tile.setToggleState(on, juce::dontSendNotification);
         tile.repaint();
@@ -86,6 +86,13 @@ private:
             setMouseCursor(juce::MouseCursor::PointingHandCursor);
         }
         void paintButton(juce::Graphics& g, bool, bool down) override {
+            // Locked: shown as it is, faded.
+            if (!isEnabled()) { g.beginTransparencyLayer(.45f); }
+            paintTile(g, down);
+            if (!isEnabled()) { g.endTransparencyLayer(); }
+        }
+        void paintTile(juce::Graphics& g, bool down) {
+            const auto on = getToggleState();
             const auto hover = fade.value();
             const auto bounds = getLocalBounds().toFloat();
             const auto radius = motion::style::radius + 1.0f;
@@ -136,7 +143,6 @@ private:
 
         Choice choice;
         Look look;
-        bool on = false;
         juce::String amount;
         motion::style::Fade fade {*this};
     };
