@@ -206,6 +206,22 @@ public:
             expect(drawn, "the beam draws the hatching");
         }
 
+        beginTest("A mirror shows the scene, not hatching of its own, however the camera hatches");
+        {
+            for (const auto onFrame : {true, false}) {
+                auto project = scene({{"edges", 0}, {"reflects", 100}});
+                project.cameras.front().properties["hatching"] = motion::Curve(100);
+                project.cameras.front().properties["hatchFrame"] = motion::Curve(onFrame ? 1 : 0);
+                addClip(project, generatorAsset(5, "directionalLight"), 50, {{"rotation.x", -90}, {"rotation.y", 0}, {"light.shadows", 0}});
+                const motion::PreparedComposition prepared(project, 48000);
+                motion::hidden::Workspace workspace;
+                const auto frame = motion::hidden::cull(prepared, 1, workspace);
+                const auto hatchedOver = std::any_of(frame->hatching.begin(), frame->hatching.end(), [](const auto& entry) { return entry.clip == 0 && entry.drawing != nullptr && !entry.drawing->empty(); });
+                const auto* drawn = frame->drawing(0);
+                expect(!hatchedOver && (drawn == nullptr || drawn->empty()), juce::String(onFrame ? "over the frame" : "on the surfaces") + ": none on the mirror");
+            }
+        }
+
         beginTest("A camera hatching on its surfaces lays the curve on them, so it moves with them");
         {
             const auto hatchAt = [&](double x, double turn) {

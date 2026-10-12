@@ -380,6 +380,9 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
         if (!nearest.has_value() || !(nearest->w > 0)) { return std::nullopt; }
         const auto surface = static_cast<std::uint32_t>(nearest->tag >> 32), face = static_cast<std::uint32_t>(nearest->tag & 0xffffffffu);
         if (surface >= items.size() || !normals[surface].has_value()) { return std::nullopt; }
+        // A mirror shows the scene, not hatching of its own: as much as it
+        // reflects, it has none.
+        if (!(items[surface].clip->reflects(time) < 1)) { return std::nullopt; }
         // Where the line from the eye meets the face: exactly on it (the
         // buffer's depth is pushed back, most for a face seen edge on).
         const auto& triangle = items[surface].drawing->faces().triangles[face];
@@ -416,7 +419,11 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
     std::vector<std::vector<std::unique_ptr<osci::Shape>>> shapes(items.size());
     for (const auto& stroke : strokes) {
         const auto& clip = *items[stroke.surface].clip;
-        const auto colour = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, 1, 1, 1), time), time);
+        auto colour = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, 1, 1, 1), time), time);
+        const auto itself = static_cast<float>(1 - clip.reflects(time));
+        colour.r *= itself;
+        colour.g *= itself;
+        colour.b *= itself;
         const auto point = [&](const hatching::Seen& seen) {
             return osci::Point(static_cast<float>(seen.at.x), static_cast<float>(seen.at.y), static_cast<float>(seen.at.z),
                 std::max(0.0f, colour.r) * seen.hue[0] * static_cast<float>(amount), std::max(0.0f, colour.g) * seen.hue[1] * static_cast<float>(amount), std::max(0.0f, colour.b) * seen.hue[2] * static_cast<float>(amount));
