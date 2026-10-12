@@ -1,7 +1,6 @@
 #pragma once
 
 #include "HiddenLineScene.h"
-#include "SierpinskiHatching.h"
 #include "SurfaceLines.h"
 #include <map>
 #include <memory>
@@ -24,17 +23,6 @@ public:
         // Whether it is closed (every edge has a face either side), so the
         // eye sees only its near side.
         bool closed = false;
-        // Its Sierpinski curves for hatching, by how finely: halved down to
-        // its size over two to the power of the key.
-        std::map<int, hatching::sierpinski::Curve> curves;
-        const hatching::sierpinski::Curve& curveAt(int depth) {
-            auto found = curves.find(depth);
-            if (found == curves.end()) {
-                const auto size = surface::detail::boundsOf(this->corners, this->faces).size();
-                found = curves.emplace(depth, hatching::sierpinski::Curve::of(this->corners, this->faces, size / (1 << depth))).first;
-            }
-            return found->second;
-        }
         std::map<std::tuple<int, int, double>, std::vector<surface::Piece>> patterns;
 
         // A pattern laid on it; noise at `turn` round its loop. Of noise that
@@ -133,9 +121,8 @@ struct Styled {
     // The drawing it was given, and the one it draws instead.
     const PreparedDrawing* unstyled = nullptr;
     std::shared_ptr<const PreparedDrawing> drawing;
-    // Where the lines laid on it begin, where its hatching's begin and end,
-    // and where its outline's begin.
-    std::size_t laidFrom = 0, hatchFrom = 0, hatchTo = 0, eyeOnlyFrom = 0;
+    // Where the lines laid on it begin, and where its outline's begin.
+    std::size_t laidFrom = 0, eyeOnlyFrom = 0;
     // For each line laid on it, where on its face the line's ends are.
     std::vector<std::array<surface::Weights, 2>> ends;
     // Its corners and normals in the scene, this frame, and which way its
@@ -162,16 +149,12 @@ struct Styled {
     }
 
     // The normals to light a line by, turning along it as the surface does;
-    // none for one of its own (lit by the faces it runs along, as ever). Its
-    // hatching is left unlit: its density shows the light.
+    // none for one of its own (lit by the faces it runs along, as ever).
     std::optional<Normals> normalsOf(std::size_t shape) const {
         if (shape < laidFrom || shape - laidFrom >= ends.size()) { return std::nullopt; }
-        if (shape >= hatchFrom && shape < hatchTo) { return Normals::unlitLine(); }
-        // A step of a curve over the faces ends on another face (its second).
-        const auto& on = drawing->shapeFaces()[shape];
-        const auto face = static_cast<std::uint32_t>(on[0]), endFace = on[1] >= 0 ? static_cast<std::uint32_t>(on[1]) : face;
+        const auto face = static_cast<std::uint32_t>(drawing->shapeFaces()[shape][0]);
         const auto& [starts, finishes] = ends[shape - laidFrom];
-        return Normals::turning(normals.at(face, starts), normals.at(endFace, finishes));
+        return Normals::turning(normals.at(face, starts), normals.at(face, finishes));
     }
     // How near a line of its outline its own faces may come, along the line
     // from it to the eye that sees it, without hiding it: it is where the
@@ -184,12 +167,11 @@ struct Styled {
 };
 
 // Draws a surface in its style, placed in the scene for the frame (see
-// Styled::place), as `eye` sees it, with the camera's hatching on it as
-// bright as `hatchAmount`, following the smooth surface. `nearSideOnly`: what is laid on a closed
+// Styled::place), as `eye` sees it. `nearSideOnly`: what is laid on a closed
 // surface's far side from the eye is left out, as lines hidden there would
 // be (for a view that hides none).
 inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>& owner, const std::vector<std::array<std::int32_t, 2>>& along, const LineStyle& style,
-    std::optional<Vec3> eye, LaidSurfaces& laid, bool nearSideOnly = false, const std::vector<hatching::sierpinski::Step>& hatch = {}, double hatchAmount = 0) {
+    std::optional<Vec3> eye, LaidSurfaces& laid, bool nearSideOnly = false) {
     const auto& source = *styled.unstyled;
     std::vector<std::unique_ptr<osci::Shape>> shapes;
     std::vector<std::array<std::int32_t, 2>> faces;
@@ -217,25 +199,10 @@ inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>&
             styled.ends.push_back({starts, ends});
         });
     };
-    // Steps of the hatching's curve over the faces, on the smooth surface.
-    const auto addSteps = [&](const std::vector<hatching::sierpinski::Step>& steps, double amount) {
-        const auto point = [&](std::uint32_t face, const surface::Weights& weights) {
-            const auto p = surface::smoothAt(surface.corners, surface.faces, surface.normals, face, weights);
-            return osci::Point(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
-        };
-        for (const auto& step : steps) {
-            shapes.push_back(dimmed(std::make_unique<osci::Line>(point(step.fromFace, step.from), point(step.toFace, step.to)), amount));
-            faces.push_back({static_cast<std::int32_t>(step.fromFace), static_cast<std::int32_t>(step.toFace)});
-            styled.ends.push_back({step.from, step.to});
-        }
-    };
     for (std::size_t pattern = 0; pattern < style.patterns.size(); ++pattern) {
         if (!(style.patterns[pattern] > 0)) { continue; }
         add(surface.pattern(static_cast<surface::Pattern>(pattern), static_cast<int>(style.detail), style.noiseTurn), style.patterns[pattern], patternTurn, true);
     }
-    styled.hatchFrom = shapes.size();
-    if (hatchAmount > 0) { addSteps(hatch, hatchAmount); }
-    styled.hatchTo = shapes.size();
     styled.eyeOnlyFrom = shapes.size();
     if (style.outline > 0 && eye.has_value()) { add(surface::outline(styled.corners, surface.faces, styled.normals, *eye), style.outline, outlineTurn, false); }
     auto drawing = std::make_shared<PreparedDrawing>(std::move(shapes), true);

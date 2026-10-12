@@ -13,12 +13,11 @@
 
 // Lines drawn on a surface: its outline as an eye sees it (where it turns
 // from the eye) and patterns over it that show its shape: a spiral round it,
-// slices through it, rings round its middle, contours of noise (and a
-// Sierpinski curve, laid by SierpinskiHatching.h). Each piece lies on one
-// face, between two points given by
-// their weights on its corners, so whoever draws it can put it wherever the
-// face's corners go (the source's own space, or the scene). Pieces come in
-// order along each line, end to end. Pure geometry, so it can be tested alone.
+// slices through it, rings round its middle, contours of noise. Each piece
+// lies on one face, between two points given by their weights on its
+// corners, so whoever draws it can put it wherever the face's corners go
+// (the source's own space, or the scene). Pieces come in order along each
+// line, end to end. Pure geometry, so it can be tested alone.
 namespace motion::hidden::surface {
 using Face = std::array<std::uint32_t, 3>;
 using Weights = std::array<double, 3>;

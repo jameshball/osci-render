@@ -4,7 +4,6 @@
 #include "../model/LightPresets.h"
 #include "../render/Reflections.h"
 #include "../render/HiddenLineHatching.h"
-#include "../render/SierpinskiHatching.h"
 #include "../render/SurfaceLines.h"
 
 // Pictures of how a surface can draw itself, and of a light's presets, for
@@ -192,12 +191,12 @@ inline const Picture& surfacePicture(SurfaceLook look) {
 }
 
 // How a camera shades what light falls on: by brightness (a ball's lines
-// bright where it is lit and faint where not), or by hatching (a Sierpinski
-// curve over it, dense where it is lit).
-enum class Shading { brightness, hatching, frameHatching };
+// bright where it is lit and faint where not), or by hatching (a Hilbert
+// curve over the frame, dense where it falls on light).
+enum class Shading { brightness, hatching };
 inline const Picture& shadingPicture(Shading shading) {
     static const auto made = [] {
-        std::array<Picture, 3> result;
+        std::array<Picture, 2> result;
         const Vec3 toward = Vec3 {-.6, .55, .58}.normalized().value();
         // The ball's lines, split by how lit they are.
         Picture bright;
@@ -242,39 +241,7 @@ inline const Picture& shadingPicture(Shading shading) {
         // Over the frame: the disc hatched as the frame's grid falls on it,
         // in its frame.
         hatched.context.addRectangle(-1.0f, -1.0f, 2.0f, 2.0f);
-        result[static_cast<std::size_t>(Shading::frameHatching)] = hatched;
-        // On the ball itself, one curve over its faces, lit from the upper left.
-        const auto& made = detail::ball();
-        const auto curve = hidden::hatching::sierpinski::Curve::of(made.corners, made.faces, .14);
-        const auto middleOf = [&](std::uint32_t node) {
-            const auto [face, weights] = curve.middleOf(node);
-            return std::pair {hidden::surface::smoothAt(made.corners, made.faces, made.normals, face, weights), made.normals.at(face, weights)};
-        };
-        const auto lit = hidden::hatching::sierpinski::Lit::of(curve, [&](std::uint32_t leaf) -> double {
-            const auto [at, normal] = middleOf(leaf);
-            if (!detail::facing(normal)) { return -1; }
-            return std::max(0.0, normal.dot(toward)) * std::abs(detail::turned(normal).z);
-        }, [&](std::uint32_t leaf) {
-            const auto& node = curve.nodes[leaf];
-            const auto& face = made.faces[node.face];
-            const auto a = hidden::surface::at(made.corners, face, node.corners[0]), b = hidden::surface::at(made.corners, face, node.corners[1]), c = hidden::surface::at(made.corners, face, node.corners[2]);
-            return (b - a).cross(c - a).length() / 2;
-        }, [&](std::uint32_t leaf) { return middleOf(leaf).first; });
-        juce::Path sierpinskiLines;
-        bool drawing = false;
-        lit.curveAt(.14, lit.brightest(), 1, [&](std::optional<std::uint32_t> node, double light) {
-            if (!node.has_value() || light < hidden::hatching::darkest) {
-                drawing = false;
-                return;
-            }
-            const auto at = detail::onTile(middleOf(*node).first);
-            if (drawing) { sierpinskiLines.lineTo(at); } else { sierpinskiLines.startNewSubPath(at); }
-            drawing = true;
-        });
-        Picture onBall;
-        onBall.lines = sierpinskiLines;
-        onBall.context.addEllipse(-1, -1, 2, 2);
-        result[static_cast<std::size_t>(Shading::hatching)] = onBall;
+        result[static_cast<std::size_t>(Shading::hatching)] = hatched;
         return result;
     }();
     return made[static_cast<std::size_t>(shading)];

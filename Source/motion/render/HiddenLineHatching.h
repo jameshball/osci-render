@@ -13,9 +13,8 @@
 // curve and a dark one has little. Each cell's threshold for dividing is its
 // own, fixed to where the cell is, so as light grows the cells divide one by
 // one rather than all at once, and a gradient of light is a gradient of
-// density. Here the curve is Hilbert's over the frame, fixed to it (Field);
-// SierpinskiHatching.h lays one on each surface instead, to move with it.
-// Pure geometry, so it can be tested alone.
+// density. The curve is Hilbert's over the frame, fixed to it (Field). Pure
+// geometry, so it can be tested alone.
 namespace motion::hidden::hatching {
 // What the curve finds at a point of the frame: the surface seen there, where
 // it is in the scene, and how much light reaches it (0..1).
