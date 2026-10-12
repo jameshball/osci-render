@@ -82,6 +82,34 @@ public:
             expectEquals(near(true), 0, "but not where the block stands between them");
         }
 
+        beginTest("A mirror shows where surfaces cut through each other");
+        {
+            // A small box poking out of the big one's corner: where it comes
+            // out is a line neither box draws.
+            auto project = scene(100);
+            addClip(project, generatorAsset(8, "box"), 80, {{"position.x", .3}, {"position.y", .1}, {"position.z", .3}, {"generator.width", .3}, {"generator.height", .3}, {"generator.depth", .3}});
+            const motion::PreparedComposition prepared(project);
+            motion::hidden::Workspace workspace;
+            const auto frame = motion::hidden::cull(prepared, 1, workspace);
+            const auto eye = prepared.viewpoint(1)->position;
+            // On the big box's front face (z = .3), facing the camera, where the small one's bottom face (y = -.05) meets it.
+            const motion::Vec3 from {.15, -.05, .3}, to {.3, -.05, .3};
+            int along = 0;
+            for (const auto& point : pointsOf(reflectionOf(*frame, floorClip))) {
+                auto direction = (point - eye).normalized().value();
+                direction.y = -direction.y;
+                const motion::Vec3 start {point.x, point.y, point.z};
+                // How near the line off the floor passes to the crossing.
+                const auto edge = to - from;
+                const auto across = direction.cross(edge);
+                if (!(across.length() > 1.0e-9)) { continue; }
+                const auto gap = std::abs((from - start).dot(across)) / across.length();
+                const auto t = (from - start).cross(direction).dot(across) / across.dot(across);
+                along += gap < .004 && t > .2 && t < .8 ? 1 : 0;
+            }
+            expect(along > 0, "the crossing is seen in the floor");
+        }
+
         beginTest("A mirror ball shows the scene on its surface, inside its round rim");
         {
             auto project = scene(0);

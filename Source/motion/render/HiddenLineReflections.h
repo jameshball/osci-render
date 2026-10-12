@@ -1,6 +1,7 @@
 #pragma once
 
 #include "HiddenLineBake.h"
+#include "HiddenLineCrossings.h"
 #include "HiddenLineScene.h"
 #include "Reflections.h"
 #include "SceneRays.h"
@@ -212,6 +213,24 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         }
     }
     rays.build(std::move(faces));
+    // Where surfaces cut through each other, anywhere in the scene, with the
+    // surface and face each piece lies on.
+    std::vector<crossing::Triangle> crossingTriangles;
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> crossingFaces;
+    for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+        const auto& item = items[surface];
+        if (item.drawing == nullptr) { continue; }
+        const auto& triangles = item.drawing->faces().triangles;
+        for (std::uint32_t face = 0; face < triangles.size(); ++face) {
+            const auto& a = world[surface][triangles[face][0]];
+            const auto& b = world[surface][triangles[face][1]];
+            const auto& c = world[surface][triangles[face][2]];
+            if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
+            crossingTriangles.push_back({{*a, *b, *c}, surface});
+            crossingFaces.emplace_back(surface, face);
+        }
+    }
+    const auto crossings = crossing::runsInScene(crossingTriangles, nullptr);
 
     // Scratch, per stretch of line.
     std::vector<double> shares;
@@ -425,6 +444,32 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
             }
         }
 
+        // A straight stretch of a clip's line from `from` to `to` in the
+        // scene (its shape's progress from `start` to `end`), as the mirror
+        // shows it: lit as it is lit, then coloured by its clip.
+        const auto reflectStretch = [&](const SceneItem& item, osci::Shape& shape, const Normals& normals, Vec3 from, Vec3 to, double start, double end, float itself) {
+            const auto response = static_cast<float>(item.clip->lit(time));
+            const auto lineColour = [&](double share, double& shade, float& reaching) {
+                std::array<float, 3> light {1, 1, 1};
+                if (lit) {
+                    light = lightAt(lights, from + (to - from) * share, normals, response, &shade);
+                    reaching = std::max({light[0], light[1], light[2]});
+                }
+                const auto drawnAs = composition.applyCompositionEffects(item.clip->processPoint(litColour(shape.nextVector(static_cast<float>(start + (end - start) * share)), light), time), time);
+                return std::array<float, 3> {std::max(0.0f, drawnAs.r) * itself, std::max(0.0f, drawnAs.g) * itself, std::max(0.0f, drawnAs.b) * itself};
+            };
+            if (mirror.sphere.has_value()) {
+                const auto& sphere = *mirror.sphere;
+                trace(from, to, 0.0, 1.0, [&](Vec3 point, std::optional<Vec3> near) { return sphere.reflectionOf(eye.position, point, near); }, reflector.surface, lineColour);
+                return;
+            }
+            for (const auto& flat : mirror.flats) {
+                for (const auto& [low, high] : flat.spans(eye.position, from, to)) {
+                    trace(from, to, low, high, [&](Vec3 point, std::optional<Vec3>) { return flat.reflectionOf(eye.position, point); }, SceneRays::none, lineColour);
+                }
+            }
+        };
+
         for (std::uint32_t source = 0; source < items.size(); ++source) {
             if (source == reflector.surface) { continue; }
             const auto& item = items[source];
@@ -454,7 +499,6 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 }
             }
             if (!(itself > 0)) { continue; }
-            const auto response = static_cast<float>(item.clip->lit(time));
             for (std::size_t index = 0; index < item.drawing->shapeCount(); ++index) {
                 if (cancelled()) { return std::nullopt; }
                 auto* shape = item.drawing->shape(index);
@@ -482,28 +526,29 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 for (std::size_t stretch = 0; stretch + 1 < path.size(); ++stretch) {
                     const auto& [start, from] = path[stretch];
                     const auto& [end, to] = path[stretch + 1];
-                    if (!from.has_value() || !to.has_value()) { continue; }
-                    // Lit as it is lit, then coloured by its clip.
-                    const auto lineColour = [&](double share, double& shade, float& reaching) {
-                        std::array<float, 3> light {1, 1, 1};
-                        if (lit) {
-                            light = lightAt(lights, *from + (*to - *from) * share, normals, response, &shade);
-                            reaching = std::max({light[0], light[1], light[2]});
-                        }
-                        const auto drawnAs = composition.applyCompositionEffects(item.clip->processPoint(litColour(shape->nextVector(static_cast<float>(start + (end - start) * share)), light), time), time);
-                        return std::array<float, 3> {std::max(0.0f, drawnAs.r) * itself, std::max(0.0f, drawnAs.g) * itself, std::max(0.0f, drawnAs.b) * itself};
-                    };
-                    if (mirror.sphere.has_value()) {
-                        const auto& sphere = *mirror.sphere;
-                        trace(*from, *to, 0.0, 1.0, [&](Vec3 point, std::optional<Vec3> near) { return sphere.reflectionOf(eye.position, point, near); }, reflector.surface, lineColour);
-                        continue;
-                    }
-                    for (const auto& flat : mirror.flats) {
-                        for (const auto& [low, high] : flat.spans(eye.position, *from, *to)) {
-                            trace(*from, *to, low, high, [&](Vec3 point, std::optional<Vec3>) { return flat.reflectionOf(eye.position, point); }, SceneRays::none, lineColour);
-                        }
-                    }
+                    if (from.has_value() && to.has_value()) { reflectStretch(item, *shape, normals, *from, *to, start, end, itself); }
                 }
+            }
+        }
+        // Where surfaces cut through each other: a line on the earlier one,
+        // as it is drawn, wherever it is in the scene.
+        for (const auto& run : crossings) {
+            for (const auto& piece : run) {
+                const auto& [surface, face] = crossingFaces[piece.triangle];
+                if (surface == reflector.surface) { continue; }
+                const auto& item = items[surface];
+                const auto itself = static_cast<float>(1 - item.clip->reflects(time));
+                if (!(itself > 0)) { continue; }
+                const auto& corners = item.drawing->faces().triangles[face];
+                const auto& vertices = item.drawing->faces().vertices;
+                const auto source = [&](const crossing::Weights& weights) {
+                    const auto mixed = [&](float osci::Point::* axis) { return static_cast<float>(vertices[corners[0]].*axis * weights[0] + vertices[corners[1]].*axis * weights[1] + vertices[corners[2]].*axis * weights[2]); };
+                    return osci::Point(mixed(&osci::Point::x), mixed(&osci::Point::y), mixed(&osci::Point::z));
+                };
+                osci::Line line(source(piece.from), source(piece.to));
+                Normals normals;
+                if (lit) { normals.add(normalOf(crossingTriangles[piece.triangle].eye[0], crossingTriangles[piece.triangle].eye[1], crossingTriangles[piece.triangle].eye[2])); }
+                reflectStretch(item, line, normals, piece.eyeFrom, piece.eyeTo, 0.0, 1.0, itself);
             }
         }
         auto drawing = lines.drawing();

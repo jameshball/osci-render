@@ -16,7 +16,8 @@
 // shows where it comes out: a line neither drawing has, but an edge of what is
 // seen all the same. Pure geometry in eye space, so it can be tested alone.
 namespace motion::hidden::crossing {
-// A triangle of a surface that hides, in eye space.
+// A triangle of a surface that hides, in eye space (or, for runsInScene,
+// in the scene).
 struct Triangle {
     std::array<Vec3, 3> eye;
     std::uint32_t surface;
@@ -298,6 +299,63 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
                 }
             }
             first = firstEnd;
+        }
+    }
+    return detail::joined(pieces, triangles);
+}
+
+// Every crossing between different surfaces' triangles anywhere in the
+// scene, not just where an eye sees: what a mirror shows can be anywhere.
+// `triangles`' corners are in the scene, surface by surface. Only surfaces
+// whose boxes overlap are paired, and only their triangles inside the other's
+// box, swept along x. None, once `cancel` is set partway.
+inline std::vector<std::vector<Piece>> runsInScene(const std::vector<Triangle>& triangles, const std::atomic<bool>* cancel = nullptr) {
+    struct Bounds {
+        Vec3 low {1.0e300, 1.0e300, 1.0e300}, high {-1.0e300, -1.0e300, -1.0e300};
+        void include(const Bounds& other) {
+            low = {std::min(low.x, other.low.x), std::min(low.y, other.low.y), std::min(low.z, other.low.z)};
+            high = {std::max(high.x, other.high.x), std::max(high.y, other.high.y), std::max(high.z, other.high.z)};
+        }
+        bool overlaps(const Bounds& other) const {
+            return low.x <= other.high.x && other.low.x <= high.x && low.y <= other.high.y && other.low.y <= high.y && low.z <= other.high.z && other.low.z <= high.z;
+        }
+    };
+    std::vector<Bounds> boxes(triangles.size());
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> surfaces;
+    std::vector<Bounds> surfaceBoxes;
+    for (std::uint32_t index = 0; index < triangles.size(); ++index) {
+        for (const auto& corner : triangles[index].eye) { boxes[index].include({corner, corner}); }
+        if (surfaces.empty() || triangles[surfaces.back().first].surface != triangles[index].surface) {
+            surfaces.push_back({index, index});
+            surfaceBoxes.emplace_back();
+        }
+        surfaces.back().second = index + 1;
+        surfaceBoxes.back().include(boxes[index]);
+    }
+    std::vector<Piece> pieces;
+    std::vector<std::uint32_t> mine, theirs;
+    for (std::size_t one = 0; one < surfaces.size(); ++one) {
+        for (auto other = one + 1; other < surfaces.size(); ++other) {
+            if (cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return {}; }
+            if (!surfaceBoxes[one].overlaps(surfaceBoxes[other])) { continue; }
+            const auto within = [&](std::size_t surface, const Bounds& box, std::vector<std::uint32_t>& found) {
+                found.clear();
+                for (auto index = surfaces[surface].first; index < surfaces[surface].second; ++index) {
+                    if (boxes[index].overlaps(box)) { found.push_back(index); }
+                }
+                std::sort(found.begin(), found.end(), [&](std::uint32_t a, std::uint32_t b) { return boxes[a].low.x < boxes[b].low.x; });
+            };
+            within(one, surfaceBoxes[other], mine);
+            within(other, surfaceBoxes[one], theirs);
+            std::size_t first = 0;
+            for (const auto a : mine) {
+                while (first < theirs.size() && boxes[theirs[first]].high.x < boxes[a].low.x) { ++first; }
+                for (auto index = first; index < theirs.size() && boxes[theirs[index]].low.x <= boxes[a].high.x; ++index) {
+                    if (!boxes[a].overlaps(boxes[theirs[index]])) { continue; }
+                    const auto piece = between(triangles, a, theirs[index]);
+                    if (piece.has_value()) { pieces.push_back(*piece); }
+                }
+            }
         }
     }
     return detail::joined(pieces, triangles);
