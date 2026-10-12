@@ -98,6 +98,30 @@ int main() {
         for (const auto& piece : levels) { heights.insert(std::lround(at(flat, faces[piece.face], piece.from).y * 1.0e4)); }
         check(heights.size() == 8, "eight slices up a flat ball: " + std::to_string(heights.size()));
     }
+    // A flat square, lying down or standing up: a spiral across it is one
+    // line, winding in from its edges as a record's groove does, not many
+    // starts crowded together.
+    for (int lying = 0; lying < 3; ++lying) {
+        std::vector<Vec3> square;
+        std::vector<Face> cells;
+        constexpr int n = 8;
+        for (int i = 0; i <= n; ++i) {
+            for (int j = 0; j <= n; ++j) {
+                const auto u = -1 + 2.0 * i / n, v = -1 + 2.0 * j / n;
+                square.push_back(lying == 0 ? Vec3 {u, 0, v} : lying == 1 ? Vec3 {u, v, 0} : Vec3 {0, u, v});
+            }
+        }
+        for (std::uint32_t i = 0; i < n; ++i) {
+            for (std::uint32_t j = 0; j < n; ++j) {
+                const auto k = i * (n + 1) + j;
+                cells.push_back({k, k + 1, k + n + 2});
+                cells.push_back({k, k + n + 2, k + n + 1});
+            }
+        }
+        const auto pieces = pattern(square, cells, Pattern::spiral, 8);
+        check(!pieces.empty() && pieces.size() < 2000, "a flat square's spiral is a few hundred pieces: " + std::to_string(pieces.size()));
+        check(linesIn(square, cells, pieces) == 1, "one line: " + std::to_string(linesIn(square, cells, pieces)));
+    }
     // Rings and noise lie on the surface too.
     for (const auto kind : {Pattern::rings, Pattern::noise}) {
         const auto pieces = pattern(corners, faces, kind, 16);

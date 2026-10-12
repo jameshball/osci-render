@@ -157,8 +157,13 @@ inline std::vector<Piece> contours(const std::vector<Face>& faces, const std::ve
         // A face with no area (two corners at one place) draws nothing.
         const auto& p = placed[index];
         if (p[0] == p[1] || p[1] == p[2] || p[2] == p[0]) { continue; }
-        const auto low = static_cast<long>(std::ceil(std::min({v[0], v[1], v[2]}) - nudge));
-        const auto high = static_cast<long>(std::floor(std::max({v[0], v[1], v[2]}) - nudge));
+        // Faces are cut finer than the lines are apart, so each crosses a
+        // few levels: more is a pattern run away, drawn as nothing.
+        constexpr double mostLevels = 256;
+        const auto least = std::min({v[0], v[1], v[2]}), most = std::max({v[0], v[1], v[2]});
+        if (!std::isfinite(least) || !std::isfinite(most) || most - least > mostLevels || std::abs(least) > 1.0e15) { continue; }
+        const auto low = static_cast<std::int64_t>(std::ceil(least - nudge));
+        const auto high = static_cast<std::int64_t>(std::floor(most - nudge));
         for (auto level = low; level <= high; ++level) {
             const auto value = static_cast<double>(level) + nudge;
             std::array<Weights, 2> ends {};
@@ -231,16 +236,28 @@ namespace detail {
 // points only, so round a tube (a torus lying down) it climbs up the
 // outside, over the top and down the inside, all the way round, not up both
 // sides to meet at the top: `round` is then how far it is round, where it
-// comes back to its start (zero for a surface with nothing round it).
+// comes back to its start (zero for a surface with nothing round it). A
+// surface flat across its height (`flat`) is climbed in from its rim (its
+// edges no other face shares), or from its outermost points if it has none.
 struct Climb {
     int cuts = 1;
     std::vector<std::vector<std::uint32_t>> grids;
     std::vector<double> up;
     double highest = 0, round = 0;
 
-    static Climb over(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Bounds& bounds, int cuts) {
+    static Climb over(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Bounds& bounds, int cuts, bool flat) {
         Climb climb;
         climb.cuts = cuts;
+        // Edges of one face only, by their ends' places.
+        using Place = std::tuple<std::int64_t, std::int64_t, std::int64_t>;
+        std::map<std::pair<Place, Place>, int> edgeUses;
+        const auto edgeOf = [](Place a, Place b) { return a < b ? std::pair {a, b} : std::pair {b, a}; };
+        if (flat) {
+            for (const auto& f : faces) {
+                for (std::size_t corner = 0; corner < 3; ++corner) { ++edgeUses[edgeOf(placeOf(corners[f[corner]]), placeOf(corners[f[(corner + 1) % 3]]))]; }
+            }
+        }
+        std::vector<char> rim;
         std::vector<Vec3> points;
         std::map<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::uint32_t> at;
         std::vector<std::vector<std::pair<std::uint32_t, double>>> next;
@@ -265,8 +282,18 @@ struct Climb {
                     if (added) {
                         points.push_back(point);
                         next.emplace_back();
+                        rim.push_back(0);
                     }
                     grid.push_back(found->second);
+                }
+            }
+            if (flat) {
+                // Its grid's points along each of its sides on the rim.
+                const auto onRim = [&](Place from, Place to) { return edgeUses[edgeOf(from, to)] == 1; };
+                for (int step = 0; step <= cuts; ++step) {
+                    if (onRim(pa, pb)) { rim[grid[pointAt(0, step)]] = 1; }
+                    if (onRim(pa, pc)) { rim[grid[pointAt(step, 0)]] = 1; }
+                    if (onRim(pb, pc)) { rim[grid[pointAt(step, cuts - step)]] = 1; }
                 }
             }
             for (int row = 0; row < cuts; ++row) {
@@ -280,10 +307,17 @@ struct Climb {
         }
         const auto middle = bounds.middle();
         const auto outFrom = [&](std::uint32_t point) { return std::hypot(points[point].x - middle.x, points[point].z - middle.z); };
-        const auto lowest = [&](std::uint32_t point) { return points[point].y <= bounds.low.y + 1.0e-4 * bounds.size(); };
+        double outermost = 0;
+        for (std::uint32_t point = 0; point < points.size(); ++point) { outermost = std::max(outermost, outFrom(point)); }
+        const auto hasRim = std::any_of(rim.begin(), rim.end(), [](char on) { return on != 0; });
+        const auto lowest = [&](std::uint32_t point) {
+            if (!flat) { return points[point].y <= bounds.low.y + 1.0e-4 * bounds.size(); }
+            return hasRim ? rim[point] != 0 : outFrom(point) >= outermost - 1.0e-4 * bounds.size();
+        };
         // Whether a side may be climbed: not from the lowest points more
-        // inward than up (under a tube, not up a cone).
-        bool restricted = true;
+        // inward than up (under a tube, not up a cone). Across a flat
+        // surface every way is inward.
+        bool restricted = !flat;
         const auto inward = [&](std::uint32_t from, std::uint32_t to) {
             return restricted && lowest(from) && !lowest(to) && outFrom(from) - outFrom(to) > points[to].y - points[from].y;
         };
@@ -367,6 +401,19 @@ struct Climb {
 inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Pattern kind, double across, double turn = 0) {
     if (faces.empty() || !(across > 0)) { return {}; }
     const auto bounds = detail::boundsOf(corners, faces);
+    // A surface flat across x or z (a card facing the eye) spirals about the
+    // axis through it, as if lying down: its axes swapped to make that its
+    // height. The pieces are by face and weights, so are the same either way.
+    const auto thin = bounds.size() * 1.0e-3;
+    const auto extent = bounds.high - bounds.low;
+    if (kind == Pattern::spiral && extent.y > thin && (extent.x <= thin || extent.z <= thin)) {
+        std::vector<Vec3> lying;
+        lying.reserve(corners.size());
+        for (const auto& corner : corners) { lying.push_back(extent.x <= thin ? Vec3 {corner.y, corner.x, corner.z} : Vec3 {corner.x, corner.z, corner.y}); }
+        return pattern(lying, faces, kind, across, turn);
+    }
+    // Flat across its height: a spiral winds in from its rim.
+    const auto level = !(extent.y > thin);
     const auto spacing = bounds.size() / across;
     // Slices and the spiral are spaced by its height, so a flat thing (a
     // torus lying down) has as many across its thickness as a tall one up it.
@@ -380,7 +427,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     std::optional<detail::Climb> climb;
     double highest = 0;
     if (kind == Pattern::spiral) {
-        const auto rough = detail::Climb::over(corners, faces, bounds, 1);
+        const auto rough = detail::Climb::over(corners, faces, bounds, 1, level);
         double longest = 0;
         for (const auto& f : faces) { longest = std::max({longest, (corners[f[1]] - corners[f[0]]).length(), (corners[f[2]] - corners[f[1]]).length(), (corners[f[0]] - corners[f[2]]).length()}); }
         const auto apart = std::min(spacing, std::max(rough.highest, bounds.size() * 1.0e-3) / across);
@@ -388,15 +435,16 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         // per corner of a fine mesh already, a few hundred thousand at most.
         auto cuts = std::clamp(static_cast<int>(std::ceil(longest / (apart / 3))), 1, 64);
         while (cuts > 1 && static_cast<double>(faces.size()) * (cuts + 1) * (cuts + 2) / 2 > 3.0e5) { cuts = (cuts + 1) / 2 == cuts ? cuts - 1 : (cuts + 1) / 2; }
-        climb = cuts == 1 ? rough : detail::Climb::over(corners, faces, bounds, cuts);
+        climb = cuts == 1 ? rough : detail::Climb::over(corners, faces, bounds, cuts, level);
         highest = climb->highest;
     }
     const auto climbing = std::max(highest, bounds.size() * 1.0e-3) / across;
     // Its lines climb steeply enough to be seen to (at about 18 degrees),
     // like a screw's thread: as many side by side as keep them `climbing`
-    // apart, each a turn further up for every turn round.
+    // apart, each a turn further up for every turn round. Across a flat
+    // surface it is one line, a record's groove.
     const auto around = std::max(bounds.high.x - bounds.low.x, bounds.high.z - bounds.low.z) / 2;
-    const auto starts = std::max(1.0, std::round(2 * 3.14159265358979323846 * around * std::tan(18 * 3.14159265358979323846 / 180) / climbing));
+    const auto starts = level ? 1.0 : std::max(1.0, std::round(2 * 3.14159265358979323846 * around * std::tan(18 * 3.14159265358979323846 / 180) / climbing));
     const auto middle = bounds.middle();
     constexpr double whole = 2 * 3.14159265358979323846;
     // Noise morphs as three fields mixed by a point going round a circle of
