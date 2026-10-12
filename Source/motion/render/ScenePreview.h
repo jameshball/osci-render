@@ -39,10 +39,13 @@ public:
     // Message thread: the frame of `project` (whose revision is `revision`)
     // at `time`, from `eye`, over `reach`.
     void request(std::shared_ptr<const Project> project, std::uint64_t revision, double time, hidden::OtherEye eye) {
+        // The request replaced is let go of after the lock: it may hold the
+        // last reference to a project.
+        std::optional<Request> replaced = Request {std::move(project), revision, time, eye};
         {
             const juce::SpinLock::ScopedLockType lock(queueLock);
             if (revision != runningRevision) { cancel.store(true); }
-            pending = Request {std::move(project), revision, time, eye};
+            std::swap(pending, replaced);
         }
         wake.signal();
     }
@@ -78,6 +81,11 @@ private:
             try {
                 if (composition == nullptr || preparedRevision != job->revision) {
                     composition = std::make_unique<PreparedComposition>(*job->project, 48000, &cancel, CompositionPurpose::signal, job->eye.reach);
+                    // A preparation cancelled part way is not kept for the revision.
+                    if (cancel.load()) {
+                        composition.reset();
+                        continue;
+                    }
                     preparedRevision = job->revision;
                     identities.clear();
                     for (const auto& clip : composition->clips) { identities.push_back(identityOf(clip)); }
@@ -90,10 +98,13 @@ private:
                 result->time = job->time;
                 result->frame = std::move(*frame);
                 result->clips = identities;
+                // The result replaced is freed after the lock.
+                std::shared_ptr<const Shown> replaced = std::move(result);
                 {
                     const juce::SpinLock::ScopedLockType lock(resultLock);
-                    shown = std::move(result);
+                    std::swap(shown, replaced);
                 }
+                replaced.reset();
                 if (ready) { ready(); }
             } catch (...) {
                 composition.reset();
