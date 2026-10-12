@@ -159,6 +159,25 @@ public:
             }
         }
 
+        beginTest("A drawing of many tiny turns is drawn no brighter for its length than the rest");
+        {
+            // A zigzag of 1500 tiny turns (a mirror's view of a detailed scene, shrunk
+            // small): its corners alone would take half the cycle for a seventh of the length.
+            std::vector<osci::Point> zigzag;
+            for (int i = 0; i <= 1500; ++i) { zigzag.emplace_back(-.05f + .1f * static_cast<float>(i) / 1500, i % 2 == 0 ? 0.0f : .0005f); }
+            const motion::PreparedComposition composition(project({{polygon(1, zigzag, false), .5}, {square(2, .5f), -.4}}), 192000);
+            motion::BeamRenderer beam;
+            cycle(composition, 192000, 3, beam);
+            std::int64_t tiny = 0, big = 0;
+            for (const auto& segment : beam.plannedSegments()) {
+                if (segment.kind != motion::BeamRenderer::Kind::draw) { continue; }
+                (segment.clip == &composition.clips[0] ? tiny : big) += segment.count;
+            }
+            const auto tinyLength = 1500 * std::hypot(.1 / 1500, .0005), bigLength = 4.0;
+            const auto ratio = (static_cast<double>(tiny) / tinyLength) / (static_cast<double>(big) / bigLength);
+            expect(ratio < 1.6, "samples by length alike: " + juce::String(ratio, 2) + "x (" + juce::String(tiny) + " for the zigzag, " + juce::String(big) + " for the square)");
+        }
+
         beginTest("Opacity dims a layer through its colour; the beam time stays the same for every layer");
         {
             const auto shape = square(1, .15f);

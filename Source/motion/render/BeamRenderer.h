@@ -38,6 +38,9 @@ public:
     // Tour improvement stops after this many candidate checks and moved
     // layers, bounding planning cost however many layers are visible.
     static constexpr std::int64_t maximumOrderingWork = 8192;
+    // How many times its length's share of the cycle a layer's corners may
+    // take before it is traced by its strokes' ends instead (see finishPlan).
+    static constexpr double brightest = 1.5;
 
     enum class Kind : std::uint8_t { draw, move, hold };
     struct Segment {
@@ -295,6 +298,20 @@ private:
         std::array<std::int64_t, maximumLayers> counts{};
         std::array<std::int64_t, maximumLayers> floors{};
         for (std::size_t i = 0; i < layerCount; ++i) { floors[i] = items[i].minimum; }
+        // A layer whose strokes' corners alone would take far more of the
+        // cycle than its length's share (a mirror's view of a detailed scene,
+        // shrunk small in it: many tiny strokes, little length) would be drawn
+        // that much brighter than the rest, and flash as it comes and goes:
+        // it makes do with its strokes' ends from the start, as it would
+        // were the cycle short of time.
+        {
+            double weighed = 0;
+            for (std::size_t i = 0; i < layerCount; ++i) { weighed += items[i].length * items[i].share; }
+            for (std::size_t i = 0; i < layerCount && weighed > 0; ++i) {
+                const auto fair = static_cast<double>(total) * items[i].length * items[i].share / weighed;
+                if (static_cast<double>(floors[i]) > brightest * fair && floors[i] > items[i].coarse) { floors[i] = items[i].coarse; }
+            }
+        }
         while (layerCount > 0) {
             std::int64_t overhead = dwell + settle;
             for (std::size_t i = 1; i < layerCount; ++i) { overhead += 2 * dwell + settle + timing.travel(exitOf(i - 1), entryOf(i)); }
