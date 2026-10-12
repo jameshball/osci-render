@@ -479,8 +479,15 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto eye = [&](const PreparedClip& clip, osci::Point point) { return composition.eyePoint(clip.processPoint(point, time), time); };
     const auto screen = [&](const std::optional<Vec3>& point) { return cameraProjection(point); };
     const auto place = [&](const SceneItem& item, const osci::Point& point) { return composition.worldPoint(*item.clip, point, time); };
-    // Where a clip's point lands in the frame, with or without a camera.
+    // Where a clip's point lands in the frame the lines are seen in: the
+    // other eye's when there is one, else the camera's, or the Scope's.
+    const auto otherEye = from != nullptr ? Eye {from->eye.position, from->eye.right, from->eye.up, from->eye.forward} : Eye {};
+    const Projection otherProjection {from != nullptr ? from->eye.focalLength : 1.0};
     const auto onFrame = [&](const PreparedClip& clip, const osci::Point& point) -> std::optional<Screen> {
+        if (from != nullptr) {
+            const auto at = composition.worldPoint(clip, point, time);
+            return at.has_value() ? otherProjection(otherEye.see(*at)) : std::nullopt;
+        }
         if (view.has_value()) { return screen(eye(clip, point)); }
         const auto projected = composition.projectVisible(clip.processPoint(point, time), time);
         if (!projected.has_value()) { return std::nullopt; }
