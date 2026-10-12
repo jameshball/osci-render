@@ -39,17 +39,20 @@ inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool qua
 // How a surface draws itself: its own lines (edges), its outline as the
 // camera sees it, and patterns over it (in Pattern order: spiral, Hilbert
 // curve, noise, slices, rings), each as a brightness 0..1, and how many
-// lines across a pattern draws. Groups dim its edges and add their outline
-// and patterns.
+// lines across a pattern draws, and how far round its loop the noise has
+// morphed (turns). Groups dim its edges, add their outline and patterns, and
+// move its noise on by theirs.
 struct LineStyle {
     double edges = 1, outline = 0;
     std::array<double, patternCount> patterns {};
     double detail = objectPropertySpecs[fillDetailIndex].defaultValue;
+    double noiseTurn = 0;
     bool plain() const { return edges == 1 && outline == 0 && std::all_of(patterns.begin(), patterns.end(), [](double amount) { return amount == 0; }); }
     void include(const LineStyle& outer) {
         edges *= outer.edges;
         outline = std::max(outline, outer.outline);
         for (std::size_t pattern = 0; pattern < patternCount; ++pattern) { patterns[pattern] = std::max(patterns[pattern], outer.patterns[pattern]); }
+        noiseTurn += outer.noiseTurn;
     }
 };
 
@@ -130,6 +133,12 @@ struct TransformPose {
         }
         return false;
     }
+    // How far round its loop the noise is at a time: its phase, and as many
+    // turns as its flow has taken it by then.
+    static double noiseTurnAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
+        const auto turn = curves[noisePhaseIndex].evaluate(time) / 360 + curves[noiseFlowIndex].evaluate(time) * time;
+        return std::isfinite(turn) ? turn : 0.0;
+    }
     // A Lines property, 0..1.
     static double share(const std::array<Curve, objectPropertySpecs.size()>& curves, std::size_t index, double time) {
         const auto value = curves[index].evaluate(time) / 100;
@@ -206,6 +215,7 @@ struct PreparedGroup {
         style.edges = TransformPose::share(curves, edgesIndex, time);
         style.outline = TransformPose::share(curves, outlineIndex, time);
         for (std::size_t pattern = 0; pattern < patternCount; ++pattern) { style.patterns[pattern] = TransformPose::share(curves, patternsIndex + pattern, time); }
+        style.noiseTurn = TransformPose::noiseTurnAt(curves, time);
         return style;
     }
     const TransformPose& pose(double time) const {
@@ -257,6 +267,7 @@ struct PreparedClipStage {
         for (std::size_t pattern = 0; pattern < patternCount; ++pattern) { style.patterns[pattern] = TransformPose::share(curves, patternsIndex + pattern, local); }
         const auto detail = curves[fillDetailIndex].evaluate(local);
         style.detail = std::isfinite(detail) ? objectPropertySpecs[fillDetailIndex].clamp(std::round(detail)) : objectPropertySpecs[fillDetailIndex].defaultValue;
+        style.noiseTurn = TransformPose::noiseTurnAt(curves, local);
         for (const auto& group : groups) { style.include(group.lines(scopeTime(time))); }
         return style;
     }

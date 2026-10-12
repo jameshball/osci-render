@@ -139,6 +139,25 @@ int main() {
         }
         check(linesIn(square, halves, pieces) == 12, "four whole rings, and two more cut in four by the corners: " + std::to_string(linesIn(square, halves, pieces)));
     }
+    // Noise morphs as it turns round its loop, and is back as it was after a
+    // whole turn, never sooner.
+    {
+        const auto at = [&](double turn) { return pattern(corners, faces, Pattern::noise, 8, turn); };
+        const auto same = [&](const std::vector<Piece>& one, const std::vector<Piece>& other) {
+            if (one.size() != other.size()) { return false; }
+            for (std::size_t index = 0; index < one.size(); ++index) {
+                if (one[index].face != other[index].face) { return false; }
+                for (std::size_t corner = 0; corner < 3; ++corner) {
+                    if (std::abs(one[index].from[corner] - other[index].from[corner]) > 1.0e-6 || std::abs(one[index].to[corner] - other[index].to[corner]) > 1.0e-6) { return false; }
+                }
+            }
+            return true;
+        };
+        const auto start = at(0);
+        check(same(start, at(1)) && same(start, at(-2)), "a whole turn brings it back");
+        for (const auto turn : {.01, .25, .5, .75}) { check(!same(start, at(turn)), "it morphs on the way round: " + std::to_string(turn)); }
+        check(same(at(.3), at(1.3)), "wherever it starts");
+    }
     std::cout << "SurfaceLinesTests passed\n";
     return 0;
 }

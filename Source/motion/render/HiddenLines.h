@@ -404,6 +404,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto viewpoint = from != nullptr ? std::optional(from->eye) : composition.viewpoint(time);
     const auto eyeAt = viewpoint.has_value() ? std::optional(viewpoint->position) : std::nullopt;
     bool outlining = false;
+    // Another eye hides nothing; when the camera would, it is shown only the
+    // near side of what surfaces lay on themselves.
+    const auto nearSideOnly = from != nullptr && camera != nullptr && camera->hidesHiddenLines;
     for (std::size_t surface = 0; restyling && surface < items.size(); ++surface) {
         auto& item = items[surface];
         if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
@@ -411,7 +414,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         if (style.plain()) { continue; }
         auto& into = styled[surface];
         into.unstyled = item.drawing;
-        restyle(into, item.source, workspace.facesAlongOf(*item.drawing, item.source), style, world[surface], eyeAt, workspace.laid);
+        restyle(into, item.source, workspace.facesAlongOf(*item.drawing, item.source), style, world[surface], eyeAt, workspace.laid, nearSideOnly);
         item.drawing = into.drawing.get();
         item.styled = &into;
         outlining = outlining || into.eyeOnlyFrom < into.drawing->shapeCount();

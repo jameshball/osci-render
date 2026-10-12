@@ -20,12 +20,21 @@ public:
         std::vector<surface::Face> faces;
         surface::Smoothing smoothing;
         surface::Normals normals;
-        std::map<std::pair<int, int>, std::vector<surface::Piece>> patterns;
+        // Whether it is closed (every edge has a face either side), so the
+        // eye sees only its near side.
+        bool closed = false;
+        std::map<std::tuple<int, int, double>, std::vector<surface::Piece>> patterns;
 
-        const std::vector<surface::Piece>& pattern(surface::Pattern kind, int detail) {
-            const std::pair key {static_cast<int>(kind), detail};
+        // A pattern laid on it; noise at `turn` round its loop. Of noise that
+        // morphs, only the latest is kept.
+        const std::vector<surface::Piece>& pattern(surface::Pattern kind, int detail, double turn) {
+            const auto noise = kind == surface::Pattern::noise;
+            const std::tuple key {static_cast<int>(kind), detail, noise ? turn : 0.0};
             auto found = patterns.find(key);
-            if (found == patterns.end()) { found = patterns.emplace(key, surface::pattern(corners, faces, kind, detail)).first; }
+            if (found == patterns.end()) {
+                if (noise) { std::erase_if(patterns, [](const auto& laid) { return std::get<0>(laid.first) == static_cast<int>(surface::Pattern::noise); }); }
+                found = patterns.emplace(key, surface::pattern(corners, faces, kind, detail, noise ? turn : 0.0)).first;
+            }
             return found->second;
         }
     };
@@ -41,6 +50,18 @@ public:
             made.faces.assign(mesh.triangles.begin(), mesh.triangles.end());
             made.smoothing = surface::Smoothing::of(made.corners, made.faces);
             made.normals = made.smoothing.normals(made.corners, made.faces);
+            std::map<std::pair<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::tuple<std::int64_t, std::int64_t, std::int64_t>>, int> sides;
+            for (const auto& face : made.faces) {
+                // A face with no area (two corners at one place) has no sides.
+                const std::array places {surface::detail::placeOf(made.corners[face[0]]), surface::detail::placeOf(made.corners[face[1]]), surface::detail::placeOf(made.corners[face[2]])};
+                if (places[0] == places[1] || places[1] == places[2] || places[2] == places[0]) { continue; }
+                for (std::size_t side = 0; side < 3; ++side) {
+                    auto a = places[side], b = places[(side + 1) % 3];
+                    if (b < a) { std::swap(a, b); }
+                    ++sides[{a, b}];
+                }
+            }
+            made.closed = !sides.empty() && std::all_of(sides.begin(), sides.end(), [](const auto& side) { return side.second == 2; });
             found = laid.emplace(&drawing, std::move(made)).first;
         }
         return found->second;
@@ -61,6 +82,11 @@ inline constexpr double outlineTurn = .1, patternTurn = .2;
 // where on its face the stretch's ends are.
 template <typename Line>
 void smoothLines(const LaidSurfaces::Surface& surface, const std::vector<surface::Piece>& pieces, double turn, Line&& line) {
+    // Where the last piece ended, flat and lifted: a piece going on from
+    // there starts exactly there, though its face's corners lift the place
+    // a little differently (at a cone's tip, each face takes its normal from
+    // the faces near it alone), so a line stays one stroke.
+    std::optional<std::pair<Vec3, osci::Point>> ended;
     for (const auto& piece : pieces) {
         const auto stretches = surface::stretchesOf(surface.normals, piece, turn);
         const auto weightsAt = [&](double share) {
@@ -72,12 +98,15 @@ void smoothLines(const LaidSurfaces::Surface& surface, const std::vector<surface
             const auto p = surface::smoothAt(surface.corners, surface.faces, surface.normals, piece.face, weightsAt(static_cast<double>(stretch) / stretches));
             return osci::Point(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
         };
-        auto previous = point(0);
+        const auto& face = surface.faces[piece.face];
+        const auto flatStart = surface::at(surface.corners, face, piece.from);
+        auto previous = ended.has_value() && surface::detail::placeOf(ended->first) == surface::detail::placeOf(flatStart) ? ended->second : point(0);
         for (int stretch = 1; stretch <= stretches; ++stretch) {
             const auto next = point(stretch);
             line(previous, next, piece.face, weightsAt(static_cast<double>(stretch - 1) / stretches), weightsAt(static_cast<double>(stretch) / stretches));
             previous = next;
         }
+        ended = std::pair {surface::at(surface.corners, face, piece.to), previous};
     }
 }
 
@@ -119,9 +148,11 @@ struct Styled {
 };
 
 // Draws a surface in its style (`styled.unstyled` its drawing), `world`
-// holding its mesh's corners in the scene, as `eye` sees it.
+// holding its mesh's corners in the scene, as `eye` sees it. `nearSideOnly`:
+// what is laid on a closed surface's far side from the eye is left out, as
+// lines hidden there would be (for a view that hides none).
 inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>& owner, const std::vector<std::array<std::int32_t, 2>>& along, const LineStyle& style,
-    const std::vector<std::optional<Vec3>>& world, std::optional<Vec3> eye, LaidSurfaces& laid) {
+    const std::vector<std::optional<Vec3>>& world, std::optional<Vec3> eye, LaidSurfaces& laid, bool nearSideOnly = false) {
     const auto& source = *styled.unstyled;
     std::vector<std::unique_ptr<osci::Shape>> shapes;
     std::vector<std::array<std::int32_t, 2>> faces;
@@ -143,18 +174,31 @@ inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>&
     styled.normals = surface.smoothing.normals(styled.corners, surface.faces);
     styled.laidFrom = shapes.size();
     styled.ends.clear();
-    const auto add = [&](const std::vector<surface::Piece>& pieces, double amount, double turn) {
+    const auto add = [&](const std::vector<surface::Piece>& pieces, double amount, double turn, bool laidOn) {
+        const auto culling = laidOn && nearSideOnly && surface.closed && eye.has_value();
+        // Its faces' normals point out of it or into it, as its faces wind:
+        // which, by the sign of what they enclose.
+        double enclosed = 0;
+        for (std::size_t index = 0; culling && index < surface.faces.size(); ++index) {
+            const auto& f = surface.faces[index];
+            enclosed += styled.corners[f[0]].dot(styled.corners[f[1]].cross(styled.corners[f[2]]));
+        }
+        const auto farSide = [&](std::uint32_t face, const surface::Weights& at) {
+            const auto facing = styled.normals.at(face, at).dot(*eye - surface::at(styled.corners, surface.faces[face], at));
+            return enclosed < 0 ? facing > 0 : facing < 0;
+        };
         smoothLines(surface, pieces, turn, [&](osci::Point from, osci::Point to, std::uint32_t face, const surface::Weights& starts, const surface::Weights& ends) {
+            if (culling && farSide(face, starts) && farSide(face, ends)) { return; }
             shapes.push_back(dimmed(std::make_unique<osci::Line>(from, to), amount));
             faces.push_back({static_cast<std::int32_t>(face), -1});
             styled.ends.push_back({starts, ends});
         });
     };
     for (std::size_t pattern = 0; pattern < style.patterns.size(); ++pattern) {
-        if (style.patterns[pattern] > 0) { add(surface.pattern(static_cast<surface::Pattern>(pattern), static_cast<int>(style.detail)), style.patterns[pattern], patternTurn); }
+        if (style.patterns[pattern] > 0) { add(surface.pattern(static_cast<surface::Pattern>(pattern), static_cast<int>(style.detail), style.noiseTurn), style.patterns[pattern], patternTurn, true); }
     }
     styled.eyeOnlyFrom = shapes.size();
-    if (style.outline > 0 && eye.has_value()) { add(surface::outline(styled.corners, surface.faces, styled.normals, *eye), style.outline, outlineTurn); }
+    if (style.outline > 0 && eye.has_value()) { add(surface::outline(styled.corners, surface.faces, styled.normals, *eye), style.outline, outlineTurn, false); }
     auto drawing = std::make_shared<PreparedDrawing>(std::move(shapes), true);
     drawing->setFaces(source.faces());
     drawing->setShapeFaces(std::move(faces));

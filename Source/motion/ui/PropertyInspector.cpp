@@ -365,7 +365,7 @@ juce::String MotionPropertyInspector::sectionOf(const juce::String& group) const
     }
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
     if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Reflects" || group == "Beam") { return "Appearance"; }
-    if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Hilbert curve" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail") { return "Lines"; }
+    if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Hilbert curve" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail" || group == "Noise phase" || group == "Noise flow") { return "Lines"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }

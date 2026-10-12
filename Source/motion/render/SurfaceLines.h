@@ -240,12 +240,20 @@ inline std::array<int, 2> hilbertPoint(int order, std::int64_t index) {
 // A pattern over the faces, `across` lines across the surface's largest
 // side. A spiral turns about the surface's own up (y) through its middle,
 // slices run along it, and rings centre on its front (its nearest along z).
-inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Pattern kind, double across) {
+// `turn`: how far round its loop noise has morphed (a whole turn brings it
+// back as it was).
+inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Pattern kind, double across, double turn = 0) {
     if (faces.empty() || !(across > 0)) { return {}; }
     const auto bounds = detail::boundsOf(corners, faces);
     const auto spacing = bounds.size() / across;
     const auto middle = bounds.middle();
-    constexpr double turn = 2 * 3.14159265358979323846;
+    constexpr double whole = 2 * 3.14159265358979323846;
+    // Noise morphs as three fields mixed by a point going round a circle of
+    // the sphere of their mixes, tipped off its middle: as strong all the way
+    // round, and never at its opposite (which would draw the same lines), so
+    // it comes back only after a whole turn.
+    constexpr double tip = .5;
+    const std::array<double, 3> mix {std::cos(tip) * std::cos(whole * turn), std::cos(tip) * std::sin(whole * turn), std::sin(tip)};
     if (kind == Pattern::hilbert) {
         // Laid on from the side each face looks to most, as a texture laid
         // on a box round it: a curve on each of its six sides, each face
@@ -339,9 +347,12 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
             case Pattern::slices: return (p.y + middle.y - bounds.low.y) / spacing + .5;
             // Round its front (its middle, at its nearest along z): a bullseye seen from in front.
             case Pattern::rings: return (p - Vec3 {0, 0, bounds.high.z - middle.z}).length() / spacing + .5;
-            case Pattern::noise: return 2.5 * detail::noise(p * (across / bounds.size() * .5) + Vec3 {17.3, 5.1, 9.7});
+            case Pattern::noise: {
+                const auto at = p * (across / bounds.size() * .5);
+                return 2.5 * (mix[0] * detail::noise(at + Vec3 {17.3, 5.1, 9.7}) + mix[1] * detail::noise(at + Vec3 {-41.7, 23.9, 3.3}) + mix[2] * detail::noise(at + Vec3 {8.1, -29.3, 61.7}));
+            }
             case Pattern::spiral:
-            default: return (p.y + bounds.size() / 2) / spacing - (onAxis ? from : from + std::remainder(std::atan2(p.z, p.x) - from, turn)) / turn;
+            default: return (p.y + bounds.size() / 2) / spacing - (onAxis ? from : from + std::remainder(std::atan2(p.z, p.x) - from, whole)) / whole;
         }
     };
     // Found on the faces cut finely (a few times to a spacing), so the

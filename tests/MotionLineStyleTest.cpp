@@ -143,6 +143,76 @@ public:
             expect(points.size() > 100, "it is drawn where the light falls");
             expect(steepest < .03f, "its light changes smoothly with its height: " + juce::String(steepest));
         }
+
+        beginTest("Seen from another eye, only the near side of a pattern shows when the camera hides lines");
+        {
+            const auto farPoints = [&](bool hiding) {
+                const motion::PreparedComposition prepared(scene({{"edges", 0}, {"spiral", 100}}, false, hiding));
+                motion::hidden::Workspace workspace;
+                const motion::Vec3 position {2.5, 1, 1};
+                const auto forward = (motion::Vec3 {} - position).normalized().value();
+                const auto right = forward.cross({0, 1, 0}).normalized().value();
+                const motion::hidden::OtherEye other {{position, right, right.cross(forward), forward, 2}, {1.5, 1.5}};
+                const auto frame = motion::hidden::cull(prepared, 1, workspace, nullptr, &other);
+                int far = 0;
+                for (const auto& point : pointsOf(frame->drawing(0))) {
+                    const motion::Vec3 at {point.x, point.y, point.z};
+                    far += at.normalized().value().dot(position - at) < -.05 ? 1 : 0;
+                }
+                return far;
+            };
+            expect(farPoints(false) > 100, "with nothing hidden, all of it shows");
+            expectEquals(farPoints(true), 0, "with lines hidden, none of its far side");
+        }
+
+        beginTest("A pattern's lines run on unbroken, even over a cone's tip");
+        {
+            motion::Project project;
+            project.duration = 3;
+            addClip(project, generatorAsset(1, "cone"), 10, {{"edges", 0}, {"slices", 100}});
+            const motion::PreparedComposition prepared(project);
+            motion::hidden::Workspace workspace;
+            const auto frame = motion::hidden::cull(prepared, 1, workspace);
+            const auto* drawn = frame->drawing(0);
+            int breaks = 0;
+            for (std::size_t index = 1; drawn != nullptr && index < drawn->shapeCount(); ++index) {
+                const auto a = drawn->shape(index - 1)->nextVector(1), b = drawn->shape(index)->nextVector(0);
+                // Apart by more than a drawing takes as joined.
+                breaks += std::hypot(static_cast<double>(a.x - b.x), static_cast<double>(a.y - b.y), static_cast<double>(a.z - b.z)) > 1.0e-6 ? 1 : 0;
+            }
+            expect(drawn != nullptr && drawn->shapeCount() > 500, "the slices are drawn");
+            expect(breaks <= 8, "each slice one stroke: " + juce::String(breaks) + " breaks");
+        }
+
+        beginTest("Noise morphs as it flows, and comes back round after a whole turn");
+        {
+            const auto drawnAt = [&](double time, double phase) {
+                motion::Project project;
+                project.duration = 6;
+                addClip(project, generatorAsset(1, "sphere"), 10, {{"edges", 0}, {"noise", 100}, {"noiseFlow", .5}, {"noisePhase", phase}});
+                const motion::PreparedComposition prepared(project);
+                motion::hidden::Workspace workspace;
+                const auto frame = motion::hidden::cull(prepared, time, workspace);
+                std::vector<float> points;
+                for (const auto& point : pointsOf(frame->drawing(0))) {
+                    points.push_back(static_cast<float>(point.x));
+                    points.push_back(static_cast<float>(point.y));
+                }
+                return points;
+            };
+            const auto alike = [](const std::vector<float>& one, const std::vector<float>& other) {
+                if (one.size() != other.size()) { return false; }
+                for (std::size_t index = 0; index < one.size(); ++index) {
+                    if (std::abs(one[index] - other[index]) > 1.0e-4f) { return false; }
+                }
+                return true;
+            };
+            const auto start = drawnAt(.5, 0);
+            expect(!start.empty(), "it draws");
+            expect(!alike(start, drawnAt(1, 0)), "half a second on, it has morphed");
+            expect(alike(start, drawnAt(2.5, 0)), "a turn later (2 s at half a turn a second) it is as it was");
+            expect(alike(start, drawnAt(.5, 360)), "and a whole turn of phase is none");
+        }
     }
 
 private:

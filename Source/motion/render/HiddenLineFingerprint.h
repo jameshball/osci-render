@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CompositionRenderer.h"
+#include "SurfaceLines.h"
 #include <vector>
 
 namespace motion::hidden {
@@ -42,7 +43,8 @@ public:
             if (!active) { continue; }
             add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0, clip.lit(time), clip.reflects(time));
             const auto lines = clip.lines(time);
-            add(lines.edges, lines.outline, lines.detail);
+            // Its noise's turn only while it draws noise.
+            add(lines.edges, lines.outline, lines.detail, lines.patterns[static_cast<std::size_t>(surface::Pattern::noise)] > 0 ? lines.noiseTurn : 0.0);
             for (const auto amount : lines.patterns) { add(amount); }
             // The drawing it shows (frames that repeat one are the same), or
             // for a point source the frame.
