@@ -44,12 +44,10 @@ public:
     }
     bool empty() const { return triangles.empty(); }
 
-    using Near = GrazedSurface;
-
     // Whether a face is between `from` and `to`, other than a face of
     // `ignored`. Hits within `nearFrom` of `from` or `nearTo` of `to` (in the
     // scene's units) don't count: a point on a surface is never hidden by it.
-    bool blocked(Vec3 from, Vec3 to, double nearFrom, double nearTo, std::uint32_t ignored = none, Near near = {}) const {
+    bool blocked(Vec3 from, Vec3 to, double nearFrom, double nearTo, std::uint32_t ignored = none, GrazedSurface near = {}) const {
         if (nodes.empty()) { return false; }
         const auto span = to - from;
         const auto length = span.length();

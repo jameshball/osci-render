@@ -223,13 +223,13 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         // A straight stretch of line from `from` to `to` in the scene, where
         // the mirror shows it between those shares of it: `reflection(point,
         // near)` is where a point of it is seen (`near`, where a point next
-        // to it is), and `colourAt(share, shade, light)` the colour it is
-        // drawn there, telling what shadows take and the light it takes.
+        // to it is), and `colourAt(share, shade, bright)` the colour it is
+        // drawn there, telling what shadows take and how bright it is drawn.
         // A ball is round where its mesh is not: what hides it from the eye
         // is found along the line to the eye, not in the camera's depth
         // buffer, where its own faces seen edge on would cut its rim.
         const auto byRay = depth != nullptr && mirror.sphere.has_value();
-        const auto trace = [&](Vec3 from, Vec3 to, double low, double high, auto&& reflection, std::uint32_t ignored, auto&& colourAt, SceneRays::Near grazed = {}) {
+        const auto trace = [&](Vec3 from, Vec3 to, double low, double high, auto&& reflection, std::uint32_t ignored, auto&& colourAt, GrazedSurface grazed = {}) {
             const auto pointAt = [&](double share) { return from + (to - from) * share; };
             // As finely as a pixel of its reflection, from a few points of it.
             double length = 0;
@@ -414,14 +414,16 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         // scene (its shape's progress from `start` to `end`), as the mirror
         // shows it: lit as it is lit, then coloured by its clip. Only in
         // `only`, of a flat mirror's pieces, when given.
-        const auto reflectStretch = [&](const SceneItem& item, osci::Shape& shape, const Normals& normals, Vec3 from, Vec3 to, double start, double end, float itself, const FlatMirror* only = nullptr, SceneRays::Near grazed = {}) {
+        const auto reflectStretch = [&](const SceneItem& item, osci::Shape& shape, const Normals& normals, Vec3 from, Vec3 to, double start, double end, float itself, const FlatMirror* only = nullptr, GrazedSurface grazed = {}) {
             const auto response = static_cast<float>(item.clip->lit(time));
+            // As bright as it is drawn: by its style, as little as its own
+            // surface mirrors, and its light.
+            const auto* dimmed = dynamic_cast<const DimmedShape*>(&shape);
+            const auto drawn = (dimmed != nullptr ? dimmed->gain() : 1.0f) * itself;
             const auto lineColour = [&](double share, double& shade, float& reaching) {
                 std::array<float, 3> light {1, 1, 1};
-                if (lit) {
-                    light = lightAt(lights, from + (to - from) * share, normals.at(start + (end - start) * share), response, &shade);
-                    reaching = std::max({light[0], light[1], light[2]});
-                }
+                if (lit) { light = lightAt(lights, from + (to - from) * share, normals.at(start + (end - start) * share), response, &shade); }
+                reaching = drawn * (lit ? std::max({light[0], light[1], light[2]}) : 1.0f);
                 const auto drawnAs = composition.applyCompositionEffects(item.clip->processPoint(litColour(shape.nextVector(static_cast<float>(start + (end - start) * share)), light), time), time);
                 return std::array<float, 3> {std::max(0.0f, drawnAs.r) * itself, std::max(0.0f, drawnAs.g) * itself, std::max(0.0f, drawnAs.b) * itself};
             };

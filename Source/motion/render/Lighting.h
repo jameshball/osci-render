@@ -45,9 +45,6 @@ struct Projection {
     double focalLength = 1;
     bool parallel = false;
     double far = 0, span = 1;
-    // Nothing nearer a perspective eye than this is seen or hides anything.
-    static constexpr double nearPlane = .05;
-
     std::optional<Screen> operator()(Vec3 eye) const {
         if (parallel) { return Screen {eye.x * focalLength, eye.y * focalLength, 1 + (far - eye.z) / span}; }
         if (!(eye.z > nearPlane)) { return std::nullopt; }
@@ -91,10 +88,9 @@ struct LightView {
         return views[best];
     }
     // How wide a pixel of its shadows is at a point, in the scene.
-    double texel(Vec3 world) const { return texel(world, viewOf(world)); }
     double texel(Vec3 world, const ShadowView& view) const {
         const auto size = view.depth->pixelSize() / std::max(1.0e-9, view.projection.focalLength);
-        return view.projection.parallel ? size : size * std::max(Projection::nearPlane, view.eye.see(world).z);
+        return view.projection.parallel ? size : size * std::max(nearPlane, view.eye.see(world).z);
     }
 
     // How much of the light reaches a point (1 where nothing blocks it), as

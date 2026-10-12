@@ -507,7 +507,7 @@ struct PreparedCamera {
     // Shorter axes are degenerate: a parent scaled flat, or a target at the camera.
     static constexpr double minimumAxis = 1.0e-9;
     // Points nearer than this to a camera are not drawn.
-    static constexpr double nearPlane = 0.05;
+    static constexpr double nearPlane = hidden::nearPlane;
     // The point on the camera's image plane; none at or behind the near plane.
     static std::optional<osci::Point> project(const Frame& frame, osci::Point point) {
         const auto offset = Vec3 {point.x, point.y, point.z} - frame.position;

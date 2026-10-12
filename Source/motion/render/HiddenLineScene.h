@@ -20,8 +20,6 @@ inline constexpr double testStep = DepthBuffer::pixel;
 // A piece this short at the end of a cut run (two pixels) is too small to
 // see but would cost the beam a sample of its own, so it is trimmed.
 inline constexpr double sliver = 2 * DepthBuffer::pixel;
-// Nothing nearer the eye than this is drawn or hides anything.
-inline constexpr double nearPlane = Projection::nearPlane;
 
 struct Styled;
 
@@ -42,14 +40,15 @@ struct SceneItem {
     const Styled* styled = nullptr;
 };
 
-// How much of the beam's time a lit part takes for its length, beside the
-// rest: less the dimmer its brightest light, down to a little. Drawn more
-// quickly where it is dim, it leaves its time to what is bright, and a part
-// fading out gives its time back as it fades rather than all at once when it
-// goes. Its colour stays the light it takes, so what the light dims evenly is
-// still dimmer; this only shares the beam among the parts.
+// How much of the beam's time a part takes for its length, beside the rest,
+// from how bright it is drawn (its brightest light, its style's amount and
+// how little its surface mirrors, together): less the dimmer it is, down to a
+// little. Drawn more quickly where it is dim, it leaves its time to what is
+// bright, and a part fading out gives its time back as it fades rather than
+// all at once when it goes. Its colour stays as dim as it is, so what dims
+// evenly is still dimmer; this only shares the beam among the parts.
 // On a display with no brightness input (`xyOnly`), its time is all there is
-// to show its light by, and its colour is not dimmed.
+// to show its brightness by, and its colour is not dimmed.
 inline constexpr double leastLitWeight = .05;
 inline double litWeight(double brightest, bool xyOnly = false) {
     const auto light = std::max(0.0, brightest);

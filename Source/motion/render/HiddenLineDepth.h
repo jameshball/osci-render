@@ -7,6 +7,10 @@
 #include <vector>
 
 namespace motion::hidden {
+// Nothing nearer an eye than this (a camera, or a light seeing what it
+// shadows) is seen, drawn, or hides anything.
+inline constexpr double nearPlane = .05;
+
 // A point on screen, in output units (the frame spans -1 to 1), with its
 // inverse depth (1 / distance along the view): what a depth buffer compares.
 struct Screen {
@@ -86,7 +90,6 @@ public:
         empty = true;
         clear();
     }
-    Reach reach() const { return covered; }
 
     // Only what was drawn since the last clear is cleared.
     void clear() {

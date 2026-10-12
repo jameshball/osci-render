@@ -1264,6 +1264,7 @@ void MotionEditor::timerCallback() {
         if (processor.lightsFrames()) { doing.add("lighting"); done.add("lit"); }
         if (processor.reflectsFrames()) { doing.add("reflecting"); done.add("reflected"); }
         if (processor.restylesFrames()) { doing.add("drawing lines on surfaces"); done.add("lines drawn on surfaces"); }
+        if (processor.hatchesFrames()) { doing.add("hatching"); done.add("hatched"); }
         if (hiding.has_value() && !doing.isEmpty()) {
             const auto last = doing.strings.getLast();
             doing.remove(doing.size() - 1);
