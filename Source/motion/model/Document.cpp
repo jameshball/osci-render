@@ -504,8 +504,11 @@ juce::Result Document::setTempoFromAudio(Id clipId, double bpm, double downbeat,
     return juce::Result::ok();
 }
 
+// Every identity comes from this document's counter (reset() raises it past
+// a loaded project's), so the counter is the highest in use.
 Id Document::highestId() const {
-    return highestProjectIdentity(state, lastId);
+    jassert(highestProjectIdentity(state, lastId) == lastId);
+    return lastId;
 }
 
 juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, Asset copy, Id& madeId) {
@@ -1167,10 +1170,10 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
         // scoped independently inside the definition after this operation.
         copy.muted = !trackIsAudible(state, track);
         copy.solo = false;
-        auto group = track.group;
-        while (group != 0) {
-            requiredGroups.insert(group);
-            group = findGroup(state, group)->parent;
+        // Ancestors already collected end the walk (their own were too).
+        for (auto group = track.group; group != 0 && requiredGroups.insert(group).second;) {
+            const auto* found = findGroup(state, group);
+            group = found != nullptr ? found->parent : 0;
         }
         definition->tracks.push_back(std::move(copy));
     }
