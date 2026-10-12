@@ -336,7 +336,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         group.name = item->getStringAttribute("name", "Group").toStdString();
         group.muted = item->getBoolAttribute("muted", false);
         group.solo = item->getBoolAttribute("solo", false);
-        group.height = std::clamp(item->getIntAttribute("height", 0), 0, Track::maximumHeight);
+        group.height = Track::rowHeight(item->getIntAttribute("height", 0));
         group.spatialPath = item->getBoolAttribute("spatialPath", false);
         group.quaternionRotation = item->getBoolAttribute("quaternionRotation", false);
         const auto effects = loadEffects(*item, group.effects, identities);
@@ -368,8 +368,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         track.muted = row->getBoolAttribute("muted", false);
         track.solo = row->getBoolAttribute("solo", false);
         track.locked = row->getBoolAttribute("locked", false);
-        track.height = std::clamp(row->getIntAttribute("height", 0), 0, Track::maximumHeight);
-        if (track.height != 0) { track.height = std::max(track.height, Track::minimumHeight); }
+        track.height = Track::rowHeight(row->getIntAttribute("height", 0));
         track.label = std::clamp(row->getIntAttribute("label", 0), 0, 8);
         const auto groupIdentity = readId(*row, "group");
         if (!groupIdentity.has_value()) {
@@ -687,7 +686,8 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         const auto identity = claimId(*item, identities);
         if (!identity.has_value()) { return juce::Result::fail("Invalid asset identity."); }
         asset->id = *identity;
-        asset->name = item->getStringAttribute("name");
+        // A name is only shown, so a missing one is replaced below, not refused.
+        asset->name = item->getStringAttribute("name").trim().removeCharacters("\r\n");
         asset->extension = item->getStringAttribute("extension");
         if (asset->extension.equalsIgnoreCase(".blender")) {
             const auto* live = item->getChildByName("blender");
@@ -701,6 +701,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             project.assets.push_back(std::move(asset));
             continue;
         }
+        if (asset->name.isEmpty()) { asset->name = "Untitled" + asset->extension; }
         if (asset->extension.equalsIgnoreCase(".lsystem")) { asset->fractalDepth = item->getIntAttribute("fractalDepth", -1); }
         if (asset->extension.equalsIgnoreCase(".txt")) {
             const auto* text = item->getChildByName("typography");

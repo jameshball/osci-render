@@ -206,6 +206,8 @@ struct Track {
     // the project, changed without undo and kept across undo/redo.
     int height = 0;
     static constexpr int minimumHeight = 22, maximumHeight = 240;
+    // A requested row height kept within range; 0 stays the default.
+    static int rowHeight(int height) { return height <= 0 ? 0 : std::clamp(height, minimumHeight, maximumHeight); }
     // Label colour index for the timeline (0: automatic, by clip kind).
     int label = 0;
 

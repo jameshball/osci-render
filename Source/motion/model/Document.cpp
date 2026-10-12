@@ -560,7 +560,7 @@ bool Document::setTrackHeight(Id trackId, int height) {
 
 bool Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
     std::map<Id, int> wanted;
-    for (const auto& [id, height] : heights) { wanted[id] = height == 0 ? 0 : std::clamp(height, Track::minimumHeight, Track::maximumHeight); }
+    for (const auto& [id, height] : heights) { wanted[id] = Track::rowHeight(height); }
     std::set<Id> found;
     forEachComposition(state, [&](const Composition& composition) {
         for (const auto& track : composition.tracks) { if (wanted.contains(track.id)) { found.insert(track.id); } }
