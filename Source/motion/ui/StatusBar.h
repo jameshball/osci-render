@@ -22,6 +22,7 @@ public:
         addAndMakeVisible(message);
         stats.setFont(motion::style::caption());
         stats.setJustificationType(juce::Justification::centredRight);
+        stats.setMinimumHorizontalScale(1.0f);
         stats.setColour(juce::Label::textColourId, osci::Colours::textSubtle());
         addAndMakeVisible(stats);
         action.setName("Status action");
@@ -63,8 +64,12 @@ public:
         repaint();
     }
     juce::String text() const { return message.getText(); }
+    // Shown whole while it fits in half the bar; its tooltip always has it whole.
     void setStatistics(const juce::String& text) {
-        if (stats.getText() != text) { stats.setText(text, juce::dontSendNotification); }
+        if (stats.getText() == text) { return; }
+        stats.setText(text, juce::dontSendNotification);
+        stats.setTooltip(text);
+        resized();
     }
 
     // A problem is a pill as long as its words: a dot in its colour, the
@@ -79,7 +84,8 @@ public:
     }
     void resized() override {
         auto area = getLocalBounds().reduced(motion::style::padding, 0);
-        stats.setBounds(area.removeFromRight(360));
+        const auto statsWidth = juce::roundToInt(juce::TextLayout::getStringWidth(stats.getFont(), stats.getText())) + 8;
+        stats.setBounds(area.removeFromRight(std::min(statsWidth, area.getWidth() / 2)));
         area.removeFromRight(motion::style::padding);
         const auto problem = current != Kind::notice;
         const auto text = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), message.getText())) + 2;
