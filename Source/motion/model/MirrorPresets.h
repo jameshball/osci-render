@@ -5,7 +5,7 @@
 
 namespace motion {
 // Mirrors ready to add: a generator's surface reflecting wholly. Any surface
-// reflects with Reflects (Appearance).
+// reflects with its Mirror property (Surface).
 struct MirrorPreset {
     std::string_view name, generator;
 };

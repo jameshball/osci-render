@@ -3,9 +3,11 @@
 #include "../render/BeamRenderer.h"
 #include <vector>
 
-// How the beam's time is shared at a moment, exactly as the renderer plans
-// it: each object's fraction of the drawing time, for the editor's readouts.
-// Owns its own planner, so it never touches the audio thread's.
+// How the beam's time is shared at a moment, as the renderer plans it: each
+// object's fraction of the drawing time, for the editor's readouts. Planned on
+// the editor's composition, which bakes nothing, so what mirrors show, the
+// camera's hatching and lines hidden behind meshes aren't counted. Owns its
+// own planner, so it never touches the audio thread's.
 class MotionBeamShares {
 public:
     struct Share {

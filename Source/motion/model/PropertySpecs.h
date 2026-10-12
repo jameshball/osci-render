@@ -31,7 +31,7 @@ inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
 // beam's time: 2x draws it twice as slowly (brighter on a scope) and takes the
 // time from the others; 0 leaves it out. Lit by lights is how far lights light
 // it: at 0 it draws in its own colour whatever lights shine, as a flame or a
-// screen gives off its own light. Reflects is how brightly its surfaces show
+// screen gives off its own light. Mirror is how brightly its surfaces show
 // the rest of the scene, as a mirror does: at 100 a perfect mirror. A group's
 // makes what it holds reflect at least as much. The Lines properties are how
 // a surface draws itself: its own lines (Edges), its outline as the camera
@@ -92,7 +92,7 @@ inline bool isLinesProperty(std::string_view id) {
 }
 
 // The same properties as Properties shows them: the anchor closes Transform,
-// and Reflects closes Surface, after how the surface draws itself.
+// and Mirror closes Surface, after how the surface draws itself.
 inline constexpr auto objectInspectorSpecs = [] {
     constexpr auto order = std::to_array<std::size_t>({0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 18});
     static_assert(order.size() == objectPropertySpecs.size(), "every property, once");
