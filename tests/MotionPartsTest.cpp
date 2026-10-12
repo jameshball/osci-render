@@ -163,13 +163,14 @@ private:
         expectEquals(after.tracks[1].clips.front().id, created, "the part sits on a new track just above the clip");
         const auto& copy = after.tracks[1].clips.front();
         const auto& kept = after.tracks[2].clips.front();
-        expect(copy.asset == part->id && kept.asset == rest->id);
+        const auto partSource = motion::findAsset(after.assets, copy.asset), restSource = motion::findAsset(after.assets, kept.asset);
+        expect(partSource != nullptr && restSource != nullptr && partSource != part && restSource != rest, "the document keeps its own copies of the halves");
         expect(copy.sameTiming(kept) && copy.properties.at("position.x").keyframes().size() == 1, "the part keeps the clip's timing and keys");
         expect(copy.effects.size() == 1 && copy.effects.front().id != 30, "effects are copied with their own identities");
         expect(after.tracks[1].solo && after.tracks[1].effects.size() == 1 && after.tracks[1].effects.front().id != 40, "the part's track keeps the track's solo and effects");
         expect(motion::findAsset(after.assets, 1) == nullptr, "the unused original leaves the library");
-        expectEquals(part->name, juce::String("Hello part.svg"));
-        expectEquals(rest->name, juce::String("Hello.svg"), "the rest keeps its source's name");
+        expectEquals(partSource->name, juce::String("Hello part.svg"));
+        expectEquals(restSource->name, juce::String("Hello.svg"), "the rest keeps its source's name");
         expectEquals(juce::String(kept.name), juce::String("Hello.txt"), "the clip keeps its own name");
         expect(undo.undo());
         expectEquals(static_cast<int>(document.project().tracks.size()), 2);

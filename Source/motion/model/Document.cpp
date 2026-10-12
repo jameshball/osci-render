@@ -508,10 +508,10 @@ Id Document::highestId() const {
     return highestProjectIdentity(state, lastId);
 }
 
-juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy) {
+juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, Asset copy, Id& madeId) {
+    madeId = 0;
     const auto& state = project();
-    if (expected == nullptr || copy == nullptr || expected == copy || std::find(state.assets.begin(), state.assets.end(), copy) != state.assets.end()
-        || std::find(state.assets.begin(), state.assets.end(), expected) == state.assets.end()) {
+    if (expected == nullptr || std::find(state.assets.begin(), state.assets.end(), expected) == state.assets.end()) {
         return juce::Result::fail("The source changed while preparing its copy.");
     }
     const auto references = sourceReferenceCount(mainProject(), expected->id);
@@ -524,13 +524,13 @@ juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const A
             if (track.locked || clip.asset != expected->id) { return juce::Result::fail("The selected clip is locked or its source has changed."); }
             const auto highest = highestId();
             if (highest >= maximumId) { return juce::Result::fail("There are no remaining source identities."); }
-            if (copy->liveIdentity != nullptr) { copy->liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
-            copy->id = highest + 1;
-            copy->name = copy->liveIdentity != nullptr ? expected->name + " copy" : expected->name.upToLastOccurrenceOf(".", false, false) + " copy " + juce::String(static_cast<juce::uint64>(copy->id)) + expected->extension;
-            lastId = copy->id;
-            edit("Make source unique", [trackIndex, clipIndex, copy](Project& project) {
-                project.assets.push_back(copy);
-                project.tracks.change(trackIndex).clips[clipIndex].asset = copy->id;
+            if (copy.liveIdentity != nullptr) { copy.liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
+            copy.id = highest + 1;
+            copy.name = copy.liveIdentity != nullptr ? expected->name + " copy" : expected->name.upToLastOccurrenceOf(".", false, false) + " copy " + juce::String(static_cast<juce::uint64>(copy.id)) + expected->extension;
+            lastId = madeId = copy.id;
+            edit("Make source unique", [trackIndex, clipIndex, made = std::make_shared<const Asset>(std::move(copy))](Project& project) {
+                project.assets.push_back(made);
+                project.tracks.change(trackIndex).clips[clipIndex].asset = made->id;
             });
             return juce::Result::ok();
         }
@@ -852,18 +852,22 @@ juce::Result Document::extractParts(const std::vector<PartSplit>& splits, std::v
         if (required > maximumId - highest) { return juce::Result::fail("There are no remaining identities for the parts."); }
         const auto stem = original->name.containsChar('.') ? original->name.upToLastOccurrenceOf(".", false, false) : original->name;
         const auto partStem = partName.endsWithIgnoreCase(part->extension) ? partName.dropLastCharacters(part->extension.length()) : partName;
-        for (auto [asset, named] : {std::pair {part, partStem}, std::pair {rest, stem}}) {
-            asset->id = ++highest;
-            asset->name = uniqueAssetName(candidate, named + asset->extension);
-            candidate.assets.push_back(asset);
-        }
+        // The document keeps its own copies of the halves, named and numbered here.
+        const auto add = [&](const Asset& half, const juce::String& named) {
+            auto made = std::make_shared<Asset>(half);
+            made->id = ++highest;
+            made->name = uniqueAssetName(candidate, named + made->extension);
+            candidate.assets.push_back(made);
+            return made;
+        };
+        const auto madePart = add(*part, partStem), madeRest = add(*rest, stem);
         auto copy = clip;
         renumber(copy, highest, owners);
         renumber(copy.effects, highest, owners);
-        copy.asset = part->id;
-        copy.name = part->name.toStdString();
+        copy.asset = madePart->id;
+        copy.name = madePart->name.toStdString();
         // The clip keeps its name, as its source does.
-        changeClip(candidate, clipId)->asset = rest->id;
+        changeClip(candidate, clipId)->asset = madeRest->id;
         Track track;
         track.id = ++highest;
         track.kind = trackAt->kind;

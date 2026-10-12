@@ -419,10 +419,11 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             }
             auto& document = owner->processor.document;
             if (request.uniqueClip != 0) {
-                const auto separated = document.makeSourceUnique(request.uniqueClip, request.replacement, asset);
+                motion::Id made = 0;
+                const auto separated = document.makeSourceUnique(request.uniqueClip, request.replacement, *asset, made);
                 if (separated.failed()) { owner->statusBar.show(separated.getErrorMessage()); return; }
                 owner->assetLibrary.refresh();
-                owner->assetLibrary.selectAsset(asset->id);
+                owner->assetLibrary.selectAsset(made);
                 owner->libraryTabs.setSelectedIndex(0);
                 owner->select(request.uniqueClip);
                 return;

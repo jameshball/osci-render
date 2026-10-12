@@ -204,13 +204,14 @@ public:
                 project.tracks.push_back(track);
             }
         });
-        auto copy = std::make_shared<motion::Asset>(*asset);
         const auto current = document.mainProject().assets.front();
-        expect(document.makeSourceUnique(document.project().tracks.front().clips.front().id, current, copy).wasOk());
-        expect(copy->liveIdentity != asset->liveIdentity);
+        motion::Id madeId = 0;
+        expect(document.makeSourceUnique(document.project().tracks.front().clips.front().id, current, *asset, madeId).wasOk());
+        const auto copy = motion::findAsset(document.project().assets, madeId);
+        expect(copy != nullptr && copy->liveIdentity != asset->liveIdentity);
         controller.poll();
-        expect(frames->resolve(copy->liveIdentity.get()) == nullptr);
-        expect(controller.listen(copy->id, true).failed());
+        expect(copy != nullptr && frames->resolve(copy->liveIdentity.get()) == nullptr);
+        expect(controller.listen(madeId, true).failed());
 
         beginTest("Project replacement prunes the listener and old snapshots cannot resolve the reopened source");
         document.reset(std::move(reopened)); controller.poll();

@@ -203,7 +203,7 @@ public:
     // Several clips in one undo step; placement is checked after every change applies.
     juce::Result setClipTimings(const std::vector<std::pair<Id, ClipTiming>>& timings);
     juce::Result duplicateClip(Id sourceId, Id& duplicateId);
-    juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy);
+    juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, Asset copy, Id& madeId);
     std::size_t compositionReferenceCount(Id definition) const;
     juce::Result removeComposition(Id definition);
     juce::Result insertComposition(Id definition, double time, Id track, Id group, Id& clipId);
@@ -226,7 +226,7 @@ public:
     // named `name`, on a new track just above, which keeps the track's
     // effects, mute and solo. An old source leaves the library when no other
     // clip uses it. Takes over both assets' identities and names.
-    struct PartSplit { Id clip = 0; std::shared_ptr<Asset> part, rest; juce::String name; };
+    struct PartSplit { Id clip = 0; std::shared_ptr<const Asset> part, rest; juce::String name; };
     juce::Result extractParts(const std::vector<PartSplit>& splits, std::vector<Id>& partClips);
     juce::Result renameAsset(Id assetId, juce::String name);
     // Swaps a source's media in place (same identity, so every clip keeps its
