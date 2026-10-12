@@ -194,10 +194,10 @@ inline const Picture& surfacePicture(SurfaceLook look) {
 // How a camera shades what light falls on: by brightness (a ball's lines
 // bright where it is lit and faint where not), or by hatching (a Hilbert
 // curve over it, dense where it is lit).
-enum class Shading { brightness, hatching };
+enum class Shading { brightness, hatching, frameHatching };
 inline const Picture& shadingPicture(Shading shading) {
     static const auto made = [] {
-        std::array<Picture, 2> result;
+        std::array<Picture, 3> result;
         const Vec3 toward = Vec3 {-.6, .55, .58}.normalized().value();
         // The ball's lines, split by how lit they are.
         Picture bright;
@@ -239,7 +239,35 @@ inline const Picture& shadingPicture(Shading shading) {
                 open = true;
             }
         }
-        result[static_cast<std::size_t>(Shading::hatching)] = hatched;
+        // Over the frame: the disc hatched as the frame's grid falls on it,
+        // in its frame.
+        hatched.context.addRectangle(-1.0f, -1.0f, 2.0f, 2.0f);
+        result[static_cast<std::size_t>(Shading::frameHatching)] = hatched;
+        // On the ball itself, from its sides, lit from the upper left.
+        const auto& made = detail::ball();
+        const auto sides = hidden::hatching::onSurface::Sides::of(made.corners, made.faces, 5);
+        const auto lit = hidden::hatching::onSurface::Lit::of(sides, [&](std::uint32_t face, const hidden::surface::Weights& weights) -> double {
+            const auto normal = made.normals.at(face, weights);
+            if (!detail::facing(normal)) { return -1; }
+            return std::max(0.0, normal.dot(toward));
+        });
+        std::vector<hidden::surface::Piece> pieces;
+        std::optional<std::pair<std::size_t, std::array<double, 2>>> previous;
+        lit.curve(24, lit.brightest(), 1, [&](std::size_t side, const std::optional<std::array<double, 2>>& middle, double light) {
+            if (!middle.has_value() || light < hidden::hatching::darkest) {
+                previous.reset();
+                return;
+            }
+            if (previous.has_value() && previous->first == side) {
+                const auto step = hidden::hatching::onSurface::cut(sides, side, made.corners, made.faces, previous->second, *middle);
+                pieces.insert(pieces.end(), step.begin(), step.end());
+            }
+            previous = std::pair {side, *middle};
+        });
+        Picture onBall;
+        onBall.lines = detail::laid(pieces);
+        onBall.context.addEllipse(-1, -1, 2, 2);
+        result[static_cast<std::size_t>(Shading::hatching)] = onBall;
         return result;
     }();
     return made[static_cast<std::size_t>(shading)];

@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include <set>
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/BeamRenderer.h"
@@ -166,11 +167,12 @@ public:
             expectEquals(farPoints(true), 0, "with lines hidden, none of its far side");
         }
 
-        beginTest("A camera hatching shades by a curve's density: on the surfaces it sees, densest where lit");
+        beginTest("A camera hatching over its frame shades by a curve's density: on the surfaces it sees, densest where lit");
         {
             auto project = scene({{"edges", 0}});
             project.cameras.front().properties["hatching"] = motion::Curve(100);
             project.cameras.front().properties["hatchDetail"] = motion::Curve(256);
+            project.cameras.front().properties["hatchFrame"] = motion::Curve(1);
             // From one side: that half of the ball is lit, the other in its own shadow.
             addClip(project, generatorAsset(5, "directionalLight"), 50, {{"rotation.x", 0}, {"rotation.y", 90}, {"light.shadows", 100}});
             // At 48 kHz, so the beam's cycle holds less than the curve would take.
@@ -202,6 +204,50 @@ public:
             bool drawn = false;
             for (const auto& segment : beam.plannedSegments()) { drawn = drawn || (segment.kind == motion::BeamRenderer::Kind::draw && segment.world && segment.clip == &prepared.clips[0]); }
             expect(drawn, "the beam draws the hatching");
+        }
+
+        beginTest("A camera hatching on its surfaces lays the curve on them, so it moves with them");
+        {
+            const auto hatchAt = [&](double x, double turn) {
+                auto project = scene({{"edges", 0}, {"position.x", x}, {"rotation.y", turn}});
+                project.cameras.front().properties["hatching"] = motion::Curve(100);
+                project.cameras.front().properties["hatchDetail"] = motion::Curve(64);
+                // From one side: that half lit, the other in its own shadow.
+                addClip(project, generatorAsset(5, "directionalLight"), 50, {{"rotation.x", 0}, {"rotation.y", 90}, {"light.shadows", 100}});
+                const motion::PreparedComposition prepared(project, 48000);
+                motion::hidden::Workspace workspace;
+                const auto frame = motion::hidden::cull(prepared, 1, workspace);
+                expect(frame->hatching.empty(), "nothing over the frame");
+                const auto& styled = workspace.styled[0];
+                std::vector<std::array<float, 3>> lines;
+                for (auto index = styled.hatchFrom; index < styled.hatchTo; ++index) {
+                    const auto point = styled.drawing->shape(index)->nextVector(.5f);
+                    lines.push_back({point.x, point.y, point.z});
+                }
+                return std::pair {lines, styled.hatchTo - styled.hatchFrom};
+            };
+            const auto [here, count] = hatchAt(0, 0);
+            expect(count > 100, "the ball carries the hatching: " + juce::String(static_cast<int>(count)));
+            std::size_t onBall = 0, onLeft = 0, onRight = 0;
+            for (const auto& point : here) {
+                const auto length = std::sqrt(point[0] * point[0] + point[1] * point[1] + point[2] * point[2]);
+                onBall += length < radius + 1.0e-3 && length > radius * .9 ? 1 : 0;
+                (point[0] > 0 ? onRight : onLeft) += 1;
+            }
+            expectEquals(static_cast<int>(onBall), static_cast<int>(here.size()), "every line of it on the ball (in its own space)");
+            expect(std::max(onLeft, onRight) > 3 * std::min(onLeft, onRight), "densest where lit: " + juce::String(static_cast<int>(onLeft)) + " / " + juce::String(static_cast<int>(onRight)));
+            // Moved, and lit the same, it is the same curve in the ball's own
+            // space, but for what turns to or from the eye.
+            const auto [moved, movedCount] = hatchAt(.1, 0);
+            const auto keyed = [](const std::vector<std::array<float, 3>>& lines) {
+                std::set<std::array<long, 3>> keys;
+                for (const auto& point : lines) { keys.insert({std::lround(point[0] * 1.0e4), std::lround(point[1] * 1.0e4), std::lround(point[2] * 1.0e4)}); }
+                return keys;
+            };
+            const auto before = keyed(here), after = keyed(moved);
+            std::size_t same = 0;
+            for (const auto& key : before) { same += after.count(key); }
+            expect(same > before.size() * 8 / 10, "it moves with the ball: " + juce::String(static_cast<int>(same)) + " of " + juce::String(static_cast<int>(before.size())) + " lines the same");
         }
 
         beginTest("A pattern's lines run on unbroken, even over a cone's tip");

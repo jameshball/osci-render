@@ -369,7 +369,7 @@ juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
     if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Beam") { return "Appearance"; }
     if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Hilbert curve" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail" || group == "Noise phase" || group == "Noise flow" || group == "Mirror") { return "Surface"; }
-    if (group == "Hatching" || group == "Hatch detail") { return "Shading"; }
+    if (group == "Hatching" || group == "Hatch detail" || group == "Hatch on frame") { return "Shading"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }
@@ -498,11 +498,20 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         using motion::ui::pictures::Shading;
         shadingTiles = std::make_unique<motion::ui::TileGrid>("Shading", std::vector<motion::ui::TileGrid::Choice> {
             {"Brightness", "Light shows as how bright each line is drawn", motion::ui::pictures::shadingPicture(Shading::brightness)},
-            {"Hatching", "Light shows as how densely a Hilbert curve covers each surface: it reads on any scope, by X and Y alone", motion::ui::pictures::shadingPicture(Shading::hatching)}},
-            2, motion::ui::TileGrid::Look::pictures, true);
+            {"Hatching", "Light shows as how densely a Hilbert curve laid on each surface covers it, moving with it: it reads on any scope, by X and Y alone", motion::ui::pictures::shadingPicture(Shading::hatching)},
+            {"On frame", "Hatching over the frame, fixed to it as things move under it", motion::ui::pictures::shadingPicture(Shading::frameHatching)}},
+            3, motion::ui::TileGrid::Look::pictures, true);
         shadingTiles->onClick = [this](std::size_t index) {
             if (shadingTiles->tile(index).getToggleState()) { return; }
-            commitValue("hatching", index == 1 ? 100.0 : 0.0, index == 1 ? "Shade by hatching" : "Shade by brightness");
+            const auto found = motion::findPropertyTarget(processor.document.project(), target);
+            if (!found.has_value() || found->locked) { return; }
+            const auto time = keyTime(*found);
+            // How much it hatches and where, as one change.
+            processor.document.edit(index == 0 ? "Shade by brightness" : index == 1 ? "Shade by hatching" : "Shade by hatching on the frame", [&](motion::Project& project) {
+                apply(project, "hatching", index == 0 ? 0.0 : 100.0, time);
+                if (index > 0) { apply(project, "hatchFrame", index == 2 ? 1.0 : 0.0, time); }
+            });
+            if (onKeyTimeEdited) { onKeyTimeEdited(); }
         };
         content.addAndMakeVisible(*shadingTiles);
     }
@@ -556,13 +565,20 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         const auto* curve = found.curve("hatching");
         const auto amount = curve != nullptr ? curve->evaluateBase(time) : 0.0;
         const auto moving = (curve != nullptr && curve->animated()) || isModulated("hatching");
+        const auto* where = found.curve("hatchFrame");
+        const auto onFrame = where != nullptr && where->evaluateBase(time) > .5;
+        const auto whereMoves = (where != nullptr && where->animated()) || isModulated("hatchFrame");
+        const auto badge = moving ? juce::String("~") : amount > 0 && amount < 99.5 ? juce::String(juce::roundToInt(amount)) + "%" : juce::String();
         shadingTiles->setState(0, !(amount > 0));
-        shadingTiles->setState(1, amount > 0, moving ? juce::String("~") : amount > 0 && amount < 99.5 ? juce::String(juce::roundToInt(amount)) + "%" : juce::String());
+        shadingTiles->setState(1, amount > 0 && !onFrame, onFrame ? juce::String() : badge);
+        shadingTiles->setState(2, amount > 0 && onFrame, onFrame ? badge : juce::String());
         shadingTiles->setLocked(found.locked);
-        // Hatching's rows only while it hatches, or is keyed or driven to.
+        // Hatching's rows only while it hatches, or is keyed or driven to;
+        // where it hatches is chosen by the tiles, so has a row only when
+        // keyed or driven.
         for (auto& row : rows) {
             if (row->section != "Shading") { continue; }
-            const auto shown = amount > 0 || moving;
+            const auto shown = row->group == "Hatch on frame" ? whereMoves : amount > 0 || moving;
             if (row->isVisible() != shown) {
                 row->setVisible(shown);
                 changed = true;

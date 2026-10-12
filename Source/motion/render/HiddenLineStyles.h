@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HiddenLineHatching.h"
 #include "HiddenLineScene.h"
 #include "SurfaceLines.h"
 #include <map>
@@ -23,6 +24,14 @@ public:
         // Whether it is closed (every edge has a face either side), so the
         // eye sees only its near side.
         bool closed = false;
+        // As each of the six sides of a box round it sees it, for hatching,
+        // by how finely.
+        std::map<int, hatching::onSurface::Sides> sides;
+        const hatching::onSurface::Sides& sidesAt(int deepest) {
+            auto found = sides.find(deepest);
+            if (found == sides.end()) { found = sides.emplace(deepest, hatching::onSurface::Sides::of(corners, faces, deepest)).first; }
+            return found->second;
+        }
         std::map<std::tuple<int, int, double>, std::vector<surface::Piece>> patterns;
 
         // A pattern laid on it; noise at `turn` round its loop. Of noise that
@@ -121,18 +130,40 @@ struct Styled {
     // The drawing it was given, and the one it draws instead.
     const PreparedDrawing* unstyled = nullptr;
     std::shared_ptr<const PreparedDrawing> drawing;
-    // Where the lines laid on it begin, and where its outline's do.
-    std::size_t laidFrom = 0, eyeOnlyFrom = 0;
+    // Where the lines laid on it begin, where its hatching's begin and end,
+    // and where its outline's begin.
+    std::size_t laidFrom = 0, hatchFrom = 0, hatchTo = 0, eyeOnlyFrom = 0;
     // For each line laid on it, where on its face the line's ends are.
     std::vector<std::array<surface::Weights, 2>> ends;
-    // Its corners and normals in the scene, this frame.
+    // Its corners and normals in the scene, this frame, and which way its
+    // faces wind: the sign of what they enclose (outward when positive).
     std::vector<Vec3> corners;
     surface::Normals normals;
+    double enclosed = 0;
+
+    // Puts it in the scene for the frame: `drawing` with its mesh's corners
+    // at `world`.
+    void place(const PreparedDrawing& drawing, const std::shared_ptr<const PreparedSource>& owner, const std::vector<std::optional<Vec3>>& world, LaidSurfaces& laid) {
+        unstyled = &drawing;
+        auto& surface = laid.of(drawing, owner);
+        corners.clear();
+        for (const auto& corner : world) { corners.push_back(corner.value_or(Vec3 {})); }
+        normals = surface.smoothing.normals(corners, surface.faces);
+        enclosed = 0;
+        for (const auto& f : surface.faces) { enclosed += corners[f[0]].dot(corners[f[1]].cross(corners[f[2]])); }
+    }
+    // Whether a point of a closed surface is on its far side from `eye`.
+    bool farFrom(Vec3 eye, std::uint32_t face, const surface::Weights& at, const std::vector<surface::Face>& faces) const {
+        const auto facing = normals.at(face, at).dot(eye - surface::at(corners, faces[face], at));
+        return enclosed < 0 ? facing > 0 : facing < 0;
+    }
 
     // The normals to light a line by, turning along it as the surface does;
-    // none for one of its own (lit by the faces it runs along, as ever).
+    // none for one of its own (lit by the faces it runs along, as ever). Its
+    // hatching is left unlit: its density shows the light.
     std::optional<Normals> normalsOf(std::size_t shape) const {
         if (shape < laidFrom || shape - laidFrom >= ends.size()) { return std::nullopt; }
+        if (shape >= hatchFrom && shape < hatchTo) { return Normals::unlitLine(); }
         const auto face = static_cast<std::uint32_t>(drawing->shapeFaces()[shape][0]);
         const auto& [starts, finishes] = ends[shape - laidFrom];
         return Normals::turning(normals.at(face, starts), normals.at(face, finishes));
@@ -147,12 +178,13 @@ struct Styled {
     }
 };
 
-// Draws a surface in its style (`styled.unstyled` its drawing), `world`
-// holding its mesh's corners in the scene, as `eye` sees it. `nearSideOnly`:
-// what is laid on a closed surface's far side from the eye is left out, as
-// lines hidden there would be (for a view that hides none).
+// Draws a surface in its style, placed in the scene for the frame (see
+// Styled::place), as `eye` sees it, with the camera's hatching on it as
+// bright as `hatchAmount`. `nearSideOnly`: what is laid on a closed
+// surface's far side from the eye is left out, as lines hidden there would
+// be (for a view that hides none).
 inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>& owner, const std::vector<std::array<std::int32_t, 2>>& along, const LineStyle& style,
-    const std::vector<std::optional<Vec3>>& world, std::optional<Vec3> eye, LaidSurfaces& laid, bool nearSideOnly = false) {
+    std::optional<Vec3> eye, LaidSurfaces& laid, bool nearSideOnly = false, const std::vector<surface::Piece>& hatch = {}, double hatchAmount = 0) {
     const auto& source = *styled.unstyled;
     std::vector<std::unique_ptr<osci::Shape>> shapes;
     std::vector<std::array<std::int32_t, 2>> faces;
@@ -169,26 +201,12 @@ inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>&
         }
     }
     auto& surface = laid.of(source, owner);
-    styled.corners.clear();
-    for (const auto& corner : world) { styled.corners.push_back(corner.value_or(Vec3 {})); }
-    styled.normals = surface.smoothing.normals(styled.corners, surface.faces);
     styled.laidFrom = shapes.size();
     styled.ends.clear();
     const auto add = [&](const std::vector<surface::Piece>& pieces, double amount, double turn, bool laidOn) {
         const auto culling = laidOn && nearSideOnly && surface.closed && eye.has_value();
-        // Its faces' normals point out of it or into it, as its faces wind:
-        // which, by the sign of what they enclose.
-        double enclosed = 0;
-        for (std::size_t index = 0; culling && index < surface.faces.size(); ++index) {
-            const auto& f = surface.faces[index];
-            enclosed += styled.corners[f[0]].dot(styled.corners[f[1]].cross(styled.corners[f[2]]));
-        }
-        const auto farSide = [&](std::uint32_t face, const surface::Weights& at) {
-            const auto facing = styled.normals.at(face, at).dot(*eye - surface::at(styled.corners, surface.faces[face], at));
-            return enclosed < 0 ? facing > 0 : facing < 0;
-        };
         smoothLines(surface, pieces, turn, [&](osci::Point from, osci::Point to, std::uint32_t face, const surface::Weights& starts, const surface::Weights& ends) {
-            if (culling && farSide(face, starts) && farSide(face, ends)) { return; }
+            if (culling && styled.farFrom(*eye, face, starts, surface.faces) && styled.farFrom(*eye, face, ends, surface.faces)) { return; }
             shapes.push_back(dimmed(std::make_unique<osci::Line>(from, to), amount));
             faces.push_back({static_cast<std::int32_t>(face), -1});
             styled.ends.push_back({starts, ends});
@@ -197,6 +215,9 @@ inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>&
     for (std::size_t pattern = 0; pattern < style.patterns.size(); ++pattern) {
         if (style.patterns[pattern] > 0) { add(surface.pattern(static_cast<surface::Pattern>(pattern), static_cast<int>(style.detail), style.noiseTurn), style.patterns[pattern], patternTurn, true); }
     }
+    styled.hatchFrom = shapes.size();
+    if (!hatch.empty() && hatchAmount > 0) { add(hatch, hatchAmount, patternTurn, true); }
+    styled.hatchTo = shapes.size();
     styled.eyeOnlyFrom = shapes.size();
     if (style.outline > 0 && eye.has_value()) { add(surface::outline(styled.corners, surface.faces, styled.normals, *eye), style.outline, outlineTurn, false); }
     auto drawing = std::make_shared<PreparedDrawing>(std::move(shapes), true);

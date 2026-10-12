@@ -431,6 +431,81 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
     return entries;
 }
 
+// The camera's hatching laid on each surface placed for the frame (see
+// hatching::onSurface): each side's cells lit by the light at the point of
+// the surface they are on, by its smooth normal, none where it faces away
+// from the eye; times how squarely it faces the eye, as a surface turned
+// from it crowds its curve together on the frame, so it is as dense there as
+// its light, not its slant; taken as a share of the brightest; as dense as
+// the light asks, or less, evenly, to take no more than half of a beam
+// cycle's samples.
+inline std::vector<std::vector<surface::Piece>> hatchSurfaces(const PreparedComposition& composition, const std::vector<SceneItem>& items, const std::vector<Styled>& styled,
+    const std::vector<char>& placed, const std::vector<LightView>& lights, bool lit, std::optional<Vec3> eye, int detail, double time, Workspace& workspace) {
+    namespace on = hatching::onSurface;
+    const auto deepest = std::clamp(static_cast<int>(std::ceil(std::log2(std::max(1, detail)))), 2, 8);
+    std::vector<std::optional<on::Lit>> litSurfaces(items.size());
+    double exposure = 0;
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        if (placed[index] == 0) { continue; }
+        const auto& item = items[index];
+        const auto& into = styled[index];
+        auto& laid = workspace.laid.of(*into.unstyled, item.source);
+        const auto closed = laid.closed;
+        const auto response = static_cast<float>(item.clip->lit(time));
+        litSurfaces[index] = on::Lit::of(laid.sidesAt(deepest), [&](std::uint32_t face, const surface::Weights& weights) -> double {
+            if (closed && eye.has_value() && into.farFrom(*eye, face, weights, laid.faces)) { return -1; }
+            const auto at = surface::at(into.corners, laid.faces[face], weights);
+            const auto normal = into.normals.at(face, weights);
+            const auto squarely = eye.has_value() ? std::abs(normal.dot((*eye - at).normalized(1.0e-12).value_or(normal))) : 1.0;
+            if (!lit) { return squarely; }
+            Normals facing;
+            facing.add(normal);
+            const auto light = lightAt(lights, at, facing, response);
+            return squarely * std::max({light[0], light[1], light[2]});
+        });
+        exposure = std::max(exposure, static_cast<double>(litSurfaces[index]->brightest()));
+    }
+    std::vector<std::vector<surface::Piece>> pieces(items.size());
+    if (!(exposure > 0)) { return pieces; }
+    const auto beamSamples = composition.sampleRate / std::max(1.0, composition.beamRate);
+    const auto most = static_cast<std::size_t>(std::max(64.0, beamSamples * .5));
+    const auto pointsAt = [&](double gain) {
+        std::size_t count = 0;
+        for (const auto& surface : litSurfaces) {
+            if (!surface.has_value()) { continue; }
+            surface->curve(detail, exposure, gain, [&](std::size_t, const std::optional<std::array<double, 2>>& middle, double light) { count += middle.has_value() && light >= hatching::darkest ? 1 : 0; });
+        }
+        return count;
+    };
+    auto gain = 1.0;
+    if (pointsAt(1) > most) {
+        double low = 0, high = 1;
+        for (int halving = 0; halving < 10; ++halving) {
+            const auto middle = (low + high) / 2;
+            (pointsAt(middle) > most ? high : low) = middle;
+        }
+        gain = low;
+    }
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        if (!litSurfaces[index].has_value()) { continue; }
+        auto& laid = workspace.laid.of(*styled[index].unstyled, items[index].source);
+        const auto& sides = laid.sidesAt(deepest);
+        std::optional<std::pair<std::size_t, std::array<double, 2>>> previous;
+        litSurfaces[index]->curve(detail, exposure, gain, [&](std::size_t side, const std::optional<std::array<double, 2>>& middle, double light) {
+            if (!middle.has_value() || light < hatching::darkest) {
+                previous.reset();
+                return;
+            }
+            if (previous.has_value() && previous->first == side) {
+                const auto step = on::cut(sides, side, laid.corners, laid.faces, previous->second, *middle);
+                pieces[index].insert(pieces[index].end(), step.begin(), step.end());
+            }
+            previous = std::pair {side, *middle};
+        });
+    }
+    return pieces;
+}
+
 inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel = nullptr, const OtherEye* from = nullptr) {
     auto& depth = workspace.depth;
     const auto cancelled = [cancel] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
@@ -441,8 +516,10 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto lit = composition.lit(time);
     const auto reflecting = composition.reflects(time);
     const auto restyling = composition.restyles(time);
-    // How much the camera shades by hatching rather than brightness.
-    const auto hatching = from == nullptr && camera != nullptr && view.has_value() ? camera->hatching(time) : 0.0;
+    // How much the camera shades by hatching rather than brightness, laid
+    // on its surfaces or over its frame.
+    const auto hatching = camera != nullptr && view.has_value() ? camera->hatching(time) : 0.0;
+    const auto frameHatching = from == nullptr && hatching > 0 && camera->hatchesOnFrame(time) ? hatching : 0.0;
     if (!hides && !lit && !reflecting && !restyling && !(hatching > 0)) { return frame; }
     std::vector<SceneItem> items;
     for (std::size_t index = 0; index < composition.clips.size(); ++index) {
@@ -477,35 +554,6 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         for (const auto& vertex : item.drawing->faces().vertices) { world[surface].push_back(place(item, vertex)); }
     }
     const auto surfaces = std::count_if(items.begin(), items.end(), [](const SceneItem& item) { return item.drawing != nullptr && !item.drawing->faces().empty(); });
-
-    // Surfaces that draw themselves other than by their edges (see
-    // LineStyle), drawn again for the frame: their outlines as the eye sees
-    // them, from the camera or the other eye.
-    auto& styled = workspace.styled;
-    styled.resize(std::max(styled.size(), items.size()));
-    const auto viewpoint = from != nullptr ? std::optional(from->eye) : composition.viewpoint(time);
-    const auto eyeAt = viewpoint.has_value() ? std::optional(viewpoint->position) : std::nullopt;
-    bool outlining = false;
-    // Another eye hides nothing; when the camera would, it is shown only the
-    // near side of what surfaces lay on themselves.
-    const auto nearSideOnly = from != nullptr && camera != nullptr && camera->hidesHiddenLines;
-    for (std::size_t surface = 0; restyling && surface < items.size(); ++surface) {
-        auto& item = items[surface];
-        if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
-        const auto style = item.clip->lines(time);
-        if (style.plain()) { continue; }
-        auto& into = styled[surface];
-        into.unstyled = item.drawing;
-        restyle(into, item.source, workspace.facesAlongOf(*item.drawing, item.source), style, world[surface], eyeAt, workspace.laid, nearSideOnly);
-        item.drawing = into.drawing.get();
-        item.styled = &into;
-        outlining = outlining || into.eyeOnlyFrom < into.drawing->shapeCount();
-    }
-    // What stands between two points, for mirrors, and for outlines: their
-    // own faces graze the line to the eye, so are found along it, not in the
-    // depth buffer.
-    const auto rayed = reflecting || (hides && outlining);
-    if (rayed) { buildRays(items, world, workspace.rays); }
 
     // The lights shining, and what each sees, to find its shadows.
     auto& lights = workspace.lights;
@@ -599,6 +647,47 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         drawnFrom.valid = true;
     }
 
+    // Surfaces that draw themselves other than by their edges (see
+    // LineStyle), or carry the camera's hatching, drawn again for the frame:
+    // their outlines as the eye sees them, from the camera or the other eye.
+    auto& styled = workspace.styled;
+    styled.resize(std::max(styled.size(), items.size()));
+    const auto viewpoint = from != nullptr ? std::optional(from->eye) : composition.viewpoint(time);
+    const auto eyeAt = viewpoint.has_value() ? std::optional(viewpoint->position) : std::nullopt;
+    bool outlining = false;
+    // Another eye hides nothing; when the camera would, it is shown only the
+    // near side of what surfaces lay on themselves.
+    const auto nearSideOnly = from != nullptr && camera != nullptr && camera->hidesHiddenLines;
+    // Hatching laid on the surfaces, so it moves with them, as the other
+    // eye sees it too; or over the frame (below).
+    const auto hatchOnSurfaces = camera != nullptr && camera->hatching(time) > 0 && !camera->hatchesOnFrame(time);
+    std::vector<char> placed(items.size(), 0);
+    std::vector<LineStyle> styles(items.size());
+    for (std::size_t surface = 0; (restyling || hatchOnSurfaces) && surface < items.size(); ++surface) {
+        const auto& item = items[surface];
+        if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
+        styles[surface] = item.clip->lines(time);
+        if (styles[surface].plain() && !hatchOnSurfaces) { continue; }
+        styled[surface].place(*item.drawing, item.source, world[surface], workspace.laid);
+        placed[surface] = 1;
+    }
+    const auto hatches = hatchOnSurfaces ? hatchSurfaces(composition, items, styled, placed, lights, lit, eyeAt, camera->hatchDetail(time), time, workspace)
+                                         : std::vector<std::vector<surface::Piece>>(items.size());
+    for (std::size_t surface = 0; surface < items.size(); ++surface) {
+        if (placed[surface] == 0) { continue; }
+        auto& item = items[surface];
+        auto& into = styled[surface];
+        restyle(into, item.source, workspace.facesAlongOf(*item.drawing, item.source), styles[surface], eyeAt, workspace.laid, nearSideOnly, hatches[surface], hatchOnSurfaces ? camera->hatching(time) : 0.0);
+        item.drawing = into.drawing.get();
+        item.styled = &into;
+        outlining = outlining || into.eyeOnlyFrom < into.drawing->shapeCount();
+    }
+    // What stands between two points, for mirrors, and for outlines: their
+    // own faces graze the line to the eye, so are found along it, not in the
+    // depth buffer.
+    const auto rayed = reflecting || (hides && outlining);
+    if (rayed) { buildRays(items, world, workspace.rays); }
+
     // What hides, over what the Scope shows. Its triangles are kept too when
     // two or more surfaces could cut through each other.
     const auto reach = composition.hiddenLineReach;
@@ -607,7 +696,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     surfaceTriangles.clear();
     surfaceSources.clear();
     std::vector<std::vector<crossing::Piece>> crossings;
-    if (hides || hatching > 0) {
+    if (hides || frameHatching > 0) {
         const auto gather = [&](std::uint32_t surface, const std::array<Vec3, 3>& corners, const std::array<osci::Point, 3>& sources) {
             if (surfaces < 2 || !hides) { return; }
             surfaceTriangles.push_back({corners, surface});
@@ -620,13 +709,13 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             if (cancelled()) { return nullptr; }
         }
     }
-    if (hatching > 0 && !depth.isEmpty()) {
-        frame->hatching = hatch(composition, time, items, world, lights, lit, cameraEye, cameraProjection, reach, depth, hatching, camera->hatchDetail(time), workspace);
+    if (frameHatching > 0 && !depth.isEmpty()) {
+        frame->hatching = hatch(composition, time, items, world, lights, lit, cameraEye, cameraProjection, reach, depth, frameHatching, camera->hatchDetail(time), workspace);
         if (cancelled()) { return nullptr; }
     }
     // Hiding lines, a camera that sees no surface hides nothing.
     const auto hiding = hides && !depth.isEmpty();
-    if (!hiding && !lit && !reflecting && !restyling) { return frame; }
+    if (!hiding && !lit && !reflecting && !restyling && !hatchOnSurfaces) { return frame; }
 
     // What is hidden, and what would be drawn twice: every line, every pixel
     // along its true path. A point shows where nothing is in front of it and

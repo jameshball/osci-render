@@ -124,22 +124,33 @@ struct Normals {
     // A line over a smooth surface, whose normal turns along it: from the
     // first at its start to the second at its end (see `at`).
     bool turns = false;
+    // A line that shows light by how densely it is drawn (hatching), not by
+    // how brightly: lights leave it as it is.
+    bool unlit = false;
 
     void add(std::optional<Vec3> normal) {
         if (normal.has_value() && count < 2) { values[static_cast<std::size_t>(count++)] = *normal; }
     }
     static Normals turning(Vec3 start, Vec3 end) { return {{start, end}, 2, true}; }
+    static Normals unlitLine() {
+        Normals normals;
+        normals.unlit = true;
+        return normals;
+    }
     // Those a share of the way along the line.
     Normals at(double share) const {
         if (!turns) { return *this; }
         Normals one;
         one.add((values[0] * (1 - share) + values[1] * share).normalized(1.0e-300).value_or(values[0]));
+        one.unlit = unlit;
         return one;
     }
     // Those of the part of the line between two shares of it.
     Normals part(double from, double to) const {
         if (!turns) { return *this; }
-        return turning(at(from).values[0], at(to).values[0]);
+        auto result = turning(at(from).values[0], at(to).values[0]);
+        result.unlit = unlit;
+        return result;
     }
 };
 

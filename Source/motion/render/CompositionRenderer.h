@@ -431,6 +431,8 @@ struct PreparedCamera {
         const auto value = curves[cameraHatchDetailIndex].evaluate(time);
         return static_cast<int>(std::isfinite(value) ? spec.clamp(std::round(value)) : spec.defaultValue);
     }
+    // Whether its hatching is over its frame, rather than on the surfaces.
+    bool hatchesOnFrame(double time) const { return curves[cameraHatchFrameIndex].evaluate(time) > .5; }
     // Whether it may hatch at all.
     bool mayHatch() const { return TransformPose::mayDifferCurve(curves[cameraHatchingIndex], cameraPropertySpecs[cameraHatchingIndex].defaultValue); }
 
