@@ -111,7 +111,7 @@ inline constexpr auto box = std::to_array<PropertySpec>({
 inline constexpr auto sphere = std::to_array<PropertySpec>({
     {"generator.radius", "Radius", "Radius", "", 0, 2, .5, .01, 3, ""},
     {"generator.segments", "Segments", "Segments", "", 3, 64, 16, 1, 0, ""},
-    {"generator.rings", "Rings", "Rings", "", 2, 32, 8, 1, 0, ""},
+    {"generator.rings", "Bands", "Bands", "", 2, 32, 8, 1, 0, ""},
 });
 inline constexpr auto torus = std::to_array<PropertySpec>({
     {"generator.radius", "Radius", "Radius", "", 0, 2, .4, .01, 3, ""},
