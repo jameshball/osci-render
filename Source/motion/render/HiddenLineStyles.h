@@ -1,7 +1,7 @@
 #pragma once
 
-#include "HiddenLineHatching.h"
 #include "HiddenLineScene.h"
+#include "SierpinskiHatching.h"
 #include "SurfaceLines.h"
 #include <map>
 #include <memory>
@@ -24,12 +24,15 @@ public:
         // Whether it is closed (every edge has a face either side), so the
         // eye sees only its near side.
         bool closed = false;
-        // As each of the six sides of a box round it sees it, for hatching,
-        // by how finely.
-        std::map<int, hatching::onSurface::Sides> sides;
-        const hatching::onSurface::Sides& sidesAt(int deepest) {
-            auto found = sides.find(deepest);
-            if (found == sides.end()) { found = sides.emplace(deepest, hatching::onSurface::Sides::of(corners, faces, deepest)).first; }
+        // Its Sierpinski curves for hatching, by how finely: halved down to
+        // its size over two to the power of the key.
+        std::map<int, hatching::sierpinski::Curve> curves;
+        const hatching::sierpinski::Curve& curveAt(int depth) {
+            auto found = curves.find(depth);
+            if (found == curves.end()) {
+                const auto size = surface::detail::boundsOf(this->corners, this->faces).size();
+                found = curves.emplace(depth, hatching::sierpinski::Curve::of(this->corners, this->faces, size / (1 << depth))).first;
+            }
             return found->second;
         }
         std::map<std::tuple<int, int, double>, std::vector<surface::Piece>> patterns;
@@ -178,13 +181,20 @@ struct Styled {
     }
 };
 
+// A line of a surface's hatching: from a point of one face to a point of
+// another (or the same), by their weights.
+struct HatchLine {
+    std::uint32_t fromFace, toFace;
+    surface::Weights from, to;
+};
+
 // Draws a surface in its style, placed in the scene for the frame (see
 // Styled::place), as `eye` sees it, with the camera's hatching on it as
-// bright as `hatchAmount`. `nearSideOnly`: what is laid on a closed
+// bright as `hatchAmount`, following the smooth surface. `nearSideOnly`: what is laid on a closed
 // surface's far side from the eye is left out, as lines hidden there would
 // be (for a view that hides none).
 inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>& owner, const std::vector<std::array<std::int32_t, 2>>& along, const LineStyle& style,
-    std::optional<Vec3> eye, LaidSurfaces& laid, bool nearSideOnly = false, const std::vector<surface::Piece>& hatch = {}, double hatchAmount = 0) {
+    std::optional<Vec3> eye, LaidSurfaces& laid, bool nearSideOnly = false, const std::vector<HatchLine>& hatch = {}, double hatchAmount = 0) {
     const auto& source = *styled.unstyled;
     std::vector<std::unique_ptr<osci::Shape>> shapes;
     std::vector<std::array<std::int32_t, 2>> faces;
@@ -216,7 +226,16 @@ inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>&
         if (style.patterns[pattern] > 0) { add(surface.pattern(static_cast<surface::Pattern>(pattern), static_cast<int>(style.detail), style.noiseTurn), style.patterns[pattern], patternTurn, true); }
     }
     styled.hatchFrom = shapes.size();
-    if (!hatch.empty() && hatchAmount > 0) { add(hatch, hatchAmount, patternTurn, true); }
+    for (std::size_t index = 0; hatchAmount > 0 && index < hatch.size(); ++index) {
+        const auto& line = hatch[index];
+        const auto point = [&](std::uint32_t face, const surface::Weights& weights) {
+            const auto p = surface::smoothAt(surface.corners, surface.faces, surface.normals, face, weights);
+            return osci::Point(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
+        };
+        shapes.push_back(dimmed(std::make_unique<osci::Line>(point(line.fromFace, line.from), point(line.toFace, line.to)), hatchAmount));
+        faces.push_back({static_cast<std::int32_t>(line.fromFace), static_cast<std::int32_t>(line.toFace)});
+        styled.ends.push_back({line.from, line.to});
+    }
     styled.hatchTo = shapes.size();
     styled.eyeOnlyFrom = shapes.size();
     if (style.outline > 0 && eye.has_value()) { add(surface::outline(styled.corners, surface.faces, styled.normals, *eye), style.outline, outlineTurn, false); }

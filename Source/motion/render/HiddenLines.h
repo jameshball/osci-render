@@ -431,28 +431,53 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
     return entries;
 }
 
-// The camera's hatching laid on each surface placed for the frame (see
-// hatching::onSurface): each side's cells lit by the light at the point of
-// the surface they are on, by its smooth normal, none where it faces away
-// from the eye; times how squarely it faces the eye, as a surface turned
-// from it crowds its curve together on the frame, so it is as dense there as
-// its light, not its slant; taken as a share of the brightest; as dense as
-// the light asks, or less, evenly, to take no more than half of a beam
-// cycle's samples.
-inline std::vector<std::vector<surface::Piece>> hatchSurfaces(const PreparedComposition& composition, const std::vector<SceneItem>& items, const std::vector<Styled>& styled,
+// The camera's hatching laid on each surface placed for the frame: a
+// Sierpinski curve over its faces (see SierpinskiHatching.h), as coarse as
+// the light asks. Each piece of it is lit by the light at its middle, by
+// the smooth normal there, times how squarely it faces the eye (a surface
+// turned from it crowds its curve together on the frame), none where it
+// faces away; light is taken as a share of the brightest. The finest it
+// goes is the scene's size over `detail` (its largest surface's), alike on
+// every surface; it is as fine as the light asks, or less, evenly, to take
+// no more than half of a beam cycle's samples.
+inline std::vector<std::vector<HatchLine>> hatchSurfaces(const PreparedComposition& composition, const std::vector<SceneItem>& items, const std::vector<Styled>& styled,
     const std::vector<char>& placed, const std::vector<LightView>& lights, bool lit, std::optional<Vec3> eye, int detail, double time, Workspace& workspace) {
-    namespace on = hatching::onSurface;
-    const auto deepest = std::clamp(static_cast<int>(std::ceil(std::log2(std::max(1, detail)))), 2, 8);
-    std::vector<std::optional<on::Lit>> litSurfaces(items.size());
+    namespace sierpinski = hatching::sierpinski;
+    std::vector<std::vector<HatchLine>> lines(items.size());
+    // The finest, in the scene: its largest surface's size over the detail.
+    double largest = 0;
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        if (placed[index] == 0) { continue; }
+        auto& laid = workspace.laid.of(*styled[index].unstyled, items[index].source);
+        largest = std::max(largest, surface::detail::boundsOf(styled[index].corners, laid.faces).size());
+    }
+    if (!(largest > 0)) { return lines; }
+    const auto finest = largest / std::max(1, detail);
+    std::vector<const sierpinski::Curve*> curves(items.size(), nullptr);
+    std::vector<std::optional<sierpinski::Lit>> litCurves(items.size());
     double exposure = 0;
     for (std::size_t index = 0; index < items.size(); ++index) {
         if (placed[index] == 0) { continue; }
         const auto& item = items[index];
         const auto& into = styled[index];
         auto& laid = workspace.laid.of(*into.unstyled, item.source);
+        // Halved finely enough in its own space to be as fine as the scene's
+        // finest in it, however it is scaled.
+        const auto own = surface::detail::boundsOf(laid.corners, laid.faces).size();
+        const auto placedSize = surface::detail::boundsOf(into.corners, laid.faces).size();
+        const auto scale = own > 0 ? placedSize / own : 1.0;
+        const auto depth = std::clamp(static_cast<int>(std::ceil(std::log2(std::max(1.0, own * scale / finest)))), 0, 10);
+        const auto& curve = laid.curveAt(depth);
+        curves[index] = &curve;
         const auto closed = laid.closed;
         const auto response = static_cast<float>(item.clip->lit(time));
-        litSurfaces[index] = on::Lit::of(laid.sidesAt(deepest), [&](std::uint32_t face, const surface::Weights& weights) -> double {
+        const auto cornersOf = [&](std::uint32_t leaf) {
+            const auto& node = curve.nodes[leaf];
+            const auto& face = laid.faces[node.face];
+            return std::array<Vec3, 3> {surface::at(into.corners, face, node.corners[0]), surface::at(into.corners, face, node.corners[1]), surface::at(into.corners, face, node.corners[2])};
+        };
+        litCurves[index] = sierpinski::Lit::of(curve, [&](std::uint32_t leaf) -> double {
+            const auto [face, weights] = curve.middleOf(leaf);
             if (closed && eye.has_value() && into.farFrom(*eye, face, weights, laid.faces)) { return -1; }
             const auto at = surface::at(into.corners, laid.faces[face], weights);
             const auto normal = into.normals.at(face, weights);
@@ -462,18 +487,23 @@ inline std::vector<std::vector<surface::Piece>> hatchSurfaces(const PreparedComp
             facing.add(normal);
             const auto light = lightAt(lights, at, facing, response);
             return squarely * std::max({light[0], light[1], light[2]});
+        }, [&](std::uint32_t leaf) {
+            const auto [a, b, c] = cornersOf(leaf);
+            return (b - a).cross(c - a).length() / 2;
+        }, [&](std::uint32_t leaf) {
+            const auto [face, weights] = curve.middleOf(leaf);
+            return surface::at(into.corners, laid.faces[face], weights);
         });
-        exposure = std::max(exposure, static_cast<double>(litSurfaces[index]->brightest()));
+        exposure = std::max(exposure, static_cast<double>(litCurves[index]->brightest()));
     }
-    std::vector<std::vector<surface::Piece>> pieces(items.size());
-    if (!(exposure > 0)) { return pieces; }
+    if (!(exposure > 0)) { return lines; }
     const auto beamSamples = composition.sampleRate / std::max(1.0, composition.beamRate);
     const auto most = static_cast<std::size_t>(std::max(64.0, beamSamples * .5));
     const auto pointsAt = [&](double gain) {
         std::size_t count = 0;
-        for (const auto& surface : litSurfaces) {
-            if (!surface.has_value()) { continue; }
-            surface->curve(detail, exposure, gain, [&](std::size_t, const std::optional<std::array<double, 2>>& middle, double light) { count += middle.has_value() && light >= hatching::darkest ? 1 : 0; });
+        for (const auto& curve : litCurves) {
+            if (!curve.has_value()) { continue; }
+            curve->curveAt(finest, exposure, gain, [&](std::optional<std::uint32_t> node, double light) { count += node.has_value() && light >= hatching::darkest ? 1 : 0; });
         }
         return count;
     };
@@ -487,23 +517,20 @@ inline std::vector<std::vector<surface::Piece>> hatchSurfaces(const PreparedComp
         gain = low;
     }
     for (std::size_t index = 0; index < items.size(); ++index) {
-        if (!litSurfaces[index].has_value()) { continue; }
-        auto& laid = workspace.laid.of(*styled[index].unstyled, items[index].source);
-        const auto& sides = laid.sidesAt(deepest);
-        std::optional<std::pair<std::size_t, std::array<double, 2>>> previous;
-        litSurfaces[index]->curve(detail, exposure, gain, [&](std::size_t side, const std::optional<std::array<double, 2>>& middle, double light) {
-            if (!middle.has_value() || light < hatching::darkest) {
+        if (!litCurves[index].has_value()) { continue; }
+        const auto& curve = *curves[index];
+        std::optional<std::pair<std::uint32_t, surface::Weights>> previous;
+        litCurves[index]->curveAt(finest, exposure, gain, [&](std::optional<std::uint32_t> node, double light) {
+            if (!node.has_value() || light < hatching::darkest) {
                 previous.reset();
                 return;
             }
-            if (previous.has_value() && previous->first == side) {
-                const auto step = on::cut(sides, side, laid.corners, laid.faces, previous->second, *middle);
-                pieces[index].insert(pieces[index].end(), step.begin(), step.end());
-            }
-            previous = std::pair {side, *middle};
+            const auto middle = curve.middleOf(*node);
+            if (previous.has_value()) { lines[index].push_back({previous->first, middle.first, previous->second, middle.second}); }
+            previous = middle;
         });
     }
-    return pieces;
+    return lines;
 }
 
 inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel = nullptr, const OtherEye* from = nullptr) {
@@ -672,7 +699,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         placed[surface] = 1;
     }
     const auto hatches = hatchOnSurfaces ? hatchSurfaces(composition, items, styled, placed, lights, lit, eyeAt, camera->hatchDetail(time), time, workspace)
-                                         : std::vector<std::vector<surface::Piece>>(items.size());
+                                         : std::vector<std::vector<HatchLine>>(items.size());
     for (std::size_t surface = 0; surface < items.size(); ++surface) {
         if (placed[surface] == 0) { continue; }
         auto& item = items[surface];

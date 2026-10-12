@@ -221,7 +221,8 @@ public:
                 const auto& styled = workspace.styled[0];
                 std::vector<std::array<float, 3>> lines;
                 for (auto index = styled.hatchFrom; index < styled.hatchTo; ++index) {
-                    const auto point = styled.drawing->shape(index)->nextVector(.5f);
+                    // Its ends, on the surface (its middle cuts across it a little).
+                    const auto point = styled.drawing->shape(index)->nextVector(0);
                     lines.push_back({point.x, point.y, point.z});
                 }
                 return std::pair {lines, styled.hatchTo - styled.hatchFrom};
@@ -231,7 +232,7 @@ public:
             std::size_t onBall = 0, onLeft = 0, onRight = 0;
             for (const auto& point : here) {
                 const auto length = std::sqrt(point[0] * point[0] + point[1] * point[1] + point[2] * point[2]);
-                onBall += length < radius + 1.0e-3 && length > radius * .9 ? 1 : 0;
+                onBall += length < radius * 1.02 && length > radius * .97 ? 1 : 0;
                 (point[0] > 0 ? onRight : onLeft) += 1;
             }
             expectEquals(static_cast<int>(onBall), static_cast<int>(here.size()), "every line of it on the ball (in its own space)");
