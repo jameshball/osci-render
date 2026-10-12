@@ -268,6 +268,8 @@ private:
     // Keys whose diamond lies under a point in a lane row.
     std::optional<KeyRef> keyAt(juce::Point<int> point) const;
     std::vector<KeyRef> keysInside(juce::Rectangle<int> area) const;
+    std::vector<KeyRef> allLaneKeys() const;
+    bool dragging() const;
     // Moves keys by a project-time delta on a copy of the gesture's project.
     // Fails when a moved key would land on a key that is not moving.
     static bool moveKeys(motion::Project& project, const std::vector<KeyRef>& keys, double delta);
@@ -320,6 +322,10 @@ private:
         double start = 0, end = 0;
         int downX = 0;
         Mode mode = Mode::move;
+        // The project when it began, put back by Escape.
+        motion::Project before;
+        std::uint64_t revision = 0;
+        bool changed = false;
     };
     std::optional<CutDrag> cutDrag;
     // A camera key in the Cameras band stands for every property's key at
@@ -360,6 +366,8 @@ public:
     // Tracks and groups picked together by their headers (Cmd or Shift),
     // for grouping them in one go (Cmd+G).
     void groupSelectedTracks();
+    // Puts these tracks (or groups) in a new group, in one undo step.
+    void groupTracks(const std::vector<motion::Id>& ids);
 private:
     void pickTrack(motion::Id id, juce::ModifierKeys mods);
     std::vector<motion::Id> tracksToGroup() const;
@@ -524,6 +532,8 @@ private:
     std::optional<juce::Rectangle<int>> marquee, clipMarquee;
     juce::Point<int> clipMarqueeStart;
     std::set<motion::Id> clipMarqueeBase;
+    // The keys selected before a key marquee began, put back by Escape.
+    std::vector<KeyRef> keysBeforeMarquee;
     motion::Id hoveredClip = 0;
     int hoveredEdge = -1;
     juce::Point<int> marqueeStart;

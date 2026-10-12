@@ -1390,27 +1390,29 @@ juce::Result Document::setCutCamera(Id cut, Id camera) {
     return changed ? juce::Result::ok() : juce::Result::fail("The cut no longer exists or already shows that camera.");
 }
 
-juce::Result Document::setCutRange(Id cut, double start, double end, juce::String label) {
-    const auto& current = project();
-    const auto frame = current.frameRate > 0 ? 1.0 / current.frameRate : 1.0 / 30;
-    const auto found = std::find_if(current.cameraCuts.begin(), current.cameraCuts.end(), [cut](const auto& item) { return item.id == cut; });
-    if (found == current.cameraCuts.end()) { return juce::Result::fail("The cut no longer exists."); }
-    if (!std::isfinite(start) || !std::isfinite(end) || start < 0 || end > current.duration + 1.0e-9 || end - start < frame - 1.0e-9) {
+juce::Result Document::applyCutRange(Project& project, Id cut, double start, double end) {
+    const auto frame = project.frameRate > 0 ? 1.0 / project.frameRate : 1.0 / 30;
+    const auto found = std::find_if(project.cameraCuts.begin(), project.cameraCuts.end(), [cut](const auto& item) { return item.id == cut; });
+    if (found == project.cameraCuts.end()) { return juce::Result::fail("The cut no longer exists."); }
+    if (!std::isfinite(start) || !std::isfinite(end) || start < 0 || end > project.duration + 1.0e-9 || end - start < frame - 1.0e-9) {
         return juce::Result::fail("A cut must stay inside the project and last at least one frame.");
     }
-    for (const auto& other : current.cameraCuts) {
+    for (const auto& other : project.cameraCuts) {
         if (other.id != cut && start < other.end() && other.start < end) { return juce::Result::fail("Cuts cannot overlap; trim the neighbouring cut first."); }
     }
-    if (found->start == start && found->end() == std::min(end, current.duration)) { return juce::Result::ok(); }
-    editCoalesced(label, "cut:" + juce::String(cut), [cut, start, end](Project& updated) {
-        for (auto& item : updated.cameraCuts) {
-            if (item.id == cut) {
-                item.start = start;
-                item.duration = spanUntil(start, std::min(end, updated.duration));
-            }
-        }
-        std::sort(updated.cameraCuts.begin(), updated.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
-    });
+    found->start = start;
+    found->duration = spanUntil(start, std::min(end, project.duration));
+    std::sort(project.cameraCuts.begin(), project.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
+    return juce::Result::ok();
+}
+
+juce::Result Document::setCutRange(Id cut, double start, double end, juce::String label) {
+    auto candidate = project();
+    const auto result = applyCutRange(candidate, cut, start, end);
+    if (result.failed()) { return result; }
+    const auto found = std::find_if(project().cameraCuts.begin(), project().cameraCuts.end(), [cut](const auto& item) { return item.id == cut; });
+    if (found->start == start && found->end() == std::min(end, project().duration)) { return juce::Result::ok(); }
+    editCoalesced(label, "cut:" + juce::String(cut), [cut, start, end](Project& updated) { applyCutRange(updated, cut, start, end); });
     return juce::Result::ok();
 }
 

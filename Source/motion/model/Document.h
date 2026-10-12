@@ -260,6 +260,9 @@ public:
     // Moves or trims a cut; it may not overlap another cut or leave the
     // project, and keeps at least one frame.
     juce::Result setCutRange(Id cut, double start, double end, juce::String label = "Move camera cut");
+    // Sets a cut's span in a project, if it stays inside it, lasts a frame
+    // and overlaps no other; the project is unchanged otherwise.
+    static juce::Result applyCutRange(Project& project, Id cut, double start, double end);
     juce::Result removeCut(Id cut);
     // Adds a camera framed like the one showing at `time`, so the output does
     // not jump. The first camera is the default view; later ones cut in at

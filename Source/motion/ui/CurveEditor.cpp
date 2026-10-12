@@ -645,11 +645,11 @@ void MotionCurveEditor::mouseDoubleClick(const juce::MouseEvent& event) {
     if (!std::isfinite(key.time) || !std::isfinite(key.value)) { return; }
     const auto id = targetId;
     const auto property = propertyName;
-    processor.document.edit("Add animation key", [id, property, key](motion::Project& project) {
+    processor.document.tryEdit("Add animation key", [id, property, key](motion::Project& project) {
         auto* target = mutableCurve(project, id, property);
-        if (target != nullptr) {
-            target->setKeyValue(key.time, key.value);
-        }
+        if (target == nullptr) { return false; }
+        target->setKeyValue(key.time, key.value);
+        return true;
     });
     selectedTime = key.time;
     refresh();
@@ -814,11 +814,9 @@ void MotionCurveEditor::mouseUp(const juce::MouseEvent&) {
 }
 
 bool MotionCurveEditor::keyPressed(const juce::KeyPress& key) {
-    if (!drag.has_value() && key.getModifiers().isCommandDown() && !key.getModifiers().isShiftDown() && (key.getKeyCode() == 'A' || key.getKeyCode() == 'a')) {
-        selectAllKeys();
-        return true;
-    }
-    if (!drag.has_value() && (key.getKeyCode() == 'F' || key.getKeyCode() == 'f')) {
+    // Select all, copying and the rest are the editor's commands.
+    const auto bare = !key.getModifiers().isCommandDown() && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown();
+    if (!drag.has_value() && bare && (key.getKeyCode() == 'F' || key.getKeyCode() == 'f')) {
         const auto primaryOnly = key.getModifiers().isShiftDown();
         // Framing the group is the automatic view, so later edits keep it framed.
         userView = primaryOnly;
@@ -1534,6 +1532,10 @@ void MotionCurveEditor::setActiveKeyValue(double value) {
     if (keys.size() != 1 || !clip.has_value() || clip->locked || drag.has_value() || !std::isfinite(value)) { return; }
     const auto ref = keys.front();
     const auto constrained = constrainedValue(*clip, value, ref.property);
+    // Its value already: nothing to record.
+    const auto* curve = findCurve(clip, ref.property);
+    const auto* current = curve != nullptr ? curve->findKey(ref.time) : nullptr;
+    if (current == nullptr || current->value == constrained) { return; }
     const auto id = targetId;
     processor.document.editCoalesced("Change animation key", "graph.key.value", [id, ref, constrained](motion::Project& project) {
         auto* curve = mutableCurve(project, id, ref.property);

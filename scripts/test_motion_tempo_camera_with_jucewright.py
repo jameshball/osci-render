@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Tempo changes from the ruler, the camera track band, and camera look-at through the real workspace."""
+import json
 import struct
 import subprocess
 import xml.etree.ElementTree as ET
@@ -55,6 +56,22 @@ project = session.artifact_dir / "tempo.osci-motion"
 project.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
 
 
+def find(value, predicate):
+    if isinstance(value, dict):
+        if predicate(value):
+            return value
+        for child in value.values():
+            found = find(child, predicate)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = find(child, predicate)
+            if found is not None:
+                return found
+    return None
+
+
 def saved():
     step("save", "press", "command + s", "--class", "MotionEditor")
     data = project.read_bytes()
@@ -84,6 +101,14 @@ try:
     assert saved().find("cameraCut") is None
     step("undo cut delete", "click", "--name", "Undo", "--exact")
     assert saved().find("cameraCut") is not None
+    # Dragging the cut moves it as it goes and is one undo step when let go.
+    view = find(json.loads(command("snapshot", "--json", "--full")), lambda node: node.get("class") == "MotionTimelineView")["bounds"]
+    step("drag cut", "drag-xy", view["x"] + 760, view["y"] + 37, view["x"] + 700, view["y"] + 37, "--steps", 10)
+    wait_undo("Move camera cut")
+    moved = float(saved().find("cameraCut").get("start"))
+    assert moved < start, (moved, start)
+    step("undo cut move", "click", "--name", "Undo", "--exact")
+    assert abs(float(saved().find("cameraCut").get("start")) - start) < 1e-9
     # A tempo change at beat 9 (the clip's second beat) from the ruler.
     step("tempo menu", "click", "--class", "MotionTimelineView", "--position", "450,12", "--button", "right")
     step("add tempo", "click", "--name", "Add tempo change here...", "--role", "menuItem", "--exact")
