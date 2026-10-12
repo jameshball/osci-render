@@ -32,7 +32,7 @@ public:
 
     static constexpr int headerHeight = 28, headerGap = 16, footerHeight = 28, footerGap = 20;
     // Choices take the control width; numbers a shorter, right-aligned field.
-    static constexpr int row = 28, rowGap = 8, caption = 120, control = 168, number = 96;
+    static constexpr int row = 28, rowGap = 8, caption = 120, control = 192, number = 96;
 
     // Shows the sheet over `owner`; returns the overlay so callers can wire
     // its dismissal.
