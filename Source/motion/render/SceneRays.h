@@ -40,7 +40,7 @@ public:
         }
         if (triangles.empty()) { return; }
         nodes.emplace_back();
-        fill(0, 0, static_cast<std::uint32_t>(triangles.size()));
+        fill(0, 0, static_cast<std::uint32_t>(triangles.size()), 0);
     }
     bool empty() const { return triangles.empty(); }
 
@@ -57,7 +57,8 @@ public:
         const auto first = nearFrom / length, last = 1 - nearTo / length;
         const auto nearFirst = near.within / length, nearLast = 1 - near.within / length;
         const Vec3 inverse {1 / span.x, 1 / span.y, 1 / span.z};
-        std::array<std::uint32_t, 64> stack {};
+        // Deep enough for any tree fill() builds (see deepest).
+        std::array<std::uint32_t, deepest + 34> stack {};
         std::size_t depth = 0;
         stack[depth++] = 0;
         while (depth > 0) {
@@ -73,7 +74,6 @@ public:
                 }
                 continue;
             }
-            if (depth + 2 > stack.size()) { return false; }
             stack[depth++] = node.start;
             stack[depth++] = node.start + 1;
         }
@@ -90,10 +90,14 @@ private:
         std::uint32_t start = 0, count = 0;
     };
     static constexpr std::uint32_t leafSize = 4;
+    // Below this depth nodes are halved at their middle triangle, so no
+    // branch is more than 32 deeper (a node holds under 2^32 triangles).
+    static constexpr std::size_t deepest = 48;
 
-    // Fills the node at `at` with the triangles from `begin` to `end` in
-    // `order`, splitting them while there are more than a leaf holds.
-    void fill(std::uint32_t at, std::uint32_t begin, std::uint32_t end) {
+    // Fills the node at `at`, `level` deep, with the triangles from `begin`
+    // to `end` in `order`, splitting them while there are more than a leaf
+    // holds.
+    void fill(std::uint32_t at, std::uint32_t begin, std::uint32_t end, std::size_t level) {
         constexpr auto largest = std::numeric_limits<double>::max();
         Vec3 low {largest, largest, largest}, high {-largest, -largest, -largest};
         Vec3 centreLow = low, centreHigh = high;
@@ -161,8 +165,8 @@ private:
             }
         }
         auto middle = static_cast<std::uint32_t>(std::partition(order.begin() + begin, order.begin() + end, [&](std::uint32_t triangle) { return binOf(triangle) < cut; }) - order.begin());
-        // Every centre in one bin: halved at the middle triangle instead.
-        if (middle == begin || middle == end) {
+        // Every centre in one bin, or deep already: halved at the middle triangle instead.
+        if (middle == begin || middle == end || level >= deepest) {
             middle = begin + (end - begin) / 2;
             std::nth_element(order.begin() + begin, order.begin() + middle, order.begin() + end,
                 [&](std::uint32_t one, std::uint32_t other) { return centres[one][axis] < centres[other][axis]; });
@@ -172,8 +176,8 @@ private:
         nodes[at].count = 0;
         nodes.emplace_back();
         nodes.emplace_back();
-        fill(children, begin, middle);
-        fill(children + 1, middle, end);
+        fill(children, begin, middle, level + 1);
+        fill(children + 1, middle, end, level + 1);
     }
 
     // Whether the part of the segment between `first` and `last` (as shares

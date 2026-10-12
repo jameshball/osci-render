@@ -164,6 +164,16 @@ int main() {
             agree += any == many.blocked(from, to, 0, 0) ? 1 : 0;
         }
         check(agree == 3000, "the tree finds just what testing each face finds");
+        // Faces each further than the last: splits by area peel one off at a
+        // time, so the tree must stop them before it grows too deep to search.
+        std::vector<SceneRays::Triangle> apart;
+        for (std::uint32_t index = 0; index < 1000; ++index) {
+            const auto x = -std::pow(1.2, index);
+            apart.push_back({{x, -.1, -.1}, {x, .2, -.1}, {x, -.1, .2}, index});
+        }
+        SceneRays deep;
+        deep.build(apart);
+        check(deep.blocked({-.5, 0, 0}, {-1.1, 0, 0}, 0, 0), "the nearest of faces spread ever further apart still blocks");
     }
 
     std::cout << "ReflectionTests passed\n";
