@@ -132,7 +132,7 @@ public:
         // short for finding spans to pay. Every pixel visited is tested exactly.
         const Edge edges[3] {Edge::of(ax, ay, bx, by, sign), Edge::of(bx, by, cx, cy, sign), Edge::of(cx, cy, ax, ay, sign)};
         const auto index = static_cast<std::int32_t>(planes.size());
-        planes.push_back({a.w - dwdx * ax - dwdy * ay - push, dwdx, dwdy, slopePush * slope, {edges[0].normalised(), edges[1].normalised(), edges[2].normalised()}});
+        planes.push_back({a.w - dwdx * ax - dwdy * ay - push, dwdx, dwdy, slopePush * slope, {edges[0].normalised(), edges[1].normalised(), edges[2].normalised()}, nextTag});
         const auto narrow = right - left < 6;
         const auto spans = narrow ? std::optional<Spans>() : std::optional<Spans>(Spans(edges));
         for (auto y = bottom; y <= top; ++y) {
@@ -169,6 +169,26 @@ public:
         drawnBottom = std::min(drawnBottom, bottom);
         drawnTop = std::max(drawnTop, top);
         empty = false;
+    }
+
+    // What the triangles drawn next are of (a surface and its face, say), so
+    // what is nearest at a point can be asked for.
+    void tagNext(std::uint64_t tag) { nextTag = tag; }
+    // What is nearest at a point of the canvas, by its tag, and its inverse
+    // depth there; none where nothing is drawn.
+    struct Nearest {
+        std::uint64_t tag;
+        double w;
+    };
+    std::optional<Nearest> nearestAt(double x, double y) const {
+        if (empty) { return std::nullopt; }
+        const auto px = toPixelX(x), py = toPixelY(y);
+        const auto column = static_cast<int>(std::floor(px)), row = static_cast<int>(std::floor(py));
+        if (column < 0 || row < 0 || column >= width || row >= height) { return std::nullopt; }
+        const auto& here = pixels[static_cast<std::size_t>(row) * static_cast<std::size_t>(width) + static_cast<std::size_t>(column)];
+        if (here.w == 0) { return std::nullopt; }
+        const auto& plane = planes[static_cast<std::size_t>(here.owner)];
+        return Nearest {plane.tag, plane.at(px, py)};
     }
 
     // Whether a point shows: nothing drawn in front of it in its pixel.
@@ -299,6 +319,7 @@ private:
     struct Plane {
         double w, dwdx, dwdy, slope;
         Edge edges[3];
+        std::uint64_t tag = 0;
         double at(double x, double y) const { return w + dwdx * x + dwdy * y; }
         // How many pixels outside the triangle a point is: none for a point
         // on an edge to well within a pixel (a line drawn along it).
@@ -319,6 +340,7 @@ private:
     int width = 0, height = 0;
     std::vector<Pixel> pixels;
     std::vector<Plane> planes;
+    std::uint64_t nextTag = 0;
     // The pixels drawn since the last clear.
     int drawnLeft = 0, drawnRight = -1, drawnBottom = 0, drawnTop = -1;
     bool empty = true;

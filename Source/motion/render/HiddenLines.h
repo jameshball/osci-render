@@ -6,6 +6,7 @@
 #include "HiddenLineCrossings.h"
 #include "HiddenLineDepth.h"
 #include "HiddenLineFingerprint.h"
+#include "HiddenLineHatching.h"
 #include "HiddenLineReflections.h"
 #include "HiddenLineScene.h"
 #include "HiddenLineStyles.h"
@@ -210,8 +211,10 @@ bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::ve
         if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
         const auto& mesh = item.drawing->faces();
         const auto& corners = world[surface];
-        for (const auto& triangle : mesh.triangles) {
+        for (std::uint32_t face = 0; face < mesh.triangles.size(); ++face) {
+            const auto& triangle = mesh.triangles[face];
             if (cancelled()) { return false; }
+            depth.tagNext(std::uint64_t {surface} << 32 | face);
             const auto a = seen(corners[triangle[0]]), b = seen(corners[triangle[1]]), c = seen(corners[triangle[2]]);
             if (!item.bent) {
                 // Exact through the eye: whole, cut (in perspective) a hair in
@@ -351,6 +354,83 @@ struct OtherEye {
     PreparedComposition::Viewpoint eye;
     Reach reach;
 };
+// The camera's hatching (see HiddenLineHatching.h) on each surface it sees:
+// the light at each point of the curve found on the surface the depth buffer
+// has there, by its smooth normal; drawn in its clip's colour in the light's,
+// as bright as `amount`, its points in the scene.
+inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, double time, const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world,
+    const std::vector<LightView>& lights, bool lit, const Eye& eye, const Projection& projection, Reach reach, const DepthBuffer& depth, double amount, int detail, Workspace& workspace) {
+    // Each surface's normals in the scene, as smooth as it is.
+    std::vector<std::optional<surface::Normals>> normals(items.size());
+    std::vector<std::vector<Vec3>> corners(items.size());
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        const auto& item = items[index];
+        if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
+        for (const auto& corner : world[index]) { corners[index].push_back(corner.value_or(Vec3 {})); }
+        if (item.styled != nullptr) {
+            normals[index] = item.styled->normals;
+            continue;
+        }
+        const auto& laid = workspace.laid.of(*item.drawing, item.source);
+        normals[index] = laid.smoothing.normals(corners[index], laid.faces);
+    }
+    const auto look = [&](double x, double y) -> std::optional<hatching::Seen> {
+        if (std::abs(x) > reach.x || std::abs(y) > reach.y) { return std::nullopt; }
+        const auto nearest = depth.nearestAt(x, y);
+        if (!nearest.has_value() || !(nearest->w > 0)) { return std::nullopt; }
+        const auto surface = static_cast<std::uint32_t>(nearest->tag >> 32), face = static_cast<std::uint32_t>(nearest->tag & 0xffffffffu);
+        if (surface >= items.size() || !normals[surface].has_value()) { return std::nullopt; }
+        // Where the line from the eye meets the face: exactly on it (the
+        // buffer's depth is pushed back, most for a face seen edge on).
+        const auto& triangle = items[surface].drawing->faces().triangles[face];
+        const auto& a = corners[surface][triangle[0]], & b = corners[surface][triangle[1]], & c = corners[surface][triangle[2]];
+        const auto seen = projection.unproject({x, y, nearest->w});
+        auto at = eye.position + eye.right * seen.x + eye.up * seen.y + eye.forward * seen.z;
+        const auto plane = (b - a).cross(c - a);
+        const auto toward = at - eye.position;
+        const auto across = plane.dot(toward);
+        if (std::abs(across) > 1.0e-12 * plane.length() * toward.length()) { at = eye.position + toward * (plane.dot(a - eye.position) / across); }
+        if (!lit) { return hatching::Seen {surface, at, 1}; }
+        // Where on its face it is, for the normal there.
+        const auto ab = b - a, ac = c - a, ap = at - a;
+        const auto d00 = ab.dot(ab), d01 = ab.dot(ac), d11 = ac.dot(ac), d20 = ap.dot(ab), d21 = ap.dot(ac);
+        const auto denominator = d00 * d11 - d01 * d01;
+        surface::Weights weights {1.0 / 3, 1.0 / 3, 1.0 / 3};
+        if (std::abs(denominator) > 1.0e-300) {
+            const auto v = std::clamp((d11 * d20 - d01 * d21) / denominator, 0.0, 1.0), w = std::clamp((d00 * d21 - d01 * d20) / denominator, 0.0, 1.0 - v);
+            weights = {1 - v - w, v, w};
+        }
+        Normals facing;
+        facing.add(normals[surface]->at(face, weights));
+        const auto light = lightAt(lights, at, facing, static_cast<float>(items[surface].clip->lit(time)));
+        const auto brightest = std::max({light[0], light[1], light[2]});
+        if (!(brightest > 0)) { return hatching::Seen {surface, at, 0}; }
+        return hatching::Seen {surface, at, static_cast<double>(brightest), {light[0] / brightest, light[1] / brightest, light[2] / brightest}};
+    };
+    // The beam draws a cycle in so many samples, and the curve needs one at
+    // each of its points: it takes no more than half of them, leaving the rest
+    // for everything else.
+    const auto beamSamples = composition.sampleRate / std::max(1.0, composition.beamRate);
+    const auto strokes = hatching::strokes(std::max(reach.x, reach.y), detail, look, static_cast<std::size_t>(std::max(64.0, beamSamples * .5)));
+    // Each surface's strokes, in its clip's colour in the light's.
+    std::vector<std::vector<std::unique_ptr<osci::Shape>>> shapes(items.size());
+    for (const auto& stroke : strokes) {
+        const auto& clip = *items[stroke.surface].clip;
+        const auto colour = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, 1, 1, 1), time), time);
+        const auto point = [&](const hatching::Seen& seen) {
+            return osci::Point(static_cast<float>(seen.at.x), static_cast<float>(seen.at.y), static_cast<float>(seen.at.z),
+                std::max(0.0f, colour.r) * seen.hue[0] * static_cast<float>(amount), std::max(0.0f, colour.g) * seen.hue[1] * static_cast<float>(amount), std::max(0.0f, colour.b) * seen.hue[2] * static_cast<float>(amount));
+        };
+        for (std::size_t index = 1; index < stroke.points.size(); ++index) { shapes[stroke.surface].push_back(std::make_unique<ColouredLine>(point(stroke.points[index - 1]), point(stroke.points[index]))); }
+    }
+    std::vector<Frame::Entry> entries;
+    for (std::size_t surface = 0; surface < items.size(); ++surface) {
+        if (shapes[surface].empty()) { continue; }
+        entries.push_back({items[surface].index, std::make_shared<PreparedDrawing>(std::move(shapes[surface]), true), 1});
+    }
+    return entries;
+}
+
 inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel = nullptr, const OtherEye* from = nullptr) {
     auto& depth = workspace.depth;
     const auto cancelled = [cancel] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
@@ -361,7 +441,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto lit = composition.lit(time);
     const auto reflecting = composition.reflects(time);
     const auto restyling = composition.restyles(time);
-    if (!hides && !lit && !reflecting && !restyling) { return frame; }
+    // How much the camera shades by hatching rather than brightness.
+    const auto hatching = from == nullptr && camera != nullptr && view.has_value() ? camera->hatching(time) : 0.0;
+    if (!hides && !lit && !reflecting && !restyling && !(hatching > 0)) { return frame; }
     std::vector<SceneItem> items;
     for (std::size_t index = 0; index < composition.clips.size(); ++index) {
         const auto& clip = composition.clips[index];
@@ -525,18 +607,22 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     surfaceTriangles.clear();
     surfaceSources.clear();
     std::vector<std::vector<crossing::Piece>> crossings;
-    if (hides) {
+    if (hides || hatching > 0) {
         const auto gather = [&](std::uint32_t surface, const std::array<Vec3, 3>& corners, const std::array<osci::Point, 3>& sources) {
-            if (surfaces < 2) { return; }
+            if (surfaces < 2 || !hides) { return; }
             surfaceTriangles.push_back({corners, surface});
             surfaceSources.push_back(sources);
         };
         if (!drawSurfaces(items, world, place, cameraEye, cameraProjection, reach, depth, workspace.dicer, gather, cancelled)) { return nullptr; }
-        if (!depth.isEmpty()) {
+        if (hides && !depth.isEmpty()) {
             dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
             crossings = crossing::runs(surfaceTriangles, view->focalLength, reach, cancel);
             if (cancelled()) { return nullptr; }
         }
+    }
+    if (hatching > 0 && !depth.isEmpty()) {
+        frame->hatching = hatch(composition, time, items, world, lights, lit, cameraEye, cameraProjection, reach, depth, hatching, camera->hatchDetail(time), workspace);
+        if (cancelled()) { return nullptr; }
     }
     // Hiding lines, a camera that sees no surface hides nothing.
     const auto hiding = hides && !depth.isEmpty();

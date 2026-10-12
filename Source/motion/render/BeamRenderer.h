@@ -212,15 +212,18 @@ private:
             if (!shown.has_value()) { continue; }
             measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share, shown->drawing, shown->shown, shown->coarse});
         }
-        // What mirrors show, each drawn as part of its clip.
+        // What mirrors show, and the camera's hatching, each drawn as part
+        // of its clip.
         const auto* baked = composition.hiddenLines != nullptr ? composition.hiddenLines->at(time) : nullptr;
-        for (std::size_t index = 0; baked != nullptr && index < baked->reflections.size() && layerCount < maximumLayers; ++index) {
-            const auto& reflection = baked->reflections[index];
-            if (reflection.clip >= composition.clips.size() || reflection.drawing == nullptr || reflection.drawing->empty()) { continue; }
-            const auto& clip = composition.clips[reflection.clip];
-            if (clip.light || !clip.active(time) || !clip.visible(time) || !(clip.beam(time) > 0)) { continue; }
-            const auto& drawing = *reflection.drawing;
-            measure(composition, {&clip, nullptr, 0, 0, {}, {}, std::max<std::int64_t>(2, drawing.minimumTraversalSamples()), clip.beam(time), &drawing, 1, std::max<std::int64_t>(2, drawing.coarseTraversalSamples()), true});
+        for (const auto* entries : {baked != nullptr ? &baked->reflections : nullptr, baked != nullptr ? &baked->hatching : nullptr}) {
+            for (std::size_t index = 0; entries != nullptr && index < entries->size() && layerCount < maximumLayers; ++index) {
+                const auto& entry = (*entries)[index];
+                if (entry.clip >= composition.clips.size() || entry.drawing == nullptr || entry.drawing->empty()) { continue; }
+                const auto& clip = composition.clips[entry.clip];
+                if (clip.light || !clip.active(time) || !clip.visible(time) || !(clip.beam(time) > 0)) { continue; }
+                const auto& drawing = *entry.drawing;
+                measure(composition, {&clip, nullptr, 0, 0, {}, {}, std::max<std::int64_t>(2, drawing.minimumTraversalSamples()), clip.beam(time), &drawing, 1, std::max<std::int64_t>(2, drawing.coarseTraversalSamples()), true});
+            }
         }
         finishPlan(composition, first, end, rate);
     }

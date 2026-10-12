@@ -112,7 +112,10 @@ inline constexpr std::array<PropertySpec, 26> luaSliderSpecs {{
     {"slider.y", "Slider Y", "Slider Y", "", 0, 1, 0, .01, 3, ""}, {"slider.z", "Slider Z", "Slider Z", "", 0, 1, 0, .01, 3, ""},
 }};
 
-inline constexpr std::array<PropertySpec, 7> cameraPropertySpecs {{
+// Hatching: the scene shaded by a Hilbert curve over what the camera sees,
+// denser where more light falls, rather than by brightness; Hatch detail is
+// how many of its cells span the frame where the light is full.
+inline constexpr std::array<PropertySpec, 9> cameraPropertySpecs {{
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.y", "Position Y", "Position", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.z", "Position Z", "Position", "Z", -unbounded, unbounded, 4, .01, 3, ""},
@@ -120,7 +123,10 @@ inline constexpr std::array<PropertySpec, 7> cameraPropertySpecs {{
     {"rotation.y", "Rotation Y", "Rotation", "Y", -unbounded, unbounded, 0, 1, 1, "°"},
     {"rotation.z", "Rotation Z", "Rotation", "Z", -unbounded, unbounded, 0, 1, 1, "°"},
     {"fov", "Field of view", "Field of view", "", 1, 179, defaultCameraFieldOfView, .5, 1, "°"},
+    {"hatching", "Hatching", "Hatching", "", 0, 100, 0, 1, 0, "%"},
+    {"hatchDetail", "Hatch detail", "Hatch detail", "", 8, 256, 64, 1, 0, ""},
 }};
+inline constexpr std::size_t cameraHatchingIndex = 7, cameraHatchDetailIndex = 8;
 
 // The Scope's picture: one row each, in the visualiser's own ranges.
 inline constexpr std::array<PropertySpec, 9> beamPropertySpecs {{

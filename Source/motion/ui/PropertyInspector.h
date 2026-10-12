@@ -123,6 +123,8 @@ private:
     std::unique_ptr<motion::ui::TileGrid> surfaceTiles;
     // A light's presets, as tiles: steady, or moving on its own.
     std::unique_ptr<motion::ui::TileGrid> presetTiles;
+    // How a camera shades: by brightness, or by hatching.
+    std::unique_ptr<motion::ui::TileGrid> shadingTiles;
     // The surface tiles' properties, in their order.
     static const std::array<std::string_view, 8>& surfaceProperties();
     // Puts the tiles in step with the target at `time`, and shows the

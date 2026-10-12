@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "../model/LightPresets.h"
 #include "../render/Reflections.h"
+#include "../render/HiddenLineHatching.h"
 #include "../render/SurfaceLines.h"
 
 // Pictures of how a surface can draw itself, and of a light's presets, for
@@ -188,6 +189,60 @@ inline const Picture& surfacePicture(SurfaceLook look) {
         return result;
     }();
     return made[static_cast<std::size_t>(look)];
+}
+
+// How a camera shades what light falls on: by brightness (a ball's lines
+// bright where it is lit and faint where not), or by hatching (a Hilbert
+// curve over it, dense where it is lit).
+enum class Shading { brightness, hatching };
+inline const Picture& shadingPicture(Shading shading) {
+    static const auto made = [] {
+        std::array<Picture, 2> result;
+        const Vec3 toward = Vec3 {-.6, .55, .58}.normalized().value();
+        // The ball's lines, split by how lit they are.
+        Picture bright;
+        bright.lines.addEllipse(-1, -1, 2, 2);
+        const auto pi = juce::MathConstants<double>::pi;
+        // Each short stretch bright or faint as the light falls on its middle.
+        const auto stretch = [&](Vec3 from, Vec3 to) {
+            if (!detail::facing(from) || !detail::facing(to)) { return; }
+            auto& path = ((from + to) * .5).dot(toward) > .15 ? bright.lines : bright.context;
+            path.startNewSubPath(detail::onTile(from));
+            path.lineTo(detail::onTile(to));
+        };
+        const auto on = [&](double latitude, double longitude) { return Vec3 {std::cos(latitude) * std::cos(longitude), std::sin(latitude), std::cos(latitude) * std::sin(longitude)}; };
+        for (int ring = 1; ring < 6; ++ring) {
+            const auto latitude = pi * ring / 6 - pi / 2;
+            for (int step = 0; step < 64; ++step) { stretch(on(latitude, 2 * pi * step / 64), on(latitude, 2 * pi * (step + 1) / 64)); }
+        }
+        for (int meridian = 0; meridian < 10; ++meridian) {
+            const auto longitude = 2 * pi * meridian / 10;
+            for (int step = 0; step < 32; ++step) { stretch(on(pi * step / 32 - pi / 2, longitude), on(pi * (step + 1) / 32 - pi / 2, longitude)); }
+        }
+        result[static_cast<std::size_t>(Shading::brightness)] = bright;
+        // A disc lit from the upper left, hatched by the curve itself.
+        Picture hatched;
+        hatched.context.addEllipse(-1, -1, 2, 2);
+        const auto look = [&](double x, double y) -> std::optional<hidden::hatching::Seen> {
+            const auto r = x * x + y * y;
+            if (r > .97) { return std::nullopt; }
+            // On the tile y runs down.
+            const Vec3 normal {x, y, std::sqrt(1 - r)};
+            return hidden::hatching::Seen {0, {x, -y, 0}, std::max(0.0, normal.dot(toward))};
+        };
+        bool open = false;
+        for (const auto& stroke : hidden::hatching::strokes(1, 32, look)) {
+            open = false;
+            for (const auto& point : stroke.points) {
+                const juce::Point<float> at(static_cast<float>(point.at.x), static_cast<float>(point.at.y));
+                if (open) { hatched.lines.lineTo(at); } else { hatched.lines.startNewSubPath(at); }
+                open = true;
+            }
+        }
+        result[static_cast<std::size_t>(Shading::hatching)] = hatched;
+        return result;
+    }();
+    return made[static_cast<std::size_t>(shading)];
 }
 
 // A preset's name short enough for a small tile.

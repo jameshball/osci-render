@@ -120,11 +120,10 @@ struct TransformPose {
     }
     // Whether a property may be other than its default at some time: keys,
     // a link or modulators can move it.
-    static bool mayDiffer(const std::array<Curve, objectPropertySpecs.size()>& curves, std::size_t index) {
-        const auto& curve = curves[index];
-        const auto usual = objectPropertySpecs[index].defaultValue;
+    static bool mayDifferCurve(const Curve& curve, double usual) {
         return curve.base != usual || curve.drivers != nullptr || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [usual](const Keyframe& key) { return key.value != usual; });
     }
+    static bool mayDiffer(const std::array<Curve, objectPropertySpecs.size()>& curves, std::size_t index) { return mayDifferCurve(curves[index], objectPropertySpecs[index].defaultValue); }
     static bool mayReflect(const std::array<Curve, objectPropertySpecs.size()>& curves) { return mayDiffer(curves, reflectsIndex); }
     // Whether it may draw itself other than by its edges alone.
     static bool mayRestyle(const std::array<Curve, objectPropertySpecs.size()>& curves) {
@@ -418,9 +417,22 @@ struct PreparedChain {
 
 struct PreparedCamera {
     Id id;
-    std::array<Curve, 7> curves;
+    std::array<Curve, cameraPropertySpecs.size()> curves;
     PreparedChain target, parent;
     bool hidesHiddenLines = false;
+
+    // How much it shades by hatching (0..1), and how many cells across.
+    double hatching(double time) const {
+        const auto value = curves[cameraHatchingIndex].evaluate(time) / 100;
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
+    }
+    int hatchDetail(double time) const {
+        const auto& spec = cameraPropertySpecs[cameraHatchDetailIndex];
+        const auto value = curves[cameraHatchDetailIndex].evaluate(time);
+        return static_cast<int>(std::isfinite(value) ? spec.clamp(std::round(value)) : spec.defaultValue);
+    }
+    // Whether it may hatch at all.
+    bool mayHatch() const { return TransformPose::mayDifferCurve(curves[cameraHatchingIndex], cameraPropertySpecs[cameraHatchingIndex].defaultValue); }
 
     struct Frame {
         Vec3 position, right, up, forward;
@@ -430,6 +442,7 @@ struct PreparedCamera {
     // position/rotation (X, then Y, then Z), carried by the parent group,
     // then aimed at the target's anchor with Z rotation kept as roll.
     std::optional<Frame> frame(double time) const {
+        // Where it is and how it sees: its first seven.
         std::array<double, 7> values;
         for (std::size_t index = 0; index < values.size(); ++index) {
             values[index] = curves[index].evaluate(time);
@@ -691,17 +704,19 @@ struct PreparedComposition {
             lights.clear();
         }
         // Frames whose hidden lines a camera removes, that lights light, in
-        // which something reflects, or a surface draws itself other than by
-        // its edges, are baked off the render thread.
+        // which something reflects, a surface draws itself other than by its
+        // edges, or a camera hatches, are baked off the render thread.
         const auto hides = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.hidesHiddenLines; });
         const auto reflective = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayReflect(); });
         const auto restyled = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayRestyle(); });
-        if (purpose == CompositionPurpose::signal && preparationError.isEmpty() && (hides || !lights.empty() || reflective || restyled)) {
+        const auto hatches = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.mayHatch(); });
+        if (purpose == CompositionPurpose::signal && preparationError.isEmpty() && (hides || !lights.empty() || reflective || restyled || hatches)) {
             hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach);
             hiddenLines->hides = hides;
             hiddenLines->lights = !lights.empty();
             hiddenLines->reflects = reflective;
             hiddenLines->restyles = restyled;
+            hiddenLines->hatches = hatches;
         }
     }
 

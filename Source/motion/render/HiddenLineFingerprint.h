@@ -10,18 +10,20 @@ namespace motion::hidden {
 // whether it plays and shows, which drawing of its source it shows, and every
 // pose and effect setting along its chain (its colour aside: that is applied
 // as the beam draws, after what is baked, except where a mirror shows it,
-// which bakes its colour into the reflection). Two times with equal
+// which bakes its colour into the reflection, or a camera hatches). Two times with equal
 // fingerprints cull to the same frame, so a bake can reuse one for the other:
 // a still stretch of a project costs one frame.
 class Fingerprint {
 public:
     void take(const PreparedComposition& composition, double time) {
         values.clear();
-        colours = composition.reflects(time);
         const auto* camera = composition.activeCamera(time);
+        // Hatching, as reflections do, bakes the colours it is drawn in.
+        const auto hatching = camera != nullptr ? camera->hatching(time) : 0.0;
+        colours = composition.reflects(time) || hatching > 0;
         add(camera != nullptr ? static_cast<double>(camera - composition.cameras.data()) : -1.0);
         if (camera != nullptr) {
-            add(camera->hidesHiddenLines ? 1.0 : 0.0);
+            add(camera->hidesHiddenLines ? 1.0 : 0.0, hatching, hatching > 0 ? static_cast<double>(camera->hatchDetail(time)) : 0.0);
             const auto view = camera->frame(time);
             if (view.has_value()) {
                 for (const auto& axis : {view->position, view->right, view->up, view->forward}) { add(axis.x, axis.y, axis.z); }

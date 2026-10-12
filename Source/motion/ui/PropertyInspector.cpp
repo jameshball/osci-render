@@ -369,6 +369,7 @@ juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
     if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Beam") { return "Appearance"; }
     if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Hilbert curve" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail" || group == "Noise phase" || group == "Noise flow" || group == "Mirror") { return "Surface"; }
+    if (group == "Hatching" || group == "Hatch detail") { return "Shading"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }
@@ -492,6 +493,19 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
     }
     surfaceTiles.reset();
     presetTiles.reset();
+    shadingTiles.reset();
+    if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return spec.id == "hatching"; })) {
+        using motion::ui::pictures::Shading;
+        shadingTiles = std::make_unique<motion::ui::TileGrid>("Shading", std::vector<motion::ui::TileGrid::Choice> {
+            {"Brightness", "Light shows as how bright each line is drawn", motion::ui::pictures::shadingPicture(Shading::brightness)},
+            {"Hatching", "Light shows as how densely a Hilbert curve covers each surface: it reads on any scope, by X and Y alone", motion::ui::pictures::shadingPicture(Shading::hatching)}},
+            2, motion::ui::TileGrid::Look::pictures, true);
+        shadingTiles->onClick = [this](std::size_t index) {
+            if (shadingTiles->tile(index).getToggleState()) { return; }
+            commitValue("hatching", index == 1 ? 100.0 : 0.0, index == 1 ? "Shade by hatching" : "Shade by brightness");
+        };
+        content.addAndMakeVisible(*shadingTiles);
+    }
     if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return motion::isLinesProperty(spec.id); })) {
         using motion::ui::pictures::SurfaceLook;
         const auto picture = [](SurfaceLook look) { return motion::ui::pictures::surfacePicture(look); };
@@ -537,13 +551,31 @@ const std::array<std::string_view, 8>& MotionPropertyInspector::surfacePropertie
 }
 
 bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, double time) {
+    bool changed = false;
+    if (shadingTiles != nullptr) {
+        const auto* curve = found.curve("hatching");
+        const auto amount = curve != nullptr ? curve->evaluateBase(time) : 0.0;
+        const auto moving = (curve != nullptr && curve->animated()) || isModulated("hatching");
+        shadingTiles->setState(0, !(amount > 0));
+        shadingTiles->setState(1, amount > 0, moving ? juce::String("~") : amount > 0 && amount < 99.5 ? juce::String(juce::roundToInt(amount)) + "%" : juce::String());
+        shadingTiles->setLocked(found.locked);
+        // Hatching's rows only while it hatches, or is keyed or driven to.
+        for (auto& row : rows) {
+            if (row->section != "Shading") { continue; }
+            const auto shown = amount > 0 || moving;
+            if (row->isVisible() != shown) {
+                row->setVisible(shown);
+                changed = true;
+            }
+        }
+    }
     if (presetTiles != nullptr) {
         const auto current = motion::currentLightPreset(processor.document.project(), target);
         presetTiles->setState(0, !current.has_value());
         for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) { presetTiles->setState(index + 1, current == motion::lightPresets[index]); }
         presetTiles->setLocked(found.locked);
     }
-    if (surfaceTiles == nullptr) { return false; }
+    if (surfaceTiles == nullptr) { return changed; }
     const auto valueOf = [&](std::string_view property) {
         const auto* curve = found.curve(std::string(property));
         if (curve != nullptr) { return curve->evaluateBase(time); }
@@ -563,7 +595,6 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
     }
     surfaceTiles->setLocked(found.locked);
     const auto patterned = std::any_of(surfaceProperties().begin() + 2, surfaceProperties().begin() + 7, live);
-    bool changed = false;
     for (auto& row : rows) {
         if (row->section != "Surface" || row->fields.empty()) { continue; }
         const auto property = row->fields.front()->spec.id;
@@ -591,10 +622,12 @@ void MotionPropertyInspector::layoutContent() {
                 if (index > from || after) { y += motion::style::gap; }
                 content.sections.emplace_back(y, row->section);
                 y += sectionHeading + motion::style::gap;
-                // Surface opens with its tiles; its rows below are those on.
-                if (row->section == "Surface" && surfaceTiles != nullptr) {
-                    const auto height = surfaceTiles->heightFor(inner);
-                    surfaceTiles->setBounds(motion::style::padding, y, inner, height);
+                // Surface and Shading open with their tiles; their rows below
+                // are those on.
+                auto* tiles = row->section == "Surface" ? surfaceTiles.get() : row->section == "Shading" ? shadingTiles.get() : nullptr;
+                if (tiles != nullptr) {
+                    const auto height = tiles->heightFor(inner);
+                    tiles->setBounds(motion::style::padding, y, inner, height);
                     y += height + motion::style::padding;
                 }
             }

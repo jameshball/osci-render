@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
+#include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/render/HiddenLines.h"
 
 // How a surface draws itself: its edges, its outline as the eye sees it, and
@@ -163,6 +164,44 @@ public:
             };
             expect(farPoints(false) > 100, "with nothing hidden, all of it shows");
             expectEquals(farPoints(true), 0, "with lines hidden, none of its far side");
+        }
+
+        beginTest("A camera hatching shades by a curve's density: on the surfaces it sees, densest where lit");
+        {
+            auto project = scene({{"edges", 0}});
+            project.cameras.front().properties["hatching"] = motion::Curve(100);
+            project.cameras.front().properties["hatchDetail"] = motion::Curve(256);
+            // From one side: that half of the ball is lit, the other in its own shadow.
+            addClip(project, generatorAsset(5, "directionalLight"), 50, {{"rotation.x", 0}, {"rotation.y", 90}, {"light.shadows", 100}});
+            // At 48 kHz, so the beam's cycle holds less than the curve would take.
+            const motion::PreparedComposition prepared(project, 48000);
+            expect(prepared.hiddenLines != nullptr, "a camera that hatches is baked");
+            motion::hidden::Workspace workspace;
+            const auto frame = motion::hidden::cull(prepared, 1, workspace);
+            expect(frame->hatching.size() == 1 && frame->hatching.front().clip == 0, "the ball is hatched");
+            std::size_t points = 0, lit = 0, dark = 0, onBall = 0;
+            for (const auto& entry : frame->hatching) {
+                for (std::size_t index = 0; index < entry.drawing->shapeCount(); ++index) {
+                    const auto point = entry.drawing->shape(index)->nextVector(0);
+                    const motion::Vec3 at {point.x, point.y, point.z};
+                    ++points;
+                    // On its faces: a 16-sided ball's are this far in at most.
+                    onBall += at.length() < radius + 1.0e-3 && at.length() > radius * .92 ? 1 : 0;
+                    (at.x > 0 ? lit : dark) += 1;
+                }
+            }
+            expect(points > 100, "it is drawn: " + juce::String(static_cast<int>(points)));
+            expectEquals(static_cast<int>(onBall), static_cast<int>(points), "every point of it on the ball");
+            expect(std::max(lit, dark) > 4 * std::min(lit, dark), "densest where lit: " + juce::String(static_cast<int>(lit)) + " on one side, " + juce::String(static_cast<int>(dark)) + " on the other");
+            expect(points <= 48000 / 60 / 2, "no more than half a beam cycle's samples: " + juce::String(static_cast<int>(points)));
+            // The beam draws it as part of the ball.
+            std::atomic<bool> cancel {false};
+            motion::hidden::Baker::bakeAll(*prepared.hiddenLines, 48000, cancel);
+            motion::BeamRenderer beam;
+            beam.planCycle(prepared, 1, 48000);
+            bool drawn = false;
+            for (const auto& segment : beam.plannedSegments()) { drawn = drawn || (segment.kind == motion::BeamRenderer::Kind::draw && segment.world && segment.clip == &prepared.clips[0]); }
+            expect(drawn, "the beam draws the hatching");
         }
 
         beginTest("A pattern's lines run on unbroken, even over a cone's tip");

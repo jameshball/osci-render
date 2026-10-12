@@ -31,6 +31,8 @@ struct Frame {
     // in the scene, coloured as they are drawn, and only the camera places
     // them. Drawn as part of that clip, with its share of the beam.
     std::vector<Entry> reflections;
+    // The camera's hatching on each surface it shades, likewise in the scene.
+    std::vector<Entry> hatching;
 
     const Entry* entry(std::size_t clip) const {
         for (const auto& item : drawings) {
@@ -67,8 +69,8 @@ public:
     const std::shared_ptr<const Project> project;
     const Reach reach;
     // What it bakes: lines a camera hides, light from lights, reflections,
-    // surfaces drawn other than by their edges, or any of them together.
-    bool hides = true, lights = false, reflects = false, restyles = false;
+    // surfaces drawn other than by their edges, hatching, or any of them.
+    bool hides = true, lights = false, reflects = false, restyles = false, hatches = false;
 
     double frameRate() const { return rate; }
     std::size_t frameCount() const { return count; }
