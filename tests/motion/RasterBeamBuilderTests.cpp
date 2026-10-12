@@ -205,6 +205,30 @@ int main() {
         const auto ratio = static_cast<double>(rightCells.size()) / static_cast<double>(std::max<std::size_t>(1, leftCells.size()));
         check(ratio > .8 && ratio < 1.25, "as dense where dim as where bright");
         check(rightRed / rightCount > 1.5 * leftRed / leftCount, "its colour the picture's, brighter where it is");
+        // The least budget of all still fits: a curve not divided at all.
+        for (const auto least : {std::size_t {16}, std::size_t {17}}) {
+            hilbert.pointsPerFrame = least;
+            verify(ramp.build(hilbert), least);
+        }
+        // A wide picture's curve stays on it, where its grid reaches past it.
+        Image wide(64, 16);
+        for (int y = 0; y < 16; ++y) { for (int x = 0; x < 64; ++x) { wide.set(x, y, {200, 200, 200, 255}); } }
+        hilbert.pointsPerFrame = 1024;
+        const auto spread = wide.build(hilbert);
+        verify(spread, 1024);
+        float lowest = 1, highest = -1;
+        for (const auto& p : spread.points) {
+            if (dark(p)) { continue; }
+            lowest = std::min(lowest, p.y);
+            highest = std::max(highest, p.y);
+        }
+        check(lowest >= -.25f && highest <= .25f, "every point on the picture, none in the grid past it");
+        // Scattered lit pixels: a cell mostly drawn is drawn in their colour,
+        // never the black between them.
+        Image speckled(16, 16);
+        for (int y = 0; y < 16; ++y) { for (int x = 0; x < 16; ++x) { if ((x + y) % 2 == 0) { speckled.set(x, y, {255, 128, 0, 255}); } } }
+        hilbert.pointsPerFrame = 64;
+        verify(speckled.build(hilbert), 64);
     }
     std::cout << "RasterBeamBuilder tests passed\n";
 }

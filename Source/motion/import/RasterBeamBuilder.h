@@ -54,13 +54,16 @@ public:
                 }
                 return rgb;
             };
-            std::vector<std::uint8_t> mask(static_cast<std::size_t>(width) * height);
+            // How bright each pixel is, and whether it is bright enough to draw.
+            std::vector<float> brightness(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+            std::vector<std::uint8_t> mask(brightness.size());
             for (int y = 0; y < height; ++y) {
                 if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                 for (int x = 0; x < width; ++x) {
                     const auto rgb = colour(x, y);
-                    const auto luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-                    mask[static_cast<std::size_t>(y) * width + x] = luminance > 0 && luminance >= settings.threshold;
+                    const auto index = static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+                    brightness[index] = 0.2126f * rgb[0] + 0.7152f * rgb[1] + 0.0722f * rgb[2];
+                    mask[index] = brightness[index] > 0 && brightness[index] >= settings.threshold;
                 }
             }
             const auto lit = [&](int x, int y) {
@@ -82,19 +85,12 @@ public:
                 int deepest = 0;
                 while ((1 << deepest) < std::max(width, height)) { ++deepest; }
                 const auto cells = static_cast<std::size_t>(1) << deepest;
-                std::vector<float> brightness(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
-                for (int y = 0; y < height; ++y) {
-                    for (int x = 0; x < width; ++x) {
-                        const auto rgb = colour(x, y);
-                        brightness[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] = static_cast<float>(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
-                    }
-                }
                 const auto density = settings.shading == RasterSettings::Shading::density;
-                // By density: how bright each cell is, stretched between the
-                // picture's own darkest and brightest (but the odd pixel), so
-                // the curve's density spans its range, then to the power of
-                // 1.5, as a line on a scope with brightness would show it. By
-                // colour: how much of each cell is lit, the curve as fine
+                // By density: how bright each drawn pixel is, stretched
+                // between the picture's own darkest and brightest (but the odd
+                // pixel), so the curve's density spans its range, then to the
+                // power of 1.5, as a line on a scope with brightness would show
+                // it. By colour: whether each pixel is drawn, the curve as fine
                 // over all of it, its colour showing how bright.
                 auto sorted = brightness;
                 const auto at = [&](double share) {
@@ -107,50 +103,81 @@ public:
                 std::vector<float> finest(cells * cells, 0.0f);
                 for (int y = 0; y < height; ++y) {
                     for (int x = 0; x < width; ++x) {
-                        const auto value = brightness[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
-                        const auto lit = value > 0 && value >= settings.threshold;
-                        const auto spread = stretched ? std::clamp((value - darkest) / (brightest - darkest), 0.0f, 1.0f) : value;
-                        finest[static_cast<std::size_t>(y) * cells + static_cast<std::size_t>(x)] = density ? std::pow(spread, 1.5f) : (lit ? 1.0f : 0.0f);
+                        const auto index = static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+                        if (mask[index] == 0) { continue; }
+                        const auto spread = stretched ? std::clamp((brightness[index] - darkest) / (brightest - darkest), 0.0f, 1.0f) : brightness[index];
+                        finest[static_cast<std::size_t>(y) * cells + static_cast<std::size_t>(x)] = density ? std::pow(spread, 1.5f) : 1.0f;
                     }
                 }
                 const auto pyramid = hilbert::Pyramid::of(std::move(finest), deepest, hilbert::Pyramid::Combine::mean);
+                // The colour of what each cell draws: the mean of its drawn
+                // pixels' (so a cell mostly drawn has their colour, never the
+                // black of one between them).
+                std::array<std::vector<float>, 3> channels;
+                std::vector<float> drawn(cells * cells, 0.0f);
+                for (auto& channel : channels) { channel.assign(cells * cells, 0.0f); }
+                for (int y = 0; y < height; ++y) {
+                    for (int x = 0; x < width; ++x) {
+                        if (mask[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] == 0) { continue; }
+                        const auto index = static_cast<std::size_t>(y) * cells + static_cast<std::size_t>(x);
+                        const auto rgb = colour(x, y);
+                        for (std::size_t c = 0; c < 3; ++c) { channels[c][index] = rgb[c]; }
+                        drawn[index] = 1;
+                    }
+                }
+                const auto drawnShare = hilbert::Pyramid::of(std::move(drawn), deepest, hilbert::Pyramid::Combine::mean);
+                const std::array<hilbert::Pyramid, 3> hues {hilbert::Pyramid::of(std::move(channels[0]), deepest, hilbert::Pyramid::Combine::mean),
+                    hilbert::Pyramid::of(std::move(channels[1]), deepest, hilbert::Pyramid::Combine::mean), hilbert::Pyramid::of(std::move(channels[2]), deepest, hilbert::Pyramid::Combine::mean)};
+                const auto colourOf = [&](const hilbert::Cell& cell) {
+                    const auto share = drawnShare.at(cell.level, cell.row, cell.column);
+                    std::array<float, 3> rgb {};
+                    for (std::size_t c = 0; c < 3; ++c) { rgb[c] = share > 0 ? hues[c].at(cell.level, cell.row, cell.column) / share : 0.0f; }
+                    return rgb;
+                };
                 // Whether a cell of the curve is drawn: by density, bright
-                // enough; by colour, mostly lit.
-                const auto shows = [&](const hilbert::Cell& cell) {
-                    const auto value = pyramid.at(cell.level, cell.row, cell.column);
-                    return density ? value > 0 && value >= settings.threshold : value >= .5f;
-                };
-                const auto curve = [&](double gain, auto&& visit) {
-                    hilbert::curve(deepest, [&](const hilbert::Cell& cell) {
-                        const auto value = pyramid.at(cell.level, cell.row, cell.column);
-                        return value > 0 && cell.size * value * gain > hilbert::threshold(cell.column, cell.row, cell.level);
-                    }, visit);
-                };
+                // enough to show (so near black isn't scribbled over); by
+                // colour, mostly drawn.
+                constexpr float faintest = .02f;
+                const auto shows = [&](const hilbert::Cell& cell) { return pyramid.at(cell.level, cell.row, cell.column) >= (density ? faintest : .5f); };
                 // As fine as the picture asks, or less, evenly, to fit the
-                // budget: each cell drawn a sample, each run two more.
-                const auto gain = hilbert::fitting(settings.pointsPerFrame, [&](double trying) {
-                    std::size_t count = 0;
+                // budget: each cell drawn a sample, each run two more. Not
+                // divided at all if need be, so even the least budget fits.
+                const auto count = [&](double gain) {
+                    std::size_t samples = 0;
                     bool open = false;
-                    curve(trying, [&](const hilbert::Cell& cell) {
+                    hilbert::adaptive(pyramid, gain, 1, [&](const hilbert::Cell& cell) {
                         const auto drawn = shows(cell);
-                        count += drawn ? (open ? 1 : 3) : 0;
+                        samples += drawn ? (open ? 1 : 3) : 0;
                         open = drawn;
-                    });
-                    return count;
-                });
+                        return samples <= settings.pointsPerFrame;
+                    }, 0);
+                    return samples;
+                };
+                const auto gain = hilbert::fitting(settings.pointsPerFrame, count);
+                if (!gain.has_value()) { return tooComplex(); }
                 if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
+                // A cell's point, kept inside the picture: a coarse cell over
+                // its edge has its middle outside it.
+                const auto inside = [&](const hilbert::Cell& cell) {
+                    return Vertex {std::clamp(cell.x, .5, width - .5), std::clamp(cell.y, .5, height - .5)};
+                };
                 Path path;
                 path.fullHue = density;
                 bool fits = true;
-                curve(gain, [&](const hilbert::Cell& cell) {
+                hilbert::adaptive(pyramid, *gain, 1, [&](const hilbert::Cell& cell) {
                     if (shows(cell)) {
-                        path.vertices.push_back({cell.x, cell.y});
+                        // Coarse cells over the picture's edge can come to one
+                        // place: a step of no length goes nowhere.
+                        const auto vertex = inside(cell);
+                        if (!path.vertices.empty() && path.vertices.back().x == vertex.x && path.vertices.back().y == vertex.y) { return; }
+                        path.vertices.push_back(vertex);
+                        path.colours.push_back(colourOf(cell));
                         return;
                     }
                     if (!path.vertices.empty() && fits) { fits = addPath(std::move(path)); }
                     path = {};
                     path.fullHue = density;
-                });
+                }, 0);
                 if (!path.vertices.empty() && fits) { fits = addPath(std::move(path)); }
                 if (!fits) { return tooComplex(); }
             } else if (settings.mode == RasterSettings::Mode::scanlines) {
@@ -279,7 +306,7 @@ public:
                 emit(path.vertices.front(), {0, 0, 0});
                 if (path.vertices.size() == 1) {
                     const auto point = path.vertices.front();
-                    const auto rgb = shown(path, colour(static_cast<int>(point.x), static_cast<int>(point.y)));
+                    const auto rgb = shown(path, path.colours.empty() ? colour(static_cast<int>(point.x), static_cast<int>(point.y)) : path.colours.front());
                     for (std::size_t i = 0; i <= path.dwell; ++i) { emit(point, rgb); }
                 } else {
                     for (std::size_t v = 1; v < path.vertices.size(); ++v) {
@@ -287,6 +314,13 @@ public:
                         const auto a = path.vertices[v - 1], b = path.vertices[v];
                         const auto ux = (b.x - a.x) / segment.length, uy = (b.y - a.y) / segment.length;
                         const auto segmentColour = [&](double distance) {
+                            // A Hilbert curve's colours are its cells', from one to the next.
+                            if (!path.colours.empty()) {
+                                const auto share = static_cast<float>(std::clamp(distance / segment.length, 0.0, 1.0));
+                                const auto& from = path.colours[v - 1];
+                                const auto& to = path.colours[v];
+                                return shown(path, {from[0] + (to[0] - from[0]) * share, from[1] + (to[1] - from[1]) * share, from[2] + (to[2] - from[2]) * share});
+                            }
                             const auto inset = path.contour ? 0.25 : 0.0;
                             distance = std::clamp(distance, inset, segment.length - inset);
                             return shown(path, colour(static_cast<int>(std::floor(a.x + ux * distance - uy * inset)),
@@ -311,7 +345,8 @@ public:
 
 private:
     struct Vertex { double x, y; };
-    struct Path { std::vector<Vertex> vertices; bool contour = false; std::size_t dwell = 0; bool fullHue = false; };
+    // A path's corners; for a Hilbert curve, each corner's colour too.
+    struct Path { std::vector<Vertex> vertices; std::vector<std::array<float, 3>> colours; bool contour = false; std::size_t dwell = 0; bool fullHue = false; };
     static Result tooComplex() { return {{}, "Raster is too complex for this point budget. Increase samples, reduce resolution, or simplify the image."}; }
 };
 }

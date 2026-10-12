@@ -1,9 +1,12 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <optional>
+#include <type_traits>
 #include <vector>
 
 // A Hilbert curve over a square grid, its cells divided as finely as each
@@ -33,6 +36,7 @@ struct Pyramid {
     std::vector<std::vector<float>> levels;
 
     static Pyramid of(std::vector<float> finest, int deepest, Combine combine) {
+        assert(finest.size() == (std::size_t {1} << deepest) * (std::size_t {1} << deepest));
         Pyramid pyramid;
         pyramid.deepest = deepest;
         pyramid.levels.resize(static_cast<std::size_t>(deepest) + 1);
@@ -64,11 +68,14 @@ struct Cell {
 
 // The curve over the grid `1 << deepest` cells across: `visit(cell)` for each
 // cell it passes through, in order, a cell divided while `divides(cell)` says
-// so (and always down to `shallowest`), never past `deepest`.
+// so (and always down to `shallowest`), never past `deepest`. A visit that
+// returns false stops the curve there.
 template <typename Divides, typename Visit>
 void curve(int deepest, Divides&& divides, Visit&& visit, int shallowest = 2) {
+    bool stopped = false;
     // A cell from its corner (x, y) along i and j, as the curve by vectors goes.
     const auto walk = [&](const auto& self, double x, double y, double ix, double iy, double jx, double jy, int level) -> void {
+        if (stopped) { return; }
         const auto size = std::abs(ix) + std::abs(iy);
         const auto across = 1 << level;
         const Cell cell {level, std::clamp(static_cast<int>((y + (iy + jy) / 2) / size), 0, across - 1), std::clamp(static_cast<int>((x + (ix + jx) / 2) / size), 0, across - 1),
@@ -83,19 +90,37 @@ void curve(int deepest, Divides&& divides, Visit&& visit, int shallowest = 2) {
             self(self, x + hx + jx, y + hy + jy, -kx, -ky, -hx, -hy, level + 1);
             return;
         }
-        visit(cell);
+        if constexpr (std::is_same_v<std::invoke_result_t<Visit&, const Cell&>, bool>) {
+            stopped = !visit(cell);
+        } else {
+            visit(cell);
+        }
     };
     const auto cells = static_cast<double>(1 << deepest);
     walk(walk, 0, 0, cells, 0, 0, cells, 0);
 }
 
+// The curve as finely divided as what each cell holds asks: a cell divides
+// while its width (in finest cells) times what it holds times `gain` is more
+// than `finest` (in finest cells) times its own threshold, so at full a cell
+// is divided down to about `finest` across.
+template <typename Visit>
+void adaptive(const Pyramid& pyramid, double gain, double finest, Visit&& visit, int shallowest = 2) {
+    curve(pyramid.deepest, [&](const Cell& cell) {
+        const auto value = pyramid.at(cell.level, cell.row, cell.column);
+        return value > 0 && cell.size * value * gain > finest * threshold(cell.column, cell.row, cell.level);
+    }, visit, shallowest);
+}
+
 // As fine as asked, or less, evenly, to come to no more than `most`: the
-// largest gain from 0 to 1 at which `count(gain)` fits, found by halving.
+// largest gain from 0 to 1 at which `count(gain)` fits, found by halving;
+// none if even the coarsest curve (gain 0) doesn't.
 template <typename Count>
-double fitting(std::size_t most, Count&& count) {
-    if (count(1.0) <= most) { return 1; }
+std::optional<double> fitting(std::size_t most, Count&& count) {
+    if (count(1.0) <= most) { return 1.0; }
+    if (count(0.0) > most) { return std::nullopt; }
     double low = 0, high = 1;
-    for (int halving = 0; halving < 16; ++halving) {
+    for (int halving = 0; halving < 10; ++halving) {
         const auto middle = (low + high) / 2;
         (count(middle) > most ? high : low) = middle;
     }

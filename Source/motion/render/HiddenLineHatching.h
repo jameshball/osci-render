@@ -18,7 +18,8 @@
 // geometry, so it can be tested alone.
 namespace motion::hidden::hatching {
 // What the curve finds at a point of the frame: the surface seen there, where
-// it is in the scene, and how much light reaches it (0..1).
+// it is in the scene, and how much light reaches it (as a share of the
+// brightest seen, 0..1, once the field has it).
 struct Seen {
     std::uint32_t surface;
     Vec3 at;
@@ -65,45 +66,52 @@ struct Field {
         brightest = hilbert::Pyramid::of(std::move(finestLight), deepest, hilbert::Pyramid::Combine::most);
     }
 
-    // The curve (see hilbert::curve): `visit(seen, size)` is told of each of
-    // its cells in order (none for one with no surface in it) and how wide it
-    // is. Cells are divided while wider than the finest over the light in them
-    // times `gain`, at least to a 4 by 4 grid. A cell's point is what is seen
-    // at its middle, or failing that its finest cell nearest the middle that
-    // has a surface; `placed` false leaves them unlooked for, as for counting.
+    // The curve (see hilbert::adaptive): `visit(seen, size, light)` is told
+    // of each of its cells in order (none seen for one with no surface in
+    // it), how wide it is, and the most light in it. Cells are divided while
+    // wider than the finest over the light in them times `gain`, at least to
+    // a 4 by 4 grid. A cell's point is what its finest cells nearest its
+    // middle see; `placed` false leaves them unlooked for, as for counting.
     template <typename Visit>
     void curve(double gain, Visit&& visit, bool placed = true) {
-        hilbert::curve(deepest, [&](const hilbert::Cell& cell) {
-            const auto light = brightest.at(cell.level, cell.row, cell.column);
-            return light > 0 && cell.size * step * light * gain > finest * hilbert::threshold(cell.column, cell.row, cell.level);
-        }, [&](const hilbert::Cell& cell) {
+        hilbert::adaptive(brightest, gain, finest / step, [&](const hilbert::Cell& cell) {
             const auto light = brightest.at(cell.level, cell.row, cell.column);
             const auto size = cell.size * step;
             if (light < 0 || !placed) {
                 visit(std::optional<Seen>(), size, light);
                 return;
             }
-            const auto cx = -half + cell.x * step, cy = -half + cell.y * step;
-            auto centre = cell.level == deepest ? seen[static_cast<std::size_t>(cell.row) * static_cast<std::size_t>(cells) + static_cast<std::size_t>(cell.column)] : look(cx, cy);
-            if (cell.level != deepest && centre.has_value()) { centre->light = exposed(centre->light); }
-            if (!centre.has_value()) {
-                // The finest cell in it nearest its middle that has a surface.
-                const auto span = cells >> cell.level;
-                double nearest = 1.0e300;
-                for (int r = cell.row * span; r < (cell.row + 1) * span; ++r) {
-                    for (int c = cell.column * span; c < (cell.column + 1) * span; ++c) {
-                        const auto& candidate = seen[static_cast<std::size_t>(r) * static_cast<std::size_t>(cells) + static_cast<std::size_t>(c)];
-                        if (!candidate.has_value()) { continue; }
-                        const auto distance = std::hypot(-half + (c + .5) * step - cx, -half + (r + .5) * step - cy);
-                        if (distance < nearest) {
-                            nearest = distance;
-                            centre = candidate;
-                        }
+            visit(nearestSeen(cell), size, light);
+        });
+    }
+
+private:
+    const std::optional<Seen>& seenAt(int row, int column) const { return seen[static_cast<std::size_t>(row) * static_cast<std::size_t>(cells) + static_cast<std::size_t>(column)]; }
+    // What a cell's finest cells nearest its middle see: those at its middle
+    // if any has a surface, else the nearest that has.
+    std::optional<Seen> nearestSeen(const hilbert::Cell& cell) const {
+        if (cell.level == deepest) { return seenAt(cell.row, cell.column); }
+        const auto span = cells >> cell.level;
+        const auto nearestIn = [&](int top, int left, int bottom, int right) {
+            std::optional<Seen> found;
+            double nearest = 1.0e300;
+            for (int r = top; r < bottom; ++r) {
+                for (int c = left; c < right; ++c) {
+                    const auto& candidate = seenAt(r, c);
+                    if (!candidate.has_value()) { continue; }
+                    const auto distance = std::hypot(c + .5 - cell.x, r + .5 - cell.y);
+                    if (distance < nearest) {
+                        nearest = distance;
+                        found = candidate;
                     }
                 }
             }
-            visit(centre, size, light);
-        });
+            return found;
+        };
+        const auto middleRow = cell.row * span + span / 2, middleColumn = cell.column * span + span / 2;
+        auto found = nearestIn(middleRow - 1, middleColumn - 1, middleRow + 1, middleColumn + 1);
+        if (!found.has_value()) { found = nearestIn(cell.row * span, cell.column * span, (cell.row + 1) * span, (cell.column + 1) * span); }
+        return found;
     }
 };
 
@@ -135,7 +143,8 @@ std::vector<Stroke> strokes(double half, int across, Look&& look, std::size_t mo
         field.curve(gain, [&](const std::optional<Seen>&, double, float light) { count += light >= darkest ? 1 : 0; }, false);
         return count;
     };
-    const auto gain = hilbert::fitting(most, pointsAt);
+    // None fits: the coarsest curve.
+    const auto gain = hilbert::fitting(most, pointsAt).value_or(0.0);
     std::vector<Stroke> found;
     bool open = false;
     field.curve(gain, [&](const std::optional<Seen>& seen, double, float) {
