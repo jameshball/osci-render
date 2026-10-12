@@ -21,13 +21,16 @@ namespace motion::hidden::crossing {
 struct Triangle {
     std::array<Vec3, 3> eye;
     std::uint32_t surface;
+    // How much its surface mirrors: a crossing is drawn on the surface that
+    // shows its own lines more, as a mirror's give way to what it shows.
+    float mirrors = 0;
 };
 
 // A point on a triangle, as the weights of its corners.
 using Weights = std::array<double, 3>;
 
-// One piece of a crossing, on the triangle (of the earlier surface) it
-// belongs to.
+// One piece of a crossing, on the triangle it belongs to: the one of the
+// surface that mirrors less, or of the earlier surface.
 struct Piece {
     std::uint32_t triangle;
     Weights from, to;
@@ -103,7 +106,7 @@ inline std::optional<Piece> between(const std::vector<Triangle>& triangles, std:
     const auto high = std::min(std::max(alongA[0], alongA[1]), std::max(alongB[0], alongB[1]));
     if (!(high - low > tolerance * direction.length())) { return std::nullopt; }
     // The overlap's ends, on the triangle the crossing belongs to.
-    const auto ownedByA = first.surface < second.surface;
+    const auto ownedByA = first.mirrors != second.mirrors ? first.mirrors < second.mirrors : first.surface < second.surface;
     const auto& owner = ownedByA ? first : second;
     const auto& cut = ownedByA ? *cutA : *cutB;
     const auto& range = ownedByA ? alongA : alongB;

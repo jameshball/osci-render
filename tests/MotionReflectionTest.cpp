@@ -133,6 +133,24 @@ public:
             expect(along > 0, "the crossing is seen in the floor");
         }
 
+        beginTest("Where a mirror and a surface cut through each other, the line is drawn on the surface");
+        {
+            // The small box poking out of the big one, which is now a mirror
+            // drawing none of its own lines.
+            auto project = scene(0);
+            project.tracks.change(0).clips[0].properties["reflects"] = motion::Curve(100);
+            addClip(project, generatorAsset(8, "box"), 80, {{"position.x", .3}, {"position.y", .1}, {"position.z", .3}, {"generator.width", .3}, {"generator.height", .3}, {"generator.depth", .3}});
+            const motion::PreparedComposition prepared(project);
+            motion::hidden::Workspace workspace;
+            const auto frame = motion::hidden::cull(prepared, 1, workspace);
+            const auto onMirror = static_cast<int>(pointsOf(frame->drawing(0)).size());
+            int along = 0;
+            // On the big box's front face, where the small one's left side
+            // comes out of it, in the small box's own terms (it stands at .3, .1, .3).
+            for (const auto& point : pointsOf(frame->drawing(2))) { along += std::abs(point.x + .15) < .002 && std::abs(point.z) < .002 && point.y > -.1 && point.y < .1 ? 1 : 0; }
+            expect(along > 0, "the crossing is drawn with the small box's lines");
+        }
+
         beginTest("A mirror ball shows the scene on its surface, inside its round rim");
         {
             auto project = scene(0);

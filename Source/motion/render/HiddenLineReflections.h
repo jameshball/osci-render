@@ -171,7 +171,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
-        const auto amount = item.clip->reflects(time);
+        const auto amount = item.mirrors;
         if (!(amount > 0)) { continue; }
         auto mirror = Mirror::of(world[surface], item.drawing->faces().triangles);
         mirror.face(eye.position);
@@ -192,7 +192,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
             const auto& b = world[surface][triangles[face][1]];
             const auto& c = world[surface][triangles[face][2]];
             if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
-            crossingTriangles.push_back({{*a, *b, *c}, surface});
+            crossingTriangles.push_back({{*a, *b, *c}, surface, static_cast<float>(item.mirrors)});
             crossingFaces.emplace_back(surface, face);
         }
     }
@@ -478,7 +478,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
             // Another mirror shows here as it shows to the eye: its own lines
             // as dim as it draws them, and a ball by its rim, as the
             // mirror's view of it has it (from the eye's image through it).
-            const auto itself = static_cast<float>(1 - item.clip->reflects(time));
+            const auto itself = static_cast<float>(1 - item.mirrors);
             const auto other = std::find_if(reflectors.begin(), reflectors.end(), [source](const Reflector& candidate) { return candidate.surface == source; });
             if (other != reflectors.end() && other->mirror.sphere.has_value()) {
                 const auto otherTint = composition.applyCompositionEffects(item.clip->processPoint(osci::Point(0, 0, 0, -1, -1, -1), time), time);
@@ -540,7 +540,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 const auto& [surface, face] = crossingFaces[piece.triangle];
                 if (surface == reflector.surface) { continue; }
                 const auto& item = items[surface];
-                const auto itself = static_cast<float>(1 - item.clip->reflects(time));
+                const auto itself = static_cast<float>(1 - item.mirrors);
                 if (!(itself > 0)) { continue; }
                 const auto& corners = item.drawing->faces().triangles[face];
                 const auto& vertices = item.drawing->faces().vertices;

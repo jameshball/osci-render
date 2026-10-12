@@ -382,7 +382,7 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
         if (surface >= items.size() || !normals[surface].has_value()) { return std::nullopt; }
         // A mirror shows the scene, not hatching of its own: as much as it
         // reflects, it has none.
-        if (!(items[surface].clip->reflects(time) < 1)) { return std::nullopt; }
+        if (!(items[surface].mirrors < 1)) { return std::nullopt; }
         // Where the line from the eye meets the face: exactly on it (the
         // buffer's depth is pushed back, most for a face seen edge on).
         const auto& triangle = items[surface].drawing->faces().triangles[face];
@@ -423,7 +423,7 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
     for (const auto& stroke : strokes) {
         const auto& clip = *items[stroke.surface].clip;
         auto colour = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, 1, 1, 1), time), time);
-        const auto itself = static_cast<float>(1 - clip.reflects(time));
+        const auto itself = static_cast<float>(1 - items[stroke.surface].mirrors);
         const auto weight = composition.scope.xyOnly ? std::max(leastLitWeight, itself * amount) : 1.0;
         colour.r *= itself;
         colour.g *= itself;
@@ -472,7 +472,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         const auto* points = clip.source->pointFrames();
         if (drawing == nullptr && points == nullptr) { continue; }
         const auto bent = bends(clip) || std::any_of(clip.ancestors.begin(), clip.ancestors.end(), [](const auto& stage) { return bends(stage); });
-        items.push_back({index, &clip, clip.source, drawing, points, sourceFrame, bent});
+        items.push_back({index, &clip, clip.source, drawing, points, sourceFrame, bent, clip.reflects(time)});
     }
     const Eye cameraEye = view.has_value() ? Eye {view->position, view->right, view->up, view->forward} : Eye {};
     const Projection cameraProjection {view.has_value() ? view->focalLength : 1.0};
@@ -636,7 +636,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     if (hides || frameHatching > 0) {
         const auto gather = [&](std::uint32_t surface, const std::array<Vec3, 3>& corners, const std::array<osci::Point, 3>& sources) {
             if (surfaces < 2 || !hides) { return; }
-            surfaceTriangles.push_back({corners, surface});
+            surfaceTriangles.push_back({corners, surface, static_cast<float>(items[surface].mirrors)});
             surfaceSources.push_back(sources);
         };
         if (!drawSurfaces(items, world, place, cameraEye, cameraProjection, reach, depth, workspace.dicer, gather, cancelled)) { return nullptr; }
@@ -845,6 +845,12 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (cancelled()) { return nullptr; }
+        // A mirror wholly showing the scene draws none of its own lines, so
+        // they neither show nor cover others.
+        if (!(item.mirrors < 1)) {
+            lostBy[surface] = 1;
+            continue;
+        }
         auto& kept = keptBy[surface];
         bool lost = false;
         recording = surface + 1 < items.size() || !crossings.empty();
@@ -1136,7 +1142,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         // as much dimmer as it reflects, and gone when it reflects wholly.
         // A surface drawn again for the frame is listed as drawn.
         if (items[surface].styled != nullptr) { lostBy[surface] = 1; }
-        const auto itself = 1 - items[surface].clip->reflects(time);
+        const auto itself = 1 - items[surface].mirrors;
         if (itself < 1) {
             auto& pieces = keptBy[surface];
             if (itself > 0) {
