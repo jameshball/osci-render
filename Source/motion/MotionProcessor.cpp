@@ -24,6 +24,9 @@ MotionProcessor::MotionProcessor()
     recordingParameters.canvasWidth.addListener(this);
     recordingParameters.canvasHeight.addListener(this);
     blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto frames) { publishLiveSources(std::move(frames)); });
+    // A parameter dragged after a document edit is its own undo step, never
+    // joined to the edit's.
+    document.onUndoStep = [this] { lastUndoParamId = {}; };
     document.onChanged = [this] {
         // The loop range reaches the audio thread with every edit, editor or not.
         const auto& project = document.project();
@@ -220,6 +223,20 @@ juce::AudioProcessorEditor* MotionProcessor::createEditor() {
 }
 
 void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
+    // Hosts may save from any thread; the document belongs to the message
+    // thread, so it is read there or under its lock.
+    std::optional<juce::MessageManagerLock> lock;
+    if (!juce::MessageManager::existsAndIsCurrentThread()) {
+        lock.emplace();
+        if (!lock->lockWasGained()) { return; }
+    }
+    if (unrestoredState.getSize() > 0) {
+        if (document.generation() == unrestoredGeneration && document.revision() == unrestoredRevision) {
+            destination = unrestoredState;
+            return;
+        }
+        unrestoredState.reset();
+    }
     juce::XmlElement project("motion-project");
     project.setAttribute("schema", 1);
     saveStandaloneProjectFilePathToXml(project);
@@ -230,15 +247,33 @@ void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
 }
 
 void MotionProcessor::setStateInformation(const void* data, int size) {
+    const auto failed = [&](const juce::String& reason) {
+        const juce::MessageManagerLock messageLock;
+        unrestoredState = juce::MemoryBlock(data, static_cast<std::size_t>(std::max(0, size)));
+        unrestoredGeneration = document.generation();
+        unrestoredRevision = document.revision();
+        restoreError = "The saved project couldn't be opened (" + reason + "). It is kept as it was until you change this one.";
+    };
     auto project = getXmlFromBinary(data, size);
     if (project == nullptr || !project->hasTagName("motion-project") || project->getIntAttribute("schema") != 1) {
+        failed("it isn't an osci-motion project this version reads");
         return;
     }
     const auto* compositionXml = project->getChildByName("composition");
-    if (compositionXml == nullptr) { return; }
+    if (compositionXml == nullptr) {
+        failed("it has no composition");
+        return;
+    }
     motion::Project prepared;
     const auto result = motion::Document::prepareLoad(*compositionXml, prepared);
-    if (result.failed()) { return; }
+    if (result.failed()) {
+        failed(result.getErrorMessage());
+        return;
+    }
+    {
+        const juce::MessageManagerLock messageLock;
+        unrestoredState.reset();
+    }
     applyPreparedProject(std::move(prepared), *project);
 }
 

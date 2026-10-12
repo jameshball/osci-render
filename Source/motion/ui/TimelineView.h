@@ -339,14 +339,14 @@ private:
         bool moved = false;
     };
     std::optional<CameraKeyDrag> cameraKeyDrag;
-    std::optional<std::pair<motion::Id, double>> selectedCameraKey;
+    mutable std::optional<std::pair<motion::Id, double>> selectedCameraKey;
     const motion::Camera* selectedCamera() const;
     // The selected camera's key nearest x, within 5 px.
     std::optional<double> cameraKeyAt(int x) const;
     static void moveCameraKeys(motion::Camera& camera, double from, double to);
     void dragCameraKey(const juce::MouseEvent& event);
     void deleteCameraKey(motion::Id id, double time);
-    motion::Id selectedCut = 0;
+    mutable motion::Id selectedCut = 0;
 
     juce::Rectangle<int> markerBounds(const motion::Marker& marker) const;
     const motion::Marker* markerAt(juce::Point<int> point) const;
@@ -371,8 +371,8 @@ public:
 private:
     void pickTrack(motion::Id id, juce::ModifierKeys mods);
     std::vector<motion::Id> tracksToGroup() const;
-    std::set<motion::Id> selectedTracks;
-    motion::Id trackAnchor = 0;
+    mutable std::set<motion::Id> selectedTracks;
+    mutable motion::Id trackAnchor = 0;
     void showGroupMenu(motion::Id id);
     void showTrackMenu(motion::Id id);
     void toggleLock(motion::Id id);
@@ -519,7 +519,7 @@ private:
     motion::Id dropAssetId = 0;
     std::string dropEffect;
     motion::Id dropInstance = 0; // an effect card being moved
-    std::vector<KeyRef> selectedKeys;
+    mutable std::vector<KeyRef> selectedKeys;
     struct KeyDrag {
         motion::Project before;
         std::vector<KeyRef> keys;

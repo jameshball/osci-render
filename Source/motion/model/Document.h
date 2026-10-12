@@ -168,7 +168,12 @@ public:
     juce::Result enterComposition(Id id);
     juce::Result setMarker(Id id, double time, juce::String name);
     juce::Result removeMarker(Id id);
+    // Changes when the document is replaced (a new or loaded project): work
+    // started for the old one is dropped.
     std::uint64_t generation() const { return projectGeneration; }
+    // Changes as well when the composition edited changes (entering one, or
+    // the one entered going away): edits in progress to the scope give up.
+    std::uint64_t scopeGeneration() const { return scopeChanges; }
     std::uint64_t revision() const { return stateRevision; }
     // Identities stay below the Scope's reserved one, so it never collides.
     static constexpr Id maximumId = beamIdentity - 1;
@@ -304,6 +309,9 @@ public:
     // Worker-safe preparation; output is replaced only after full validation.
     static juce::Result prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel = nullptr);
     std::function<void()> onChanged;
+    // Called as an edit begins its own undo step: whatever else shares the
+    // undo manager (parameter drags) starts a new step after it.
+    std::function<void()> onUndoStep;
 
     static Clip makeCompositionClip(Id id, const CompositionDefinition& definition, double time);
     static Clip makeClip(Id id, const Asset& asset, double time);
@@ -340,7 +348,7 @@ private:
     Project state, scopeView;
     Id scopeId = 0;
     Id lastId = 0;
-    std::uint64_t projectGeneration = 0;
+    std::uint64_t projectGeneration = 0, scopeChanges = 0;
     std::uint64_t stateRevision = 0;
     bool carryView = true;
     // During undo and redo: the step's opposite snapshot, for carrying view options.

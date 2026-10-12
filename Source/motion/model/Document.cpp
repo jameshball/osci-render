@@ -114,7 +114,7 @@ Project Document::mergeScope(Project view) const {
 void Document::refreshScope() {
     if (scopeId == 0) { scopeView = {}; return; }
     const auto found = findDefinition(state, scopeId);
-    if (found == nullptr) { scopeId = 0; ++projectGeneration; scopeView = {}; return; }
+    if (found == nullptr) { scopeId = 0; ++scopeChanges; scopeView = {}; return; }
     scopeView = state;
     static_cast<Composition&>(scopeView) = *found;
 }
@@ -158,7 +158,7 @@ juce::Result Document::enterComposition(Id id) {
     if (id != 0 && std::none_of(state.definitions.begin(), state.definitions.end(), [id](const auto& value) { return value->id == id; })) {
         return juce::Result::fail("The composition no longer exists.");
     }
-    scopeId = id; ++projectGeneration; ++stateRevision;
+    scopeId = id; ++scopeChanges; ++stateRevision;
     refreshScope();
     if (onChanged) { onChanged(); }
     sendChangeMessage();
@@ -298,7 +298,10 @@ Project Document::finished(Project view) const {
 }
 
 void Document::record(const juce::String& label, Project view, bool joinPrevious) {
-    if (!joinPrevious) { undo.beginNewTransaction(label); }
+    if (!joinPrevious) {
+        undo.beginNewTransaction(label);
+        if (onUndoStep) { onUndoStep(); }
+    }
     undo.perform(new Change(*this, state, finished(std::move(view))));
 }
 
@@ -314,7 +317,9 @@ void Document::edit(juce::String label, std::function<void(Project&)> operation)
 
 void Document::editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation) {
     const auto now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
-    const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && now - coalescingTime < 1.0;
+    // Joins only while the newest undo step is still this control's: a
+    // parameter changed since (it shares the undo manager) has its own.
+    const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && now - coalescingTime < 1.0 && undo.getUndoDescription() == label;
     auto after = project();
     operation(after);
     record(label, std::move(after), joins);
@@ -340,12 +345,14 @@ void Document::changeView(std::function<void(Composition&)> change) {
 
 void Document::commit(juce::String label, Project before) {
     undo.beginNewTransaction(label);
+    if (onUndoStep) { onUndoStep(); }
     undo.perform(new Change(*this, mergeScope(std::move(before)), state));
 }
 
 void Document::reset(Project project) {
     scopeId = 0;
     ++projectGeneration;
+    ++scopeChanges;
     undo.clearUndoHistory();
     lastId = highestProjectIdentity(project, lastId);
     // A different document: nothing carries over from the previous one.

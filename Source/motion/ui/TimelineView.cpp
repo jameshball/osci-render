@@ -79,6 +79,9 @@ void MotionTimelineView::setSelection(motion::Id id) {
     if (selectedCameraKey.has_value() && selectedCameraKey->first != id) { selectedCameraKey.reset(); }
     selected = id;
     if (!notifyingSelection) {
+        // Picked from elsewhere (the Scene, the library): keys selected here
+        // would otherwise go on being what Delete or Cut acts on.
+        selectedKeys.clear();
         selectedClips.clear();
         if (isClip(id)) { selectedClips.insert(id); }
     }
@@ -3546,21 +3549,41 @@ int MotionTimelineView::boundedPixel(double value) {
 }
 
 void MotionTimelineView::ensureTrackRows() const {
-    const auto generation = processor.document.generation();
+    // A new project, or another composition entered: other rows, and nothing
+    // of the old selection.
+    const auto generation = processor.document.scopeGeneration();
     const auto revision = processor.document.revision();
     if (layoutGeneration != generation) {
         collapsedGroups.clear();
         selectedClips.clear();
+        selectedKeys.clear();
+        selectedTracks.clear();
+        selectedCameraKey.reset();
         selected = 0;
         selectedMarker = 0;
+        selectedCut = 0;
+        trackAnchor = 0;
         layoutGeneration = generation;
         layoutRevision.reset();
     }
+    // Any change (an undo among them): what is selected and gone is let go.
     if (!layoutRevision.has_value() || *layoutRevision != revision) {
+        const auto& project = processor.document.project();
         rulerHeight = cameraBandTop() + (showsCameraBand() ? cameraBandHeight + bandGap : 0);
-        if (std::none_of(processor.document.project().markers.begin(), processor.document.project().markers.end(), [this](const auto& marker) { return marker.id == selectedMarker; })) { selectedMarker = 0; }
+        if (std::none_of(project.markers.begin(), project.markers.end(), [this](const auto& marker) { return marker.id == selectedMarker; })) { selectedMarker = 0; }
+        if (std::none_of(project.cameraCuts.begin(), project.cameraCuts.end(), [this](const auto& cut) { return cut.id == selectedCut; })) { selectedCut = 0; }
+        if (selectedCameraKey.has_value() && std::none_of(project.cameras.begin(), project.cameras.end(), [this](const auto& camera) { return camera.id == selectedCameraKey->first; })) { selectedCameraKey.reset(); }
         rebuildRows();
         std::erase_if(selectedClips, [this](auto id) { return !isClip(id); });
+        std::erase_if(selectedTracks, [&project](auto id) {
+            return motion::findGroup(project, id) == nullptr && std::none_of(project.tracks.begin(), project.tracks.end(), [id](const auto& track) { return track.id == id; });
+        });
+        std::erase_if(selectedKeys, [&project](const KeyRef& key) {
+            const auto* clip = motion::findClip(project, key.clip);
+            if (clip == nullptr) { return true; }
+            const auto found = clip->properties.find(key.property);
+            return found == clip->properties.end() || found->second.findKey(key.time) == nullptr;
+        });
         layoutRevision = revision;
     }
     scrollY = std::clamp(scrollY, 0, maximumScrollY());

@@ -1292,9 +1292,10 @@ private:
         beginTest("Nested editing uses one undo history while save retains the complete main project");
         const auto definitionId = document.project().definitions.front()->id;
         const auto mainName = document.mainProject().name;
-        const auto generation = document.generation();
+        const auto generation = document.generation(), scopeGeneration = document.scopeGeneration();
         expect(document.enterComposition(definitionId).wasOk());
-        expect(document.generation() != generation && document.editingComposition() == definitionId);
+        // Another composition edited, the same document: work for it goes on.
+        expect(document.scopeGeneration() != scopeGeneration && document.generation() == generation && document.editingComposition() == definitionId);
         expect(document.project().tracks.front().clips.front().id == clip.id);
         document.edit("Rename motif", [](motion::Project& value) { value.name = "Shared edited motif"; });
         expect(document.project().name == "Shared edited motif");

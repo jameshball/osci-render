@@ -173,10 +173,10 @@ void MotionEditor::setUpCompositionNavigation() {
     scopeLabel.setName("Composition name");
     scopeLabel.setEditable(false, true);
     scopeLabel.setTooltip("Shared composition: changes affect every instance. Double-click to rename.");
-    scopeLabel.onEditorShow = [this] { scopeNameGeneration = processor.document.generation(); };
+    scopeLabel.onEditorShow = [this] { scopeNameGeneration = processor.document.scopeGeneration(); };
     scopeLabel.onTextChange = [this] {
         const auto name = scopeLabel.getText().trim();
-        if (processor.document.editingComposition() == 0 || processor.document.generation() != scopeNameGeneration || name.isEmpty() || name.length() > 200) { return; }
+        if (processor.document.editingComposition() == 0 || processor.document.scopeGeneration() != scopeNameGeneration || name.isEmpty() || name.length() > 200) { return; }
         processor.document.edit("Rename composition", [name](motion::Project& project) { project.name = name; });
     };
 }
@@ -403,13 +403,13 @@ void MotionEditor::setUpTransport() {
     timeLabel.setTooltip("Double-click to go to a position. Use the current display, or append s for seconds / f for frames. Musical positions use bar.beat.tick (960 ticks per beat).");
     timeLabel.onEditorShow = [this] {
         positionEditGrid = processor.document.project().timeGrid();
-        positionEditGeneration = processor.document.generation();
+        positionEditGeneration = processor.document.scopeGeneration();
         positionEditRevision = processor.document.revision();
     };
     timeLabel.onTextChange = [this] {
         const auto& project = processor.document.project();
         const auto requested = positionEditGrid.parsePosition(timeLabel.getText().toStdString());
-        const bool current = positionEditGeneration == processor.document.generation() && positionEditRevision == processor.document.revision();
+        const bool current = positionEditGeneration == processor.document.scopeGeneration() && positionEditRevision == processor.document.revision();
         timeLabel.setText(juce::String(project.timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification);
         if (!current) { return; }
         if (!requested.has_value() || *requested > project.duration) {
@@ -1275,6 +1275,8 @@ void MotionEditor::timerCallback() {
     }
     processor.collectPreparedState();
     assetLibrary.updateLiveStatus();
+    const auto restoreError = processor.takeRestoreError();
+    if (restoreError.isNotEmpty()) { statusBar.show(restoreError, MotionStatusBar::Kind::warning); }
     const auto preparationError = processor.getPreparationError();
     if (preparationError != lastPreparationError) {
         lastPreparationError = preparationError;

@@ -137,6 +137,14 @@ public:
     void setStateInformation(const void* data, int size) override;
     // Message-thread publication after standalone background preparation.
     void applyPreparedProject(motion::Project prepared, juce::XmlElement& state);
+    // Why the host's saved project couldn't be restored, once; message thread.
+    juce::String takeRestoreError() { return std::exchange(restoreError, {}); }
 private:
+    // A host's saved state that couldn't be restored: handed back as it was
+    // when the host saves again, until the project is changed or replaced,
+    // so a failed restore never overwrites the user's project with an empty one.
+    juce::MemoryBlock unrestoredState;
+    std::uint64_t unrestoredGeneration = 0, unrestoredRevision = 0;
+    juce::String restoreError;
     motion::hidden::Baker hiddenLineBaker;
 };
