@@ -53,7 +53,8 @@ public:
         const PreparedSource* source = nullptr;
         std::size_t frame = 0;
         bool reversed = false;
-        osci::Point from, to;
+        // Dark unless set: a hold with nothing to draw leaves the beam off.
+        osci::Point from {0, 0, 0, 0, 0, 0}, to {0, 0, 0, 0, 0, 0};
         // The vector drawing drawn (hidden lines removed, when baked); none
         // for point frames.
         const PreparedDrawing* drawing = nullptr;

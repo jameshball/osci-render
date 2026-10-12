@@ -45,6 +45,20 @@ public:
             expect(shown > whole * .98, "and none of it is hidden by the ball itself");
         }
 
+        beginTest("A surface asked to draw no lines leaves the beam dark");
+        {
+            const motion::PreparedComposition prepared(scene({{"edges", 0}}));
+            std::atomic<bool> cancel {false};
+            if (prepared.hiddenLines != nullptr) { motion::hidden::Baker::bakeAll(*prepared.hiddenLines, 48000, cancel); }
+            motion::BeamRenderer beam;
+            int lit = 0;
+            for (std::int64_t index = 0; index < 1600; ++index) {
+                const auto point = beam.sample(prepared, 1, index, 48000, false, 1);
+                lit += point.r != 0 || point.g != 0 || point.b != 0 ? 1 : 0;
+            }
+            expectEquals(lit, 0, "every sample is dark, not left to take its clip's colour");
+        }
+
         beginTest("An outline is drawn over patterns as well");
         {
             const motion::PreparedComposition prepared(scene({{"edges", 0}, {"outline", 100}, {"rings", 100}}, false, true));
