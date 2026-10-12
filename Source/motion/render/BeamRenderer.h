@@ -38,8 +38,8 @@ public:
     // Tour improvement stops after this many candidate checks and moved
     // layers, bounding planning cost however many layers are visible.
     static constexpr std::int64_t maximumOrderingWork = 8192;
-    // How many times its length's share of the cycle a layer's corners may
-    // take before it is traced by its strokes' ends instead (see finishPlan).
+    // How many times the cycle's even density a layer may take before it is
+    // dimmed to match (see finishPlan).
     static constexpr double brightest = 1.5;
 
     enum class Kind : std::uint8_t { draw, move, hold };
@@ -56,6 +56,8 @@ public:
         const PreparedDrawing* drawing = nullptr;
         // Its points are in the scene already: a clip's reflections.
         bool world = false;
+        // How bright it is drawn (see finishPlan).
+        float gain = 1;
     };
 
     // Cycles never straddle a frame of the project's frame rate, so exported
@@ -298,19 +300,14 @@ private:
         std::array<std::int64_t, maximumLayers> counts{};
         std::array<std::int64_t, maximumLayers> floors{};
         for (std::size_t i = 0; i < layerCount; ++i) { floors[i] = items[i].minimum; }
-        // A layer whose strokes' corners alone would take far more of the
-        // cycle than its length's share (a mirror's view of a detailed scene,
-        // shrunk small in it: many tiny strokes, little length) would be drawn
-        // that much brighter than the rest, and flash as it comes and goes:
-        // it makes do with its strokes' ends from the start, as it would
-        // were the cycle short of time.
-        {
-            double weighed = 0;
-            for (std::size_t i = 0; i < layerCount; ++i) { weighed += items[i].length * items[i].share; }
-            for (std::size_t i = 0; i < layerCount && weighed > 0; ++i) {
-                const auto fair = static_cast<double>(total) * items[i].length * items[i].share / weighed;
-                if (static_cast<double>(floors[i]) > brightest * fair && floors[i] > items[i].coarse) { floors[i] = items[i].coarse; }
-            }
+        // A mirror's view (a reflection, in the scene) is traced by its
+        // strokes' ends and then evenly by length however many samples it
+        // gets: tiny and detailed, shrunk small in a mirror ball, its corners
+        // would take far more of the cycle than its length's share, and as it
+        // fitted the cycle or not it would switch between its corners and its
+        // length and flash.
+        for (std::size_t i = 0; i < layerCount; ++i) {
+            if (items[i].world && items[i].coarse < floors[i]) { floors[i] = items[i].coarse; }
         }
         while (layerCount > 0) {
             std::int64_t overhead = dwell + settle;
@@ -400,6 +397,26 @@ private:
             const auto cut = std::min(surplus, used - budget);
             counts[largest] -= cut; used -= cut;
         }
+        // A layer whose strokes' corners alone take far more samples than its
+        // length's share (a mirror's view of a detailed scene, shrunk small:
+        // many tiny strokes, little length) would draw that much brighter
+        // than the rest: it is dimmed to match, by as much as it is over, so
+        // its brightness follows its detail smoothly from frame to frame and
+        // never flashes as it fits the cycle or not.
+        std::array<float, maximumLayers> gains{};
+        {
+            // Matched to the dimmest: the even density, or with every layer
+            // at its floor, the least of theirs.
+            auto least = std::numeric_limits<double>::infinity();
+            for (std::size_t i = 0; i < layerCount; ++i) {
+                if (items[i].length > 0) { least = std::min(least, static_cast<double>(counts[i]) / items[i].length); }
+            }
+            const auto density = std::max(low, std::isfinite(least) ? least : 0.0);
+            for (std::size_t i = 0; i < layerCount; ++i) {
+                const auto fair = brightest * density * items[i].length;
+                gains[i] = counts[i] > 0 && static_cast<double>(counts[i]) > fair ? static_cast<float>(fair / static_cast<double>(counts[i])) : 1.0f;
+            }
+        }
         // Beam scales each layer's even share with no floor: what one layer
         // gives up goes to the others, and their total stays the same. Below
         // its complete-stroke budget a layer is traced by phase instead.
@@ -440,7 +457,7 @@ private:
             }
             const auto& layer = items[i];
             if (layer.drawing != nullptr && layer.drawing->coarseTraversalSamples() > counts[i]) { planSimplified = true; }
-            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing, layer.world});
+            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing, layer.world, gains[i]});
             cursor += counts[i];
         }
         hold(exitOf(layerCount - 1), dwell);
@@ -575,13 +592,22 @@ private:
                 const auto* drawing = segment->drawing;
                 osci::Point raw;
                 if (drawing != nullptr && drawing->coarseTraversalSamples() > 0 && n >= 3) {
-                    raw = drawing->sampleTraversal(step, n);
+                    raw = drawing->sampleTraversal(step, n, segment->world);
                 } else {
                     const auto span = n > 1 ? 1.0 / static_cast<double>(n - 1) : 1.0;
                     raw = drawing != nullptr ? drawing->sample(static_cast<double>(step) * span, span) : segment->source->sampleFrame(segment->frame, static_cast<double>(step) * span, span);
                 }
                 // Behind the camera there is no position: hold dark at the entry.
-                return place(composition, *segment->clip, raw, segment->world).value_or(dark(segment->from));
+                auto placed = place(composition, *segment->clip, raw, segment->world);
+                if (!placed.has_value()) { return dark(segment->from); }
+                if (segment->gain < 1) {
+                    // Uncoloured is white, as a clip's colour takes it.
+                    const auto uncoloured = placed->r < 0;
+                    placed->r = (uncoloured ? 1.0f : placed->r) * segment->gain;
+                    placed->g = (uncoloured ? 1.0f : placed->g) * segment->gain;
+                    placed->b = (uncoloured ? 1.0f : placed->b) * segment->gain;
+                }
+                return *placed;
             }
         }
         return {0, 0, 0, 0, 0, 0};

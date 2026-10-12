@@ -168,14 +168,15 @@ public:
             const motion::PreparedComposition composition(project({{polygon(1, zigzag, false), .5}, {square(2, .5f), -.4}}), 192000);
             motion::BeamRenderer beam;
             cycle(composition, 192000, 3, beam);
-            std::int64_t tiny = 0, big = 0;
+            // How bright each is: its samples, as bright as it is drawn.
+            double tiny = 0, big = 0;
             for (const auto& segment : beam.plannedSegments()) {
                 if (segment.kind != motion::BeamRenderer::Kind::draw) { continue; }
-                (segment.clip == &composition.clips[0] ? tiny : big) += segment.count;
+                (segment.clip == &composition.clips[0] ? tiny : big) += static_cast<double>(segment.count) * segment.gain;
             }
             const auto tinyLength = 1500 * std::hypot(.1 / 1500, .0005), bigLength = 4.0;
-            const auto ratio = (static_cast<double>(tiny) / tinyLength) / (static_cast<double>(big) / bigLength);
-            expect(ratio < 1.6, "samples by length alike: " + juce::String(ratio, 2) + "x (" + juce::String(tiny) + " for the zigzag, " + juce::String(big) + " for the square)");
+            const auto ratio = (tiny / tinyLength) / (big / bigLength);
+            expect(ratio < 1.6, "as bright by length: " + juce::String(ratio, 2) + "x (" + juce::String(tiny, 0) + " for the zigzag, " + juce::String(big, 0) + " for the square)");
         }
 
         beginTest("Opacity dims a layer through its colour; the beam time stays the same for every layer");

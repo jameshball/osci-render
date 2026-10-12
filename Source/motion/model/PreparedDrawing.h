@@ -96,10 +96,13 @@ public:
     // including corners and closed-path seams (with too few for corners, their
     // ends alone). Extra samples are apportioned by cumulative length, then
     // use each shape's native parameterization. This is not arc-length
-    // reparameterization within a curved shape.
-    osci::Point sampleTraversal(std::int64_t index, std::int64_t count) const {
+    // reparameterization within a curved shape. `even`: its strokes' ends
+    // alone however many samples it gets, the rest by length, so it is as
+    // bright all along (for an approximation, a mirror's view, whose corners
+    // need not be exact).
+    osci::Point sampleTraversal(std::int64_t index, std::int64_t count, bool even = false) const {
         if (coarse.minimum > 0 && count < coarse.minimum) { return sampleLongest(index, count); }
-        const auto& traversal = count >= detailed.minimum ? detailed : coarse;
+        const auto& traversal = count >= detailed.minimum && !even ? detailed : coarse;
         if (traversal.minimum == 0 || count < traversal.minimum || index < 0 || index >= count) {
             return osci::Point(0, 0, 0, 0, 0, 0);
         }

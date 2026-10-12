@@ -507,7 +507,25 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         joined.push_back({pieces[start].face, pieces[start].from, pieces[end].to});
         start = end + 1;
     }
-    return joined;
+    // A loop shorter than half a spacing (noise's, about a peak or a dip,
+    // as it grows from nothing while the noise flows) draws as a bright
+    // bead, the beam lingering on its corners: it is left out until it is
+    // big enough to draw as a line.
+    std::vector<Piece> kept;
+    kept.reserve(joined.size());
+    std::size_t first = 0;
+    while (first < joined.size()) {
+        auto last = first;
+        double length = (flat(joined[first], joined[first].to) - flat(joined[first], joined[first].from)).length();
+        while (last + 1 < joined.size() && (flat(joined[last + 1], joined[last + 1].from) - flat(joined[last], joined[last].to)).length() < 1.0e-9 * bounds.size() + 1.0e-12) {
+            ++last;
+            length += (flat(joined[last], joined[last].to) - flat(joined[last], joined[last].from)).length();
+        }
+        const auto closed = (flat(joined[last], joined[last].to) - flat(joined[first], joined[first].from)).length() < 1.0e-9 * bounds.size() + 1.0e-12;
+        if (!closed || length >= spacing / 2) { kept.insert(kept.end(), joined.begin() + static_cast<std::ptrdiff_t>(first), joined.begin() + static_cast<std::ptrdiff_t>(last) + 1); }
+        first = last + 1;
+    }
+    return kept;
 }
 
 // A surface's normals: each face's own, and at each of its corners the
