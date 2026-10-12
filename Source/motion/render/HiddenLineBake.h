@@ -93,6 +93,8 @@ public:
         delete slots[frame].exchange(result.release(), std::memory_order_acq_rel);
         done.fetch_add(1, std::memory_order_relaxed);
     }
+    // A frame that could not be baked: it is drawn whole, as before it was.
+    void skip() { done.fetch_add(1, std::memory_order_relaxed); }
     double progress() const { return static_cast<double>(std::min(done.load(std::memory_order_relaxed), count)) / static_cast<double>(count); }
     bool complete() const { return done.load(std::memory_order_relaxed) >= count; }
 

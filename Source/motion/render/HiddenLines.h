@@ -1232,10 +1232,16 @@ private:
 
     static void run(Bake& bake, double sampleRate, std::size_t firstFrame, const std::atomic<bool>& cancel) {
         if (cancel.load()) { return; }
+        // A worker that fails gives its frames up, drawn whole, so the bake
+        // still finishes.
+        const auto giveUp = [&bake, firstFrame](std::optional<std::size_t> frame) {
+            for (; frame.has_value(); frame = bake.claim(firstFrame)) { bake.skip(); }
+        };
         std::unique_ptr<PreparedComposition> composition;
         try {
             composition = std::make_unique<PreparedComposition>(*bake.project, sampleRate, &cancel, CompositionPurpose::signal, bake.reach);
         } catch (...) {
+            if (!cancel.load()) { giveUp(bake.claim(firstFrame)); }
             return;
         }
         auto workspace = std::make_unique<Workspace>();
@@ -1258,7 +1264,9 @@ private:
                 last = std::make_unique<Frame>(*result);
                 std::swap(lastPrint, print);
                 bake.publish(*frame, std::move(result));
-            } catch (const std::bad_alloc&) {
+            } catch (...) {
+                last.reset();
+                giveUp(frame);
                 return;
             }
         }
