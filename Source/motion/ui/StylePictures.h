@@ -211,18 +211,19 @@ inline const Picture& shadingPicture(Shading shading) {
             path.lineTo(detail::onTile(to));
         };
         const auto on = [&](double latitude, double longitude) { return Vec3 {std::cos(latitude) * std::cos(longitude), std::sin(latitude), std::cos(latitude) * std::sin(longitude)}; };
-        for (int ring = 1; ring < 6; ++ring) {
-            const auto latitude = pi * ring / 6 - pi / 2;
+        // Few lines: it is drawn as small as a chip's icon.
+        for (int ring = 1; ring < 4; ++ring) {
+            const auto latitude = pi * ring / 4 - pi / 2;
             for (int step = 0; step < 64; ++step) { stretch(on(latitude, 2 * pi * step / 64), on(latitude, 2 * pi * (step + 1) / 64)); }
         }
-        for (int meridian = 0; meridian < 10; ++meridian) {
-            const auto longitude = 2 * pi * meridian / 10;
+        for (int meridian = 0; meridian < 6; ++meridian) {
+            const auto longitude = 2 * pi * meridian / 6;
             for (int step = 0; step < 32; ++step) { stretch(on(pi * step / 32 - pi / 2, longitude), on(pi * (step + 1) / 32 - pi / 2, longitude)); }
         }
         result[static_cast<std::size_t>(Shading::brightness)] = bright;
         // A disc lit from the upper left, hatched by the curve itself.
         Picture hatched;
-        hatched.context.addEllipse(-1, -1, 2, 2);
+        hatched.lines.addEllipse(-1, -1, 2, 2);
         const auto look = [&](double x, double y) -> std::optional<hidden::hatching::Seen> {
             const auto r = x * x + y * y;
             if (r > .97) { return std::nullopt; }
@@ -231,7 +232,7 @@ inline const Picture& shadingPicture(Shading shading) {
             return hidden::hatching::Seen {0, {x, -y, 0}, std::max(0.0, normal.dot(toward))};
         };
         bool open = false;
-        for (const auto& stroke : hidden::hatching::strokes(1, 32, look)) {
+        for (const auto& stroke : hidden::hatching::strokes(1, 12, look)) {
             open = false;
             for (const auto& point : stroke.points) {
                 const juce::Point<float> at(static_cast<float>(point.at.x), static_cast<float>(point.at.y));

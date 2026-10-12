@@ -499,7 +499,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         shadingTiles = std::make_unique<motion::ui::TileGrid>("Shading", std::vector<motion::ui::TileGrid::Choice> {
             {"Brightness", "Light shows as how bright each line is drawn", motion::ui::pictures::shadingPicture(Shading::brightness)},
             {"Hatching", "Light shows as how densely a curve over the frame covers what it falls on", motion::ui::pictures::shadingPicture(Shading::hatching)}},
-            3, motion::ui::TileGrid::Look::pictures, true);
+            2, motion::ui::TileGrid::Look::chips, true);
         shadingTiles->onClick = [this](std::size_t index) {
             if (shadingTiles->tile(index).getToggleState()) { return; }
             const auto found = motion::findPropertyTarget(processor.document.project(), target);

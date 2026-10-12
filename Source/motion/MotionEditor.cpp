@@ -1101,7 +1101,8 @@ void MotionEditor::showAddLight() {
     for (const auto* kind : kinds) {
         const auto& definition = *motion::findGenerator(kind);
         const juce::String name(definition.name.data(), definition.name.size());
-        lights.push_back({name.upToLastOccurrenceOf(" light", false, true), "Add a " + name.toLowerCase(), motion::ui::pictures::ofGenerator(definition)});
+        const auto article = juce::String("aeiou").containsChar(name.toLowerCase()[0]) ? "Add an " : "Add a ";
+        lights.push_back({name.upToLastOccurrenceOf(" light", false, true), article + name.toLowerCase(), motion::ui::pictures::ofGenerator(definition)});
     }
     // A point light already moving on its own.
     for (const auto preset : motion::lightPresets) {
