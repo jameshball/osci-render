@@ -47,12 +47,14 @@ struct SceneItem {
 // goes. Its colour stays the light it takes, so what the light dims evenly is
 // still dimmer; this only shares the beam among the parts.
 // On a display with no brightness input (`xyOnly`), its time is all there is
-// to show its light by: it takes time as it is bright, and its colour is not
-// dimmed.
+// to show its light by, and its colour is not dimmed.
 inline constexpr double leastLitWeight = .05;
 inline double litWeight(double brightest, bool xyOnly = false) {
     const auto light = std::max(0.0, brightest);
-    return std::clamp(xyOnly ? light : std::sqrt(light), leastLitWeight, 1.0);
+    // As bright, for its length, as a line on a scope with brightness: there
+    // it takes time as the square root of its light and is as bright as its
+    // light, so light to the power of 1.5 in all.
+    return std::clamp(xyOnly ? std::pow(std::min(1.0, light), 1.5) : std::sqrt(light), leastLitWeight, 1.0);
 }
 
 // Values at every step from 0 to `steps`, found by `find(step)` at every
