@@ -86,11 +86,13 @@ void MotionPropertyInspector::refresh() {
         if (generator != nullptr) { specList.assign(generator->parameters.begin(), generator->parameters.end()); }
         const auto base = motion::propertySpecs(*found);
         // A light draws nothing: it takes no share of the beam, and lights or
-        // reflects nothing of itself. A curve has no surface to reflect with.
+        // reflects nothing of itself. A curve has no surface to reflect with,
+        // or to draw lines on.
         const auto light = generator != nullptr && generator->category == motion::GeneratorCategory::light;
         const auto surfaceless = light || (generator != nullptr && generator->category == motion::GeneratorCategory::curve);
         std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [light, surfaceless](const auto& spec) {
-            return !(light && (spec.id == "beam" || spec.id == "lit")) && !(surfaceless && spec.id == "reflects");
+            const auto onSurface = spec.id == "reflects" || motion::isLinesProperty(spec.id);
+            return !(light && (spec.id == "beam" || spec.id == "lit")) && !(surfaceless && onSurface);
         });
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
     }
@@ -363,6 +365,7 @@ juce::String MotionPropertyInspector::sectionOf(const juce::String& group) const
     }
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
     if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Reflects" || group == "Beam") { return "Appearance"; }
+    if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Hilbert curve" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail") { return "Lines"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }

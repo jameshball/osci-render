@@ -252,9 +252,9 @@ void MotionCompositionView::paint(juce::Graphics& g) {
 void MotionCompositionView::askForLighting(double time) const {
     const auto view = camera.view();
     if (scenePreview == nullptr || shownProject == nullptr || prepared == nullptr || !view.has_value() || getWidth() <= 0 || getHeight() <= 0) { return; }
-    // Only a scene with a light, or something that may reflect, looks any
-    // different lit.
-    if (std::none_of(prepared->clips.begin(), prepared->clips.end(), [](const motion::PreparedClip& clip) { return clip.light || clip.mayReflect(); })) { return; }
+    // Only a scene with a light, or something that may reflect or draw
+    // itself other than by its edges, looks any different worked out.
+    if (std::none_of(prepared->clips.begin(), prepared->clips.end(), [](const motion::PreparedClip& clip) { return clip.light || clip.mayReflect() || clip.mayRestyle(); })) { return; }
     const auto asked = std::tuple {preparedSerial, time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, getWidth(), getHeight()};
     if (lightingAsked == asked) { return; }
     lightingAsked = asked;

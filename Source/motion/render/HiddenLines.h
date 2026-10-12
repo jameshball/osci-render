@@ -8,6 +8,7 @@
 #include "HiddenLineFingerprint.h"
 #include "HiddenLineReflections.h"
 #include "HiddenLineScene.h"
+#include "HiddenLineStyles.h"
 #include "HiddenLineDicing.h"
 #include "Lighting.h"
 #include "../model/Vec3.h"
@@ -20,7 +21,8 @@ namespace motion::hidden {
 // is kept alive by its source.
 class ShapePart final : public osci::Shape {
 public:
-    ShapePart(osci::Shape& whole, std::shared_ptr<const PreparedSource> owner, float from, float to) : shape(&whole), source(std::move(owner)), start(from), end(to) {}
+    // `owner` keeps `whole` alive: its source, or the drawing it is of.
+    ShapePart(osci::Shape& whole, std::shared_ptr<const void> owner, float from, float to) : shape(&whole), owner(std::move(owner)), start(from), end(to) {}
     osci::Point nextVector(float progress) override { return shape->nextVector(start + (end - start) * progress); }
     void scale(float, float, float) override {}
     void translate(float, float, float) override {}
@@ -33,7 +35,7 @@ public:
 
 private:
     osci::Shape* shape;
-    std::shared_ptr<const PreparedSource> source;
+    std::shared_ptr<const void> owner;
     float start, end;
 };
 
@@ -286,6 +288,10 @@ struct Workspace {
     ShadowBuffers shadows;
     // What stands between mirrors and what they show.
     SceneRays rays;
+    // Patterns laid on surfaces, and the frame's drawings of surfaces that
+    // draw themselves other than by their edges.
+    LaidSurfaces laid;
+    std::vector<Styled> styled;
     std::vector<LightView> lights;
     // Which faces each line of a drawing runs along, found once a drawing
     // (whose source is kept alive here, so its address is never another's).
@@ -295,6 +301,7 @@ struct Workspace {
     };
     std::unordered_map<const PreparedDrawing*, Along> along;
     const std::vector<std::array<std::int32_t, 2>>& facesAlongOf(const PreparedDrawing& drawing, const std::shared_ptr<const PreparedSource>& source) {
+        if (!drawing.shapeFaces().empty()) { return drawing.shapeFaces(); }
         auto found = along.find(&drawing);
         if (found == along.end()) {
             if (along.size() > 1024) { along.clear(); }
@@ -353,7 +360,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto hides = from == nullptr && camera != nullptr && camera->hidesHiddenLines && view.has_value();
     const auto lit = composition.lit(time);
     const auto reflecting = composition.reflects(time);
-    if (!hides && !lit && !reflecting) { return frame; }
+    const auto restyling = composition.restyles(time);
+    if (!hides && !lit && !reflecting && !restyling) { return frame; }
     std::vector<SceneItem> items;
     for (std::size_t index = 0; index < composition.clips.size(); ++index) {
         const auto& clip = composition.clips[index];
@@ -387,6 +395,32 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         for (const auto& vertex : item.drawing->faces().vertices) { world[surface].push_back(place(item, vertex)); }
     }
     const auto surfaces = std::count_if(items.begin(), items.end(), [](const SceneItem& item) { return item.drawing != nullptr && !item.drawing->faces().empty(); });
+
+    // Surfaces that draw themselves other than by their edges (see
+    // LineStyle), drawn again for the frame: their outlines as the eye sees
+    // them, from the camera or the other eye.
+    auto& styled = workspace.styled;
+    styled.resize(std::max(styled.size(), items.size()));
+    const auto viewpoint = from != nullptr ? std::optional(from->eye) : composition.viewpoint(time);
+    const auto eyeAt = viewpoint.has_value() ? std::optional(viewpoint->position) : std::nullopt;
+    bool outlining = false;
+    for (std::size_t surface = 0; restyling && surface < items.size(); ++surface) {
+        auto& item = items[surface];
+        if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
+        const auto style = item.clip->lines(time);
+        if (style.plain()) { continue; }
+        auto& into = styled[surface];
+        into.unstyled = item.drawing;
+        restyle(into, item.source, workspace.facesAlongOf(*item.drawing, item.source), style, world[surface], eyeAt, workspace.laid);
+        item.drawing = into.drawing.get();
+        item.styled = &into;
+        outlining = outlining || into.eyeOnlyFrom < into.drawing->shapeCount();
+    }
+    // What stands between two points, for mirrors, and for outlines: their
+    // own faces graze the line to the eye, so are found along it, not in the
+    // depth buffer.
+    const auto rayed = reflecting || (hides && outlining);
+    if (rayed) { buildRays(items, world, workspace.rays); }
 
     // The lights shining, and what each sees, to find its shadows.
     auto& lights = workspace.lights;
@@ -503,7 +537,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     }
     // Hiding lines, a camera that sees no surface hides nothing.
     const auto hiding = hides && !depth.isEmpty();
-    if (!hiding && !lit && !reflecting) { return frame; }
+    if (!hiding && !lit && !reflecting && !restyling) { return frame; }
 
     // What is hidden, and what would be drawn twice: every line, every pixel
     // along its true path. A point shows where nothing is in front of it and
@@ -521,7 +555,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     drawnStarts.clear();
     // Only worth recording while a later clip, or a crossing, could retrace it.
     bool recording = false;
-    const auto visibleRuns = [&](auto&& at, double length) {
+    // `seen(t, point)` says whether nothing hides the point at t.
+    const auto runsSeen = [&](auto&& at, double length, auto&& seen) {
         runs.clear();
         if (!hiding) {
             runs.emplace_back(0.0, 1.0);
@@ -534,7 +569,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         // take the beam's time from what it does.
         const auto showing = [&](int step) {
             const auto& point = samples[static_cast<std::size_t>(step)];
-            if (!point.has_value() || std::abs(point->x) > reach.x * DepthBuffer::overscan || std::abs(point->y) > reach.y * DepthBuffer::overscan || !depth.shows(*point)) { return false; }
+            if (!point.has_value() || std::abs(point->x) > reach.x * DepthBuffer::overscan || std::abs(point->y) > reach.y * DepthBuffer::overscan || !seen(static_cast<double>(step) / steps, *point)) { return false; }
             const auto& before = samples[static_cast<std::size_t>(std::max(0, step - 1))];
             const auto& after = samples[static_cast<std::size_t>(std::min(steps, step + 1))];
             return !before.has_value() || !after.has_value() || !coverage.covers(*point, after->x - before->x, after->y - before->y);
@@ -563,6 +598,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 if (t >= a && t <= b && point.has_value()) { drawn.push_back(*point); }
             }
         }
+    };
+    const auto visibleRuns = [&](auto&& at, double length) {
+        runsSeen(at, length, [&](double, const Screen& point) { return depth.shows(point); });
     };
     const auto commitDrawn = [&] {
         if (!hiding) { return; }
@@ -670,6 +708,10 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto normalsOf = [&](std::size_t surface, std::size_t shape) {
         Normals normals;
         if (!lit || items[surface].drawing == nullptr || faceNormals[surface].empty()) { return normals; }
+        if (items[surface].styled != nullptr) {
+            const auto smooth = items[surface].styled->normalsOf(shape);
+            if (smooth.has_value()) { return *smooth; }
+        }
         const auto& along = workspace.facesAlongOf(*items[surface].drawing, items[surface].source);
         if (shape >= along.size()) { return normals; }
         for (const auto face : along[shape]) {
@@ -752,7 +794,16 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             const auto to = eye(*item.clip, end);
             lastEnd = end;
             lastEye = to;
-            if (line && !item.bent) {
+            if (item.styled != nullptr && index >= item.styled->eyeOnlyFrom && rayed && eyeAt.has_value()) {
+                // An outline: hidden by what the line to the eye meets.
+                const SceneRays::Near grazed {surface, item.styled->grazing(static_cast<std::uint32_t>(item.drawing->shapeFaces()[index][0]))};
+                const auto sa = screen(from), sb = screen(to);
+                const auto length = sa.has_value() && sb.has_value() ? std::hypot(sb->x - sa->x, sb->y - sa->y) : 2 * (reach.x + reach.y);
+                runsSeen([&](double t) { return from.has_value() && to.has_value() ? screen(*from + (*to - *from) * t) : std::optional<Screen>(); }, length, [&](double t, const Screen&) {
+                    const auto at = place(item, shape->nextVector(static_cast<float>(t)));
+                    return at.has_value() && !workspace.rays.blocked(*at, *eyeAt, 1.0e-6, 0, SceneRays::none, grazed);
+                });
+            } else if (line && !item.bent) {
                 // Straight through the camera: interpolated exactly.
                 const auto sa = screen(from), sb = screen(to);
                 const auto length = sa.has_value() && sb.has_value() ? std::hypot(sb->x - sa->x, sb->y - sa->y) : 2 * (reach.x + reach.y);
@@ -777,9 +828,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             lost = true;
             for (const auto& [a, b] : runs) {
                 if (line) {
-                    kept.push_back({std::make_unique<osci::Line>(shape->nextVector(static_cast<float>(a)), shape->nextVector(static_cast<float>(b))), true, normalsOf(surface, index)});
+                    kept.push_back({std::make_unique<osci::Line>(shape->nextVector(static_cast<float>(a)), shape->nextVector(static_cast<float>(b))), true, normalsOf(surface, index).part(a, b)});
                 } else {
-                    kept.push_back({std::make_unique<ShapePart>(*shape, item.source, static_cast<float>(a), static_cast<float>(b)), true, normalsOf(surface, index)});
+                    kept.push_back({std::make_unique<ShapePart>(*shape, item.styled != nullptr ? std::shared_ptr<const void>(item.styled->drawing) : std::shared_ptr<const void>(item.source), static_cast<float>(a), static_cast<float>(b)), true, normalsOf(surface, index).part(a, b)});
                 }
             }
         }
@@ -865,7 +916,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     const auto at = straight ? std::optional<Vec3>(*startsAt + (*endsAt - *startsAt) * t) : place(item, shape->nextVector(static_cast<float>(t)));
                     double shade = 0;
                     ts[static_cast<std::size_t>(step)] = t;
-                    light[static_cast<std::size_t>(step)] = at.has_value() ? lightAt(lights, *at, piece.normals, response, &shade) : std::array<float, 3> {};
+                    light[static_cast<std::size_t>(step)] = at.has_value() ? lightAt(lights, *at, piece.normals.at(t), response, &shade) : std::array<float, 3> {};
                     shades[static_cast<std::size_t>(step)] = at.has_value() ? shade : -1;
                 };
                 // Found finely only where their ends' shadows differ, either
@@ -948,6 +999,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         // A mirror shows the scene in place of itself: its own lines are
         // as much dimmer as it reflects, and gone when it reflects wholly.
+        // A surface drawn again for the frame is listed as drawn.
+        if (items[surface].styled != nullptr) { lostBy[surface] = 1; }
         const auto itself = 1 - items[surface].clip->reflects(time);
         if (itself < 1) {
             auto& pieces = keptBy[surface];
@@ -968,9 +1021,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         frame->drawings.push_back({items[surface].index, std::move(shown), fraction});
     }
     // What mirrors show.
-    const auto viewpoint = !reflecting ? std::nullopt : from != nullptr ? std::optional(from->eye) : composition.viewpoint(time);
-    if (viewpoint.has_value()) {
-        auto shown = reflect(composition, time, items, world, place, normalsOf, lights, lit, *viewpoint, from != nullptr ? from->reach : composition.hiddenLineReach, hiding ? &depth : nullptr, workspace.rays, cancelled);
+    if (reflecting && viewpoint.has_value()) {
+        auto shown = reflect(composition, time, items, world, place, normalsOf, lights, lit, *viewpoint, from != nullptr ? from->reach : composition.hiddenLineReach, hiding ? &depth : nullptr, workspace.rays, workspace.laid, cancelled);
         if (!shown.has_value()) { return nullptr; }
         frame->reflections = std::move(*shown);
     }

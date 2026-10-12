@@ -161,9 +161,15 @@ public:
     // A mesh's faces, set while it is prepared; empty for line drawings.
     const Mesh& faces() const { return meshFaces; }
     void setFaces(Mesh value) { meshFaces = std::move(value); }
+    // The faces each shape lies along (up to two, -1 for none), when the
+    // drawing says so itself: lines drawn on a surface, not found from its
+    // faces' edges. Empty otherwise.
+    const std::vector<std::array<std::int32_t, 2>>& shapeFaces() const { return facesOfShapes; }
+    void setShapeFaces(std::vector<std::array<std::int32_t, 2>> value) { facesOfShapes = std::move(value); }
 
 private:
     Mesh meshFaces;
+    std::vector<std::array<std::int32_t, 2>> facesOfShapes;
     bool fading = false, turning = false;
     // A run of a stroke walked as one: shapes joined smoothly, from where the
     // stroke starts or turns a corner to the next.

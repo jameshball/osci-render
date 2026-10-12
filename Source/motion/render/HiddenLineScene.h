@@ -3,6 +3,7 @@
 #include "CompositionRenderer.h"
 #include "HiddenLineDepth.h"
 #include "Lighting.h"
+#include "SceneRays.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -22,6 +23,8 @@ inline constexpr double sliver = 2 * DepthBuffer::pixel;
 // Nothing nearer the eye than this is drawn or hides anything.
 inline constexpr double nearPlane = Projection::nearPlane;
 
+struct Styled;
+
 // A clip of the frame being culled or lit: its drawing at that time (or, for
 // a point source, its frame of points), and whether anything bends it.
 struct SceneItem {
@@ -32,6 +35,9 @@ struct SceneItem {
     const PreparedPointFrames* points;
     std::size_t frame;
     bool bent;
+    // How it draws itself this frame, when not by its edges alone (see
+    // LineStyle); `drawing` is then the one it draws instead.
+    const Styled* styled = nullptr;
 };
 
 // How much of the beam's time a lit part takes for its length, beside the
@@ -120,5 +126,44 @@ inline osci::Point litColour(osci::Point point, const std::array<float, 3>& ligh
         point.b /= brightest;
     }
     return point;
+}
+
+// A shape drawn dimmer: a mirror's own lines, as it shows the scene in their
+// place, or a surface's, as bright as its Lines say.
+class DimmedShape final : public osci::Shape {
+public:
+    DimmedShape(std::unique_ptr<osci::Shape> whole, float gain) : shape(std::move(whole)), factor(gain) {}
+    osci::Point nextVector(float progress) override {
+        auto point = shape->nextVector(progress);
+        point.r = (point.r < 0 ? 1.0f : point.r) * factor;
+        point.g = (point.g < 0 ? 1.0f : point.g) * factor;
+        point.b = (point.b < 0 ? 1.0f : point.b) * factor;
+        return point;
+    }
+    void scale(float, float, float) override {}
+    void translate(float, float, float) override {}
+    float length() override { return shape->length(); }
+    std::unique_ptr<osci::Shape> clone() override { return std::make_unique<DimmedShape>(shape->clone(), factor); }
+    std::string type() override { return "Dimmed"; }
+
+private:
+    std::unique_ptr<osci::Shape> shape;
+    float factor;
+};
+
+// What can stand between two points of the scene: every surface's faces.
+inline void buildRays(const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world, SceneRays& rays) {
+    std::vector<SceneRays::Triangle> faces;
+    for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+        const auto& item = items[surface];
+        if (item.drawing == nullptr) { continue; }
+        for (const auto& triangle : item.drawing->faces().triangles) {
+            const auto& a = world[surface][triangle[0]];
+            const auto& b = world[surface][triangle[1]];
+            const auto& c = world[surface][triangle[2]];
+            if (a.has_value() && b.has_value() && c.has_value()) { faces.push_back({*a, *b, *c, surface}); }
+        }
+    }
+    rays.build(std::move(faces));
 }
 }

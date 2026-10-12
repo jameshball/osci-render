@@ -41,6 +41,9 @@ public:
             add(active ? 1.0 : 0.0);
             if (!active) { continue; }
             add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0, clip.lit(time), clip.reflects(time));
+            const auto lines = clip.lines(time);
+            add(lines.edges, lines.outline, lines.detail);
+            for (const auto amount : lines.patterns) { add(amount); }
             // The drawing it shows (frames that repeat one are the same), or
             // for a point source the frame.
             const auto frame = clip.source != nullptr ? clip.source->frameIndex(clip.localTime(time)) : 0;

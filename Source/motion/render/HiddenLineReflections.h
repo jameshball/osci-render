@@ -3,6 +3,7 @@
 #include "HiddenLineBake.h"
 #include "HiddenLineCrossings.h"
 #include "HiddenLineScene.h"
+#include "HiddenLineStyles.h"
 #include "Reflections.h"
 #include "SceneRays.h"
 #include <optional>
@@ -47,29 +48,6 @@ public:
 private:
     std::vector<osci::Point> points;
     std::vector<double> lengths;
-};
-
-// A shape drawn dimmer: a mirror's own lines, as it shows the scene in their
-// place.
-class DimmedShape final : public osci::Shape {
-public:
-    DimmedShape(std::unique_ptr<osci::Shape> whole, float gain) : shape(std::move(whole)), factor(gain) {}
-    osci::Point nextVector(float progress) override {
-        auto point = shape->nextVector(progress);
-        point.r = (point.r < 0 ? 1.0f : point.r) * factor;
-        point.g = (point.g < 0 ? 1.0f : point.g) * factor;
-        point.b = (point.b < 0 ? 1.0f : point.b) * factor;
-        return point;
-    }
-    void scale(float, float, float) override {}
-    void translate(float, float, float) override {}
-    float length() override { return shape->length(); }
-    std::unique_ptr<osci::Shape> clone() override { return std::make_unique<DimmedShape>(shape->clone(), factor); }
-    std::string type() override { return "Dimmed"; }
-
-private:
-    std::unique_ptr<osci::Shape> shape;
-    float factor;
 };
 
 // A curve is cut where a straight line from the last cut would stray from
@@ -177,7 +155,7 @@ private:
 template <typename Place, typename NormalsOf, typename Cancelled>
 std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& composition, double time, const std::vector<SceneItem>& items,
     const std::vector<std::vector<std::optional<Vec3>>>& world, Place&& place, NormalsOf&& normalsOf, const std::vector<LightView>& lights, bool lit,
-    const PreparedComposition::Viewpoint& view, Reach reach, const DepthBuffer* depth, SceneRays& rays, Cancelled&& cancelled) {
+    const PreparedComposition::Viewpoint& view, Reach reach, const DepthBuffer* depth, const SceneRays& rays, LaidSurfaces& laid, Cancelled&& cancelled) {
     std::vector<Frame::Entry> entries;
     const Eye eye {view.position, view.right, view.up, view.forward};
     const Projection projection {view.focalLength};
@@ -200,19 +178,6 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         if (mirror.sphere.has_value() || !mirror.flats.empty()) { reflectors.push_back({surface, std::move(mirror), amount}); }
     }
     if (reflectors.empty()) { return entries; }
-    // What can stand between a mirror and what it shows: every surface.
-    std::vector<SceneRays::Triangle> faces;
-    for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
-        const auto& item = items[surface];
-        if (item.drawing == nullptr) { continue; }
-        for (const auto& triangle : item.drawing->faces().triangles) {
-            const auto& a = world[surface][triangle[0]];
-            const auto& b = world[surface][triangle[1]];
-            const auto& c = world[surface][triangle[2]];
-            if (a.has_value() && b.has_value() && c.has_value()) { faces.push_back({*a, *b, *c, surface}); }
-        }
-    }
-    rays.build(std::move(faces));
     // Where surfaces cut through each other, anywhere in the scene, with the
     // surface and face each piece lies on.
     std::vector<crossing::Triangle> crossingTriangles;
@@ -263,7 +228,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         // is found along the line to the eye, not in the camera's depth
         // buffer, where its own faces seen edge on would cut its rim.
         const auto byRay = depth != nullptr && mirror.sphere.has_value();
-        const auto trace = [&](Vec3 from, Vec3 to, double low, double high, auto&& reflection, std::uint32_t ignored, auto&& colourAt) {
+        const auto trace = [&](Vec3 from, Vec3 to, double low, double high, auto&& reflection, std::uint32_t ignored, auto&& colourAt, SceneRays::Near grazed = {}) {
             const auto pointAt = [&](double share) { return from + (to - from) * share; };
             // As finely as a pixel of its reflection, from a few points of it.
             double length = 0;
@@ -332,7 +297,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                     const auto index = start + static_cast<std::size_t>(step);
                     const auto point = pointAt(shares[index]);
                     const auto apart = (point - *seenAt[index]).length();
-                    clear[index] = rays.blocked(*seenAt[index], point, 1.0e-6 * (1 + apart), 1.0e-6 + DepthBuffer::depthPush * apart, ignored) ? 0 : 1;
+                    clear[index] = rays.blocked(*seenAt[index], point, 1.0e-6 * (1 + apart), 1.0e-6 + DepthBuffer::depthPush * apart, ignored, grazed) ? 0 : 1;
                     return clear[index] != 0;
                 }, [&](int step, bool answer) { clear[start + static_cast<std::size_t>(step)] = answer ? 1 : 0; });
                 start = end + 1;
@@ -446,13 +411,14 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
 
         // A straight stretch of a clip's line from `from` to `to` in the
         // scene (its shape's progress from `start` to `end`), as the mirror
-        // shows it: lit as it is lit, then coloured by its clip.
-        const auto reflectStretch = [&](const SceneItem& item, osci::Shape& shape, const Normals& normals, Vec3 from, Vec3 to, double start, double end, float itself) {
+        // shows it: lit as it is lit, then coloured by its clip. Only in
+        // `only`, of a flat mirror's pieces, when given.
+        const auto reflectStretch = [&](const SceneItem& item, osci::Shape& shape, const Normals& normals, Vec3 from, Vec3 to, double start, double end, float itself, const FlatMirror* only = nullptr, SceneRays::Near grazed = {}) {
             const auto response = static_cast<float>(item.clip->lit(time));
             const auto lineColour = [&](double share, double& shade, float& reaching) {
                 std::array<float, 3> light {1, 1, 1};
                 if (lit) {
-                    light = lightAt(lights, from + (to - from) * share, normals, response, &shade);
+                    light = lightAt(lights, from + (to - from) * share, normals.at(start + (end - start) * share), response, &shade);
                     reaching = std::max({light[0], light[1], light[2]});
                 }
                 const auto drawnAs = composition.applyCompositionEffects(item.clip->processPoint(litColour(shape.nextVector(static_cast<float>(start + (end - start) * share)), light), time), time);
@@ -460,14 +426,48 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
             };
             if (mirror.sphere.has_value()) {
                 const auto& sphere = *mirror.sphere;
-                trace(from, to, 0.0, 1.0, [&](Vec3 point, std::optional<Vec3> near) { return sphere.reflectionOf(eye.position, point, near); }, reflector.surface, lineColour);
+                trace(from, to, 0.0, 1.0, [&](Vec3 point, std::optional<Vec3> near) { return sphere.reflectionOf(eye.position, point, near); }, reflector.surface, lineColour, grazed);
                 return;
             }
             for (const auto& flat : mirror.flats) {
+                if (only != nullptr && &flat != only) { continue; }
                 for (const auto& [low, high] : flat.spans(eye.position, from, to)) {
-                    trace(from, to, low, high, [&](Vec3 point, std::optional<Vec3>) { return flat.reflectionOf(eye.position, point); }, SceneRays::none, lineColour);
+                    trace(from, to, low, high, [&](Vec3 point, std::optional<Vec3>) { return flat.reflectionOf(eye.position, point); }, SceneRays::none, lineColour, grazed);
                 }
             }
+        };
+        // A surface's outline as the mirror's view of it has it: from the
+        // eye's image through each flat piece, or from where a ball shows
+        // the surface's middle.
+        const auto reflectOutline = [&](std::uint32_t source, double amount, float itself) {
+            const auto& item = items[source];
+            const auto& styled = *item.styled;
+            const auto& surface = laid.of(*styled.unstyled, item.source);
+            Vec3 middle {};
+            int placed = 0;
+            for (const auto& corner : world[source]) {
+                if (corner.has_value()) {
+                    middle = middle + *corner;
+                    ++placed;
+                }
+            }
+            if (placed == 0) { return; }
+            middle = middle / placed;
+            const auto draw = [&](Vec3 seenFrom, const FlatMirror* only) {
+                smoothLines(surface, surface::outline(styled.corners, surface.faces, styled.normals, seenFrom), outlineTurn, [&](osci::Point from, osci::Point to, std::uint32_t face, const surface::Weights& starts, const surface::Weights& ends) {
+                    const auto a = place(item, from), b = place(item, to);
+                    if (!a.has_value() || !b.has_value()) { return; }
+                    DimmedShape line(std::make_unique<osci::Line>(from, to), static_cast<float>(amount));
+                    const auto normals = Normals::turning(styled.normals.at(face, starts), styled.normals.at(face, ends));
+                    reflectStretch(item, line, normals, *a, *b, 0.0, 1.0, itself, only, {source, styled.grazing(face)});
+                });
+            };
+            if (mirror.sphere.has_value()) {
+                const auto shownAt = mirror.sphere->reflectionOf(eye.position, middle);
+                if (shownAt.has_value()) { draw(*shownAt, nullptr); }
+                return;
+            }
+            for (const auto& flat : mirror.flats) { draw(flat.image(eye.position), &flat); }
         };
 
         for (std::uint32_t source = 0; source < items.size(); ++source) {
@@ -499,7 +499,9 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 }
             }
             if (!(itself > 0)) { continue; }
-            for (std::size_t index = 0; index < item.drawing->shapeCount(); ++index) {
+            const auto eyeOnlyFrom = item.styled != nullptr ? item.styled->eyeOnlyFrom : item.drawing->shapeCount();
+            if (eyeOnlyFrom < item.drawing->shapeCount()) { reflectOutline(source, item.clip->lines(time).outline, itself); }
+            for (std::size_t index = 0; index < eyeOnlyFrom; ++index) {
                 if (cancelled()) { return std::nullopt; }
                 auto* shape = item.drawing->shape(index);
                 if (shape == nullptr || !(shape->length() > 0)) { continue; }

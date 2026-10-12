@@ -77,6 +77,9 @@ inline std::optional<Meeting> meetingOf(const Face& face, const Weights& weights
     return Meeting {face[first], face[second], std::llround(weights[second] * 1.0e9)};
 }
 
+// A corner's place, to the nearest ten millionth.
+inline std::tuple<std::int64_t, std::int64_t, std::int64_t> placeOf(Vec3 p) { return {std::llround(p.x * 1.0e7), std::llround(p.y * 1.0e7), std::llround(p.z * 1.0e7)}; }
+
 // The faces with each corner as the first corner at its place: a mesh may
 // repeat a place (a ball's poles, a seam), and lines meet there all the same.
 inline std::vector<Face> byPlace(const std::vector<Vec3>& corners, const std::vector<Face>& faces) {
@@ -84,8 +87,7 @@ inline std::vector<Face> byPlace(const std::vector<Vec3>& corners, const std::ve
     std::vector<Face> placed(faces.size());
     for (std::size_t index = 0; index < faces.size(); ++index) {
         for (std::size_t corner = 0; corner < 3; ++corner) {
-            const auto& p = corners[faces[index][corner]];
-            placed[index][corner] = first.try_emplace({std::llround(p.x * 1.0e7), std::llround(p.y * 1.0e7), std::llround(p.z * 1.0e7)}, faces[index][corner]).first->second;
+            placed[index][corner] = first.try_emplace(placeOf(corners[faces[index][corner]]), faces[index][corner]).first->second;
         }
     }
     return placed;
@@ -326,67 +328,222 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         }
         return pieces;
     }
-    std::vector<std::array<double, 3>> values(faces.size());
-    for (std::size_t index = 0; index < faces.size(); ++index) {
-        const auto& f = faces[index];
-        // A spiral's angle round the face, unwound from its first corner so
-        // it doesn't jump a turn across the face.
-        std::array<double, 3> angles {};
-        for (std::size_t corner = 0; corner < 3; ++corner) {
-            const auto p = corners[f[corner]] - middle;
-            angles[corner] = std::atan2(p.z, p.x);
-            if (corner > 0) { angles[corner] = angles[0] + std::remainder(angles[corner] - angles[0], turn); }
+    // The pattern's value at a point: its lines are where it is whole. A
+    // spiral's angle is unwound from `from`, so it doesn't jump a turn across
+    // a face, and on its axis, where it has none, is `from`.
+    const auto valueAt = [&](Vec3 point, double from) {
+        const auto p = point - middle;
+        const auto onAxis = std::hypot(p.x, p.z) < 1.0e-9 * bounds.size();
+        switch (kind) {
+            // Half a spacing in from the ends, so none is lost at a tip.
+            case Pattern::slices: return (p.y + middle.y - bounds.low.y) / spacing + .5;
+            // Round its front (its middle, at its nearest along z): a bullseye seen from in front.
+            case Pattern::rings: return (p - Vec3 {0, 0, bounds.high.z - middle.z}).length() / spacing + .5;
+            case Pattern::noise: return 2.5 * detail::noise(p * (across / bounds.size() * .5) + Vec3 {17.3, 5.1, 9.7});
+            case Pattern::spiral:
+            default: return (p.y + bounds.size() / 2) / spacing - (onAxis ? from : from + std::remainder(std::atan2(p.z, p.x) - from, turn)) / turn;
         }
-        for (std::size_t corner = 0; corner < 3; ++corner) {
-            const auto p = corners[f[corner]] - middle;
-            switch (kind) {
-                // Half a spacing in from the ends, so none is lost at a tip.
-                case Pattern::slices: values[index][corner] = (p.y + middle.y - bounds.low.y) / spacing + .5; break;
-                // Round its front (its middle, at its nearest along z): a bullseye seen from in front.
-                case Pattern::rings: values[index][corner] = (p - Vec3 {0, 0, bounds.high.z - middle.z}).length() / spacing + .5; break;
-                case Pattern::noise: values[index][corner] = 2.5 * detail::noise(p * (across / bounds.size() * .5) + Vec3 {17.3, 5.1, 9.7}); break;
-                case Pattern::spiral:
-                default: values[index][corner] = (p.y + bounds.size() / 2) / spacing - angles[corner] / turn; break;
+    };
+    // Found on the faces cut finely (a few times to a spacing), so the
+    // lines are as curved across a big face as the pattern is: each piece
+    // then put back on the face it was cut from.
+    std::vector<Vec3> fine;
+    std::vector<Face> fineFaces;
+    std::vector<std::uint32_t> parents;
+    std::vector<std::array<Weights, 3>> placings;
+    std::vector<std::array<double, 3>> values;
+    for (std::uint32_t index = 0; index < faces.size(); ++index) {
+        const auto& f = faces[index];
+        const auto a = corners[f[0]], b = corners[f[1]], c = corners[f[2]];
+        const auto longest = std::max({(b - a).length(), (c - b).length(), (a - c).length()});
+        const auto cuts = std::clamp(static_cast<int>(std::ceil(longest / (spacing / 6))), 1, 32);
+        const auto centre = (a + b + c) / 3.0 - middle;
+        const auto from = std::atan2(centre.z, centre.x);
+        // Its points by weights, row by row from the first corner.
+        const auto first = static_cast<std::uint32_t>(fine.size());
+        std::vector<Weights> weightsOf;
+        for (int row = 0; row <= cuts; ++row) {
+            for (int column = 0; column <= cuts - row; ++column) {
+                const Weights weights {static_cast<double>(cuts - row - column) / cuts, static_cast<double>(column) / cuts, static_cast<double>(row) / cuts};
+                weightsOf.push_back(weights);
+                fine.push_back(a * weights[0] + b * weights[1] + c * weights[2]);
+            }
+        }
+        const auto pointAt = [&](int row, int column) { return static_cast<std::uint32_t>(row * (cuts + 1) - row * (row - 1) / 2 + column); };
+        const auto add = [&](std::uint32_t p, std::uint32_t q, std::uint32_t r) {
+            fineFaces.push_back({first + p, first + q, first + r});
+            parents.push_back(index);
+            placings.push_back({weightsOf[p], weightsOf[q], weightsOf[r]});
+            values.push_back({valueAt(fine[first + p], from), valueAt(fine[first + q], from), valueAt(fine[first + r], from)});
+        };
+        for (int row = 0; row < cuts; ++row) {
+            for (int column = 0; column < cuts - row; ++column) {
+                add(pointAt(row, column), pointAt(row, column + 1), pointAt(row + 1, column));
+                if (column + 1 < cuts - row) { add(pointAt(row, column + 1), pointAt(row + 1, column + 1), pointAt(row + 1, column)); }
             }
         }
     }
-    return detail::contours(faces, detail::byPlace(corners, faces), values);
+    auto pieces = detail::contours(fineFaces, detail::byPlace(fine, fineFaces), values);
+    const auto onParent = [&](std::uint32_t face, const Weights& weights) {
+        Weights placed {};
+        for (std::size_t corner = 0; corner < 3; ++corner) {
+            for (std::size_t parent = 0; parent < 3; ++parent) { placed[parent] += weights[corner] * placings[face][corner][parent]; }
+        }
+        return placed;
+    };
+    for (auto& piece : pieces) { piece = {parents[piece.face], onParent(piece.face, piece.from), onParent(piece.face, piece.to)}; }
+    return pieces;
 }
 
-// Where faces turn from the eye: within a smooth stretch of surface (faces
-// meeting at less than `crease`, radians), where the corners' normals,
-// shared with their smooth neighbours, turn edge on to it, so a curved
+// A surface's normals: each face's own, and at each of its corners the
+// normal shared with its smooth neighbours there (faces meeting it at less
+// than `crease`, radians), so a curved surface turns smoothly across its
+// faces and a sharp edge stays sharp.
+struct Normals {
+    std::vector<Vec3> faces;
+    std::vector<std::array<Vec3, 3>> corners;
+
+    // At a point of a face, between its corners'.
+    Vec3 at(std::uint32_t face, const Weights& weights) const {
+        const auto& c = corners[face];
+        return (c[0] * weights[0] + c[1] * weights[1] + c[2] * weights[2]).normalized(1.0e-300).value_or(faces[face]);
+    }
+};
+// Which faces each face's corners are shared with smoothly (by place: a
+// mesh may repeat a corner): worked out once for a mesh, so its normals are
+// found quickly wherever its corners move after (turned, not bent much).
+// A corner's normal is its smooth neighbours' faces' normals, weighted so a
+// surface's normals hardly depend on how it is cut into faces.
+struct Smoothing {
+    // For each face's corner in turn, its smooth neighbours (the face
+    // itself among them, and which of each one's corners is at the place)
+    // from `start` to the next corner's start.
+    std::vector<std::uint32_t> start;
+    std::vector<std::pair<std::uint32_t, std::uint8_t>> neighbours;
+
+    static Smoothing of(const std::vector<Vec3>& corners, const std::vector<Face>& faces, double crease = .7) {
+        const auto own = faceNormals(corners, faces);
+        std::map<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::vector<std::pair<std::uint32_t, std::uint8_t>>> around;
+        for (std::uint32_t index = 0; index < faces.size(); ++index) {
+            const auto a = detail::placeOf(corners[faces[index][0]]), b = detail::placeOf(corners[faces[index][1]]), c = detail::placeOf(corners[faces[index][2]]);
+            if (a == b || b == c || c == a) { continue; }
+            for (std::uint8_t corner = 0; corner < 3; ++corner) { around[detail::placeOf(corners[faces[index][corner]])].emplace_back(index, corner); }
+        }
+        const auto cosCrease = std::cos(crease);
+        Smoothing smoothing;
+        smoothing.start.reserve(faces.size() * 3 + 1);
+        for (std::uint32_t index = 0; index < faces.size(); ++index) {
+            for (std::uint8_t corner = 0; corner < 3; ++corner) {
+                smoothing.start.push_back(static_cast<std::uint32_t>(smoothing.neighbours.size()));
+                // A face with no area has only itself.
+                const auto found = around.find(detail::placeOf(corners[faces[index][corner]]));
+                if (found == around.end()) {
+                    smoothing.neighbours.emplace_back(index, corner);
+                    continue;
+                }
+                for (const auto& neighbour : found->second) {
+                    if (own[neighbour.first].dot(own[index]) >= cosCrease) { smoothing.neighbours.push_back(neighbour); }
+                }
+            }
+        }
+        smoothing.start.push_back(static_cast<std::uint32_t>(smoothing.neighbours.size()));
+        return smoothing;
+    }
+
+    // The mesh's normals with its corners at `corners`.
+    Normals normals(const std::vector<Vec3>& corners, const std::vector<Face>& faces) const {
+        Normals found;
+        found.faces = faceNormals(corners, faces);
+        found.corners.resize(faces.size());
+        // Max's weight: the sine of the face's angle there over its sides'
+        // lengths, which is exact for corners on a ball.
+        const auto weightAt = [&](std::uint32_t face, std::size_t corner) {
+            const auto& f = faces[face];
+            const auto& at = corners[f[corner]];
+            const auto one = corners[f[(corner + 1) % 3]] - at, other = corners[f[(corner + 2) % 3]] - at;
+            const auto lengths = one.dot(one) * other.dot(other);
+            return lengths > 1.0e-300 ? one.cross(other).length() / lengths : 0.0;
+        };
+        for (std::size_t index = 0; index < faces.size(); ++index) {
+            for (std::size_t corner = 0; corner < 3; ++corner) {
+                const auto at = index * 3 + corner;
+                Vec3 sum;
+                for (auto neighbour = start[at]; neighbour < start[at + 1]; ++neighbour) {
+                    const auto& [face, itsCorner] = neighbours[neighbour];
+                    sum = sum + found.faces[face] * weightAt(face, itsCorner);
+                }
+                found.corners[index][corner] = sum.normalized(1.0e-300).value_or(found.faces[index]);
+            }
+        }
+        return found;
+    }
+
+private:
+    static std::vector<Vec3> faceNormals(const std::vector<Vec3>& corners, const std::vector<Face>& faces) {
+        std::vector<Vec3> normals(faces.size());
+        for (std::size_t index = 0; index < faces.size(); ++index) {
+            const auto& f = faces[index];
+            normals[index] = (corners[f[1]] - corners[f[0]]).cross(corners[f[2]] - corners[f[0]]).normalized(1.0e-300).value_or(Vec3 {});
+        }
+        return normals;
+    }
+};
+inline Normals normalsOf(const std::vector<Vec3>& corners, const std::vector<Face>& faces, double crease = .7) { return Smoothing::of(corners, faces, crease).normals(corners, faces); }
+
+// A point of a face on the smooth surface its corners' normals describe,
+// rather than the flat face: lifted off the face along the normal there, as
+// far as the planes its corners' normals stand on would pull it, halfway
+// (Phong tessellation at half, along the normal: on a ball, round to the
+// second order, and its normal still pointing from the middle).
+inline Vec3 smoothAt(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Normals& normals, std::uint32_t face, const Weights& weights) {
+    const auto& f = faces[face];
+    const auto flat = at(corners, f, weights);
+    Vec3 onPlanes;
+    for (std::size_t corner = 0; corner < 3; ++corner) {
+        const auto& normal = normals.corners[face][corner];
+        onPlanes = onPlanes + (flat - normal * (flat - corners[f[corner]]).dot(normal)) * weights[corner];
+    }
+    const auto normal = normals.at(face, weights);
+    return flat + normal * ((onPlanes - flat).dot(normal) * .5);
+}
+
+// How many straight stretches follow a piece over the smooth surface: one
+// for each turn of the normal by `turn` (radians) along it, at most 8.
+inline int stretchesOf(const Normals& normals, const Piece& piece, double turn = .1) {
+    const auto cosine = std::clamp(normals.at(piece.face, piece.from).dot(normals.at(piece.face, piece.to)), -1.0, 1.0);
+    return std::clamp(static_cast<int>(std::ceil(std::acos(cosine) / turn)), 1, 8);
+}
+
+// Where faces turn from the eye: within a smooth stretch of surface, where
+// the corners' normals (see Normals) turn edge on to it, so a curved
 // surface's outline is smooth; at a sharper edge between a face toward the
 // eye and one away, along that edge; and along every edge of the surface
 // only one face has (a flat drawing's outline).
-inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Vec3 eye, double crease = .7) {
-    std::vector<Vec3> normals(faces.size());
-    for (std::size_t index = 0; index < faces.size(); ++index) {
-        const auto& f = faces[index];
-        normals[index] = (corners[f[1]] - corners[f[0]]).cross(corners[f[2]] - corners[f[0]]).normalized(1.0e-300).value_or(Vec3 {});
-    }
-    // Faces by the corners they share (by place: a mesh may repeat a corner).
-    std::map<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::vector<std::uint32_t>> around;
-    const auto keyOf = [](Vec3 p) { return std::tuple {std::llround(p.x * 1.0e7), std::llround(p.y * 1.0e7), std::llround(p.z * 1.0e7)}; };
-    for (std::uint32_t index = 0; index < faces.size(); ++index) {
-        const auto a = keyOf(corners[faces[index][0]]), b = keyOf(corners[faces[index][1]]), c = keyOf(corners[faces[index][2]]);
-        if (a == b || b == c || c == a) { continue; }
-        for (const auto corner : faces[index]) { around[keyOf(corners[corner])].push_back(index); }
-    }
+inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Normals& smooth, Vec3 eye, double crease = .7) {
+    const auto& normals = smooth.faces;
+    const auto keyOf = detail::placeOf;
     const auto cosCrease = std::cos(crease);
-    // Each face's corners' normals: its smooth neighbours' at that corner, together.
     std::vector<std::array<double, 3>> facing(faces.size());
     for (std::uint32_t index = 0; index < faces.size(); ++index) {
-        const auto& f = faces[index];
         for (std::size_t corner = 0; corner < 3; ++corner) {
-            Vec3 sum;
-            for (const auto other : around[keyOf(corners[f[corner]])]) {
-                if (normals[other].dot(normals[index]) >= cosCrease) { sum = sum + normals[other]; }
-            }
-            const auto normal = sum.normalized(1.0e-300).value_or(normals[index]);
-            facing[index][corner] = normal.dot((eye - corners[f[corner]]).normalized(1.0e-300).value_or(Vec3 {}));
+            facing[index][corner] = smooth.corners[index][corner].dot((eye - corners[faces[index][corner]]).normalized(1.0e-300).value_or(Vec3 {}));
         }
     }
+    // How far along a face's side, from one corner to another, the smooth
+    // surface (see smoothAt) turns edge on to the eye: between where the
+    // corners' facings say, found by halving.
+    const auto edgeOn = [&](std::uint32_t face, std::size_t from, std::size_t to, double facingFrom) {
+        double low = 0, high = 1;
+        for (int step = 0; step < 24; ++step) {
+            const auto middle = (low + high) * .5;
+            Weights weights {};
+            weights[from] = 1 - middle;
+            weights[to] = middle;
+            const auto facing = smooth.at(face, weights).dot(eye - smoothAt(corners, faces, smooth, face, weights));
+            ((facing < 0) == (facingFrom < 0) ? low : high) = middle;
+        }
+        return (low + high) * .5;
+    };
     const auto placed = detail::byPlace(corners, faces);
     std::vector<detail::Found> found;
     for (std::uint32_t index = 0; index < faces.size(); ++index) {
@@ -399,10 +556,14 @@ inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::v
         for (std::size_t side = 0; side < 3 && count < 2; ++side) {
             const auto next = (side + 1) % 3;
             if ((v[side] < 0) == (v[next] < 0)) { continue; }
-            const auto share = v[side] / (v[side] - v[next]);
+            // Found the same way from the faces either side, from the side's
+            // first corner by place.
+            const auto flip = p[side] > p[next];
+            const auto first = flip ? next : side, second = flip ? side : next;
+            const auto share = edgeOn(index, first, second, v[first]);
             Weights weights {};
-            weights[side] = 1 - share;
-            weights[next] = share;
+            weights[first] = 1 - share;
+            weights[second] = share;
             ends[static_cast<std::size_t>(count++)] = weights;
         }
         if (count == 2) { found.push_back({{index, ends[0], ends[1]}, {detail::meetingOf(placed[index], ends[0]), detail::meetingOf(placed[index], ends[1])}}); }
@@ -434,6 +595,51 @@ inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::v
         to[(side + 1) % 3] = 1;
         found.push_back({{index, from, to}, {detail::meetingOf(placed[index], from), detail::meetingOf(placed[index], to)}});
     }
-    return detail::chained(std::move(found));
+    // Across a face the smooth outline bends: each piece over a curved face
+    // is cut into stretches, their ends moved square across it onto where
+    // the surface is edge on, as far as the face reaches.
+    std::vector<Piece> followed;
+    for (const auto& piece : detail::chained(std::move(found))) {
+        const auto stretches = stretchesOf(smooth, piece, .1);
+        if (stretches == 1) {
+            followed.push_back(piece);
+            continue;
+        }
+        const auto facingAt = [&](const Weights& weights) { return smooth.at(piece.face, weights).dot(eye - smoothAt(corners, faces, smooth, piece.face, weights)); };
+        // Square across the piece, keeping the weights' sum.
+        const Vec3 along {piece.to[0] - piece.from[0], piece.to[1] - piece.from[1], piece.to[2] - piece.from[2]};
+        const auto across = along.cross({1, 1, 1});
+        auto previous = piece.from;
+        for (int stretch = 1; stretch <= stretches; ++stretch) {
+            const auto share = static_cast<double>(stretch) / stretches;
+            Weights next;
+            for (std::size_t corner = 0; corner < 3; ++corner) { next[corner] = piece.from[corner] + (piece.to[corner] - piece.from[corner]) * share; }
+            if (stretch < stretches) {
+                // How far it may move either way and stay on the face.
+                double least = -1.0e300, most = 1.0e300;
+                for (std::size_t corner = 0; corner < 3; ++corner) {
+                    if (std::abs(across[corner]) < 1.0e-300) { continue; }
+                    const auto limit = -next[corner] / across[corner];
+                    (across[corner] > 0 ? least : most) = across[corner] > 0 ? std::max(least, limit) : std::min(most, limit);
+                }
+                const auto moved = [&](double by) { return Weights {next[0] + across[0] * by, next[1] + across[1] * by, next[2] + across[2] * by}; };
+                const auto low = facingAt(moved(least)), high = facingAt(moved(most));
+                if (least < most && (low < 0) != (high < 0)) {
+                    double from = least, to = most;
+                    for (int step = 0; step < 24; ++step) {
+                        const auto middle = (from + to) * .5;
+                        ((facingAt(moved(middle)) < 0) == (low < 0) ? from : to) = middle;
+                    }
+                    next = moved((from + to) * .5);
+                }
+            }
+            followed.push_back({piece.face, previous, next});
+            previous = next;
+        }
+    }
+    return followed;
+}
+inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Vec3 eye, double crease = .7) {
+    return outline(corners, faces, normalsOf(corners, faces, crease), eye, crease);
 }
 }

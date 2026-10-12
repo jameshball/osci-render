@@ -67,8 +67,8 @@ public:
     const std::shared_ptr<const Project> project;
     const Reach reach;
     // What it bakes: lines a camera hides, light from lights, reflections,
-    // or any of them together.
-    bool hides = true, lights = false, reflects = false;
+    // surfaces drawn other than by their edges, or any of them together.
+    bool hides = true, lights = false, reflects = false, restyles = false;
 
     double frameRate() const { return rate; }
     std::size_t frameCount() const { return count; }

@@ -119,6 +119,7 @@ public:
     bool hidesHiddenLines() const { return publishedBake != nullptr && publishedBake->hides; }
     bool lightsFrames() const { return publishedBake != nullptr && publishedBake->lights; }
     bool reflectsFrames() const { return publishedBake != nullptr && publishedBake->reflects; }
+    bool restylesFrames() const { return publishedBake != nullptr && publishedBake->restyles; }
 private:
     // Removes the lines cameras can't see, off the audio thread, from the
     // playhead out. Last, so its workers stop before the rest is destroyed.

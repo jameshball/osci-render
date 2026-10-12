@@ -1,6 +1,7 @@
 #include "../../Source/motion/render/SurfaceLines.h"
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <string>
 
 using namespace motion;
@@ -65,11 +66,19 @@ int main() {
         const auto pieces = pattern(corners, faces, Pattern::spiral, 8);
         check(!pieces.empty(), "a ball has a spiral");
         check(linesIn(corners, faces, pieces) <= 3, "it runs as one line (poles aside): " + std::to_string(linesIn(corners, faces, pieces)));
-        double turned = 0;
+        // How far each line turns (whichever way it runs), together.
+        double turned = 0, line = 0;
+        std::optional<Vec3> last;
         for (const auto& piece : pieces) {
             const auto from = at(corners, faces[piece.face], piece.from), to = at(corners, faces[piece.face], piece.to);
-            turned += std::remainder(std::atan2(to.z, to.x) - std::atan2(from.z, from.x), 2 * 3.14159265358979323846);
+            if (last.has_value() && (from - *last).length() > 1.0e-5) {
+                turned += std::abs(line);
+                line = 0;
+            }
+            line += std::remainder(std::atan2(to.z, to.x) - std::atan2(from.z, from.x), 2 * 3.14159265358979323846);
+            last = to;
         }
+        turned += std::abs(line);
         check(std::abs(turned) > 2 * 3.14159265358979323846 * 6, "turning round many times as it climbs");
     }
     // Rings and noise lie on the surface too.
@@ -113,6 +122,22 @@ int main() {
         // A flat square's outline is its border.
         const std::vector<Vec3> square {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}};
         check(outline(square, {{0, 1, 2}, {0, 2, 3}}, {0, 0, 5}).size() == 4, "a flat square's outline is its four sides");
+    }
+    // A pattern is as curved across a big face as it is: rings on a square
+    // of two faces are round.
+    {
+        const std::vector<Vec3> square {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}};
+        const std::vector<Face> halves {{0, 1, 2}, {0, 2, 3}};
+        const auto pieces = pattern(square, halves, Pattern::rings, 8);
+        check(pieces.size() > 100, "rings across two faces, in many pieces: " + std::to_string(pieces.size()));
+        for (const auto& piece : pieces) {
+            const auto half = Weights {(piece.from[0] + piece.to[0]) / 2, (piece.from[1] + piece.to[1]) / 2, (piece.from[2] + piece.to[2]) / 2};
+            for (const auto& weights : {piece.from, piece.to, half}) {
+                const auto radius = at(square, halves[piece.face], weights).length() / .25 + .5;
+                check(std::abs(radius - std::round(radius)) < .03, "each ring round its middle, a spacing from the next: " + std::to_string(radius));
+            }
+        }
+        check(linesIn(square, halves, pieces) == 12, "four whole rings, and two more cut in four by the corners: " + std::to_string(linesIn(square, halves, pieces)));
     }
     std::cout << "SurfaceLinesTests passed\n";
     return 0;

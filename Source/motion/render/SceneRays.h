@@ -12,6 +12,13 @@
 // as triangles in a tree of boxes round them, so a test visits only the few
 // it could hit. Pure geometry, so it can be tested alone.
 namespace motion::hidden {
+// A surface whose faces count only from further than `within` of either end
+// of a line: a line along where it turns away grazes its faces near the line.
+struct GrazedSurface {
+    std::uint32_t surface = std::numeric_limits<std::uint32_t>::max();
+    double within = 0;
+};
+
 class SceneRays {
 public:
     struct Triangle {
@@ -37,15 +44,18 @@ public:
     }
     bool empty() const { return triangles.empty(); }
 
+    using Near = GrazedSurface;
+
     // Whether a face is between `from` and `to`, other than a face of
     // `ignored`. Hits within `nearFrom` of `from` or `nearTo` of `to` (in the
     // scene's units) don't count: a point on a surface is never hidden by it.
-    bool blocked(Vec3 from, Vec3 to, double nearFrom, double nearTo, std::uint32_t ignored = none) const {
+    bool blocked(Vec3 from, Vec3 to, double nearFrom, double nearTo, std::uint32_t ignored = none, Near near = {}) const {
         if (nodes.empty()) { return false; }
         const auto span = to - from;
         const auto length = span.length();
         if (!(length > nearFrom + nearTo)) { return false; }
         const auto first = nearFrom / length, last = 1 - nearTo / length;
+        const auto nearFirst = near.within / length, nearLast = 1 - near.within / length;
         const Vec3 inverse {1 / span.x, 1 / span.y, 1 / span.z};
         std::array<std::uint32_t, 64> stack {};
         std::size_t depth = 0;
@@ -56,7 +66,10 @@ public:
             if (node.count > 0) {
                 for (auto index = node.start; index < node.start + node.count; ++index) {
                     const auto& face = triangles[order[index]];
-                    if (face.surface != ignored && hits(face, from, span, first, last)) { return true; }
+                    if (face.surface == ignored) { continue; }
+                    const auto along = hit(face, from, span);
+                    if (!(along > first && along < last)) { continue; }
+                    if (face.surface != near.surface || (along > nearFirst && along < nearLast)) { return true; }
                 }
                 continue;
             }
@@ -181,22 +194,22 @@ private:
         }
         return true;
     }
-    // Whether the segment between those shares of it meets a triangle
-    // (Möller and Trumbore).
-    static bool hits(const Triangle& face, Vec3 from, Vec3 span, double first, double last) {
+    // Where the segment's line meets a triangle, as a share of the segment;
+    // NaN if it doesn't (Möller and Trumbore).
+    static double hit(const Triangle& face, Vec3 from, Vec3 span) {
+        constexpr auto missed = std::numeric_limits<double>::quiet_NaN();
         const auto ab = face.b - face.a, ac = face.c - face.a;
         const auto across = span.cross(ac);
         const auto determinant = ab.dot(across);
-        if (std::abs(determinant) < 1.0e-18) { return false; }
+        if (std::abs(determinant) < 1.0e-18) { return missed; }
         const auto inverse = 1 / determinant;
         const auto offset = from - face.a;
         const auto u = offset.dot(across) * inverse;
-        if (u < 0 || u > 1) { return false; }
+        if (u < 0 || u > 1) { return missed; }
         const auto up = offset.cross(ab);
         const auto v = span.dot(up) * inverse;
-        if (v < 0 || u + v > 1) { return false; }
-        const auto along = ac.dot(up) * inverse;
-        return along > first && along < last;
+        if (v < 0 || u + v > 1) { return missed; }
+        return ac.dot(up) * inverse;
     }
 
     std::vector<Triangle> triangles;

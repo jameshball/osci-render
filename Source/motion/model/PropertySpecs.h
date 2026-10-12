@@ -33,8 +33,11 @@ inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
 // it: at 0 it draws in its own colour whatever lights shine, as a flame or a
 // screen gives off its own light. Reflects is how brightly its surfaces show
 // the rest of the scene, as a mirror does: at 100 a perfect mirror. A group's
-// makes what it holds reflect at least as much.
-inline constexpr std::array<PropertySpec, 19> objectPropertySpecs {{
+// makes what it holds reflect at least as much. The Lines properties are how
+// a surface draws itself: its own lines (Edges), its outline as the camera
+// sees it, and patterns over it that show its shape, each as bright as set
+// (Fill detail is how many lines across a pattern draws).
+inline constexpr std::array<PropertySpec, 27> objectPropertySpecs {{
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.y", "Position Y", "Position", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.z", "Position Z", "Position", "Z", -unbounded, unbounded, 0, .01, 3, ""},
@@ -54,13 +57,30 @@ inline constexpr std::array<PropertySpec, 19> objectPropertySpecs {{
     {"beam", "Beam", "Beam", "", 0, maximumBeam, 1, .01, 2, "×"},
     {"lit", "Lit by lights", "Lit by lights", "", 0, 100, 100, 1, 0, "%"},
     {"reflects", "Reflects", "Reflects", "", 0, 100, 0, 1, 0, "%"},
+    {"edges", "Edges", "Edges", "", 0, 100, 100, 1, 0, "%"},
+    {"outline", "Outline", "Outline", "", 0, 100, 0, 1, 0, "%"},
+    {"spiral", "Spiral", "Spiral", "", 0, 100, 0, 1, 0, "%"},
+    {"hilbert", "Hilbert curve", "Hilbert curve", "", 0, 100, 0, 1, 0, "%"},
+    {"noise", "Noise", "Noise", "", 0, 100, 0, 1, 0, "%"},
+    {"slices", "Slices", "Slices", "", 0, 100, 0, 1, 0, "%"},
+    {"rings", "Rings", "Rings", "", 0, 100, 0, 1, 0, "%"},
+    {"fillDetail", "Fill detail", "Fill detail", "", 2, 64, 8, 1, 0, ""},
 }};
 inline constexpr std::size_t opacityIndex = 12, anchorIndex = 13, beamIndex = 16, litIndex = 17, reflectsIndex = 18;
+// The Lines properties: edges, outline, the five patterns (in Pattern order:
+// spiral, Hilbert curve, noise, slices, rings) and the fill's detail.
+inline constexpr std::size_t edgesIndex = 19, outlineIndex = 20, patternsIndex = 21, patternCount = 5, fillDetailIndex = 26;
+inline bool isLinesProperty(std::string_view id) {
+    for (auto index = edgesIndex; index <= fillDetailIndex; ++index) {
+        if (objectPropertySpecs[index].id == id) { return true; }
+    }
+    return false;
+}
 
 // The same properties as Properties shows them: the anchor closes Transform.
 inline constexpr auto objectInspectorSpecs = [] {
-    constexpr std::array<std::size_t, 19> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 18, 16};
-    std::array<PropertySpec, 19> result {};
+    constexpr std::array<std::size_t, 27> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 18, 16, 19, 20, 21, 22, 23, 24, 25, 26};
+    std::array<PropertySpec, 27> result {};
     for (std::size_t index = 0; index < order.size(); ++index) { result[index] = objectPropertySpecs[order[index]]; }
     return result;
 }();

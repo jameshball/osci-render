@@ -36,6 +36,23 @@ inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool qua
 // offsets), then translation (along a spatial path when there is one), and
 // colour gains dimmed by the opacity. Evaluated once, it applies to any number
 // of points.
+// How a surface draws itself: its own lines (edges), its outline as the
+// camera sees it, and patterns over it (in Pattern order: spiral, Hilbert
+// curve, noise, slices, rings), each as a brightness 0..1, and how many
+// lines across a pattern draws. Groups dim its edges and add their outline
+// and patterns.
+struct LineStyle {
+    double edges = 1, outline = 0;
+    std::array<double, patternCount> patterns {};
+    double detail = objectPropertySpecs[fillDetailIndex].defaultValue;
+    bool plain() const { return edges == 1 && outline == 0 && std::all_of(patterns.begin(), patterns.end(), [](double amount) { return amount == 0; }); }
+    void include(const LineStyle& outer) {
+        edges *= outer.edges;
+        outline = std::max(outline, outer.outline);
+        for (std::size_t pattern = 0; pattern < patternCount; ++pattern) { patterns[pattern] = std::max(patterns[pattern], outer.patterns[pattern]); }
+    }
+};
+
 struct TransformPose {
     using Matrix = std::array<std::array<float, 3>, 3>;
     std::array<float, 3> scale {1, 1, 1}, translation {}, colour {1, 1, 1}, anchor {};
@@ -98,11 +115,25 @@ struct TransformPose {
         const auto value = curves[reflectsIndex].evaluate(time) / 100;
         return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
     }
-    // Whether it may reflect at some time: keys, a link or modulators can
-    // lift it above nothing.
-    static bool mayReflect(const std::array<Curve, objectPropertySpecs.size()>& curves) {
-        const auto& curve = curves[reflectsIndex];
-        return curve.base > 0 || curve.drivers != nullptr || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [](const Keyframe& key) { return key.value > 0; });
+    // Whether a property may be other than its default at some time: keys,
+    // a link or modulators can move it.
+    static bool mayDiffer(const std::array<Curve, objectPropertySpecs.size()>& curves, std::size_t index) {
+        const auto& curve = curves[index];
+        const auto usual = objectPropertySpecs[index].defaultValue;
+        return curve.base != usual || curve.drivers != nullptr || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [usual](const Keyframe& key) { return key.value != usual; });
+    }
+    static bool mayReflect(const std::array<Curve, objectPropertySpecs.size()>& curves) { return mayDiffer(curves, reflectsIndex); }
+    // Whether it may draw itself other than by its edges alone.
+    static bool mayRestyle(const std::array<Curve, objectPropertySpecs.size()>& curves) {
+        for (auto index = edgesIndex; index < patternsIndex + patternCount; ++index) {
+            if (mayDiffer(curves, index)) { return true; }
+        }
+        return false;
+    }
+    // A Lines property, 0..1.
+    static double share(const std::array<Curve, objectPropertySpecs.size()>& curves, std::size_t index, double time) {
+        const auto value = curves[index].evaluate(time) / 100;
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : objectPropertySpecs[index].defaultValue / 100;
     }
     static double beamAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
         const auto value = curves[beamIndex].evaluate(time);
@@ -170,6 +201,13 @@ struct PreparedGroup {
     }
     bool visible(double time) const { return TransformPose::opacityAt(curves, time) > 0 && TransformPose::beamAt(curves, time) > 0; }
     double beam(double time) const { return TransformPose::beamAt(curves, time); }
+    LineStyle lines(double time) const {
+        LineStyle style;
+        style.edges = TransformPose::share(curves, edgesIndex, time);
+        style.outline = TransformPose::share(curves, outlineIndex, time);
+        for (std::size_t pattern = 0; pattern < patternCount; ++pattern) { style.patterns[pattern] = TransformPose::share(curves, patternsIndex + pattern, time); }
+        return style;
+    }
     const TransformPose& pose(double time) const {
         return poses.at(time, [&] { return TransformPose::at(curves, time, spatial.get()); });
     }
@@ -208,6 +246,22 @@ struct PreparedClipStage {
         auto value = TransformPose::litAt(curves, localTime(time));
         for (const auto& group : groups) { value *= TransformPose::litAt(group.curves, scopeTime(time)); }
         return value;
+    }
+    // How it draws itself (see LineStyle): its own, with its groups' edges
+    // dimming it and their outline and patterns adding to it.
+    LineStyle stageLines(double time) const {
+        const auto local = localTime(time);
+        LineStyle style;
+        style.edges = TransformPose::share(curves, edgesIndex, local);
+        style.outline = TransformPose::share(curves, outlineIndex, local);
+        for (std::size_t pattern = 0; pattern < patternCount; ++pattern) { style.patterns[pattern] = TransformPose::share(curves, patternsIndex + pattern, local); }
+        const auto detail = curves[fillDetailIndex].evaluate(local);
+        style.detail = std::isfinite(detail) ? objectPropertySpecs[fillDetailIndex].clamp(std::round(detail)) : objectPropertySpecs[fillDetailIndex].defaultValue;
+        for (const auto& group : groups) { style.include(group.lines(scopeTime(time))); }
+        return style;
+    }
+    bool stageMayRestyle() const {
+        return TransformPose::mayRestyle(curves) || std::any_of(groups.begin(), groups.end(), [](const auto& group) { return TransformPose::mayRestyle(group.curves); });
     }
     // Its own Reflects, or a group's holding it, whichever is more.
     double stageReflects(double time) const {
@@ -263,6 +317,16 @@ struct PreparedClip : PreparedClipStage {
         auto value = stageLit(time);
         for (const auto& ancestor : ancestors) { value *= ancestor.stageLit(time); }
         return std::isfinite(value) ? value : 1.0;
+    }
+    // How its surfaces draw themselves, with its groups' and nested
+    // placements' (see LineStyle).
+    LineStyle lines(double time) const {
+        auto style = stageLines(time);
+        for (const auto& ancestor : ancestors) { style.include(ancestor.stageLines(time)); }
+        return style;
+    }
+    bool mayRestyle() const {
+        return stageMayRestyle() || std::any_of(ancestors.begin(), ancestors.end(), [](const auto& ancestor) { return ancestor.stageMayRestyle(); });
     }
     // How brightly its surfaces reflect: its own Reflects, or its groups' or
     // nested placements', whichever is most.
@@ -615,15 +679,18 @@ struct PreparedComposition {
             clips.clear();
             lights.clear();
         }
-        // Frames whose hidden lines a camera removes, that lights light, or
-        // in which something reflects, are baked off the render thread.
+        // Frames whose hidden lines a camera removes, that lights light, in
+        // which something reflects, or a surface draws itself other than by
+        // its edges, are baked off the render thread.
         const auto hides = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.hidesHiddenLines; });
         const auto reflective = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayReflect(); });
-        if (purpose == CompositionPurpose::signal && preparationError.isEmpty() && (hides || !lights.empty() || reflective)) {
+        const auto restyled = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayRestyle(); });
+        if (purpose == CompositionPurpose::signal && preparationError.isEmpty() && (hides || !lights.empty() || reflective || restyled)) {
             hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach);
             hiddenLines->hides = hides;
             hiddenLines->lights = !lights.empty();
             hiddenLines->reflects = reflective;
+            hiddenLines->restyles = restyled;
         }
     }
 
@@ -754,6 +821,10 @@ struct PreparedComposition {
     // Whether any light shines at a time: without one, everything is as bright as it is.
     bool lit(double time) const {
         return std::any_of(lights.begin(), lights.end(), [&](const PreparedLight& light) { return light.clip.active(time); });
+    }
+    // Whether anything shown at a time draws itself other than by its edges.
+    bool restyles(double time) const {
+        return std::any_of(clips.begin(), clips.end(), [&](const PreparedClip& clip) { return !clip.light && clip.active(time) && clip.visible(time) && !clip.lines(time).plain(); });
     }
     // Whether anything shown at a time reflects.
     bool reflects(double time) const {
