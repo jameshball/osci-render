@@ -373,13 +373,21 @@ void MotionEditor::setUpTransport() {
         }
         processor.setOutputMode(mode);
         // A scope driven by X and Y alone can't show brightness: offer to
-        // draw for it, light shown by the beam's time instead.
-        if (mode == MotionProcessor::OutputMode::xy && !processor.document.project().scope.xyOnly) {
-            statusBar.show("An X/Y scope can't show brightness: lighting, opacity and mirrors draw as if at full", MotionStatusBar::Kind::notice, "Draw for XY only", [this] {
-                if (processor.document.project().scope.xyOnly) { return; }
-                processor.document.edit("Set the scope to XY only", [](motion::Project& project) { project.scope.xyOnly = true; });
-                statusBar.show("Drawing for an XY-only scope: brightness is shown by the beam's time. Scope options change it back.", MotionStatusBar::Kind::notice);
+        // draw for it, light shown by the beam's time instead; and the other
+        // way when the output carries brightness again.
+        const auto xyOnly = processor.document.project().scope.xyOnly;
+        const auto suggest = [this](bool on, const juce::String& why, const juce::String& action, const juce::String& done) {
+            statusBar.show(why, MotionStatusBar::Kind::notice, action, [this, on, done] {
+                if (processor.document.project().scope.xyOnly == on) { return; }
+                processor.document.edit(on ? "Set the scope to XY only" : "Give the scope brightness", [on](motion::Project& project) { project.scope.xyOnly = on; });
+                statusBar.show(done, MotionStatusBar::Kind::notice);
             });
+        };
+        if (mode == MotionProcessor::OutputMode::xy && !xyOnly) {
+            suggest(true, "An XY output carries no brightness, so lighting and fades won't show.", "Draw for XY only",
+                "Drawing for XY only: brighter parts are drawn more slowly. Scope settings change it back.");
+        } else if (mode == MotionProcessor::OutputMode::xyrgb && xyOnly) {
+            suggest(false, "This output carries brightness, but the scope is set to XY only.", "Use brightness", "The scope uses brightness again.");
         }
     };
     playButton.setTooltip("Play / pause (Space)");
