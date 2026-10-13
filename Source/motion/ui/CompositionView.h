@@ -81,6 +81,9 @@ public:
     bool isNavigating() const { return navigating; }
     void setNavigating(bool enabled);
     void frameSelection();
+    // How far from the left the tool strip floating over the view reaches;
+    // framing keeps what it frames clear of it.
+    void setCoveredLeft(int pixels) { coveredLeft = pixels; }
     void resetView() { cancelGesture(); camera = {}; repaint(); }
 
     // Looking through an output camera: the Scene shows exactly its view, and
@@ -270,6 +273,7 @@ private:
     void refreshPartBar();
     std::vector<motion::Id> clipsIn(juce::Rectangle<float> area) const;
     bool partMode = false;
+    int coveredLeft = 0;
     std::map<motion::Id, Picked> picked;
     std::optional<PartHit> hoverPart;
     std::optional<juce::Rectangle<float>> marquee;

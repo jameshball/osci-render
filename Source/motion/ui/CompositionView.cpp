@@ -103,7 +103,14 @@ void MotionCompositionView::frameSelection() {
             found = true;
         }
     }
-    if (found) { camera.frame((minimum + maximum) * 0.5, std::max(0.05, (maximum - minimum).length() * 0.5)); }
+    if (found) {
+        // Fit what is clear of the tool strip, when it covers the output's
+        // left edge (a narrow view), and centre there.
+        const auto view = outputFrame();
+        const auto clear = view.withLeft(std::max(view.getX(), static_cast<float>(coveredLeft + 8)));
+        const auto radius = std::max(0.05, (maximum - minimum).length() * 0.5) * view.getWidth() / std::max(1.0f, clear.getWidth());
+        if (camera.frame((minimum + maximum) * 0.5, radius)) { camera.pan(clear.getCentreX() - view.getCentreX(), 0, view.getHeight()); }
+    }
     repaint();
 }
 

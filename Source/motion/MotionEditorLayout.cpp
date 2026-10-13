@@ -179,6 +179,7 @@ void MotionEditor::resized() {
     sceneTools.setVisible(room >= sceneTools.preferredHeight());
     sceneTools.setBounds(editing.getX() + 8, editing.getY() + 9, sceneTools.preferredWidth(), sceneTools.preferredHeight());
     composition.setBounds(editing.withTrimmedTop(1));
+    composition.setCoveredLeft(sceneTools.isVisible() ? sceneTools.getRight() - composition.getX() : 0);
     sceneTools.toFront(false);
     // The ways of picking parts open beside the parts tool while it is on.
     partPickTools.setVisible(sceneTools.isVisible() && composition.inPartMode());
