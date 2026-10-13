@@ -118,8 +118,9 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
 }
 
 void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
-    if (!keyDrag.has_value()) { return; }
-    if (processor.document.revision() != keyDrag->revision) { keyDrag.reset(); return; }
+    auto* keyDrag = active<KeyDrag>();
+    if (keyDrag == nullptr) { return; }
+    if (processor.document.revision() != keyDrag->revision) { gesture = {}; return; }
     const auto* clip = motion::findClip(keyDrag->before, keyDrag->grabbed.clip);
     if (clip == nullptr) { return; }
     const auto timing = clip->timing(keyDrag->before.tempo());
@@ -141,7 +142,7 @@ void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
 }
 
 bool MotionTimelineView::nudgeSelectedKeys(int frames) {
-    if (keyDrag.has_value()) { return true; }
+    if (active<KeyDrag>() != nullptr) { return true; }
     const auto& project = processor.document.project();
     const auto delta = frames / (project.frameRate > 0 ? project.frameRate : 30.0);
     const auto keys = selectedKeys;
@@ -159,21 +160,24 @@ bool MotionTimelineView::nudgeSelectedKeys(int frames) {
 }
 
 void MotionTimelineView::endKeyDrag() {
-    if (keyDrag.has_value() && keyDrag->changed && processor.document.revision() == keyDrag->revision) {
+    auto* keyDrag = active<KeyDrag>();
+    if (keyDrag == nullptr) { return; }
+    if (keyDrag->changed && processor.document.revision() == keyDrag->revision) {
         processor.document.commit(keyDrag->keys.size() > 1 ? "Move keys" : "Move key", std::move(keyDrag->before));
     }
-    keyDrag.reset();
+    gesture = {};
 }
 
 void MotionTimelineView::cancelKeyDrag() {
-    if (keyDrag.has_value() && keyDrag->changed && processor.document.revision() == keyDrag->revision) {
+    auto* keyDrag = active<KeyDrag>();
+    if (keyDrag != nullptr && keyDrag->changed && processor.document.revision() == keyDrag->revision) {
         selectedKeys = keyDrag->keys;
         processor.document.preview(std::move(keyDrag->before));
     }
     // A marquee given up leaves the keys selected as they were.
-    if (!keyDrag.has_value() && marquee.has_value()) { selectedKeys = keysBeforeMarquee; }
-    keyDrag.reset();
-    marquee.reset();
+    const auto* marquee = active<KeyMarquee>();
+    if (marquee != nullptr) { selectedKeys = marquee->before; }
+    if (keyDrag != nullptr || marquee != nullptr) { gesture = {}; }
     repaint();
 }
 

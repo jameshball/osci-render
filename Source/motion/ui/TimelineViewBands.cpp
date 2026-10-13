@@ -119,7 +119,7 @@ void MotionTimelineView::cameraBandDown(const juce::MouseEvent& event) {
     if (key.has_value()) {
         selectedCut = 0;
         selectedCameraKey = std::make_pair(selected, *key);
-        cameraKeyDrag = CameraKeyDrag {selected, *key, *key, event.x, processor.document.project(), processor.document.revision(), false};
+        gesture = CameraKeyDrag {selected, *key, *key, event.x, processor.document.project(), processor.document.revision(), false};
         repaint();
         return;
     }
@@ -150,13 +150,13 @@ void MotionTimelineView::cameraBandDown(const juce::MouseEvent& event) {
     drag.mode = std::abs(event.x - bounds.getX()) <= 5 ? CutDrag::Mode::left : (std::abs(event.x - bounds.getRight()) <= 5 ? CutDrag::Mode::right : CutDrag::Mode::move);
     drag.before = processor.document.project();
     drag.revision = processor.document.revision();
-    cutDrag = std::move(drag);
+    gesture = std::move(drag);
     repaint();
 }
 
 void MotionTimelineView::cameraBandDrag(const juce::MouseEvent& event) {
-    auto& drag = *cutDrag;
-    if (processor.document.revision() != drag.revision) { cutDrag.reset(); return; }
+    auto& drag = std::get<CutDrag>(gesture);
+    if (processor.document.revision() != drag.revision) { gesture = {}; return; }
     const auto& project = drag.before;
     const auto delta = (event.x - drag.downX) / pixelsPerSecond;
     auto start = drag.start, end = drag.end;
@@ -269,10 +269,10 @@ void MotionTimelineView::moveCameraKeys(motion::Camera& camera, double from, dou
 }
 
 void MotionTimelineView::dragCameraKey(const juce::MouseEvent& event) {
-    auto& drag = *cameraKeyDrag;
+    auto& drag = std::get<CameraKeyDrag>(gesture);
     // An undo or load under the drag ends it where it is.
     if (processor.document.revision() != drag.revision) {
-        cameraKeyDrag.reset();
+        gesture = {};
         return;
     }
     const auto time = processor.document.project().frameTime(snapTime(drag.from + (event.x - drag.downX) / pixelsPerSecond, event.mods));

@@ -308,22 +308,24 @@ void MotionTimelineView::placeGroup(motion::Id id, int boundary, motion::Id pare
 }
 
 bool MotionTimelineView::inLiftedBlock(int row) const {
-    return trackDrag.has_value() && row >= trackDrag->first && row < trackDrag->last;
+    const auto* trackDrag = active<TrackDrag>();
+    return trackDrag != nullptr && row >= trackDrag->first && row < trackDrag->last;
 }
 
 void MotionTimelineView::validateTrackDrag() {
-    if (!trackDrag.has_value()) { return; }
+    const auto* trackDrag = active<TrackDrag>();
+    if (trackDrag == nullptr) { return; }
     const auto stale = processor.document.revision() != trackDrag->revision || trackDrag->last > static_cast<int>(rows.size())
         || rows[static_cast<std::size_t>(trackDrag->first)].id != trackDrag->id;
     if (stale) {
-        trackDrag.reset();
+        gesture = {};
         rowShift.clear();
     }
 }
 
 void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
     ensureTrackRows();
-    if (!trackDrag.has_value()) {
+    if (active<TrackDrag>() == nullptr) {
         if (finished) { return; }
         const auto found = std::find_if(rows.begin(), rows.end(), [id](const auto& row) { return row.id == id && !row.isLane(); });
         if (found == rows.end()) { return; }
@@ -332,13 +334,14 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
         // A track lifts with its lanes; a group with everything under it.
         auto last = first + 1;
         while (last < static_cast<int>(rows.size()) && (found->group() ? rows[static_cast<std::size_t>(last)].depth > found->depth : rows[static_cast<std::size_t>(last)].isLane())) { ++last; }
-        trackDrag = TrackDrag {id, first, last, rowY(last) - rowY(first), y - rowY(first), y, processor.document.revision(), first};
+        gesture = TrackDrag {id, first, last, rowY(last) - rowY(first), y - rowY(first), y, processor.document.revision(), first};
         rowShift.assign(rows.size(), 0.0f);
         rowAnimation.startTimerHz(60);
     }
+    auto* trackDrag = active<TrackDrag>();
     // Another edit while dragging ends the drag where it began.
     if (processor.document.revision() != trackDrag->revision) {
-        trackDrag.reset();
+        gesture = {};
         return;
     }
     trackDrag->pointer = y;
@@ -346,7 +349,7 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
     if (!finished) { stepRows(); return; }
     const auto drag = *trackDrag;
     const auto top = liftedTop();
-    trackDrag.reset();
+    gesture = {};
     // Let go where it was, it stays put: nothing to place.
     const auto inPlace = drag.group == 0 && drag.boundary >= drag.first && drag.boundary <= drag.last;
     if (!inPlace) {
@@ -373,6 +376,7 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
 }
 
 int MotionTimelineView::dropBoundary(motion::Id& group) const {
+    const auto* trackDrag = active<TrackDrag>();
     group = 0;
     const auto count = static_cast<int>(rows.size());
     const auto centre = liftedTop() + trackDrag->height / 2;
@@ -420,7 +424,8 @@ std::pair<int, motion::Id> MotionTimelineView::dropTarget(const TrackDrag& drag)
 }
 
 float MotionTimelineView::targetShift(int row) const {
-    if (!trackDrag.has_value()) { return 0.0f; }
+    const auto* trackDrag = active<TrackDrag>();
+    if (trackDrag == nullptr) { return 0.0f; }
     auto boundary = trackDrag->boundary;
     if (boundary > trackDrag->first && boundary <= trackDrag->last) { boundary = trackDrag->first; }
     return static_cast<float>((row >= trackDrag->last ? -trackDrag->height : 0) + (row >= boundary ? trackDrag->height : 0));
@@ -429,7 +434,8 @@ float MotionTimelineView::targetShift(int row) const {
 void MotionTimelineView::stepRows() {
     ensureTrackRows();
     validateTrackDrag();
-    if (trackDrag.has_value()) { trackDrag->boundary = dropBoundary(trackDrag->group); }
+    auto* trackDrag = active<TrackDrag>();
+    if (trackDrag != nullptr) { trackDrag->boundary = dropBoundary(trackDrag->group); }
     if (rowShift.size() != rows.size()) { rowShift.assign(rows.size(), 0.0f); }
     bool moving = false;
     for (std::size_t row = 0; row < rowShift.size(); ++row) {
@@ -439,7 +445,7 @@ void MotionTimelineView::stepRows() {
         if (std::abs(target - shift) < .5f) { shift = target; } else { moving = true; }
     }
     // Near the top or bottom edge the list scrolls to reach further rows.
-    if (trackDrag.has_value()) {
+    if (trackDrag != nullptr) {
         const auto edge = trackDrag->pointer < rulerHeight + 16 ? -8 : trackDrag->pointer > rulerHeight + viewHeight() - 16 ? 8 : 0;
         if (edge != 0) {
             const auto before = scrollY;
@@ -447,7 +453,7 @@ void MotionTimelineView::stepRows() {
             if (scrollY != before) { trackDrag->boundary = dropBoundary(trackDrag->group); }
         }
     }
-    if (!trackDrag.has_value() && !moving) {
+    if (trackDrag == nullptr && !moving) {
         rowShift.clear();
         rowAnimation.stopTimer();
     }

@@ -163,7 +163,7 @@ int MotionTimelineView::storedHeight(motion::Id id) const {
 
 void MotionTimelineView::revealSelection() {
     // Do not move rows under the pointer during a clip gesture.
-    if (before.has_value() || scrubbing) { return; }
+    if (clipGesture()) { return; }
     ensureTrackRows();
     const auto& project = processor.document.project();
     motion::Id trackId = 0, parent = 0;
@@ -399,6 +399,7 @@ void MotionTimelineView::resized() {
     // Headers live in a container clipped below the ruler, so rows scroll
     // smoothly under it.
     headerArea.setBounds(0, rulerHeight, namesWidth - 5, viewHeight());
+    const auto* trackDrag = active<TrackDrag>();
     for (auto& header : headers) {
         const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == header->id && !row.isLane(); });
         if (found == rows.end()) { header->setVisible(false); continue; }
@@ -490,7 +491,8 @@ void MotionTimelineView::paintOverChildren(juce::Graphics& g) {
     // JUCE can skip paint() under opaque children; rows must still be current.
     ensureTrackRows();
     validateTrackDrag();
-    if (!trackDrag.has_value()) { return; }
+    const auto* trackDrag = active<TrackDrag>();
+    if (trackDrag == nullptr) { return; }
     juce::Graphics::ScopedSaveState view(g);
     g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
     const auto top = liftedTop();
@@ -692,7 +694,8 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
     // A dragged track lifts out of the list and the other rows slide by
     // their eased offsets; paintOverChildren draws the lifted block.
-    const auto dragging = trackDrag.has_value();
+    const auto* trackDrag = active<TrackDrag>();
+    const auto dragging = trackDrag != nullptr;
     // While rows slide (dragging or settling) some come from off screen.
     const auto sliding = dragging || !rowShift.empty();
     const auto reach = sliding ? (dragging ? trackDrag->height : getHeight()) : 0;
@@ -791,9 +794,10 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         }
     }
     // The row edge under the pointer (or being dragged) shows where it resizes.
-    if (hoveredEdge >= 0 || heightDrag.has_value()) {
+    const auto* heightDrag = active<HeightDrag>();
+    if (hoveredEdge >= 0 || heightDrag != nullptr) {
         auto row = hoveredEdge;
-        if (heightDrag.has_value()) {
+        if (heightDrag != nullptr) {
             const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& item) { return item.id == heightDrag->track && !item.isLane(); });
             row = found != rows.end() ? static_cast<int>(found - rows.begin()) : -1;
         }
@@ -806,7 +810,9 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     g.fillRect(0, getHeight() - scrollStrip, getWidth(), scrollStrip);
     paintScrollBars(g);
     // A box being dragged to pick clips or keys, over every row it crosses.
-    for (const auto* box : {clipMarquee.has_value() ? &*clipMarquee : nullptr, marquee.has_value() ? &*marquee : nullptr}) {
+    const auto* clipMarquee = active<ClipMarquee>();
+    const auto* keyMarquee = active<KeyMarquee>();
+    for (const auto* box : {clipMarquee != nullptr ? &clipMarquee->area : nullptr, keyMarquee != nullptr ? &keyMarquee->area : nullptr}) {
         if (box == nullptr) { continue; }
         g.setColour(osci::Colours::accentColor().withAlpha(.1f));
         g.fillRect(*box);
@@ -825,7 +831,7 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     ensureTrackRows();
     cancelGesture();
     if (onNamesEdge(event) && event.mods.isLeftButtonDown()) {
-        resizingNames = true;
+        gesture = NamesResize {};
         return;
     }
     const auto edge = rowEdgeAt(event.getPosition());
@@ -839,7 +845,7 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
             repaint();
             return;
         }
-        heightDrag = HeightDrag {id, heightOf(static_cast<std::size_t>(edge)), event.y, storedHeight(id)};
+        gesture = HeightDrag {id, heightOf(static_cast<std::size_t>(edge)), event.y, storedHeight(id)};
         return;
     }
     if (inCameraBand(event.y)) {
@@ -857,13 +863,14 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         const auto id = marker->id;
         const auto time = marker->time;
         selectMarker(id);
-        markerDragging = id;
-        markerOriginalTime = time;
         processor.seek(time);
-        downX = event.x;
-        before = processor.document.project();
-        expectedRevision = processor.document.revision();
-        changed = false;
+        MarkerDrag drag;
+        drag.marker = id;
+        drag.originalTime = time;
+        drag.downX = event.x;
+        drag.before = processor.document.project();
+        drag.revision = processor.document.revision();
+        gesture = std::move(drag);
         repaint();
         return;
     }
@@ -895,11 +902,10 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
             }
             if (isKeySelected(key->clip, key->property, key->time)) { beginKeyDrag(*key, event.x); }
         } else {
-            marqueeStart = event.getPosition();
-            keysBeforeMarquee = selectedKeys;
-            marqueeBase = event.mods.isShiftDown() ? selectedKeys : std::vector<KeyRef>{};
-            selectedKeys = marqueeBase;
-            marquee = juce::Rectangle<int>(marqueeStart, marqueeStart);
+            const auto start = event.getPosition();
+            auto base = event.mods.isShiftDown() ? selectedKeys : std::vector<KeyRef>{};
+            gesture = KeyMarquee {juce::Rectangle<int>(start, start), start, base, selectedKeys};
+            selectedKeys = std::move(base);
         }
         repaint();
         return;
@@ -922,7 +928,7 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     if (event.y < rulerHeight && event.x >= namesWidth) {
-        scrubbing = true;
+        gesture = Scrub {};
         seek(event.x, event.mods);
         return;
     }
@@ -933,9 +939,9 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     const auto* clip = clipAt(event.getPosition(), row);
     if (clip == nullptr) {
         // Empty space: drag a box to select clips (Shift or Cmd adds).
-        clipMarqueeBase = event.mods.isShiftDown() || event.mods.isCommandDown() ? selectedClips : std::set<motion::Id>{};
-        if (clipMarqueeBase.empty()) { selectClip(0); }
-        if (event.x >= namesWidth) { clipMarquee = juce::Rectangle<int>(event.getPosition(), event.getPosition()); clipMarqueeStart = event.getPosition(); }
+        auto base = event.mods.isShiftDown() || event.mods.isCommandDown() ? selectedClips : std::set<motion::Id>{};
+        if (base.empty()) { selectClip(0); }
+        if (event.x >= namesWidth) { gesture = ClipMarquee {juce::Rectangle<int>(event.getPosition(), event.getPosition()), event.getPosition(), std::move(base)}; }
         return;
     }
     if (event.mods.isShiftDown() || event.mods.isCommandDown()) {
@@ -948,27 +954,29 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     if (processor.document.project().tracks[row].locked) { selectClip(clip->id); return; }
-    original = *clip;
-    originalRow = row;
-    downX = event.x;
-    const auto bounds = clipBounds(original, row);
+    const auto id = clip->id;
+    const auto bounds = clipBounds(*clip, row);
     if (tool == Tool::ripple && event.x >= bounds.getX() + 8 && event.x <= bounds.getRight() - 8) {
-        selectClip(original.id);
+        selectClip(id);
         return;
     }
-    mode = tool == Tool::slip ? Mode::slip : (tool == Tool::stretch ? Mode::stretch
+    ClipDrag drag;
+    drag.original = *clip;
+    drag.originalRow = row;
+    drag.downX = event.x;
+    drag.mode = tool == Tool::slip ? Mode::slip : (tool == Tool::stretch ? Mode::stretch
         : (event.x < bounds.getX() + 8 ? Mode::left : (event.x > bounds.getRight() - 8 ? Mode::right : Mode::move)));
-    if (tool == Tool::ripple) { mode = mode == Mode::left ? Mode::rippleLeft : Mode::rippleRight; }
-    before = processor.document.project();
-    expectedRevision = processor.document.revision();
-    changed = false;
+    if (tool == Tool::ripple) { drag.mode = drag.mode == Mode::left ? Mode::rippleLeft : Mode::rippleRight; }
+    drag.before = processor.document.project();
+    drag.revision = processor.document.revision();
     // Moving, trimming, slipping and stretching take every selected clip
     // along; a ripple trim shifts what follows, so takes one.
-    const auto together = mode != Mode::rippleLeft && mode != Mode::rippleRight;
-    if (!selectedClips.contains(original.id) || !together) {
-        selectClip(original.id);
+    const auto together = drag.mode != Mode::rippleLeft && drag.mode != Mode::rippleRight;
+    gesture = std::move(drag);
+    if (!selectedClips.contains(id) || !together) {
+        selectClip(id);
     } else {
-        notifySelection(original.id);
+        notifySelection(id);
     }
 }
 
@@ -1089,8 +1097,9 @@ void MotionTimelineView::paintScrollBars(juce::Graphics& g) const {
         g.setColour(juce::Colours::white.withAlpha(hot ? .4f : .2f));
         g.fillRoundedRectangle(thumb.toFloat(), barSize * .5f);
     };
-    if (horizontalBarShown()) { draw(horizontalBar(), horizontalThumb(), barDrag.has_value() || hoveredBar == 1); }
-    if (verticalBarShown()) { draw(verticalBar(), verticalThumb(), barDrag.has_value() || hoveredBar == 2); }
+    const auto grabbed = active<BarDrag>() != nullptr;
+    if (horizontalBarShown()) { draw(horizontalBar(), horizontalThumb(), grabbed || hoveredBar == 1); }
+    if (verticalBarShown()) { draw(verticalBar(), verticalThumb(), grabbed || hoveredBar == 2); }
 }
 
 int MotionTimelineView::barAt(juce::Point<int> point) const {
@@ -1113,12 +1122,12 @@ bool MotionTimelineView::barDown(const juce::MouseEvent& event) {
             thumb = horizontalThumb();
         }
         const auto mode = event.x <= thumb.getX() + 5 ? BarDrag::Mode::zoomLeft : event.x >= thumb.getRight() - 5 ? BarDrag::Mode::zoomRight : BarDrag::Mode::scrollTime;
-        barDrag = BarDrag {mode, event.x, scrollTime, pixelsPerSecond, scrollY};
+        gesture = BarDrag {mode, event.x, scrollTime, pixelsPerSecond, scrollY};
     } else {
         if (!verticalThumb().contains(verticalThumb().getCentreX(), event.y)) {
             scrollY = std::clamp(juce::roundToInt((event.y - verticalBar().getY()) / static_cast<double>(std::max(1, verticalBar().getHeight())) * maximumScrollY()), 0, maximumScrollY());
         }
-        barDrag = BarDrag {BarDrag::Mode::scrollRows, event.y, scrollTime, pixelsPerSecond, scrollY};
+        gesture = BarDrag {BarDrag::Mode::scrollRows, event.y, scrollTime, pixelsPerSecond, scrollY};
     }
     resized();
     repaint();
@@ -1126,7 +1135,7 @@ bool MotionTimelineView::barDown(const juce::MouseEvent& event) {
 }
 
 void MotionTimelineView::barDragged(const juce::MouseEvent& event) {
-    const auto& drag = *barDrag;
+    const auto& drag = std::get<BarDrag>(gesture);
     if (drag.mode == BarDrag::Mode::scrollRows) {
         const auto bar = verticalBar(), thumb = verticalThumb();
         const auto travel = std::max(1, bar.getHeight() - thumb.getHeight());
@@ -1191,13 +1200,13 @@ bool MotionTimelineView::loopDown(const juce::MouseEvent& event) {
         return true;
     }
     const auto mode = std::abs(event.x - bounds.getX()) <= 5 ? LoopDrag::Mode::left : std::abs(event.x - bounds.getRight()) <= 5 ? LoopDrag::Mode::right : LoopDrag::Mode::move;
-    loopDrag = LoopDrag {mode, project.loopStart, project.loopEnd, event.x, project, processor.document.revision(), false};
+    gesture = LoopDrag {mode, project.loopStart, project.loopEnd, event.x, project, processor.document.revision(), false};
     return true;
 }
 
 void MotionTimelineView::loopDragged(const juce::MouseEvent& event) {
-    auto& drag = *loopDrag;
-    if (processor.document.revision() != drag.revision) { loopDrag.reset(); return; }
+    auto& drag = std::get<LoopDrag>(gesture);
+    if (processor.document.revision() != drag.revision) { gesture = {}; return; }
     const auto delta = (event.x - drag.downX) / pixelsPerSecond;
     auto updated = drag.before;
     const auto length = drag.end - drag.start;
@@ -1240,41 +1249,43 @@ std::vector<double> MotionTimelineView::editPoints() const {
 }
 
 void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
-    if (beamDrag.has_value()) { beamDragged(event); return; }
-    if (barDrag.has_value()) { barDragged(event); return; }
-    if (loopDrag.has_value()) { loopDragged(event); return; }
-    if (heightDrag.has_value()) {
+    if (active<BeamDrag>() != nullptr) { beamDragged(event); return; }
+    if (active<BarDrag>() != nullptr) { barDragged(event); return; }
+    if (active<LoopDrag>() != nullptr) { loopDragged(event); return; }
+    const auto* heightDrag = active<HeightDrag>();
+    if (heightDrag != nullptr) {
         processor.document.setTrackHeight(heightDrag->track, std::clamp(heightDrag->startHeight + event.y - heightDrag->downY, motion::Track::minimumHeight, motion::Track::maximumHeight));
         layoutRows();
         resized();
         repaint();
         return;
     }
-    if (resizingNames) {
+    if (active<NamesResize>() != nullptr) {
         namesWidth = std::clamp(event.x, narrowestNames, std::max(narrowestNames, std::min(widestNames, getWidth() / 2)));
         refreshTracks();
         repaint();
         return;
     }
-    if (cameraKeyDrag.has_value()) {
+    if (active<CameraKeyDrag>() != nullptr) {
         dragCameraKey(event);
         return;
     }
-    if (cutDrag.has_value()) {
+    if (active<CutDrag>() != nullptr) {
         cameraBandDrag(event);
         return;
     }
-    if (keyDrag.has_value()) { dragKeys(event.x, event.mods); return; }
-    if (clipMarquee.has_value()) {
-        clipMarquee = juce::Rectangle<int>(clipMarqueeStart, event.getPosition());
-        auto chosen = clipMarqueeBase;
+    if (active<KeyDrag>() != nullptr) { dragKeys(event.x, event.mods); return; }
+    auto* clipMarquee = active<ClipMarquee>();
+    if (clipMarquee != nullptr) {
+        clipMarquee->area = juce::Rectangle<int>(clipMarquee->start, event.getPosition());
+        auto chosen = clipMarquee->base;
         motion::Id first = 0;
         const auto& tracks = processor.document.project().tracks;
         for (int row = firstVisibleRow(); row < static_cast<int>(rows.size()) && rowY(row) < getHeight(); ++row) {
             const auto& item = rows[static_cast<std::size_t>(row)];
             if (item.isLane() || item.track < 0) { continue; }
             for (const auto& clip : tracks[static_cast<std::size_t>(item.track)].clips) {
-                if (!clipBounds(clip, item.track).intersects(*clipMarquee)) { continue; }
+                if (!clipBounds(clip, item.track).intersects(clipMarquee->area)) { continue; }
                 chosen.insert(clip.id);
                 if (first == 0) { first = clip.id; }
             }
@@ -1288,49 +1299,53 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         repaint();
         return;
     }
-    if (marquee.has_value()) {
-        marquee = juce::Rectangle<int>(marqueeStart, event.getPosition());
-        selectedKeys = marqueeBase;
-        for (auto& key : keysInside(*marquee)) {
+    auto* keyMarquee = active<KeyMarquee>();
+    if (keyMarquee != nullptr) {
+        keyMarquee->area = juce::Rectangle<int>(keyMarquee->start, event.getPosition());
+        selectedKeys = keyMarquee->base;
+        for (auto& key : keysInside(keyMarquee->area)) {
             if (!isKeySelected(key.clip, key.property, key.time)) { selectedKeys.push_back(std::move(key)); }
         }
         repaint();
         return;
     }
-    if (scrubbing) {
+    if (active<Scrub>() != nullptr) {
         seek(event.x, event.mods);
         return;
     }
     if (!gestureIsCurrent()) {
         return;
     }
-    if (markerDragging != 0) {
-        auto updated = *before;
-        const auto delta = (event.x - downX) / pixelsPerSecond;
-        const auto time = delta == 0 ? markerOriginalTime : std::clamp(snapEdge(markerOriginalTime + delta, event.mods, *before, {}, nullptr, markerDragging), 0.0, updated.duration);
-        if (std::any_of(updated.markers.begin(), updated.markers.end(), [this, time](const auto& marker) { return marker.id != markerDragging && motion::sameTime(marker.time, time); })) { return; }
-        for (auto& marker : updated.markers) { if (marker.id == markerDragging) { marker.time = time; } }
+    auto* markerDrag = active<MarkerDrag>();
+    if (markerDrag != nullptr) {
+        const auto id = markerDrag->marker;
+        auto updated = markerDrag->before;
+        const auto delta = (event.x - markerDrag->downX) / pixelsPerSecond;
+        const auto time = delta == 0 ? markerDrag->originalTime : std::clamp(snapEdge(markerDrag->originalTime + delta, event.mods, markerDrag->before, {}, nullptr, id), 0.0, updated.duration);
+        if (std::any_of(updated.markers.begin(), updated.markers.end(), [id, time](const auto& marker) { return marker.id != id && motion::sameTime(marker.time, time); })) { return; }
+        for (auto& marker : updated.markers) { if (marker.id == id) { marker.time = time; } }
         std::sort(updated.markers.begin(), updated.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
-        changed = time != markerOriginalTime;
+        markerDrag->changed = time != markerDrag->originalTime;
         processor.document.preview(std::move(updated));
-        expectedRevision = processor.document.revision();
+        markerDrag->revision = processor.document.revision();
         repaint();
         return;
     }
-    auto candidate = original;
-    const auto timing = original.timing(before->tempo());
+    auto& drag = std::get<ClipDrag>(gesture);
+    auto candidate = drag.original;
+    const auto timing = drag.original.timing(drag.before.tempo());
     auto edited = timing;
-    auto delta = (event.x - downX) / pixelsPerSecond;
+    auto delta = (event.x - drag.downX) / pixelsPerSecond;
     if (delta != 0.0 && !event.mods.isAltDown()) {
         std::set<motion::Id> excluded(selectedClips.begin(), selectedClips.end());
-        excluded.insert(original.id);
-        if (mode == Mode::slip) {
+        excluded.insert(drag.original.id);
+        if (drag.mode == Mode::slip) {
             const auto anchor = timing.offset / timing.rate;
-            delta = before->timeGrid().snap(anchor + delta) - anchor;
-        } else if (mode == Mode::move) {
+            delta = drag.before.timeGrid().snap(anchor + delta) - anchor;
+        } else if (drag.mode == Mode::move) {
             // Either edge of a moving clip can catch a magnet.
-            const auto startTarget = magnet(timing.start + delta, *before, excluded);
-            const auto endTarget = magnet(timing.end() + delta, *before, excluded);
+            const auto startTarget = magnet(timing.start + delta, drag.before, excluded);
+            const auto endTarget = magnet(timing.end() + delta, drag.before, excluded);
             const auto startDistance = startTarget.has_value() ? std::abs(*startTarget - (timing.start + delta)) : 1.0e300;
             const auto endDistance = endTarget.has_value() ? std::abs(*endTarget - (timing.end() + delta)) : 1.0e300;
             if (startTarget.has_value() && startDistance <= endDistance) {
@@ -1340,28 +1355,28 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
                 delta = *endTarget - timing.end();
                 snapGuide = endTarget;
             } else {
-                delta = before->timeGrid().snap(timing.start + delta) - timing.start;
+                delta = drag.before.timeGrid().snap(timing.start + delta) - timing.start;
                 snapGuide.reset();
             }
         } else {
-            const auto anchor = mode == Mode::right || mode == Mode::stretch || mode == Mode::rippleRight ? timing.end() : timing.start;
-            delta = snapEdge(anchor + delta, event.mods, *before, excluded) - anchor;
+            const auto anchor = drag.mode == Mode::right || drag.mode == Mode::stretch || drag.mode == Mode::rippleRight ? timing.end() : timing.start;
+            delta = snapEdge(anchor + delta, event.mods, drag.before, excluded) - anchor;
         }
     } else {
         snapGuide.reset();
     }
-    if (mode == Mode::rippleLeft || mode == Mode::rippleRight) {
-        auto updated = *before;
-        if (!motion::rippleTrim(updated.tracks.change(originalRow), original.id, mode == Mode::rippleLeft, delta, updated.tempo())) { return; }
-        for (const auto& item : updated.tracks[originalRow].clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
-        changed = delta != 0;
+    if (drag.mode == Mode::rippleLeft || drag.mode == Mode::rippleRight) {
+        auto updated = drag.before;
+        if (!motion::rippleTrim(updated.tracks.change(drag.originalRow), drag.original.id, drag.mode == Mode::rippleLeft, delta, updated.tempo())) { return; }
+        for (const auto& item : updated.tracks[drag.originalRow].clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
+        drag.changed = delta != 0;
         processor.document.preview(std::move(updated));
-        expectedRevision = processor.document.revision();
+        drag.revision = processor.document.revision();
         repaint();
         return;
     }
-    if (mode == Mode::move && selectedClips.size() > 1) {
-        auto updated = *before;
+    if (drag.mode == Mode::move && selectedClips.size() > 1) {
+        auto updated = drag.before;
         double earliest = timing.start;
         for (const auto& track : updated.tracks) {
             for (const auto& item : track.clips) {
@@ -1370,9 +1385,9 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         }
         delta = std::max(delta, -earliest);
         const auto row = trackAtY(event.y);
-        const auto rows = row >= 0 ? row - originalRow : 0;
+        const auto rows = row >= 0 ? row - drag.originalRow : 0;
         if (rows != 0) {
-            const auto sourceY = trackY(originalRow);
+            const auto sourceY = trackY(drag.originalRow);
             const auto visibleDelta = trackY(row) - sourceY;
             for (int index = 0; index < static_cast<int>(updated.tracks.size()); ++index) {
                 const auto& track = updated.tracks[index];
@@ -1385,23 +1400,23 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         for (const auto& track : updated.tracks) {
             for (const auto& item : track.clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
         }
-        changed = delta != 0 || rows != 0;
+        drag.changed = delta != 0 || rows != 0;
         processor.document.preview(std::move(updated));
-        expectedRevision = processor.document.revision();
+        drag.revision = processor.document.revision();
         repaint();
         return;
     }
     // A clip's timing with the drag applied to the edge (or contents) held.
     const auto dragged = [&](const auto& from) {
         auto to = from;
-        if (mode == Mode::move) {
+        if (drag.mode == Mode::move) {
             to.moveTo(std::max(0.0, from.start + delta));
-        } else if (mode == Mode::left) {
+        } else if (drag.mode == Mode::left) {
             to.setStart(std::max(0.0, from.start + delta));
             to.offset = from.localTime(to.start);
-        } else if (mode == Mode::right) {
+        } else if (drag.mode == Mode::right) {
             to.setEnd(to.end() + delta);
-        } else if (mode == Mode::slip) {
+        } else if (drag.mode == Mode::slip) {
             to.offset += delta * from.rate;
         } else {
             to.setEnd(to.end() + delta);
@@ -1409,10 +1424,10 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         }
         return to;
     };
-    if (mode != Mode::move && selectedClips.size() > 1 && selectedClips.contains(original.id)) {
+    if (drag.mode != Mode::move && selectedClips.size() > 1 && selectedClips.contains(drag.original.id)) {
         // Every selected clip on an unlocked track by the same time, as the
         // one held: all their start or end edges, contents or speeds.
-        auto updated = *before;
+        auto updated = drag.before;
         std::vector<std::pair<int, motion::Clip>> edits;
         for (int index = 0; index < static_cast<int>(updated.tracks.size()); ++index) {
             const auto& track = updated.tracks[index];
@@ -1437,38 +1452,38 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
             updated.duration = std::max(updated.duration, clip.timing(updated.tempo()).end());
         }
         blocked.reset();
-        changed = delta != 0.0;
+        drag.changed = delta != 0.0;
         processor.document.preview(std::move(updated));
-        expectedRevision = processor.document.revision();
+        drag.revision = processor.document.revision();
         repaint();
         return;
     }
     if (delta != 0.0) {
         edited = dragged(timing);
-        if (!candidate.setTiming(edited, before->tempo())) { return; }
+        if (!candidate.setTiming(edited, drag.before.tempo())) { return; }
     }
-    const auto target = mode == Mode::move
-        ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : originalRow) : originalRow;
-    if (before->tracks[target].locked || before->tracks[target].kind != before->tracks[originalRow].kind) { return; }
-    const bool candidateChanged = candidate.start != original.start || candidate.duration != original.duration
-        || candidate.offset != original.offset || candidate.rate != original.rate || target != originalRow;
+    const auto target = drag.mode == Mode::move
+        ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : drag.originalRow) : drag.originalRow;
+    if (drag.before.tracks[target].locked || drag.before.tracks[target].kind != drag.before.tracks[drag.originalRow].kind) { return; }
+    const bool candidateChanged = candidate.start != drag.original.start || candidate.duration != drag.original.duration
+        || candidate.offset != drag.original.offset || candidate.rate != drag.original.rate || target != drag.originalRow;
     if (!candidateChanged) {
-        if (changed) {
-            processor.document.preview(*before);
-            expectedRevision = processor.document.revision();
-            changed = false;
+        if (drag.changed) {
+            processor.document.preview(drag.before);
+            drag.revision = processor.document.revision();
+            drag.changed = false;
             repaint();
         }
         return;
     }
-    auto updated = *before;
-    std::erase_if(updated.tracks.change(originalRow).clips, [&](const auto& clip) { return clip.id == original.id; });
+    auto updated = drag.before;
+    std::erase_if(updated.tracks.change(drag.originalRow).clips, [&](const auto& clip) { return clip.id == drag.original.id; });
     if (updated.tracks.change(target).insert(candidate, updated.tempo())) {
         updated.duration = std::max(updated.duration, candidate.timing(updated.tempo()).end());
-        changed = true;
+        drag.changed = true;
         blocked.reset();
         processor.document.preview(std::move(updated));
-        expectedRevision = processor.document.revision();
+        drag.revision = processor.document.revision();
         repaint();
     } else {
         // Where the clip would land shows in red; it stays at the last free spot.
@@ -1483,61 +1498,67 @@ void MotionTimelineView::mouseUp(const juce::MouseEvent&) {
         blocked.reset();
         repaint();
     }
-    if (heightDrag.has_value()) { heightDrag.reset(); return; }
-    if (beamDrag.has_value()) {
+    if (active<HeightDrag>() != nullptr) { gesture = {}; return; }
+    auto* beamDrag = active<BeamDrag>();
+    if (beamDrag != nullptr) {
         if (beamDrag->changed && processor.document.revision() == beamDrag->revision) {
             processor.document.commit("Change Beam", std::move(beamDrag->before));
         }
-        beamDrag.reset();
+        gesture = {};
         repaint();
         return;
     }
-    if (barDrag.has_value()) { barDrag.reset(); repaint(); return; }
-    if (loopDrag.has_value()) {
+    if (active<BarDrag>() != nullptr) { gesture = {}; repaint(); return; }
+    auto* loopDrag = active<LoopDrag>();
+    if (loopDrag != nullptr) {
         if (loopDrag->changed && processor.document.revision() == loopDrag->revision) {
             const motion::Document::ViewChange view(processor.document);
             processor.document.commit("Move loop", std::move(loopDrag->before));
         }
-        loopDrag.reset();
+        gesture = {};
         return;
     }
-    if (resizingNames) {
-        resizingNames = false;
+    if (active<NamesResize>() != nullptr) {
+        gesture = {};
         return;
     }
-    if (cameraKeyDrag.has_value()) {
+    auto* cameraKeyDrag = active<CameraKeyDrag>();
+    if (cameraKeyDrag != nullptr) {
         if (cameraKeyDrag->moved && processor.document.revision() == cameraKeyDrag->revision) {
             processor.document.commit("Move camera key", std::move(cameraKeyDrag->before));
         }
-        cameraKeyDrag.reset();
+        gesture = {};
         repaint();
         return;
     }
-    if (cutDrag.has_value()) {
+    auto* cutDrag = active<CutDrag>();
+    if (cutDrag != nullptr) {
         if (cutDrag->changed && processor.document.revision() == cutDrag->revision) {
             processor.document.commit(cutDrag->mode == CutDrag::Mode::move ? "Move camera cut" : "Trim camera cut", std::move(cutDrag->before));
         }
-        cutDrag.reset();
+        gesture = {};
         repaint();
         return;
     }
-    if (keyDrag.has_value()) { endKeyDrag(); repaint(); return; }
-    if (marquee.has_value()) { marquee.reset(); repaint(); return; }
-    if (clipMarquee.has_value()) { clipMarquee.reset(); repaint(); return; }
-    scrubbing = false;
+    if (active<KeyDrag>() != nullptr) { endKeyDrag(); repaint(); return; }
+    if (active<KeyMarquee>() != nullptr || active<ClipMarquee>() != nullptr) { gesture = {}; repaint(); return; }
+    if (active<Scrub>() != nullptr) { gesture = {}; return; }
     if (!gestureIsCurrent()) {
         return;
     }
-    auto originalProject = std::move(*before);
-    before.reset();
+    auto& drag = *projectDrag();
+    auto originalProject = std::move(drag.before);
+    const auto changed = drag.changed;
+    const auto* clipDrag = active<ClipDrag>();
+    const auto marker = clipDrag == nullptr;
+    const auto mode = marker ? Mode::move : clipDrag->mode;
+    gesture = {};
     if (changed) {
         const auto several = selectedClips.size() > 1 && mode != Mode::rippleLeft && mode != Mode::rippleRight;
         const juce::String action = mode == Mode::move ? "Move clip" : mode == Mode::slip ? "Slip clip" : mode == Mode::stretch ? "Stretch clip" : (mode == Mode::rippleLeft || mode == Mode::rippleRight) ? "Ripple trim clip" : "Trim clip";
-        const auto label = markerDragging != 0 ? juce::String("Move marker") : action + (several ? "s" : "");
+        const auto label = marker ? juce::String("Move marker") : action + (several ? "s" : "");
         processor.document.commit(label, std::move(originalProject));
     }
-    changed = false;
-    markerDragging = 0;
 }
 
 void MotionTimelineView::mouseDoubleClick(const juce::MouseEvent& event) {
@@ -1545,7 +1566,7 @@ void MotionTimelineView::mouseDoubleClick(const juce::MouseEvent& event) {
     const auto edge = rowEdgeAt(event.getPosition());
     if (edge >= 0) {
         // Double-click a row's bottom edge: back to the default height.
-        heightDrag.reset();
+        if (active<HeightDrag>() != nullptr) { gesture = {}; }
         processor.document.setTrackHeight(rows[static_cast<std::size_t>(edge)].id, 0);
         layoutRows();
         resized();
@@ -1569,8 +1590,7 @@ void MotionTimelineView::mouseDoubleClick(const juce::MouseEvent& event) {
 // Whether a drag of any kind is under way: zooming or scrolling then would
 // move what the drag measures from.
 bool MotionTimelineView::dragging() const {
-    return before.has_value() || scrubbing || keyDrag.has_value() || beamDrag.has_value() || loopDrag.has_value() || barDrag.has_value() || heightDrag.has_value() || cutDrag.has_value()
-        || cameraKeyDrag.has_value() || trackDrag.has_value() || markerDragging != 0 || resizingNames || marquee.has_value() || clipMarquee.has_value();
+    return !std::holds_alternative<std::monostate>(gesture);
 }
 
 void MotionTimelineView::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) {
@@ -1652,7 +1672,7 @@ void MotionTimelineView::setDefaultTrackHeight(int height) {
 void MotionTimelineView::followPlayhead(double time, bool playing) {
     const auto x = timeX(time);
     const auto visible = x >= namesWidth && x <= getWidth() - 16;
-    if (!follow.update(playing, visible) || !followEnabled || before.has_value() || scrubbing || getWidth() <= namesWidth) { return; }
+    if (!follow.update(playing, visible) || !followEnabled || clipGesture() || getWidth() <= namesWidth) { return; }
     scrollTime = std::max(0.0, time - 16 / pixelsPerSecond);
     repaint();
 }
@@ -1661,48 +1681,55 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
     ensureTrackRows();
     // Space, Cmd+D and the rest are the editor's commands, whichever panel
     // has focus: only what is the timeline's own is handled here.
-    if (key == juce::KeyPress::escapeKey && (keyDrag.has_value() || marquee.has_value())) {
+    const auto escape = key == juce::KeyPress::escapeKey;
+    if (escape && (active<KeyDrag>() != nullptr || active<KeyMarquee>() != nullptr)) {
         cancelKeyDrag();
         return true;
     }
-    if (key == juce::KeyPress::escapeKey && cutDrag.has_value()) {
+    auto* cutDrag = active<CutDrag>();
+    if (escape && cutDrag != nullptr) {
         if (cutDrag->changed && processor.document.revision() == cutDrag->revision) { processor.document.preview(std::move(cutDrag->before)); }
-        cutDrag.reset();
+        gesture = {};
         repaint();
         return true;
     }
     // Escape puts back what a beam share or camera key drag changed.
-    if (key == juce::KeyPress::escapeKey && beamDrag.has_value()) {
+    auto* beamDrag = active<BeamDrag>();
+    if (escape && beamDrag != nullptr) {
         if (beamDrag->changed && processor.document.revision() == beamDrag->revision) { processor.document.preview(std::move(beamDrag->before)); }
-        beamDrag.reset();
+        gesture = {};
         repaint();
         return true;
     }
-    if (key == juce::KeyPress::escapeKey && cameraKeyDrag.has_value()) {
+    auto* cameraKeyDrag = active<CameraKeyDrag>();
+    if (escape && cameraKeyDrag != nullptr) {
         if (processor.document.revision() == cameraKeyDrag->revision && std::abs(cameraKeyDrag->to - cameraKeyDrag->from) > 1.0e-9) {
             processor.document.preview(std::move(cameraKeyDrag->before));
             selectedCameraKey = std::make_pair(cameraKeyDrag->camera, cameraKeyDrag->from);
         }
-        cameraKeyDrag.reset();
+        gesture = {};
         repaint();
         return true;
     }
-    if (key == juce::KeyPress::escapeKey && loopDrag.has_value()) {
+    auto* loopDrag = active<LoopDrag>();
+    if (escape && loopDrag != nullptr) {
         if (loopDrag->changed && processor.document.revision() == loopDrag->revision) { processor.document.preview(std::move(loopDrag->before)); }
-        loopDrag.reset();
+        gesture = {};
         return true;
     }
-    if (key == juce::KeyPress::escapeKey && heightDrag.has_value()) {
+    const auto* heightDrag = active<HeightDrag>();
+    if (escape && heightDrag != nullptr) {
         processor.document.setTrackHeight(heightDrag->track, heightDrag->original);
-        heightDrag.reset();
+        gesture = {};
         layoutRows();
         resized();
         repaint();
         return true;
     }
-    if (key == juce::KeyPress::escapeKey && clipMarquee.has_value()) {
-        clipMarquee.reset();
-        selectedClips = clipMarqueeBase;
+    auto* clipMarquee = active<ClipMarquee>();
+    if (escape && clipMarquee != nullptr) {
+        selectedClips = std::move(clipMarquee->base);
+        gesture = {};
         notifySelection(selectedClips.empty() ? 0 : *selectedClips.begin());
         return true;
     }
@@ -1726,7 +1753,7 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
     if (arrow != 0 && key.getModifiers().isAltDown() && !key.getModifiers().isCommandDown() && !selectedKeys.empty()) {
         return nudgeSelectedKeys(arrow * (key.getModifiers().isShiftDown() ? 10 : 1));
     }
-    if (key == juce::KeyPress::escapeKey && (before.has_value() || scrubbing)) {
+    if (escape && clipGesture()) {
         cancelGesture();
         return true;
     }
@@ -2106,12 +2133,12 @@ void MotionTimelineView::fillCard(juce::Graphics& g, int y, int height, juce::Co
 }
 
 bool MotionTimelineView::gestureIsCurrent() {
-    if (!before.has_value()) {
+    const auto* drag = projectDrag();
+    if (drag == nullptr) {
         return false;
     }
-    if (processor.document.revision() != expectedRevision) {
-        before.reset();
-        changed = false;
+    if (processor.document.revision() != drag->revision) {
+        gesture = {};
         repaint();
         return false;
     }
@@ -2119,16 +2146,17 @@ bool MotionTimelineView::gestureIsCurrent() {
 }
 
 void MotionTimelineView::cancelGesture() {
-    scrubbing = false;
-    markerDragging = 0;
     if (gestureIsCurrent()) {
-        auto restore = std::move(*before);
-        before.reset();
+        auto& drag = *projectDrag();
+        auto restore = std::move(drag.before);
+        const auto changed = drag.changed;
+        gesture = {};
         if (changed) {
             processor.document.preview(std::move(restore));
         }
+    } else if (active<Scrub>() != nullptr) {
+        gesture = {};
     }
-    changed = false;
     repaint();
 }
 

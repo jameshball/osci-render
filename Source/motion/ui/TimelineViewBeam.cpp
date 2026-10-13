@@ -93,7 +93,8 @@ void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::
     }
     fill.lineTo(right, area.getBottom());
     fill.closeSubPath();
-    const auto lit = beamHover == id || (beamDrag.has_value() && beamDrag->id == id);
+    const auto* beamDrag = active<BeamDrag>();
+    const auto lit = beamHover == id || (beamDrag != nullptr && beamDrag->id == id);
     const auto& project = processor.document.project();
     const auto target = motion::findPropertyTarget(project, id);
     const auto* curve = target.has_value() ? target->curve("beam") : nullptr;
@@ -207,17 +208,17 @@ bool MotionTimelineView::beamDown(const juce::MouseEvent& event) {
         }
     }
     const auto beam = curve != nullptr ? curve->evaluate(local) : 1.0;
-    beamDrag = BeamDrag {id, target->area, time, fraction, beam, project, processor.document.revision(), false, event.mods.isCommandDown(), event.y};
+    auto& drag = gesture.emplace<BeamDrag>(BeamDrag {id, target->area, time, fraction, beam, project, processor.document.revision(), false, event.mods.isCommandDown(), event.y});
     beamPointer = event.x;
-    if (beamDrag->keyed) {
+    if (drag.keyed) {
         // Cmd-click keys the Beam here at its current value.
-        auto updated = beamDrag->before;
+        auto updated = drag.before;
         auto* keyed = motion::ensurePropertyCurve(updated, id, "beam");
         if (keyed != nullptr) {
             keyed->setKeyValue(local, keyed->evaluateBase(local));
             processor.document.preview(std::move(updated));
-            beamDrag->revision = processor.document.revision();
-            beamDrag->changed = true;
+            drag.revision = processor.document.revision();
+            drag.changed = true;
         }
     }
     repaint();
@@ -225,8 +226,8 @@ bool MotionTimelineView::beamDown(const juce::MouseEvent& event) {
 }
 
 void MotionTimelineView::beamDragged(const juce::MouseEvent& event) {
-    auto& drag = *beamDrag;
-    if (processor.document.revision() != drag.revision) { beamDrag.reset(); repaint(); return; }
+    auto& drag = std::get<BeamDrag>(gesture);
+    if (processor.document.revision() != drag.revision) { gesture = {}; repaint(); return; }
     const auto area = drag.area;
     // The edge follows the pointer, over at least 64 px however short the
     // row, so small rows stay precise; Shift moves it a quarter as far.
