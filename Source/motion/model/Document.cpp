@@ -1389,12 +1389,9 @@ static bool hasCamera(const Project& project, Id id) {
 static bool isVisualClipOrGroup(const Project& project, Id id, bool groupsOnly) {
     if (id == 0) { return true; }
     if (findGroup(project, id) != nullptr) { return true; }
-    if (groupsOnly) { return false; }
-    for (const auto& track : project.tracks) {
-        if (track.kind != TrackKind::visual) { continue; }
-        for (const auto& clip : track.clips) { if (clip.id == id) { return true; } }
-    }
-    return false;
+    // A clip aimed at is a source's, as pruning keeps (a composition's
+    // instance has no one place to aim at).
+    return !groupsOnly && hasVisualClip(project, id);
 }
 
 // A cut at `time` ends the cut it falls in and lasts until the next cut.

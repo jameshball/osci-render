@@ -126,7 +126,10 @@ private:
         }
         for (const auto& track : project.tracks) {
             if (track.kind != motion::TrackKind::visual) { continue; }
-            for (const auto& clip : track.clips) { targets.emplace_back(clip.id, juce::String(clip.name)); }
+            // A composition's instance has no one place to aim at.
+            for (const auto& clip : track.clips) {
+                if (clip.composition == 0) { targets.emplace_back(clip.id, juce::String(clip.name)); }
+            }
         }
         const auto fill = [](juce::ComboBox& box, std::vector<std::pair<motion::Id, juce::String>>& listed, std::vector<std::pair<motion::Id, juce::String>> items, motion::Id current) {
             if (items != listed) {
