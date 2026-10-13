@@ -94,16 +94,15 @@ void MotionAssetLibrary::updateStatus() {
     // Only say something the row does not already show; the generic
     // how-to lives in the list's tooltip.
     juce::String help;
-    if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr && liveStatus) {
-        help = liveStatus(assetId(row)) + "\nEnter to insert. Drag to place.";
-    }
-    if (definitionRow(row)) {
-        help = document.canReferenceComposition(assetId(row))
-            ? "Shared composition. Enter or double-click to insert; drag to place. Open to edit."
-            : "It contains the composition you're editing, so it can't go inside it. Open to edit.";
-    }
+    if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr && liveStatus) { help = liveStatus(assetId(row)); }
+    if (definitionRow(row) && !document.canReferenceComposition(assetId(row))) { help = "It contains the composition you're editing, so it can't go inside it."; }
     status.setText(importStatus.isNotEmpty() ? importStatus : help, juce::dontSendNotification);
     resized();
+}
+
+juce::String MotionAssetLibrary::getTooltipForRow(int row) {
+    if (definitionRow(row) && !document.canReferenceComposition(assetId(row))) { return "Open it to edit it; it can't go inside the composition you're editing"; }
+    return "Drag into the Scene or timeline, or double-click (Return) to insert at the playhead";
 }
 
 void MotionAssetLibrary::resized() {
@@ -116,7 +115,7 @@ void MotionAssetLibrary::resized() {
     const auto row = list.getSelectedRow();
     const bool live = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr;
     // The status line takes room only when it has something to say.
-    const auto statusHeight = status.getText().isEmpty() && importStatus.isEmpty() ? 0 : live ? 92 : 68;
+    const auto statusHeight = status.getText().isEmpty() && importStatus.isEmpty() ? 0 : live ? 48 : 52;
     status.setBounds(area.removeFromBottom(statusHeight).reduced(6, statusHeight > 0 ? 4 : 0));
     if (bakeSettings.isVisible()) { bakeSettings.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
     list.setBounds(area);

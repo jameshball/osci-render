@@ -40,6 +40,7 @@ private:
     int getNumRows() override { return static_cast<int>(assets.size() + definitions.size()); }
 
     juce::String getNameForRow(int row) override;
+    juce::String getTooltipForRow(int row) override;
 
     void paintListBoxItem(int row, juce::Graphics& graphics, int width, int height, bool selected) override;
 

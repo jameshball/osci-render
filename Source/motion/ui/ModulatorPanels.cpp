@@ -150,7 +150,7 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
     routesTitle.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     routesTitle.setText("Drives", juce::dontSendNotification);
     content.addAndMakeVisible(routesTitle);
-    routesHint.setText("Drag the card onto a property.", juce::dontSendNotification);
+    routesHint.setText("Drag the card onto a property", juce::dontSendNotification);
     routesHint.setFont(motion::style::caption());
     routesHint.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     routesHint.setJustificationType(juce::Justification::topLeft);

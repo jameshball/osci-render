@@ -105,7 +105,7 @@ void MotionEffectStack::paint(juce::Graphics& g) {
     if (!hint.isEmpty()) {
         g.setColour(osci::Colours::textMuted().withAlpha(.6f));
         g.setFont(motion::style::caption());
-        g.drawText("Drag effects here from the Effects tab.", hint, juce::Justification::centredLeft, true);
+        g.drawText("Drag effects here from the Effects tab", hint, juce::Justification::centredLeft, true);
     }
     if (!stages.empty()) {
         g.setColour(osci::Colours::textMuted().withAlpha(.6f));
