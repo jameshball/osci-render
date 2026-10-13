@@ -37,7 +37,11 @@ public:
         const auto hover = isMouseOver(true) ? segmentAt(getMouseXYRelative().x) : -1;
         for (int index = 0; index < labels.size(); ++index) {
             const auto segment = segmentBounds(index).toFloat();
-            if (index == selected) {
+            // Disabled, the choice still shows, faintly, with no edge to press.
+            if (index == selected && !isEnabled()) {
+                g.setColour(style::hoverFill());
+                g.fillRoundedRectangle(segment, style::radius);
+            } else if (index == selected) {
                 g.setColour(osci::Colours::surfaceRaised().brighter(.12f));
                 g.fillRoundedRectangle(segment, style::radius);
                 g.setColour(style::hairline());
@@ -47,7 +51,7 @@ public:
                 g.fillRoundedRectangle(segment, style::radius);
             }
             g.setFont(compact ? style::caption() : style::body());
-            const auto alpha = !isEnabled() ? .35f : index == selected ? 1.0f : index == hover ? .9f : .62f;
+            const auto alpha = !isEnabled() ? (index == selected ? .5f : .25f) : index == selected ? 1.0f : index == hover ? .9f : .62f;
             g.setColour(osci::Colours::text().withAlpha(alpha));
             g.drawText(labels[index], segment, juce::Justification::centred, false);
         }
@@ -62,6 +66,7 @@ public:
         if (index >= 0) { setSelected(index, juce::sendNotification); }
     }
     bool keyPressed(const juce::KeyPress& key) override {
+        if (!isEnabled()) { return false; }
         if (key.getKeyCode() == juce::KeyPress::leftKey) { setSelected(selected - 1, juce::sendNotification); return true; }
         if (key.getKeyCode() == juce::KeyPress::rightKey) { setSelected(selected + 1, juce::sendNotification); return true; }
         return false;
