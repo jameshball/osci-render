@@ -316,6 +316,15 @@ void Document::edit(juce::String label, std::function<void(Project&)> operation)
     record(label, std::move(after));
 }
 
+void Document::editProject(juce::String label, std::function<void(Project&)> operation) {
+    auto after = state;
+    operation(after);
+    after.clampLoop();
+    undo.beginNewTransaction(label);
+    if (onUndoStep) { onUndoStep(); }
+    undo.perform(new Change(*this, state, std::move(after)));
+}
+
 void Document::editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation) {
     const auto now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
     // Joins only while the newest undo step is still this control's: a
@@ -625,11 +634,20 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
         return juce::Result::fail(audio(*found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
     }
     const bool lua = replacement->extension.equalsIgnoreCase(".lua");
-    edit("Replace source", [assetId, replacement, lua](Project& project) {
+    const auto* generator = generatorOf(*replacement);
+    // Every clip of it, in every composition, not only the one being edited.
+    editProject("Replace source", [assetId, replacement, lua, generator](Project& project) {
         for (auto& asset : project.assets) {
             if (asset != nullptr && asset->id == assetId) { asset = replacement; }
         }
-        // Slider curves and their bake belong to the old script.
+        // The old source's own properties (a script's sliders, a
+        // generator's parameters) and a script's bake go with it; routes and
+        // links to them are pruned.
+        const auto ownedByNew = [&](const Track& track, const std::string& name) {
+            const auto specs = track.kind == TrackKind::audio ? std::span<const PropertySpec>(audioPropertySpecs) : std::span<const PropertySpec>(objectPropertySpecs);
+            return findPropertySpec(specs, name) != nullptr || (lua && name.starts_with("slider."))
+                || (generator != nullptr && findPropertySpec(generator->parameters, name) != nullptr);
+        };
         const auto trackUses = [assetId](const Track& track) {
             return std::any_of(track.clips.begin(), track.clips.end(), [assetId](const auto& clip) { return clip.asset == assetId; });
         };
@@ -638,9 +656,10 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
                 for (auto& clip : track.clips) {
                     if (clip.asset != assetId) { continue; }
                     clip.luaBake.reset();
-                    if (!lua) { std::erase_if(clip.properties, [](const auto& item) { return item.first.starts_with("slider."); }); }
+                    std::erase_if(clip.properties, [&](const auto& item) { return !ownedByNew(track, item.first); });
                 }
             });
+            pruneReferences(composition);
         };
         const auto uses = [&](const Composition& composition) {
             return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackUses);

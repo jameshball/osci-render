@@ -149,6 +149,38 @@ public:
         motion::Project reloaded;
         expect(motion::Document::prepareLoad(document.save(), reloaded).wasOk(), "the project still loads");
 
+        beginTest("Replacing a generator from inside a composition updates the main timeline's clips too");
+        {
+            juce::UndoManager nestedUndo;
+            motion::Document nested(nestedUndo);
+            auto generator = std::make_shared<motion::Asset>();
+            generator->id = 7; generator->name = "Rectangle"; generator->extension = ".generator";
+            generator->data.append("rectangle", 9);
+            expect(motion::decodeAsset(*generator).wasOk());
+            motion::Project project;
+            project.assets.push_back(generator);
+            auto definition = std::make_shared<motion::CompositionDefinition>();
+            definition->id = 100; definition->name = "Nested";
+            project.definitions.push_back(definition);
+            motion::Track track; track.id = 10;
+            expect(track.insert(motion::Document::makeClip(11, *generator, 0), project.tempo()));
+            project.tracks.push_back(track);
+            nested.reset(project);
+            expect(nested.project().tracks[0].clips[0].properties.contains("generator.width"), "a generator's clip has its parameters");
+            expect(nested.enterComposition(100).wasOk());
+            auto shape = std::make_shared<motion::Asset>();
+            shape->id = 7; shape->name = "tri.obj"; shape->extension = ".obj";
+            const juce::String triangle("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+            shape->data.append(triangle.toRawUTF8(), triangle.getNumBytesAsUTF8());
+            expect(motion::decodeAsset(*shape).wasOk());
+            expect(nested.replaceAsset(7, shape).wasOk());
+            const auto& main = nested.mainProject().tracks[0].clips[0];
+            expect(!main.properties.contains("generator.width"), "the main timeline's clip loses the generator's parameters");
+            expect(main.properties.contains("position.x"), "and keeps its own");
+            motion::Project reloaded;
+            expect(motion::Document::prepareLoad(nested.save(), reloaded).wasOk(), "the project still loads");
+        }
+
         beginTest("Text animations share settled frames and refuse over-long timing");
         {
             auto text = std::make_shared<motion::Asset>();

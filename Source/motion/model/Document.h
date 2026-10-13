@@ -186,6 +186,10 @@ public:
         return ++lastId;
     }
     void edit(juce::String label, std::function<void(Project&)> operation);
+    // An edit of the whole project wherever the scope is, for what reaches
+    // past the composition being edited (sources, and clips everywhere that
+    // use them). The operation keeps references whole itself.
+    void editProject(juce::String label, std::function<void(Project&)> operation);
     // Records nothing, and changes no revision, when the operation declines.
     bool tryEdit(juce::String label, std::function<bool(Project&)> operation);
     // Repeated changes to one control (wheel, arrow keys) within a second
