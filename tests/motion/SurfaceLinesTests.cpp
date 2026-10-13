@@ -52,6 +52,24 @@ int main() {
     std::vector<Face> faces;
     ball(1, 24, 48, corners, faces);
 
+    // Faces of different sizes (small at the poles) cut the sides they share
+    // at different points; a line crossing one still goes on: rings, and
+    // noise's contours, are whole loops.
+    for (const auto kind : {Pattern::rings, Pattern::noise}) {
+        std::vector<Vec3> uneven;
+        std::vector<Face> unevenFaces;
+        ball(1, 12, 24, uneven, unevenFaces);
+        const auto pieces = pattern(uneven, unevenFaces, kind, 16);
+        int lines = 0, open = 0;
+        for (std::size_t index = 0; index < pieces.size(); ++index) {
+            const auto start = at(uneven, unevenFaces[pieces[index].face], pieces[index].from);
+            while (index + 1 < pieces.size() && (at(uneven, unevenFaces[pieces[index + 1].face], pieces[index + 1].from) - at(uneven, unevenFaces[pieces[index].face], pieces[index].to)).length() < 1.0e-9) { ++index; }
+            ++lines;
+            open += (at(uneven, unevenFaces[pieces[index].face], pieces[index].to) - start).length() < 1.0e-9 ? 0 : 1;
+        }
+        check(lines > 0 && open == 0, std::string(kind == Pattern::rings ? "rings" : "noise") + " are whole loops across uneven faces: " + std::to_string(open) + " of " + std::to_string(lines) + " open");
+    }
+
     // Slices: level lines, end to end round the ball, one loop a level.
     {
         const auto pieces = pattern(corners, faces, Pattern::slices, 8);

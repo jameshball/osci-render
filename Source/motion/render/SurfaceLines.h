@@ -436,6 +436,108 @@ struct Climb {
 };
 }
 
+namespace detail {
+// A point's weights on a face's corners, as it lies on the face's plane.
+inline Weights weightsOn(const std::vector<Vec3>& corners, const Face& face, Vec3 point) {
+    const auto a = corners[face[0]];
+    const auto u = corners[face[1]] - a, v = corners[face[2]] - a, w = point - a;
+    const auto uu = u.dot(u), uv = u.dot(v), vv = v.dot(v), wu = w.dot(u), wv = w.dot(v);
+    const auto area = uu * vv - uv * uv;
+    if (!(std::abs(area) > 0)) { return {1, 0, 0}; }
+    const auto second = (vv * wu - uv * wv) / area, third = (uu * wv - uv * wu) / area;
+    return {1 - second - third, second, third};
+}
+
+// Lines whose ends lie within `reach` of each other joined end to end (each
+// end to its nearest), the joining piece's end moved onto where the line
+// before it ends: faces next to each other cut the side they share at
+// different points, so a line crossing it can stop just short of where it
+// goes on. Pieces whose ends are within `same` follow on already.
+inline std::vector<Piece> mended(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const std::vector<Piece>& pieces, double reach, double same) {
+    const auto start = [&](const Piece& piece) { return at(corners, faces[piece.face], piece.from); };
+    const auto end = [&](const Piece& piece) { return at(corners, faces[piece.face], piece.to); };
+    // The lines, as runs of the pieces, and where each starts and ends.
+    struct Line { std::size_t first, last; };
+    std::vector<Line> lines;
+    for (std::size_t index = 0; index < pieces.size(); ++index) {
+        if (index == 0 || (start(pieces[index]) - end(pieces[index - 1])).length() >= same) { lines.push_back({index, index}); }
+        lines.back().last = index;
+    }
+    const auto endOf = [&](std::size_t line, int side) { return side == 0 ? start(pieces[lines[line].first]) : end(pieces[lines[line].last]); };
+    // Each open line's ends paired with others', nearest first; a line's own
+    // two ends closing it into a loop.
+    struct Pairing { double distance; std::size_t line; int side; std::size_t other; int otherSide; };
+    std::vector<Pairing> pairings;
+    std::vector<char> open(lines.size(), 0);
+    for (std::size_t line = 0; line < lines.size(); ++line) { open[line] = (endOf(line, 0) - endOf(line, 1)).length() >= same ? 1 : 0; }
+    for (std::size_t line = 0; line < lines.size(); ++line) {
+        if (open[line] == 0) { continue; }
+        for (std::size_t other = line; other < lines.size(); ++other) {
+            if (open[other] == 0) { continue; }
+            for (int side = 0; side < 2; ++side) {
+                for (int otherSide = other == line ? 1 - side : 0; otherSide < 2; ++otherSide) {
+                    if (other == line && side == 1) { continue; }
+                    const auto distance = (endOf(line, side) - endOf(other, otherSide)).length();
+                    if (distance < reach) { pairings.push_back({distance, line, side, other, otherSide}); }
+                }
+            }
+        }
+    }
+    if (pairings.empty()) { return pieces; }
+    std::sort(pairings.begin(), pairings.end(), [](const Pairing& a, const Pairing& b) { return a.distance < b.distance; });
+    // What each end is joined to: a line and its end, or none.
+    constexpr std::size_t none = std::numeric_limits<std::size_t>::max();
+    std::vector<std::array<std::pair<std::size_t, int>, 2>> joined(lines.size(), {std::pair {none, 0}, std::pair {none, 0}});
+    for (const auto& pairing : pairings) {
+        if (joined[pairing.line][static_cast<std::size_t>(pairing.side)].first != none || joined[pairing.other][static_cast<std::size_t>(pairing.otherSide)].first != none) { continue; }
+        joined[pairing.line][static_cast<std::size_t>(pairing.side)] = {pairing.other, pairing.otherSide};
+        joined[pairing.other][static_cast<std::size_t>(pairing.otherSide)] = {pairing.line, pairing.side};
+    }
+    // Walked from an end joined to nothing (or anywhere round a loop), each
+    // line from the end it is entered by.
+    std::vector<Piece> result;
+    result.reserve(pieces.size());
+    std::vector<char> walked(lines.size(), 0);
+    const auto walk = [&](std::size_t line, int side) {
+        const auto first = result.size();
+        while (line != none && walked[line] == 0) {
+            walked[line] = 1;
+            const auto& run = lines[line];
+            const auto joining = result.size();
+            if (side == 0) {
+                result.insert(result.end(), pieces.begin() + static_cast<std::ptrdiff_t>(run.first), pieces.begin() + static_cast<std::ptrdiff_t>(run.last) + 1);
+            } else {
+                for (auto index = run.last + 1; index-- > run.first;) { result.push_back({pieces[index].face, pieces[index].to, pieces[index].from}); }
+            }
+            if (joining > first) {
+                auto& piece = result[joining];
+                piece.from = weightsOn(corners, faces[piece.face], end(result[joining - 1]));
+            }
+            const auto next = joined[line][static_cast<std::size_t>(1 - side)];
+            line = next.first;
+            side = next.second;
+        }
+        // Back round to where it began: a loop, closed exactly.
+        if (line != none && result.size() > first) {
+            auto& piece = result.back();
+            piece.to = weightsOn(corners, faces[piece.face], start(result[first]));
+        }
+    };
+    for (std::size_t line = 0; line < lines.size(); ++line) {
+        if (walked[line] != 0) { continue; }
+        if (joined[line][0].first == none) {
+            walk(line, 0);
+        } else if (joined[line][1].first == none) {
+            walk(line, 1);
+        }
+    }
+    for (std::size_t line = 0; line < lines.size(); ++line) {
+        if (walked[line] == 0) { walk(line, 0); }
+    }
+    return result;
+}
+}
+
 inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Pattern kind, double across, double turn = 0) {
     if (faces.empty() || !(across > 0)) { return {}; }
     // Faces with a corner that isn't finite (a mesh an effect broke) are
@@ -592,11 +694,15 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         return placed;
     };
     for (auto& piece : pieces) { piece = {parents[piece.face], onParent(piece.face, piece.from), onParent(piece.face, piece.to)}; }
+    // How far apart its lines are: those ending nearer each other than an
+    // eighth of that are one line, broken where faces met.
+    const auto lineSpacing = kind == Pattern::spiral ? std::min(spacing, climbing) : kind == Pattern::slices ? std::min(spacing, along) : spacing;
+    pieces = detail::mended(corners, faces, pieces, lineSpacing / 8, 1.0e-9 * bounds.size() + 1.0e-12);
     // Then pieces that follow on over one face joined while they stay near
     // straight (within a 250th of the spacing: looser visibly flattens
     // curves), so a line is as few pieces as draw it well: the beam has only
     // so many points a cycle.
-    const auto tolerance = (kind == Pattern::spiral ? std::min(spacing, climbing) : kind == Pattern::slices ? std::min(spacing, along) : spacing) * .004;
+    const auto tolerance = lineSpacing * .004;
     const auto flat = [&](const Piece& piece, const Weights& weights) { return at(corners, faces[piece.face], weights); };
     std::vector<Piece> joined;
     joined.reserve(pieces.size());
