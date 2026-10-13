@@ -2,6 +2,7 @@
 
 #include "../CommonPluginProcessor.h"
 #include "model/Document.h"
+#include "model/ProjectFile.h"
 #include "render/SampleClock.h"
 #include "render/CompositionRenderer.h"
 #include "render/CompositionPreparationWorker.h"

@@ -2,6 +2,7 @@
 #include "../Source/motion/export/SignalExporter.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/model/ProjectFile.h"
 #include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/render/HiddenLineBaker.h"
 #include "../Source/motion/render/HiddenLines.h"
@@ -174,16 +175,12 @@ private:
         // A project of your own: MOTION_BENCHMARK_PROJECT=/path/to.osci-motion
         const auto path = juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_PROJECT", "");
         if (path.isEmpty()) { return; }
-        juce::MemoryBlock bytes;
-        juce::File(path).loadFileAsData(bytes);
-        const auto xml = juce::AudioProcessor::getXmlFromBinary(bytes.getData(), static_cast<int>(bytes.getSize()));
-        const auto* composition = xml != nullptr ? xml->getChildByName("composition") : nullptr;
-        motion::Project project;
-        if (composition == nullptr || motion::Document::prepareLoad(*composition, project).failed()) {
+        motion::ProjectFile file;
+        if (motion::ProjectFile::read(juce::File(path), file).failed()) {
             logMessage("Could not load " + path);
             return;
         }
-        benchmarkHiddenLineProject(juce::File(path).getFileNameWithoutExtension(), project);
+        benchmarkHiddenLineProject(juce::File(path).getFileNameWithoutExtension(), file.project);
     }
     static constexpr double sampleRate = 48000, renderSeconds = 10;
 

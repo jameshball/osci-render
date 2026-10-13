@@ -121,18 +121,7 @@ void MotionEditor::loadProject(const juce::File& file) {
         auto result = juce::Result::fail("Project loading cancelled.");
         if (!task->cancelled.load()) {
             try {
-                juce::MemoryBlock bytes;
-                if (!file.loadFileAsData(bytes) || bytes.getSize() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-                    result = juce::Result::fail("Couldn't read the project file.");
-                } else {
-                    task->xml = juce::AudioProcessor::getXmlFromBinary(bytes.getData(), static_cast<int>(bytes.getSize()));
-                    const auto* composition = task->xml != nullptr ? task->xml->getChildByName("composition") : nullptr;
-                    if (task->xml == nullptr || !task->xml->hasTagName("motion-project") || task->xml->getIntAttribute("schema") != 1 || composition == nullptr) {
-                        result = juce::Result::fail("This is not a valid osci-motion project.");
-                    } else {
-                        result = motion::Document::prepareLoad(*composition, task->prepared, &task->cancelled);
-                    }
-                }
+                result = motion::ProjectFile::read(file, task->file, &task->cancelled);
             } catch (const std::exception& error) {
                 result = juce::Result::fail("Couldn't open the project: " + juce::String(error.what()));
             }
@@ -156,7 +145,7 @@ void MotionEditor::loadProject(const juce::File& file) {
                 motion::ui::MessageSheet::show(*owner, "Project changed", "The current project changed while loading. Open the file again to replace it.");
                 return;
             }
-            owner->processor.applyPreparedProject(std::move(task->prepared), *task->xml);
+            owner->processor.applyPreparedProject(std::move(task->file.project), *task->file.xml);
             if (owner->commandLineProject == CommandLineProject::waiting && file == owner->commandLineProjectFile) { owner->commandLineProject = CommandLineProject::loaded; }
             owner->processor.currentProjectFile = file.getFullPathName();
             owner->processor.setLastOpenedDirectory(file.getParentDirectory());

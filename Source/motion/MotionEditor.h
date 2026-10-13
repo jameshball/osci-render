@@ -116,8 +116,7 @@ private:
     bool preparationSettingsOpen = false;
     struct ProjectLoad {
         std::atomic<bool> cancelled {false};
-        motion::Project prepared;
-        std::unique_ptr<juce::XmlElement> xml;
+        motion::ProjectFile file;
     };
     std::shared_ptr<ProjectLoad> projectLoad;
     juce::Component::SafePointer<osci::OverlayComponent> projectLoadOverlay;

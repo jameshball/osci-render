@@ -501,6 +501,8 @@
               resource="0" file="Source/motion/model/CompositionGraph.h"/>
         <FILE id="MotionDoc" name="Document.cpp" compile="1" resource="0" file="Source/motion/model/Document.cpp"/>
         <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
+        <FILE id="MotProjectFile" name="ProjectFile.h" compile="0" resource="0"
+              file="Source/motion/model/ProjectFile.h"/>
         <FILE id="MotmodelDocumentSerialisationcpp" name="DocumentSerialisation.cpp"
               compile="1" resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
         <FILE id="MotmodelDrawingh" name="Drawing.h" compile="0" resource="0"

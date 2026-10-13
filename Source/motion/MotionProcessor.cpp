@@ -260,18 +260,8 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
         unrestoredRevision = document.revision();
         restoreError = "The project the host saved couldn't be opened. " + reason + " It is kept as it was until you change this one.";
     };
-    auto project = getXmlFromBinary(data, size);
-    if (project == nullptr || !project->hasTagName("motion-project") || project->getIntAttribute("schema") != 1) {
-        failed("It isn't an osci-motion project this version can read.");
-        return;
-    }
-    const auto* compositionXml = project->getChildByName("composition");
-    if (compositionXml == nullptr) {
-        failed("It has no composition.");
-        return;
-    }
-    motion::Project prepared;
-    const auto result = motion::Document::prepareLoad(*compositionXml, prepared);
+    motion::ProjectFile file;
+    const auto result = motion::ProjectFile::read(data, static_cast<std::size_t>(std::max(0, size)), file);
     if (result.failed()) {
         failed(result.getErrorMessage());
         return;
@@ -282,7 +272,7 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
         unrestoredState.reset();
         restoreError.clear();
     }
-    applyPreparedProject(std::move(prepared), *project);
+    applyPreparedProject(std::move(file.project), *file.xml);
 }
 
 void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlElement& state) {
