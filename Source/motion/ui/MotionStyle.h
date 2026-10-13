@@ -60,14 +60,21 @@ inline juce::Font buttonFont(const juce::Button& button) { return button.getProp
 inline juce::Font heading() { return juce::Font(juce::FontOptions(11.0f, juce::Font::bold)); }
 inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)); }
 // A shortcut written "Cmd+Shift+F9" as the platform shows it: ⇧⌘F9 on macOS,
-// Ctrl+Shift+F9 elsewhere. Mouse gestures ("Alt+wheel") keep their words.
+// Ctrl+Shift+F9 elsewhere, with arrow keys as arrows (⇧←). Mouse gestures
+// ("Alt+wheel") keep their words.
 inline juce::String shortcutText(const juce::String& raw) {
    #if JUCE_MAC
     if (raw.containsIgnoreCase("wheel") || raw.containsIgnoreCase("drag") || raw.containsIgnoreCase("click") || raw.contains(" ")) { return raw.replace("Cmd", juce::String::fromUTF8("\u2318")); }
+    const auto arrow = [](const juce::String& key) {
+        for (const auto& [word, glyph] : std::initializer_list<std::pair<const char*, const char*>> {{"Left", "\u2190"}, {"Right", "\u2192"}, {"Up", "\u2191"}, {"Down", "\u2193"}}) {
+            if (key == word) { return juce::String::fromUTF8(glyph); }
+        }
+        return key;
+    };
     auto parts = juce::StringArray::fromTokens(raw, "+", "");
     if (raw.endsWith("+")) { parts.removeEmptyStrings(); parts.add("+"); }
-    if (parts.size() < 2) { return raw; }
-    const auto key = parts[parts.size() - 1];
+    if (parts.size() < 2) { return arrow(raw); }
+    const auto key = arrow(parts[parts.size() - 1]);
     parts.remove(parts.size() - 1);
     juce::String result;
     for (const auto& [name, glyph] : std::initializer_list<std::pair<const char*, const char*>> {{"Ctrl", "\u2303"}, {"Alt", "\u2325"}, {"Shift", "\u21e7"}, {"Cmd", "\u2318"}}) {

@@ -67,11 +67,7 @@ private:
         // Keys as caps, right-aligned: a shortcut's glyphs share one cap,
         // a gesture's words sit in plain text.
         static void paintKeys(juce::Graphics& g, const juce::String& keys, juce::Rectangle<int> area) {
-            // Arrow keys read as arrows, like the other glyphs.
-            auto text = motion::style::shortcutText(keys);
-            for (const auto& [word, arrow] : std::initializer_list<std::pair<const char*, const char*>> {{"Left", "\u2190"}, {"Right", "\u2192"}, {"Up", "\u2191"}, {"Down", "\u2193"}}) {
-                if (text.endsWith(word) && !text.contains(" ")) { text = text.dropLastCharacters(juce::String(word).length()) + juce::String::fromUTF8(arrow); }
-            }
+            const auto text = motion::style::shortcutText(keys);
             g.setFont(motion::style::body());
             const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::body(), text)) + 12;
             const auto cap = area.removeFromRight(width).withSizeKeepingCentre(width, 18).toFloat();
