@@ -74,11 +74,12 @@ void saveProperties(juce::XmlElement& item, const PropertyMap& properties) {
     for (const auto& [name, curve] : properties) { saveProperty(item, name, curve); }
 }
 
-juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
+// A property's curve from `property`. A link or key this version can't use
+// is left out, said in `notes` against `name`; false when its value isn't a
+// number at all.
+bool loadProperty(const juce::XmlElement& property, Curve& curve, LoadNotes& notes, const juce::String& name) {
     curve = Curve(property.getDoubleAttribute("base"));
-    if (!std::isfinite(curve.base)) {
-        return juce::Result::fail("Invalid property value.");
-    }
+    if (!std::isfinite(curve.base)) { return false; }
     for (auto* item : property.getChildWithTagNameIterator("link")) {
         PropertyLink link;
         link.source = readId(*item, "source").value_or(0);
@@ -86,38 +87,52 @@ juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
         link.scale = item->getDoubleAttribute("scale", 1);
         link.offset = item->getDoubleAttribute("offset", 0);
         link.delay = item->getDoubleAttribute("delay", 0);
-        if (curve.link.has_value() || !link.valid()) { return juce::Result::fail("Invalid or duplicate property link."); }
+        if (curve.link.has_value() || !link.valid()) {
+            notes.note("Property link that isn't valid", name);
+            continue;
+        }
         curve.link = std::move(link);
     }
     for (auto* point : property.getChildWithTagNameIterator("key")) {
-        const auto interpolation = point->getIntAttribute("interpolation");
+        auto interpolation = point->getIntAttribute("interpolation");
         if (interpolation < 0 || interpolation > 3) {
-            return juce::Result::fail("Unknown interpolation.");
+            notes.note("Key easing this version doesn't have, made smooth", name);
+            interpolation = static_cast<int>(Interpolation::smooth);
         }
         try {
             curve.setKey({ point->getDoubleAttribute("time"), point->getDoubleAttribute("value"),
                 static_cast<Interpolation>(interpolation), point->getDoubleAttribute("in"), point->getDoubleAttribute("out"),
                 point->getDoubleAttribute("inInfluence", Keyframe::defaultInfluence), point->getDoubleAttribute("outInfluence", Keyframe::defaultInfluence) });
         } catch (const std::invalid_argument&) {
-            return juce::Result::fail("Invalid key.");
+            notes.note("Key that isn't valid", name);
         }
     }
-    return juce::Result::ok();
+    return true;
 }
 
-// Properties whose names are fixed by their owner: each must be one of
-// `properties`, at most once. `loaded` counts those read.
-juce::Result loadKnownProperties(const juce::XmlElement& owner, PropertyMap& properties, const char* unknown, std::size_t* loaded = nullptr) {
+// Properties whose names are fixed by their owner (`owner` names its kind:
+// "Camera"): one this version doesn't have, one given twice, or one that
+// isn't a number is left out (its default kept) and said in `notes`.
+void loadKnownProperties(const juce::XmlElement& item, PropertyMap& properties, const juce::String& owner, LoadNotes& notes) {
     std::set<std::string> names;
-    for (auto* property : owner.getChildWithTagNameIterator("property")) {
+    for (auto* property : item.getChildWithTagNameIterator("property")) {
         const auto name = property->getStringAttribute("name").toStdString();
         const auto found = properties.find(name);
-        if (found == properties.end() || !names.insert(name).second) { return juce::Result::fail(unknown); }
-        const auto result = loadProperty(*property, found->second);
-        if (result.failed()) { return result; }
+        if (found == properties.end()) {
+            notes.note(owner + " property this version doesn't have", juce::String(name));
+            continue;
+        }
+        if (!names.insert(name).second) {
+            notes.note(owner + " property given twice", juce::String(name));
+            continue;
+        }
+        Curve curve;
+        if (!loadProperty(*property, curve, notes, juce::String(name))) {
+            notes.note(owner + " property that isn't a number", juce::String(name));
+            continue;
+        }
+        found->second = std::move(curve);
     }
-    if (loaded != nullptr) { *loaded = names.size(); }
-    return juce::Result::ok();
 }
 
 void saveEffects(juce::XmlElement& owner, const std::vector<EffectInstance>& effects) {
@@ -135,36 +150,48 @@ void saveEffects(juce::XmlElement& owner, const std::vector<EffectInstance>& eff
     }
 }
 
-juce::Result loadEffects(const juce::XmlElement& owner, std::vector<EffectInstance>& effects, std::set<Id>& identities) {
+// An effect this version doesn't have, or past the most an owner holds, is
+// left out; a range or parameter that isn't valid is put back to none or its
+// default.
+void loadEffects(const juce::XmlElement& owner, std::vector<EffectInstance>& effects, std::set<Id>& identities, LoadNotes& notes) {
     for (auto* item : owner.getChildWithTagNameIterator("effect")) {
-        const auto* definition = effectDefinition(item->getStringAttribute("type").toStdString());
-        const auto identity = definition != nullptr ? claimId(*item, identities) : std::nullopt;
+        const auto type = item->getStringAttribute("type");
+        const auto* definition = effectDefinition(type.toStdString());
+        if (definition == nullptr) {
+            notes.note("Effect this version doesn't have", type);
+            continue;
+        }
+        const auto name = juce::String(definition->name);
+        const auto identity = claimId(*item, identities);
         if (!identity.has_value()) {
-            return juce::Result::fail("Unknown effect type or invalid / duplicate effect identity.");
+            notes.note("Effect with a damaged identity", name);
+            continue;
         }
         if (effects.size() >= maximumEffectsPerOwner) {
-            return juce::Result::fail("Each clip, track or composition supports at most 64 effects.");
+            notes.note("Effect past the 64 one owner holds", name);
+            continue;
         }
         auto effect = makeEffect(*identity, *definition);
-        effect.name = item->getStringAttribute("name", juce::String(definition->name)).toStdString();
+        effect.name = item->getStringAttribute("name", name).toStdString();
         effect.enabled = item->getBoolAttribute("enabled", true);
-        if (item->hasAttribute("start") || item->hasAttribute("duration")) {
-            if (!item->hasAttribute("start") || !item->hasAttribute("duration")) {
-                return juce::Result::fail("Effect time ranges require both start and duration.");
-            }
+        if (item->hasAttribute("start") && item->hasAttribute("duration")) {
             effect.range = EffectRange { item->getDoubleAttribute("start"), item->getDoubleAttribute("duration") };
+            if (!effect.range->valid()) {
+                notes.note("Effect time range that isn't valid, made the whole clip", name);
+                effect.range.reset();
+            }
+        } else if (item->hasAttribute("start") || item->hasAttribute("duration")) {
+            notes.note("Effect time range missing its start or end, made the whole clip", name);
         }
-        std::size_t loaded = 0;
-        const auto properties = loadKnownProperties(*item, effect.properties, "Unknown or duplicate effect parameter.", &loaded);
-        if (properties.failed()) {
-            return properties;
-        }
-        if (loaded != effect.properties.size() || !effect.valid()) {
-            return juce::Result::fail("Invalid effect range or parameter value.");
+        loadKnownProperties(*item, effect.properties, "Effect", notes);
+        if (!effect.valid()) {
+            notes.note("Effect settings that aren't valid, reset", name);
+            const auto range = effect.range;
+            effect.properties = makeEffect(*identity, *definition).properties;
+            effect.range = range;
         }
         effects.push_back(std::move(effect));
     }
-    return juce::Result::ok();
 }
 
 juce::XmlElement saveCompositionContent(const Composition& state) {
@@ -287,82 +314,162 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
     return xml;
 }
 
-// The main composition loads as the Project, so routes may target its Scope.
+// Groups nested under one that's missing, too deep or in a loop move to the
+// top level, and tracks filed under a missing group leave it.
 template <typename CompositionType>
-juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType& project, const std::vector<std::shared_ptr<const Asset>>& assets, std::set<Id>& identities, const std::set<Id>& compositionIds) {
+void repairGroups(CompositionType& project, LoadNotes& notes) {
+    if (validGroupHierarchy(project)) { return; }
+    for (auto& group : project.groups) {
+        Id current = group.parent;
+        std::size_t depth = 1;
+        while (current != 0 && current != group.id && depth <= maximumGroupDepth) {
+            const auto* ancestor = findGroup(project, current);
+            if (ancestor == nullptr) { break; }
+            current = ancestor->parent;
+            ++depth;
+        }
+        if (current != 0) {
+            notes.note("Group under one that's missing or in a loop, moved to the top", juce::String(group.name));
+            group.parent = 0;
+        }
+    }
+    const auto lost = [&project](const Track& track) { return track.group != 0 && findGroup(project, track.group) == nullptr; };
+    project.tracks.changeEach(lost, [&](Track& track) {
+        notes.note("Track in a group that's missing, moved out", juce::String(track.name));
+        track.group = 0;
+    });
+    if (!validGroupHierarchy(project)) {
+        for (auto& group : project.groups) { group.parent = 0; }
+    }
+}
+
+// Routes from a modulator or to a property that's missing are left out, and
+// links to a property that's missing, or that would go round in a loop.
+template <typename CompositionType>
+void repairModulation(CompositionType& project, LoadNotes& notes) {
+    std::set<Id> modulators;
+    for (const auto& modulator : project.modulators) { modulators.insert(modulator.id); }
+    {
+        const DrivableProperties drivable(project);
+        std::erase_if(project.routes, [&](const ModulationRoute& route) {
+            const auto missing = !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property);
+            if (missing) { notes.note("Modulation of something that's missing", juce::String(route.property)); }
+            return missing;
+        });
+    }
+    std::vector<std::pair<Id, std::string>> broken;
+    {
+        const DrivableProperties drivable(project);
+        forEachPropertyMap(project, [&](Id owner, const PropertyMap& properties) {
+            for (const auto& [name, curve] : properties) {
+                if (!curve.link.has_value()) { continue; }
+                if (!drivable.contains(owner, name) || !hasPropertyCurve(project, curve.link->source, curve.link->property) || linkCreatesCycle(project, owner, name, *curve.link)) { broken.emplace_back(owner, name); }
+            }
+        });
+    }
+    for (const auto& [owner, name] : broken) {
+        notes.note("Property link to something missing, or in a loop", juce::String(name));
+        forEachPropertyMap(project, [&](Id each, auto& properties) {
+            const auto found = properties.find(name);
+            if (each == owner && found != properties.end()) { found->second.link.reset(); }
+        });
+    }
+}
+
+// A clip property's curve brought inside its range, keys and all.
+void clampCurve(Curve& curve, const PropertySpec& spec) {
+    curve.base = spec.clamp(curve.base);
+    const auto keys = curve.keyframes();
+    for (auto key : keys) {
+        key.value = spec.clamp(key.value);
+        curve.setKey(key);
+    }
+}
+
+// The main composition loads as the Project, so routes may target its Scope.
+// Whatever this version can't use is left out or put right (see LoadNotes).
+template <typename CompositionType>
+juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType& project, const std::vector<std::shared_ptr<const Asset>>& assets, std::set<Id>& identities, const std::set<Id>& compositionIds, LoadNotes& notes) {
     if (!xml.hasTagName("composition")) {
         return juce::Result::fail("Missing composition.");
     }
+    const Composition defaults;
     project.name = xml.getStringAttribute("name", "Untitled");
-    project.duration = xml.getDoubleAttribute("duration", 180);
-    project.frameRate = xml.getDoubleAttribute("fps", Composition {}.frameRate);
-    project.bpm = xml.getDoubleAttribute("bpm", 120);
+    // Each timing setting outside what this version allows is put back to
+    // its default.
+    const auto setting = [&](auto& field, auto value, bool allowed, const char* name, auto otherwise) {
+        field = allowed ? value : otherwise;
+        if (!allowed) { notes.note("Composition setting that isn't valid, reset", name); }
+    };
+    const auto duration = xml.getDoubleAttribute("duration", 180);
+    setting(project.duration, duration, std::isfinite(duration) && duration > 0, "duration", 180.0);
+    const auto fps = xml.getDoubleAttribute("fps", defaults.frameRate);
+    setting(project.frameRate, fps, std::isfinite(fps) && fps >= 0.001 && fps <= 1000, "frame rate", defaults.frameRate);
+    const auto bpm = xml.getDoubleAttribute("bpm", 120);
+    setting(project.bpm, bpm, std::isfinite(bpm) && bpm >= 1 && bpm <= 1000, "tempo", 120.0);
     const auto display = xml.getIntAttribute("timeDisplay", 0);
-    const auto snap = xml.getIntAttribute("gridSnap", 1);
-    project.timeDisplay = static_cast<TimeDisplay>(display);
-    project.beatsPerBar = xml.getIntAttribute("beatsPerBar", 4);
-    project.snapBeats = xml.getDoubleAttribute("snapBeats", 0.25);
-    project.gridSnap = snap != 0;
+    setting(project.timeDisplay, static_cast<TimeDisplay>(display), display >= 0 && display <= 2, "time display", defaults.timeDisplay);
+    const auto beatsPerBar = xml.getIntAttribute("beatsPerBar", 4);
+    setting(project.beatsPerBar, beatsPerBar, beatsPerBar >= 1 && beatsPerBar <= 32, "meter", 4);
+    const auto snapBeats = xml.getDoubleAttribute("snapBeats", 0.25);
+    setting(project.snapBeats, snapBeats, std::isfinite(snapBeats) && snapBeats >= 1.0 / 64 && snapBeats <= 64, "beat grid", 0.25);
+    project.gridSnap = xml.getIntAttribute("gridSnap", 1) != 0;
     project.loopStart = xml.getDoubleAttribute("loopStart", 0);
     project.loopEnd = xml.getDoubleAttribute("loopEnd", 0);
     project.looping = xml.getBoolAttribute("looping", false);
     project.clampLoop();
-    if (!std::isfinite(project.duration) || project.duration <= 0 || !std::isfinite(project.frameRate)
-        || project.frameRate < 0.001 || project.frameRate > 1000 || !std::isfinite(project.bpm) || project.bpm < 1 || project.bpm > 1000
-        || display < 0 || display > 2 || snap < 0 || snap > 1 || project.beatsPerBar < 1 || project.beatsPerBar > 32
-        || !std::isfinite(project.snapBeats) || project.snapBeats < 1.0 / 64 || project.snapBeats > 64) {
-        return juce::Result::fail("Invalid composition timing.");
-    }
     std::vector<TempoChange> tempoChanges;
     for (auto* item : xml.getChildWithTagNameIterator("tempo")) {
+        if (tempoChanges.size() >= 10000) {
+            notes.note("Tempo change past the 10000 a composition holds");
+            continue;
+        }
         tempoChanges.push_back({item->getDoubleAttribute("beat", -1), item->getDoubleAttribute("bpm", -1), item->getBoolAttribute("ramp", false)});
     }
-    if (tempoChanges.size() > 10000) { return juce::Result::fail("A composition supports at most 10000 tempo changes."); }
     if (!tempoChanges.empty()) { project.tempoChanges = std::make_shared<const std::vector<TempoChange>>(std::move(tempoChanges)); }
-    if (!project.tempo().valid()) { return juce::Result::fail("Tempo changes need increasing beats after the start and 1-1000 BPM."); }
-    const auto projectEffects = loadEffects(xml, project.effects, identities);
-    if (projectEffects.failed()) {
-        return projectEffects;
+    if (!project.tempo().valid()) {
+        notes.note("Tempo changes that aren't in order or in range, left out");
+        project.tempoChanges.reset();
     }
+    loadEffects(xml, project.effects, identities, notes);
     for (auto* item : xml.getChildWithTagNameIterator("group")) {
         Group group;
+        group.name = item->getStringAttribute("name", "Group").toStdString();
         const auto parent = readId(*item, "parent");
         const auto identity = parent.has_value() ? claimId(*item, identities) : std::nullopt;
         if (!identity.has_value()) {
-            return juce::Result::fail("Invalid or duplicate group identity.");
+            notes.note("Group with a damaged identity", juce::String(group.name));
+            continue;
         }
         group.id = *identity;
         group.parent = *parent;
-        group.name = item->getStringAttribute("name", "Group").toStdString();
         group.muted = item->getBoolAttribute("muted", false);
         group.solo = item->getBoolAttribute("solo", false);
         group.height = Track::rowHeight(item->getIntAttribute("height", 0));
         group.spatialPath = item->getBoolAttribute("spatialPath", false);
         group.quaternionRotation = item->getBoolAttribute("quaternionRotation", false);
-        const auto effects = loadEffects(*item, group.effects, identities);
-        if (effects.failed()) {
-            return effects;
-        }
-        const auto properties = loadKnownProperties(*item, group.properties, "Unknown or duplicate group property.");
-        if (properties.failed()) {
-            return properties;
-        }
+        loadEffects(*item, group.effects, identities, notes);
+        loadKnownProperties(*item, group.properties, "Group", notes);
+        if (group.parent == group.id) { group.parent = 0; }
         if (!group.valid()) {
-            return juce::Result::fail("Invalid group transform, colour or opacity.");
+            notes.note("Group transform, colour or opacity that isn't valid, reset", juce::String(group.name));
+            group.properties = Group {}.properties;
         }
         project.groups.push_back(std::move(group));
     }
     for (auto* row : xml.getChildWithTagNameIterator("track")) {
         Track track;
+        track.name = row->getStringAttribute("name").toStdString();
         const auto trackIdentity = claimId(*row, identities);
         if (!trackIdentity.has_value()) {
-            return juce::Result::fail("Invalid track identity.");
+            notes.note("Track with a damaged identity", juce::String(track.name));
+            continue;
         }
         track.id = *trackIdentity;
-        track.name = row->getStringAttribute("name").toStdString();
         const auto kind = row->getStringAttribute("kind");
         if (kind != "visual" && kind != "audio") {
-            return juce::Result::fail("Track kind must be visual or audio.");
+            notes.note("Track of a kind this version doesn't have", kind);
+            continue;
         }
         track.kind = kind == "audio" ? TrackKind::audio : TrackKind::visual;
         track.muted = row->getBoolAttribute("muted", false);
@@ -370,29 +477,27 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         track.locked = row->getBoolAttribute("locked", false);
         track.height = Track::rowHeight(row->getIntAttribute("height", 0));
         track.label = std::clamp(row->getIntAttribute("label", 0), 0, 8);
-        const auto groupIdentity = readId(*row, "group");
-        if (!groupIdentity.has_value()) {
-            return juce::Result::fail("Invalid track group identity.");
-        }
-        track.group = *groupIdentity;
-        const auto trackEffects = loadEffects(*row, track.effects, identities);
-        if (trackEffects.failed()) {
-            return trackEffects;
-        }
+        track.group = readId(*row, "group").value_or(0);
+        loadEffects(*row, track.effects, identities, notes);
         if (track.kind == TrackKind::audio && !track.effects.empty()) {
-            return juce::Result::fail("Audio tracks cannot contain visual effects.");
+            notes.note("Effect on an audio track", juce::String(track.name));
+            track.effects.clear();
         }
         for (auto* item : row->getChildWithTagNameIterator("clip")) {
             Clip clip;
+            clip.name = item->getStringAttribute("name").toStdString();
+            const auto clipName = juce::String(clip.name);
             const auto clipIdentity = claimId(*item, identities);
             const auto asset = readId(*item, "asset"), composition = readId(*item, "composition");
-            if (!clipIdentity.has_value() || !asset.has_value() || !composition.has_value()) { return juce::Result::fail("Invalid clip identity."); }
+            if (!clipIdentity.has_value() || !asset.has_value() || !composition.has_value()) {
+                notes.note("Clip with a damaged identity", clipName);
+                continue;
+            }
             clip.id = *clipIdentity;
             clip.asset = *asset;
             clip.composition = *composition;
-            clip.name = item->getStringAttribute("name").toStdString();
             const auto timeBase = item->getStringAttribute("timeBase");
-            if (timeBase != "seconds" && timeBase != "beats") { return juce::Result::fail("Clip timing must be seconds or beats."); }
+            if (timeBase != "seconds" && timeBase != "beats") { notes.note("Clip timing this version doesn't have, made seconds", clipName); }
             clip.timeBase = timeBase == "beats" ? ClipTimeBase::beats : ClipTimeBase::seconds;
             clip.contentBpm = item->getDoubleAttribute("contentBpm", 0);
             clip.start = item->getDoubleAttribute("start");
@@ -404,16 +509,21 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
             const auto found = findAsset(assets, clip.asset);
             if (clip.composition != 0) {
                 if (clip.asset != 0 || !compositionIds.contains(clip.composition) || track.kind != TrackKind::visual) {
-                    return juce::Result::fail("Invalid reusable composition reference or track kind.");
+                    notes.note("Clip of a composition that's missing", clipName);
+                    continue;
                 }
             } else {
-                if (found == nullptr) { return juce::Result::fail("Invalid clip asset."); }
+                if (found == nullptr) {
+                    notes.note("Clip whose source is missing", clipName);
+                    continue;
+                }
                 if ((track.kind == TrackKind::audio) != (found->audio != nullptr)) {
-                    return juce::Result::fail("The clip source type does not match its audio or visual track.");
+                    notes.note("Clip on a track of the wrong kind", clipName);
+                    continue;
                 }
             }
-            // Every clip property must be a known, unique schema entry whose
-            // values lie inside its declared range.
+            // Every clip property is one its owner knows, once, inside its
+            // declared range; the rest are left out or brought inside.
             const auto specs = track.kind == TrackKind::audio ? std::span<const PropertySpec>(audioPropertySpecs) : objectPropertySpecs;
             const bool luaClip = clip.composition == 0 && found != nullptr && found->extension.equalsIgnoreCase(".lua");
             const auto* generator = clip.composition == 0 && found != nullptr ? generatorOf(*found) : nullptr;
@@ -422,71 +532,82 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                 auto* spec = findPropertySpec(specs, name);
                 if (spec == nullptr && luaClip) { spec = findPropertySpec(luaSliderSpecs, name); }
                 if (spec == nullptr && generator != nullptr) { spec = findPropertySpec(generator->parameters, name); }
-                if (spec == nullptr || clip.properties.contains(name)) {
-                    return juce::Result::fail("Unknown or duplicate clip property \"" + juce::String(name) + "\".");
+                if (spec == nullptr) {
+                    notes.note("Clip property this version doesn't have", name.empty() ? juce::String("(unnamed)") : juce::String(name));
+                    continue;
+                }
+                if (clip.properties.contains(name)) {
+                    notes.note("Clip property given twice", juce::String(name));
+                    continue;
                 }
                 Curve curve;
-                const auto result = loadProperty(*property, curve);
-                if (result.failed()) {
-                    return result;
+                if (!loadProperty(*property, curve, notes, juce::String(name))) {
+                    notes.note("Clip property that isn't a number", juce::String(name));
+                    continue;
                 }
                 if (!spec->contains(curve.base) || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [spec](const auto& key) { return !spec->contains(key.value); })) {
-                    return juce::Result::fail(juce::String(spec->label.data(), spec->label.size()) + " is outside its allowed range.");
+                    notes.note("Clip property outside its range, brought inside", juce::String(spec->label.data(), spec->label.size()));
+                    clampCurve(curve, *spec);
                 }
                 clip.properties[name] = std::move(curve);
             }
             const auto* luaBake = item->getChildByName("luaBake");
             if (luaBake != nullptr) {
-                // Saved slider bakes load without executing the script.
+                // Saved slider bakes load without executing the script; one
+                // that isn't valid is left out, and the editor bakes again.
                 auto bake = std::make_shared<LuaClipBake>();
                 bake->key = luaBake->getStringAttribute("key").toStdString();
                 const auto encoded = luaBake->getAllSubText();
-                if (!luaClip || bake->key.empty() || !readBase64(encoded, bake->archive, BakedSourceArchive::maximumCompressedBytes) || bake->archive.getSize() == 0) {
-                    return juce::Result::fail("Invalid or oversized Lua slider bake.");
+                if (luaClip && !bake->key.empty() && readBase64(encoded, bake->archive, BakedSourceArchive::maximumCompressedBytes) && bake->archive.getSize() > 0) {
+                    const auto frames = BakedSourceArchive::decode(bake->archive);
+                    // Checked against the clip's sliders once routes and links load.
+                    if (frames) {
+                        bake->source = std::make_shared<const PreparedSource>(frames.source);
+                        clip.luaBake = std::move(bake);
+                    }
                 }
-                const auto frames = BakedSourceArchive::decode(bake->archive);
-                if (!frames) { return juce::Result::fail(juce::String(frames.error)); }
-                // Checked against the clip's sliders once routes and links load.
-                bake->source = std::make_shared<const PreparedSource>(frames.source);
-                clip.luaBake = std::move(bake);
             }
-            const auto clipEffects = loadEffects(*item, clip.effects, identities);
-            if (clipEffects.failed()) {
-                return clipEffects;
-            }
+            loadEffects(*item, clip.effects, identities, notes);
             if (track.kind == TrackKind::audio) {
-                if (!clip.effects.empty() || !validProperties(clip.properties, audioPropertySpecs)) {
-                    return juce::Result::fail("Audio clips need gain (0 to 4) and pan (-1 to 1) curves and cannot contain visual effects or properties.");
+                if (!clip.effects.empty()) {
+                    notes.note("Effect on an audio clip", clipName);
+                    clip.effects.clear();
+                }
+                if (!validProperties(clip.properties, audioPropertySpecs)) {
+                    notes.note("Audio clip gain or pan that isn't valid, reset", clipName);
+                    clip.properties = defaultProperties(audioPropertySpecs);
                 }
             }
             if (!track.insert(std::move(clip), project.tempo())) {
-                return juce::Result::fail("Invalid or overlapping clip range.");
+                notes.note("Clip that overlaps another on its track, or has no length", clipName);
             }
         }
         project.tracks.push_back(std::move(track));
     }
     for (auto* item : xml.getChildWithTagNameIterator("camera")) {
         Camera camera;
+        camera.name = item->getStringAttribute("name", "Camera").toStdString();
         const auto identity = claimId(*item, identities);
         if (!identity.has_value()) {
-            return juce::Result::fail("Invalid camera identity.");
+            notes.note("Camera with a damaged identity", juce::String(camera.name));
+            continue;
         }
         camera.id = *identity;
-        camera.name = item->getStringAttribute("name", "Camera").toStdString();
-        const auto target = readId(*item, "target"), parent = readId(*item, "parent");
-        camera.target = target.value_or(0);
-        camera.parent = parent.value_or(0);
+        camera.target = readId(*item, "target").value_or(0);
+        camera.parent = readId(*item, "parent").value_or(0);
         camera.hideHiddenLines = item->getBoolAttribute("hideHiddenLines", false);
-        if (!target.has_value() || !parent.has_value() || (camera.parent != 0 && findGroup(project, camera.parent) == nullptr)
-            || (camera.target != 0 && findGroup(project, camera.target) == nullptr && !hasVisualClip(project, camera.target))) {
-            return juce::Result::fail("A camera aims at or is parented to a missing object.");
+        if (camera.parent != 0 && findGroup(project, camera.parent) == nullptr) {
+            notes.note("Camera carried by a group that's missing", juce::String(camera.name));
+            camera.parent = 0;
         }
-        const auto properties = loadKnownProperties(*item, camera.properties, "Unknown or duplicate camera property.");
-        if (properties.failed()) {
-            return properties;
+        if (camera.target != 0 && findGroup(project, camera.target) == nullptr && !hasVisualClip(project, camera.target)) {
+            notes.note("Camera aimed at something that's missing", juce::String(camera.name));
+            camera.target = 0;
         }
+        loadKnownProperties(*item, camera.properties, "Camera", notes);
         if (!camera.valid()) {
-            return juce::Result::fail("Invalid camera transform or field of view.");
+            notes.note("Camera transform or field of view that isn't valid, reset", juce::String(camera.name));
+            camera.properties = Camera {}.properties;
         }
         project.cameras.push_back(std::move(camera));
     }
@@ -494,13 +615,19 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         const auto id = claimId(*item, identities);
         Marker marker {id.value_or(0), item->getDoubleAttribute("time", -1), item->getStringAttribute("name")};
         if (!id.has_value() || !marker.valid(project.duration)) {
-            return juce::Result::fail("Invalid marker identity, position or name.");
+            notes.note("Marker that isn't valid", marker.name);
+            continue;
         }
         project.markers.push_back(std::move(marker));
     }
     sortMarkers(project.markers);
-    for (std::size_t index = 1; index < project.markers.size(); ++index) {
-        if (project.markers[index].time - project.markers[index - 1].time < Marker::minimumSpacing) { return juce::Result::fail("Markers must have distinct positions."); }
+    for (std::size_t index = 1; index < project.markers.size();) {
+        if (project.markers[index].time - project.markers[index - 1].time < Marker::minimumSpacing) {
+            notes.note("Marker at the same time as another", project.markers[index].name);
+            project.markers.erase(project.markers.begin() + static_cast<std::ptrdiff_t>(index));
+            continue;
+        }
+        ++index;
     }
     for (auto* item : xml.getChildWithTagNameIterator("cameraCut")) {
         CameraCut cut;
@@ -511,36 +638,38 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         cut.duration = item->getDoubleAttribute("duration");
         const auto camera = std::find_if(project.cameras.begin(), project.cameras.end(), [&](const auto& value) { return value.id == cut.camera; });
         if (!identity.has_value() || !cut.valid() || camera == project.cameras.end()) {
-            return juce::Result::fail("Invalid camera cut range, reference or identity.");
+            notes.note("Camera cut that isn't valid, or to a camera that's missing");
+            continue;
         }
         project.cameraCuts.push_back(cut);
     }
     std::sort(project.cameraCuts.begin(), project.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
-    for (std::size_t index = 1; index < project.cameraCuts.size(); ++index) {
+    for (std::size_t index = 1; index < project.cameraCuts.size();) {
         if (project.cameraCuts[index].start < project.cameraCuts[index - 1].end()) {
-            return juce::Result::fail("Camera cuts must not overlap.");
+            notes.note("Camera cut that overlaps another");
+            project.cameraCuts.erase(project.cameraCuts.begin() + static_cast<std::ptrdiff_t>(index));
+            continue;
         }
+        ++index;
     }
-    if (!validGroupHierarchy(project)) {
-        return juce::Result::fail("Groups require existing parents and track references, no cycles, and at most 32 nesting levels.");
-    }
+    repairGroups(project, notes);
     for (auto* item : xml.getChildWithTagNameIterator("modulator")) {
         Modulator modulator;
+        modulator.name = item->getStringAttribute("name").toStdString();
         const auto identity = claimId(*item, identities);
         modulator.id = identity.value_or(0);
-        modulator.name = item->getStringAttribute("name").toStdString();
         const auto tempoSync = item->getIntAttribute("tempoSync", -1);
         const auto seed = item->getStringAttribute("seed", "0").getLargeIntValue();
-        if (tempoSync < 0 || tempoSync > 1 || seed < 0 || seed > static_cast<juce::int64>(std::numeric_limits<std::uint32_t>::max())) {
-            return juce::Result::fail("Invalid modulator settings.");
-        }
         modulator.shape.waveform = static_cast<ModulationWaveform>(item->getIntAttribute("waveform", -1));
         modulator.shape.rateHz = item->getDoubleAttribute("rateHz", 1);
         modulator.shape.phase = item->getDoubleAttribute("phase", 0);
-        modulator.shape.tempoSync = tempoSync != 0;
+        modulator.shape.tempoSync = tempoSync == 1;
         modulator.shape.beatsPerCycle = item->getDoubleAttribute("beatsPerCycle", 1);
-        modulator.shape.seed = static_cast<std::uint32_t>(seed);
-        if (!identity.has_value() || !modulator.valid()) { return juce::Result::fail("Invalid modulator settings or identity."); }
+        modulator.shape.seed = static_cast<std::uint32_t>(std::clamp<juce::int64>(seed, 0, std::numeric_limits<std::uint32_t>::max()));
+        if (!identity.has_value() || tempoSync < 0 || tempoSync > 1 || !modulator.valid()) {
+            notes.note("Modulator that isn't valid", juce::String(modulator.name));
+            continue;
+        }
         project.modulators.push_back(std::move(modulator));
     }
     for (auto* item : xml.getChildWithTagNameIterator("route")) {
@@ -553,11 +682,13 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         route.amount = item->getDoubleAttribute("amount", 1);
         const auto mode = item->getIntAttribute("mode", -1);
         route.mode = static_cast<ModulationMode>(mode);
-        if (!identity.has_value() || mode < 0 || mode > 1 || !route.valid()) { return juce::Result::fail("Invalid modulation route settings or identity."); }
+        if (!identity.has_value() || mode < 0 || mode > 1 || !route.valid()) {
+            notes.note("Modulation that isn't valid", juce::String(route.property));
+            continue;
+        }
         project.routes.push_back(std::move(route));
     }
-    const auto modulation = validateModulation(project);
-    if (!modulation.empty()) { return juce::Result::fail(juce::String(modulation)); }
+    repairModulation(project, notes);
     // Only a slider bake matching its clip's sliders and what drives them is
     // kept; a stale one is dropped and the editor bakes again.
     const auto stale = [&](const Clip& clip) {
@@ -656,14 +787,16 @@ juce::XmlElement Document::save(const Project& project) {
 
 juce::XmlElement Document::save() const { return save(state); }
 
-juce::Result Document::load(const juce::XmlElement& xml) {
+juce::Result Document::load(const juce::XmlElement& xml, LoadNotes* notes) {
     Project prepared;
-    const auto result = prepareLoad(xml, prepared);
+    const auto result = prepareLoad(xml, prepared, nullptr, notes);
     if (result.wasOk()) { reset(std::move(prepared)); }
     return result;
 }
 
-juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel) try {
+juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel, LoadNotes* given) try {
+    LoadNotes ignored;
+    auto& notes = given != nullptr ? *given : ignored;
     if (cancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
     if (!xml.hasTagName("composition")) { return juce::Result::fail("Missing composition."); }
     Project project;
@@ -672,32 +805,54 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     project.scope.travelMicrosPerUnit = xml.getDoubleAttribute("scopeTravel", defaults.travelMicrosPerUnit);
     project.scope.settleMicros = xml.getDoubleAttribute("scopeSettle", defaults.settleMicros);
     project.scope.xyOnly = xml.getBoolAttribute("scopeXYOnly", defaults.xyOnly);
-    if (!project.scope.valid()) { return juce::Result::fail("Invalid scope timing profile."); }
+    if (!project.scope.valid()) {
+        notes.note("Scope timing that isn't valid, reset");
+        project.scope = defaults;
+    }
     // The Scope's identity is reserved before anything else claims one.
     std::set<Id> identities {beamIdentity}, compositionIds;
+    std::vector<std::pair<const juce::XmlElement*, Id>> definitions;
     for (auto* item : xml.getChildWithTagNameIterator("definition")) {
+        const auto* content = item->getChildByName("composition");
         const auto identity = claimId(*item, identities);
-        if (!identity.has_value()) { return juce::Result::fail("Invalid reusable composition identity."); }
+        if (!identity.has_value() || content == nullptr || content->getNextElementWithTagName("composition") != nullptr
+            || content->getChildByName("asset") != nullptr || content->getChildByName("definition") != nullptr) {
+            notes.note("Reusable composition that's damaged", content != nullptr ? content->getStringAttribute("name") : juce::String());
+            continue;
+        }
         compositionIds.insert(*identity);
+        definitions.emplace_back(content, *identity);
     }
     for (auto* item : xml.getChildWithTagNameIterator("asset")) {
         if (cancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
         auto asset = std::make_shared<Asset>();
-        const auto identity = claimId(*item, identities);
-        if (!identity.has_value()) { return juce::Result::fail("Invalid asset identity."); }
-        asset->id = *identity;
         // A name is only shown, so a missing one is replaced below, not refused.
         asset->name = item->getStringAttribute("name").trim().removeCharacters("\r\n");
         asset->extension = item->getStringAttribute("extension");
+        const auto identity = claimId(*item, identities);
+        // A source that can't be used is left out; its clips go with it.
+        const auto leaveOut = [&](const juce::String& why) { notes.note(why, asset->name.isNotEmpty() ? asset->name : asset->extension); };
+        if (!identity.has_value()) {
+            leaveOut("Source with a damaged identity");
+            continue;
+        }
+        asset->id = *identity;
         if (asset->extension.equalsIgnoreCase(".blender")) {
             const auto* live = item->getChildByName("blender");
-            if (live == nullptr || live->getNextElement() != nullptr || item->getNumChildElements() != 1 || asset->name.trim().isEmpty()) { return juce::Result::fail("Invalid Blender source identity or settings."); }
+            if (live == nullptr || asset->name.trim().isEmpty()) {
+                leaveOut("Blender source whose settings are damaged");
+                continue;
+            }
+            if (item->getNumChildElements() != 1) { notes.note("Blender source with settings given twice, the first used", asset->name); }
             asset->blenderSettings.port = live->getIntAttribute("port", 0);
             const auto policy = live->getStringAttribute("disconnect");
-            if (policy != "freeze" && policy != "blank") { return juce::Result::fail("Invalid Blender disconnect policy."); }
-            asset->blenderSettings.freezeOnDisconnect = policy == "freeze";
+            if (policy != "freeze" && policy != "blank") { notes.note("Blender source's disconnect setting this version doesn't have, made freeze", asset->name); }
+            asset->blenderSettings.freezeOnDisconnect = policy != "blank";
             const auto result = decodeAsset(*asset, cancel);
-            if (result.failed()) { return result; }
+            if (result.failed()) {
+                leaveOut("Blender source that couldn't be set up");
+                continue;
+            }
             project.assets.push_back(std::move(asset));
             continue;
         }
@@ -722,80 +877,77 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         const bool luaSource = asset->extension.equalsIgnoreCase(".lua");
         const bool videoSource = osci::files::isVideo(asset->extension);
         auto* source = luaSource || videoSource ? item->getChildByName("source") : item;
-        if (source == nullptr) { return juce::Result::fail("Baked asset is missing its source."); }
-        if (!readBase64(source->getAllSubText(), asset->data, maximumSourceBytes)) {
-            return juce::Result::fail("Invalid embedded source, or larger than the 64 MiB import limit.");
+        if (source == nullptr || !readBase64(source->getAllSubText(), asset->data, maximumSourceBytes)) {
+            leaveOut("Source whose file is damaged, or larger than the 64 MiB limit");
+            continue;
         }
         if (osci::files::isImage(asset->extension)) {
+            // Settings this version doesn't have are its defaults.
             const auto* raster = item->getChildByName("raster");
-            if (raster == nullptr) { return juce::Result::fail("Image asset is missing its preparation settings."); }
-            const auto mode = raster->getStringAttribute("mode");
-            if (mode != "contours" && mode != "scanlines" && mode != "hilbert") { return juce::Result::fail("Unknown image preparation mode."); }
-            asset->rasterSettings.mode = mode == "contours" ? RasterSettings::Mode::contours : mode == "scanlines" ? RasterSettings::Mode::scanlines : RasterSettings::Mode::hilbert;
-            const auto shading = raster->getStringAttribute("shading", "density");
-            if (shading != "density" && shading != "colour") { return juce::Result::fail("Unknown image shading."); }
+            const RasterSettings rasterDefaults;
+            if (raster == nullptr) { notes.note("Image whose settings are missing, given the defaults", asset->name); }
+            const auto mode = raster != nullptr ? raster->getStringAttribute("mode") : juce::String("contours");
+            if (mode != "contours" && mode != "scanlines" && mode != "hilbert") { notes.note("Image trace this version doesn't have, made outlines", asset->name); }
+            asset->rasterSettings.mode = mode == "scanlines" ? RasterSettings::Mode::scanlines : mode == "hilbert" ? RasterSettings::Mode::hilbert : RasterSettings::Mode::contours;
+            const auto shading = raster != nullptr ? raster->getStringAttribute("shading", "density") : juce::String("density");
             asset->rasterSettings.shading = shading == "colour" ? RasterSettings::Shading::colour : RasterSettings::Shading::density;
-            asset->rasterSettings.threshold = raster->getDoubleAttribute("threshold", -1);
-            asset->rasterSettings.invert = raster->getBoolAttribute("invert");
-            asset->rasterSettings.resolution = raster->getIntAttribute("resolution", 0);
-            if (videoSource) { asset->rasterSettings.videoFrameRate = raster->getDoubleAttribute("frameRate", 0); }
-            const auto points = raster->getIntAttribute("pointsPerFrame", 0);
-            if (points <= 0) { return juce::Result::fail("Invalid image sample count."); }
-            asset->rasterSettings.pointsPerFrame = static_cast<std::size_t>(points);
+            if (raster != nullptr) {
+                asset->rasterSettings.threshold = raster->getDoubleAttribute("threshold", rasterDefaults.threshold);
+                asset->rasterSettings.invert = raster->getBoolAttribute("invert");
+                asset->rasterSettings.resolution = raster->getIntAttribute("resolution", rasterDefaults.resolution);
+                if (videoSource) { asset->rasterSettings.videoFrameRate = raster->getDoubleAttribute("frameRate", 0); }
+                const auto points = raster->getIntAttribute("pointsPerFrame", 0);
+                if (points > 0) { asset->rasterSettings.pointsPerFrame = static_cast<std::size_t>(points); }
+            }
         }
         if (videoSource) {
             const auto* cache = item->getChildByName("video-cache");
-            if (cache == nullptr) { return juce::Result::fail("A video in this project is missing its prepared frames. Import it again."); }
-            asset->bakeKey = cache->getStringAttribute("key");
-            if (!readBase64(cache->getAllSubText(), asset->bakedData, BakedSourceArchive::maximumCompressedBytes) || asset->bakedData.getSize() == 0) {
-                return juce::Result::fail("Invalid or oversized video source cache.");
+            if (cache == nullptr || !readBase64(cache->getAllSubText(), asset->bakedData, BakedSourceArchive::maximumCompressedBytes) || asset->bakedData.getSize() == 0) {
+                leaveOut("Video whose prepared frames are missing (import it again)");
+                continue;
             }
+            asset->bakeKey = cache->getStringAttribute("key");
         }
         if (luaSource) {
             auto* bake = item->getChildByName("bake");
-            if (bake == nullptr) { return juce::Result::fail("A Lua source in this project is missing its prepared frames. Import it again."); }
+            const auto points = bake != nullptr ? bake->getIntAttribute("pointsPerFrame", 0) : -1;
+            const auto seed = bake != nullptr ? bake->getStringAttribute("seed", "-1").getLargeIntValue() : -1;
+            if (bake == nullptr || points < 0 || seed < 0 || seed > std::numeric_limits<std::uint32_t>::max()
+                || !readBase64(bake->getAllSubText(), asset->bakedData, BakedSourceArchive::maximumCompressedBytes) || asset->bakedData.getSize() == 0) {
+                leaveOut("Lua source whose prepared frames are missing (import it again)");
+                continue;
+            }
             asset->bakeSettings.duration = bake->getDoubleAttribute("duration", 0);
             asset->bakeSettings.frameRate = bake->getDoubleAttribute("frameRate", 0);
             asset->bakeSettings.bpm = bake->getDoubleAttribute("bpm", 0);
-            const auto points = bake->getIntAttribute("pointsPerFrame", 0);
-            const auto seed = bake->getStringAttribute("seed", "-1").getLargeIntValue();
-            if (points < 0 || seed < 0 || seed > std::numeric_limits<std::uint32_t>::max()) {
-                return juce::Result::fail("Invalid Lua bake settings.");
-            }
             asset->bakeSettings.pointsPerFrame = static_cast<std::size_t>(points);
             asset->bakeSettings.seed = static_cast<std::uint32_t>(seed);
             asset->bakeKey = bake->getStringAttribute("key");
-            if (!readBase64(bake->getAllSubText(), asset->bakedData, BakedSourceArchive::maximumCompressedBytes) || asset->bakedData.getSize() == 0) {
-                return juce::Result::fail("Invalid or oversized Lua source cache.");
-            }
         }
         const auto result = decodeAsset(*asset, cancel);
+        if (cancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
         if (result.failed()) {
-            return result;
+            notes.note("Source that couldn't be prepared", asset->name + " (" + result.getErrorMessage().trimCharactersAtEnd(".") + ")");
+            continue;
         }
         project.assets.push_back(std::move(asset));
     }
     // The Scope's picture; a project saved without it keeps the defaults.
     const auto* beam = xml.getChildByName("scopeBeam");
     if (beam != nullptr) {
-        if (beam->getNextElementWithTagName("scopeBeam") != nullptr) { return juce::Result::fail("A project has one Scope."); }
-        const auto properties = loadKnownProperties(*beam, project.beam.properties, "Unknown or duplicate Scope property.");
-        if (properties.failed()) { return properties; }
-        if (!project.beam.valid()) { return juce::Result::fail("Invalid Scope property."); }
+        if (beam->getNextElementWithTagName("scopeBeam") != nullptr) { notes.note("Second Scope, left out"); }
+        loadKnownProperties(*beam, project.beam.properties, "Scope", notes);
+        if (!project.beam.valid()) {
+            notes.note("Scope setting that isn't valid, reset");
+            project.beam = Beam {};
+        }
     }
-    const auto main = loadCompositionContent(xml, project, project.assets, identities, compositionIds);
+    const auto main = loadCompositionContent(xml, project, project.assets, identities, compositionIds, notes);
     if (main.failed()) { return main; }
-    for (auto* item : xml.getChildWithTagNameIterator("definition")) {
-        const auto* content = item->getChildByName("composition");
-        if (content == nullptr || content->getNextElementWithTagName("composition") != nullptr) {
-            return juce::Result::fail("A reusable definition requires exactly one composition.");
-        }
-        if (content->getChildByName("asset") != nullptr || content->getChildByName("definition") != nullptr) {
-            return juce::Result::fail("Reusable definitions share the project media and definition registries.");
-        }
+    for (const auto& [content, identity] : definitions) {
         auto definition = std::make_shared<CompositionDefinition>();
-        definition->id = readId(*item, "id").value_or(0);
-        const auto result = loadCompositionContent(*content, *definition, project.assets, identities, compositionIds);
+        definition->id = identity;
+        const auto result = loadCompositionContent(*content, *definition, project.assets, identities, compositionIds, notes);
         if (result.failed()) { return result; }
         project.definitions.push_back(std::move(definition));
     }

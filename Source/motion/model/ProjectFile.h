@@ -13,6 +13,8 @@ namespace motion {
 struct ProjectFile {
     std::unique_ptr<juce::XmlElement> xml;
     Project project;
+    // What this version couldn't use of it, left out (see LoadNotes).
+    LoadNotes notes;
 
     // The project in `data`, its sources prepared; a reason when it isn't one.
     static juce::Result read(const void* data, std::size_t size, ProjectFile& file, const std::atomic<bool>* cancel = nullptr) {
@@ -21,7 +23,7 @@ struct ProjectFile {
         if (file.xml == nullptr || !file.xml->hasTagName("motion-project") || file.xml->getIntAttribute("schema") != 1) { return juce::Result::fail("It isn't an osci-motion project this version can read."); }
         const auto* composition = file.xml->getChildByName("composition");
         if (composition == nullptr) { return juce::Result::fail("It has no composition."); }
-        return Document::prepareLoad(*composition, file.project, cancel);
+        return Document::prepareLoad(*composition, file.project, cancel, &file.notes);
     }
     static juce::Result read(const juce::File& source, ProjectFile& file, const std::atomic<bool>* cancel = nullptr) {
         juce::MemoryBlock bytes;

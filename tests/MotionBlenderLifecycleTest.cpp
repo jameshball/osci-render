@@ -28,14 +28,21 @@ public:
         expect(reopened.assets.front()->source == nullptr && reopened.assets.front()->data.getSize() == 0);
         auto invalid = xml;
         invalid.getChildByName("asset")->getChildByName("blender")->setAttribute("disconnect", "unknown");
-        motion::Project rejected;
-        expect(motion::Document::prepareLoad(invalid, rejected).failed());
+        // Settings this version can't use are put right or left out, and said.
+        motion::Project reloaded;
+        const auto opensLeavingOut = [&](const juce::XmlElement& damaged) {
+            motion::LoadNotes notes;
+            return motion::Document::prepareLoad(damaged, reloaded, nullptr, &notes).wasOk() && !notes.empty();
+        };
+        expect(opensLeavingOut(invalid));
+        expect(reloaded.assets.size() == 1 && reloaded.assets.front()->blenderSettings.freezeOnDisconnect);
         invalid = xml;
         invalid.getChildByName("asset")->getChildByName("blender")->setAttribute("port", 1);
-        expect(motion::Document::prepareLoad(invalid, rejected).failed());
+        expect(opensLeavingOut(invalid));
+        expect(reloaded.assets.empty());
         invalid = xml;
         invalid.getChildByName("asset")->createNewChildElement("blender");
-        expect(motion::Document::prepareLoad(invalid, rejected).failed());
+        expect(opensLeavingOut(invalid));
 
         std::shared_ptr<const motion::LiveSourceFrames> frames;
         motion::LiveBlenderController controller(document, [&](auto value) { frames = std::move(value); });

@@ -97,11 +97,13 @@ public:
         }
         auto stale = xml;
         stale.getChildByName("asset")->getChildByName("bake")->setAttribute("bpm", 130);
-        expect(restored.load(stale).failed());
+        motion::LoadNotes staleNotes;
+        expect(restored.load(stale, &staleNotes).wasOk() && !staleNotes.empty(), "a bake that doesn't match its settings is left out");
         auto missing = xml;
         missing.getChildByName("asset")->deleteAllChildElementsWithTagName("bake");
-        expect(restored.load(missing).failed());
-        expectEquals(static_cast<int>(restored.project().assets.size()), 1);
+        motion::LoadNotes missingNotes;
+        expect(restored.load(missing, &missingNotes).wasOk() && !missingNotes.empty(), "a Lua source without its frames is left out");
+        expect(restored.project().assets.empty());
 
         beginTest("Fractional bake FPS and tempo survive XML text serialization exactly");
         asset->bakeSettings.frameRate = 24000.0 / 1001.0;

@@ -145,12 +145,20 @@ void MotionEditor::loadProject(const juce::File& file) {
                 motion::ui::MessageSheet::show(*owner, "Project changed", "The current project changed while loading. Open the file again to replace it.");
                 return;
             }
+            const auto notes = task->file.notes;
             owner->processor.applyPreparedProject(std::move(task->file.project), *task->file.xml);
             if (owner->commandLineProject == CommandLineProject::waiting && file == owner->commandLineProjectFile) { owner->commandLineProject = CommandLineProject::loaded; }
             owner->processor.currentProjectFile = file.getFullPathName();
             owner->processor.setLastOpenedDirectory(file.getParentDirectory());
             owner->processor.addRecentProjectFile(file);
             owner->updateTitle();
+            // Saved by a version with things this one can't use: what was left out.
+            if (!notes.empty()) {
+                juce::String message = "This version couldn't use all of it, so these were left out or put right:\n";
+                for (const auto& line : notes.lines()) { message << juce::String(juce::CharPointer_UTF8("\xe2\x80\xa2 ")) << line << "\n"; }
+                message << "\nSaving keeps the project as it opened now.";
+                motion::ui::MessageSheet::show(*owner, "Opened, with some things left out", message, "OK", {}, file.getFileName());
+            }
         });
     });
 }

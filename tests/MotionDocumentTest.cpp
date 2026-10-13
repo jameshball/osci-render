@@ -114,7 +114,9 @@ public:
         expectEquals(loaded.project().markers.front().time, 4.125);
         auto invalid = document.save();
         invalid.getChildByName("marker")->setAttribute("time", "nan");
-        expect(loaded.load(invalid).failed());
+        expect(opensLeavingOut(loaded, invalid), "a marker that isn't valid is left out");
+        expect(loaded.project().markers.empty());
+        expect(loaded.load(document.save()).wasOk());
         // An identity so high that new ones would run into the Scope's is refused.
         auto crowded = document.save();
         crowded.getChildByName("marker")->setAttribute("id", juce::String(static_cast<juce::uint64>(motion::Document::maximumId)));
@@ -288,11 +290,9 @@ public:
             expectEquals((*copy)->markers.front().time, nested.time);
         }
         expect(loaded.load(document.save()).wasOk());
-        const auto valid = loaded.save().toString();
         auto duplicateIdentity = document.save();
         duplicateIdentity.getChildByName("marker")->setAttribute("id", "102");
-        expect(loaded.load(duplicateIdentity).failed());
-        expectEquals(loaded.save().toString(), valid);
+        expect(opensLeavingOut(loaded, duplicateIdentity), "a marker sharing another's identity is left out");
     }
 
     void testFractal() {
@@ -339,8 +339,8 @@ public:
         const auto valid = restored.save().toString();
         auto invalid = xml;
         invalid.getChildByName("asset")->setAttribute("fractalDepth", 16);
-        expect(restored.load(invalid).failed());
-        expectEquals(restored.save().toString(), valid);
+        expect(opensLeavingOut(restored, invalid), "a fractal too deep to prepare is left out");
+        expect(restored.project().assets.empty());
         const auto original = asset->source;
         asset->fractalDepth = 16;
         expect(motion::decodeAsset(*asset).failed());
@@ -458,7 +458,7 @@ public:
         typography.style = 4;
         expect(typography.validate().isNotEmpty());
 
-        beginTest("Typography is persisted and invalid styles reject atomically");
+        beginTest("Typography is persisted; text that can't be set is left out");
         juce::UndoManager typographyUndo;
         motion::Document typographyDocument(typographyUndo);
         auto title = std::make_shared<motion::Asset>();
@@ -488,8 +488,8 @@ public:
         const auto savedTypography = typographyRestored.save().toString();
         auto badTypography = typographyXml;
         badTypography.getChildByName("asset")->getChildByName("typography")->setAttribute("tracking", "nan");
-        expect(typographyRestored.load(badTypography).failed());
-        expectEquals(typographyRestored.save().toString(), savedTypography);
+        expect(opensLeavingOut(typographyRestored, badTypography), "text that can't be set is left out");
+        expect(typographyRestored.project().assets.empty());
 
         motion::Asset oversizedTitle;
         oversizedTitle.extension = ".txt";
@@ -544,7 +544,7 @@ public:
         expectEquals(preparedLoad.name, juce::String("Untouched destination"));
         cancelled.store(false);
         auto invalidPreparation = xml;
-        invalidPreparation.getChildByName("asset")->setAttribute("id", "0");
+        invalidPreparation.getChildByName("asset")->setAttribute("id", juce::String(static_cast<juce::uint64>(motion::Document::maximumId)));
         expect(motion::Document::prepareLoad(invalidPreparation, preparedLoad, &cancelled).failed());
         expectEquals(preparedLoad.name, juce::String("Untouched destination"));
         auto preparationResult = juce::Result::fail("Not run");
@@ -597,16 +597,29 @@ public:
             expect(std::isfinite(point.r) && std::isfinite(point.g) && std::isfinite(point.b));
         }
 
-        beginTest("Malformed projects are rejected atomically");
+        beginTest("A damaged project opens with what can be used, and says what was left out");
         auto invalid = std::make_unique<juce::XmlElement>(xml);
         invalid->setAttribute("duration", -1);
-        expect(restored.load(*invalid).failed());
+        expect(opensLeavingOut(restored, *invalid));
         expectEquals(static_cast<int>(restored.project().tracks.size()), 1);
         expectEquals(restored.project().duration, 180.0);
         auto duplicate = std::make_unique<juce::XmlElement>(xml);
         duplicate->addChildElement(new juce::XmlElement(*duplicate->getChildByName("asset")));
-        expect(restored.load(*duplicate).failed());
+        expect(opensLeavingOut(restored, *duplicate), "a second source with the same identity is left out");
         expectEquals(static_cast<int>(restored.project().assets.size()), 1);
+
+        beginTest("A project from another version opens, its unknowns counted together by kind");
+        auto newer = std::make_unique<juce::XmlElement>(xml);
+        auto* clipXml = newer->getChildByName("track")->getChildByName("clip");
+        for (int copy = 0; copy < 2; ++copy) { clipXml->createNewChildElement("property")->setAttribute("name", copy == 0 ? "hilbert" : "sierpinski"); }
+        clipXml->createNewChildElement("effect")->setAttribute("type", "warp-drive");
+        motion::LoadNotes notes;
+        expect(restored.load(*newer, &notes).wasOk());
+        expectEquals(static_cast<int>(restored.project().tracks.size()), 1);
+        expectEquals(notes.count(), 3);
+        const auto lines = notes.lines().joinIntoString("\n");
+        expect(lines.contains(juce::String(juce::CharPointer_UTF8("Clip property this version doesn't have (\xc3\x97" "2): hilbert, sierpinski"))), lines);
+        expect(lines.contains("Effect this version doesn't have: warp-drive"), lines);
         testCameras(document);
         testAnimatedSources();
         testEffects(document.project());
@@ -624,8 +637,16 @@ public:
     }
 
 private:
+    // `xml` opens as a project saved by another version does: what this one
+    // can't use is left out, and said.
+    bool opensLeavingOut(motion::Document& document, const juce::XmlElement& xml) {
+        motion::LoadNotes notes;
+        const auto result = document.load(xml, &notes);
+        return result.wasOk() && !notes.empty();
+    }
+
     void testScopeProfile(const motion::Project& source) {
-        beginTest("Scope timing round trips exactly, edits from nested compositions and rejects invalid values");
+        beginTest("Scope timing round trips exactly, edits from nested compositions and resets invalid values");
         juce::UndoManager undo;
         motion::Document document(undo);
         document.reset(source);
@@ -648,13 +669,12 @@ private:
         expect(loaded.load(legacy).wasOk());
         expect(loaded.project().scope == motion::ScopeProfile{}, "projects without a profile use the analog scope defaults");
         expect(loaded.load(xml).wasOk());
-        const auto unchanged = loaded.save().toString();
         for (const auto* attribute : {"scopeDwell", "scopeTravel", "scopeSettle"}) {
             for (const auto* value : {"-1", "nan", "inf", "1e9"}) {
                 auto invalid = xml;
                 invalid.setAttribute(attribute, value);
-                expect(loaded.load(invalid).failed(), juce::String(attribute) + "=" + value);
-                expectEquals(loaded.save().toString(), unchanged);
+                expect(opensLeavingOut(loaded, invalid), juce::String(attribute) + "=" + value);
+                expect(loaded.project().scope == motion::ScopeProfile {}, "the profile is reset to the defaults");
             }
         }
 
@@ -708,14 +728,13 @@ private:
         expect(document.project().timeDisplay == source.timeDisplay, "undoing the step that changed the display reverts it");
         expect(undo.redo());
         expectEquals(document.project().beatsPerBar, 3);
-        beginTest("Invalid timing settings reject atomically");
-        const auto unchanged = loaded.save().toString();
-        for (const auto* attribute : { "timeDisplay", "beatsPerBar", "snapBeats", "gridSnap", "bpm", "fps" }) {
+        beginTest("Invalid timing settings are reset to their defaults");
+        for (const auto* attribute : { "timeDisplay", "beatsPerBar", "snapBeats", "bpm", "fps" }) {
             auto invalid = xml;
             invalid.setAttribute(attribute, -1);
-            expect(loaded.load(invalid).failed());
-            expectEquals(loaded.save().toString(), unchanged);
+            expect(opensLeavingOut(loaded, invalid), attribute);
         }
+        expectEquals(loaded.project().frameRate, motion::Composition {}.frameRate);
     }
 
     void testAudioExports(const motion::Project& sourceProject) {
@@ -933,40 +952,37 @@ private:
         expect(loaded.project().assets.back()->data == audio->data);
         expectWithinAbsoluteError(loaded.project().assets.back()->audio->sample(1.0 / 8000).left, 0.5f, 0.00001f);
         expect(loaded.newId() > clip.id);
-        const auto unchanged = loaded.save().toString();
-        const auto reject = [&](juce::XmlElement invalid) {
-            expect(loaded.load(invalid).failed());
-            expectEquals(loaded.save().toString(), unchanged);
-        };
+        // What doesn't fit its track, or isn't valid, is left out, and said.
+        const auto leftOut = [&](juce::XmlElement invalid) { expect(opensLeavingOut(loaded, invalid)); };
         auto wrongVisualKind = xml;
         wrongVisualKind.getChildByName("track")->setAttribute("kind", "audio");
-        reject(wrongVisualKind);
+        leftOut(wrongVisualKind);
         auto wrongAudioKind = xml;
         for (auto* row : wrongAudioKind.getChildWithTagNameIterator("track")) {
             if (row->getStringAttribute("kind") == "audio") {
                 row->setAttribute("kind", "visual");
             }
         }
-        reject(wrongAudioKind);
+        leftOut(wrongAudioKind);
         auto unknownKind = xml;
         unknownKind.getChildByName("track")->setAttribute("kind", "unknown");
-        reject(unknownKind);
+        leftOut(unknownKind);
         auto badGain = xml;
         for (auto* row : badGain.getChildWithTagNameIterator("track")) {
             if (row->getStringAttribute("kind") == "audio") {
                 row->getChildByName("clip")->getChildByName("property")->setAttribute("base", 5);
             }
         }
-        reject(badGain);
+        leftOut(badGain);
         document.edit("Invalid audio effect", [](motion::Project& value) {
             value.tracks.change(value.tracks.size() - 1).effects.push_back(motion::makeEffect(9010, *motion::effectDefinition("bulge")));
         });
-        reject(document.save());
+        leftOut(document.save());
         document.edit("Invalid clip effect", [](motion::Project& value) {
             value.tracks.change(value.tracks.size() - 1).effects.clear();
             value.tracks.change(value.tracks.size() - 1).clips[0].effects.push_back(motion::makeEffect(9011, *motion::effectDefinition("bulge")));
         });
-        reject(document.save());
+        leftOut(document.save());
     }
 
     void testModulation(const motion::Project& sourceProject) {
@@ -1207,26 +1223,24 @@ private:
         expect(restored.project().groups[1].solo);
         motion::PreparedComposition reloaded(restored.project());
         expectWithinAbsoluteError(reloaded.clips[0].sample(3, 0.2).x, world.x, 0.00001f);
-        const auto unchanged = restored.save().toString();
-        const auto reject = [&](juce::XmlElement invalid) {
-            expect(restored.load(invalid).failed());
-            expectEquals(restored.save().toString(), unchanged);
-        };
+        // A group nested where it can't be moves to the top; one damaged is
+        // left out; what was put right is said.
+        const auto leftOut = [&](juce::XmlElement invalid) { expect(opensLeavingOut(restored, invalid)); };
         auto cyclic = xml;
         cyclic.getChildByName("group")->setAttribute("parent", juce::String(inner.id));
-        reject(cyclic);
+        leftOut(cyclic);
         auto missing = xml;
         missing.getChildByName("group")->setAttribute("parent", "9999");
-        reject(missing);
+        leftOut(missing);
         auto missingTrackGroup = xml;
         missingTrackGroup.getChildByName("track")->setAttribute("group", "9999");
-        reject(missingTrackGroup);
+        leftOut(missingTrackGroup);
         auto duplicate = xml;
         duplicate.getChildByName("group")->setAttribute("id", juce::String(sourceProject.assets[0]->id));
-        reject(duplicate);
+        leftOut(duplicate);
         auto badCurve = xml;
         badCurve.getChildByName("group")->getChildByName("property")->setAttribute("name", "unknown");
-        reject(badCurve);
+        leftOut(badCurve);
 
         beginTest("Group nesting is bounded and malformed snapshots fail closed");
         auto deep = sourceProject;
@@ -1639,8 +1653,8 @@ private:
         expect(loaded.revision() == revision && loaded.project().definitions.size() == 1);
         auto duplicate = xml;
         duplicate.getChildByName("definition")->setAttribute("id", juce::String(project.assets[0]->id));
-        expect(loaded.load(duplicate).failed());
-        expect(loaded.revision() == revision);
+        expect(opensLeavingOut(loaded, duplicate), "of a definition and a source sharing an identity, the source (read second) is left out");
+        expect(loaded.project().definitions.size() == 1 && loaded.project().assets.size() + 1 == project.assets.size());
     }
 
     void testEffects(const motion::Project& sourceProject) {
@@ -1797,24 +1811,20 @@ private:
         expect(restoredEffect != nullptr && restoredEffect->range.has_value());
         motion::PreparedComposition restored(loaded.project());
         expectWithinAbsoluteError(restored.sample(3, 0.2).x, composition.sample(3, 0.2).x, 0.00001f);
-        const auto before = loaded.save().toString();
-        const auto reject = [&](juce::XmlElement invalid) {
-            expect(loaded.load(invalid).failed());
-            expectEquals(loaded.save().toString(), before);
-        };
+        const auto leftOut = [&](juce::XmlElement invalid) { expect(opensLeavingOut(loaded, invalid)); };
         auto duplicate = xml;
         duplicate.getChildByName("effect")->setAttribute("id", juce::String(sourceProject.assets[0]->id));
-        reject(duplicate);
+        leftOut(duplicate);
         auto unknown = xml;
         unknown.getChildByName("effect")->setAttribute("type", "not-an-effect");
-        reject(unknown);
+        leftOut(unknown);
         auto badRange = xml;
         badRange.getChildByName("effect")->setAttribute("start", 0);
         badRange.getChildByName("effect")->setAttribute("duration", -1);
-        reject(badRange);
+        leftOut(badRange);
         auto badParameter = xml;
         badParameter.getChildByName("effect")->getChildByName("property")->setAttribute("base", 10000);
-        reject(badParameter);
+        leftOut(badParameter);
     }
 
     static motion::Asset textAsset(const juce::String& extension, const juce::String& text) {
@@ -2121,34 +2131,30 @@ private:
         motion::PreparedComposition reloaded(loaded.project());
         expectWithinAbsoluteError(reloaded.projectPoint({ 0, 0, 0 }, 3).x, -1.0f, 0.000001f);
 
-        beginTest("Invalid camera identities, curves, references and overlapping cuts reject atomically");
-        const auto unchanged = loaded.save().toString();
-        const auto reject = [&](const juce::XmlElement& invalid) {
-            expect(loaded.load(invalid).failed());
-            expectEquals(loaded.save().toString(), unchanged);
-        };
+        beginTest("Damaged cameras and cuts are left out or reset, and said");
+        const auto leftOut = [&](const juce::XmlElement& invalid) { expect(opensLeavingOut(loaded, invalid)); };
         auto duplicate = std::make_unique<juce::XmlElement>(xml);
         duplicate->getChildByName("camera")->setAttribute("id", juce::String(sourceProject.assets[0]->id));
-        reject(*duplicate);
+        leftOut(*duplicate);
         auto missingCamera = std::make_unique<juce::XmlElement>(xml);
         missingCamera->getChildByName("cameraCut")->setAttribute("camera", "999999");
-        reject(*missingCamera);
+        leftOut(*missingCamera);
         auto overlap = std::make_unique<juce::XmlElement>(xml);
         overlap->getChildByName("cameraCut")->setAttribute("duration", 3.0);
-        reject(*overlap);
+        leftOut(*overlap);
         auto badDuration = std::make_unique<juce::XmlElement>(xml);
         badDuration->getChildByName("cameraCut")->setAttribute("duration", 0.0);
-        reject(*badDuration);
+        leftOut(*badDuration);
         auto duplicateCut = std::make_unique<juce::XmlElement>(xml);
         duplicateCut->getChildByName("cameraCut")->setAttribute("id", juce::String(camera.id));
-        reject(*duplicateCut);
+        leftOut(*duplicateCut);
         auto badFieldOfView = std::make_unique<juce::XmlElement>(xml);
         for (auto* property : badFieldOfView->getChildByName("camera")->getChildWithTagNameIterator("property")) {
             if (property->getStringAttribute("name") == "fov") {
                 property->setAttribute("base", 180.0);
             }
         }
-        reject(*badFieldOfView);
+        leftOut(*badFieldOfView);
     }
 
 };
@@ -2210,11 +2216,14 @@ public:
             }
             auto invalid = document.save();
             invalid.getChildByName("asset")->getChildByName("raster")->setAttribute("threshold", .9);
-            const auto before = loaded.save().toString();
-            expect(loaded.load(invalid).failed()); expectEquals(loaded.save().toString(), before);
+            // A video whose settings or frames can't be used is left out, and said.
+            motion::LoadNotes notes;
+            expect(loaded.load(invalid, &notes).wasOk() && !notes.empty());
             invalid = document.save();
             invalid.getChildByName("asset")->removeChildElement(invalid.getChildByName("asset")->getChildByName("video-cache"), true);
-            expect(loaded.load(invalid).failed()); expectEquals(loaded.save().toString(), before);
+            motion::LoadNotes missingNotes;
+            expect(loaded.load(invalid, &missingNotes).wasOk() && !missingNotes.empty());
+            expect(loaded.project().assets.empty());
             if (juce::String(name) == "motion.mp4") {
                 reference = asset;
                 juce::TemporaryFile exported(".wav"); std::atomic<bool> cancel {false};

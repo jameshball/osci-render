@@ -178,13 +178,16 @@ public:
                 }
             }
             motion::Project loaded;
-            expect(motion::Document::prepareLoad(xml, loaded).failed());
+            motion::LoadNotes notes;
+            expect(motion::Document::prepareLoad(xml, loaded, nullptr, &notes).wasOk() && !notes.empty(), "a link in a loop is left out");
             auto dangling = f.document.save();
             auto* route = dangling.createNewChildElement("route");
             route->setAttribute("id", "9999"); route->setAttribute("modulator", "9998");
             route->setAttribute("target", juce::String(f.first)); route->setAttribute("property", "position.x");
             route->setAttribute("amount", "1"); route->setAttribute("mode", 0);
-            expect(motion::Document::prepareLoad(dangling, loaded).failed());
+            motion::LoadNotes danglingNotes;
+            expect(motion::Document::prepareLoad(dangling, loaded, nullptr, &danglingNotes).wasOk() && !danglingNotes.empty(), "a route from a missing modulator is left out");
+            expect(std::none_of(loaded.routes.begin(), loaded.routes.end(), [](const auto& each) { return each.id == 9999; }));
         }
     }
 };

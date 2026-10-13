@@ -144,7 +144,9 @@ public:
             expect(f.document.project().cameras[0].parent == 0);
             auto broken = f.document.save();
             broken.getChildByName("camera")->setAttribute("target", "987654");
-            expect(motion::Document::prepareLoad(broken, loaded).failed());
+            motion::LoadNotes notes;
+            expect(motion::Document::prepareLoad(broken, loaded, nullptr, &notes).wasOk() && !notes.empty());
+            expect(loaded.cameras[0].target == 0, "a camera aimed at something missing looks ahead");
         }
     }
 };

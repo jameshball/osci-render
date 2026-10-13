@@ -10,6 +10,7 @@
 #include "PreparedSource.h"
 #include "LiveSourceIdentity.h"
 #include "BlenderSourceSettings.h"
+#include "LoadNotes.h"
 #include "BakeSettings.h"
 #include "RasterSettings.h"
 #include "TextSettings.h"
@@ -330,9 +331,12 @@ public:
     juce::XmlElement save() const;
     // Any project as save() writes the document's.
     static juce::XmlElement save(const Project& project);
-    juce::Result load(const juce::XmlElement& xml);
+    juce::Result load(const juce::XmlElement& xml, LoadNotes* notes = nullptr);
     // Worker-safe preparation; output is replaced only after full validation.
-    static juce::Result prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel = nullptr);
+    // What a project from another version has that this one can't use is
+    // left out (or put right), and said in `notes`; only a file that isn't
+    // a project, or is damaged past using, fails.
+    static juce::Result prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel = nullptr, LoadNotes* notes = nullptr);
     std::function<void()> onChanged;
     // Called as an edit begins its own undo step: whatever else shares the
     // undo manager (parameter drags) starts a new step after it.

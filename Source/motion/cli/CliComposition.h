@@ -20,6 +20,7 @@ struct Composition {
         ProjectFile project;
         const auto read = Recipe::isRecipe(file) ? Recipe::read(file, project.project) : ProjectFile::read(file, project);
         if (read.failed()) { return read; }
+        for (const auto& line : project.notes.lines()) { std::cerr << file.getFileName() << ": left out " << line << std::endl; }
         return prepare(project.project, sampleRate, opened);
     }
     static juce::Result prepare(const Project& project, double sampleRate, Composition& prepared) {

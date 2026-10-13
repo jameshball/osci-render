@@ -122,11 +122,14 @@ public:
 
             auto broken = saved;
             broken.getChildByName("scopeBeam")->createNewChildElement("property")->setAttribute("name", "position.x");
-            motion::Document rejected(undo);
-            expect(rejected.load(broken).failed());
+            motion::Document reopened(undo);
+            motion::LoadNotes notes;
+            expect(reopened.load(broken, &notes).wasOk() && !notes.empty(), "a Scope property this version doesn't have is left out");
             auto clash = saved;
             clash.getChildByName("camera")->setAttribute("id", juce::String(static_cast<juce::int64>(motion::beamIdentity)));
-            expect(rejected.load(clash).failed());
+            motion::LoadNotes clashNotes;
+            expect(reopened.load(clash, &clashNotes).wasOk() && !clashNotes.empty(), "a camera claiming the Scope's identity is left out");
+            expect(reopened.project().cameras.empty());
         }
 
         beginTest("The visualiser's beam effects take the document's values without touching their parameters");
