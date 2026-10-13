@@ -2,6 +2,7 @@
 #include "../../parser/FileFormatRegistry.h"
 #include "SourcePreview.h"
 #include "GeneratorIcons.h"
+#include "SourceKind.h"
 
 MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(document), list("Motion assets", this) {
     setName("Asset library");
@@ -178,10 +179,7 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
         detail = "Composition" + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(clip.duration, 1) + " s";
     } else {
         const auto& asset = *assets[static_cast<std::size_t>(row)];
-        const auto drawn = asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset.data.toString());
-        const auto* generator = motion::generatorOf(asset);
-        detail = asset.liveIdentity != nullptr ? "Blender source" : asset.extension.equalsIgnoreCase(".blender-capture") ? "Capture" : drawn ? "Drawing"
-            : generator != nullptr ? juce::String(motion::generatorCategoryLabel(generator->category).data()) : asset.extension.trimCharactersAtStart(".").toUpperCase();
+        detail = motion::ui::sourceKind(asset);
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
             detail += juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(asset.source->duration(), 1) + " s";

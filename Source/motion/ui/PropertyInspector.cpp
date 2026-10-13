@@ -1,4 +1,5 @@
 #include "PropertyInspector.h"
+#include "SourceKind.h"
 #include "../model/KeyEdit.h"
 #include "../model/LightPresets.h"
 #include "../../parser/FileFormatRegistry.h"
@@ -835,20 +836,7 @@ juce::String MotionPropertyInspector::sourceKind(motion::Id clip) const {
             if (item.id != clip) { continue; }
             if (item.composition != 0) { return "Composition"; }
             const auto found = motion::findAsset(project.assets, item.asset);
-            if (found == nullptr) { return "Object"; }
-            const auto& asset = *found;
-            const auto extension = asset.extension.toLowerCase();
-            if (asset.liveIdentity != nullptr) { return "Blender"; }
-            if (const auto* generator = motion::generatorOf(asset)) { return juce::String(motion::generatorCategoryLabel(generator->category).data()); }
-            if (extension == ".txt") { return "Text"; }
-            if (extension == ".lua") { return "Lua"; }
-            if (extension == ".lsystem") { return "Fractal"; }
-            if (osci::files::isVideo(extension)) { return "Video"; }
-            if (osci::files::isImage(extension)) { return "Image"; }
-            if (extension == ".svg") { return motion::drawing::isDrawing(asset.data.toString()) ? "Drawing" : "Vector"; }
-            if (extension == ".json" || extension == ".lottie") { return "Lottie"; }
-            if (extension == ".obj") { return "3D object"; }
-            return "Object";
+            return found != nullptr ? motion::ui::sourceKind(*found) : juce::String("Object");
         }
     }
     return "Object";
