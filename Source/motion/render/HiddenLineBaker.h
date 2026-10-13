@@ -30,7 +30,7 @@ public:
         for (unsigned index = 0; index < threads; ++index) {
             auto done = std::make_shared<std::atomic<bool>>(false);
             auto thread = std::make_unique<WorkerThread>([bake, sampleRate, firstFrame, flag = cancel, done] {
-                run(*bake, sampleRate, firstFrame, *flag);
+                run(*bake, sampleRate, [&baking = *bake, firstFrame] { return baking.claim(firstFrame); }, *flag);
                 done->store(true);
             });
             thread->startThread(juce::Thread::Priority::low);
@@ -52,11 +52,21 @@ public:
 
     // Every frame, on this thread and helpers, before an export renders.
     static void bakeAll(Bake& bake, double sampleRate, const std::atomic<bool>& cancel) {
-        const auto threads = std::clamp<unsigned>(std::thread::hardware_concurrency(), 1u, 8u);
-        std::vector<std::thread> helpers;
-        for (unsigned index = 1; index < threads; ++index) { helpers.emplace_back([&] { run(bake, sampleRate, 0, cancel); }); }
-        run(bake, sampleRate, 0, cancel);
-        for (auto& helper : helpers) { helper.join(); }
+        onThreads(std::thread::hardware_concurrency(), [&] { run(bake, sampleRate, [&bake] { return bake.claim(0); }, cancel); });
+    }
+    // Only the frames `times` fall in, likewise: what a look at a few frames
+    // needs. For a bake nothing else is baking.
+    static void bakeFrames(Bake& bake, double sampleRate, const std::vector<double>& times, const std::atomic<bool>& cancel) {
+        std::vector<std::size_t> frames;
+        for (const auto time : times) { frames.push_back(bake.frameOf(time)); }
+        std::sort(frames.begin(), frames.end());
+        frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+        std::atomic<std::size_t> taken {0};
+        const auto next = [&]() -> std::optional<std::size_t> {
+            const auto index = taken.fetch_add(1, std::memory_order_relaxed);
+            return index < frames.size() ? std::optional(frames[index]) : std::nullopt;
+        };
+        onThreads(static_cast<unsigned>(std::min<std::size_t>(frames.size(), std::thread::hardware_concurrency())), [&] { run(bake, sampleRate, next, cancel); });
     }
 
 private:
@@ -73,18 +83,29 @@ private:
         std::shared_ptr<std::atomic<bool>> done;
     };
 
-    static void run(Bake& bake, double sampleRate, std::size_t firstFrame, const std::atomic<bool>& cancel) {
+    // `work` on up to eight threads, this one among them.
+    template <typename Work>
+    static void onThreads(unsigned wanted, Work&& work) {
+        const auto threads = std::clamp<unsigned>(wanted, 1u, 8u);
+        std::vector<std::thread> helpers;
+        for (unsigned index = 1; index < threads; ++index) { helpers.emplace_back(work); }
+        work();
+        for (auto& helper : helpers) { helper.join(); }
+    }
+    // Bakes the frames `next()` hands out until it has none.
+    template <typename Next>
+    static void run(Bake& bake, double sampleRate, Next&& next, const std::atomic<bool>& cancel) {
         if (cancel.load()) { return; }
         // A worker that fails gives its frames up, drawn whole, so the bake
         // still finishes.
-        const auto giveUp = [&bake, firstFrame](std::optional<std::size_t> frame) {
-            for (; frame.has_value(); frame = bake.claim(firstFrame)) { bake.skip(); }
+        const auto giveUp = [&bake, &next](std::optional<std::size_t> frame) {
+            for (; frame.has_value(); frame = next()) { bake.skip(); }
         };
         std::unique_ptr<PreparedComposition> composition;
         try {
             composition = std::make_unique<PreparedComposition>(*bake.project, sampleRate, &cancel, CompositionPurpose::culling, bake.reach);
         } catch (...) {
-            if (!cancel.load()) { giveUp(bake.claim(firstFrame)); }
+            if (!cancel.load()) { giveUp(next()); }
             return;
         }
         auto workspace = std::make_unique<Workspace>();
@@ -93,7 +114,7 @@ private:
         Fingerprint lastPrint, print;
         std::unique_ptr<Frame> last;
         while (!cancel.load(std::memory_order_relaxed)) {
-            const auto frame = bake.claim(firstFrame);
+            const auto frame = next();
             if (!frame.has_value()) { return; }
             try {
                 const auto time = bake.timeOf(*frame);
