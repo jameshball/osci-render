@@ -265,7 +265,11 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     const auto colour = primaryColour(*clip);
     auto withDrivers = curve;
     withDrivers.drivers = drivers;
-    const auto result = [&](double time) { return constrainedValue(*clip, withDrivers.evaluate(clip->localTime(time)), propertyName); };
+    const auto range = valueRange(*clip, propertyName);
+    const auto result = [&](double time) {
+        const auto value = withDrivers.evaluate(clip->localTime(time));
+        return range.has_value() ? std::clamp(value, range->first, range->second) : value;
+    };
     {
         // A soft fill under what plays, inside the stage, gives the curve
         // weight. It goes first so it never tints the other curves.
@@ -1206,26 +1210,14 @@ std::optional<juce::Point<float>> MotionCurveEditor::tangentPoint(const motion::
     return juce::Point<float>(centre.x + static_cast<float>(delta * xScale), centre.y - static_cast<float>(slope * delta * yScale));
 }
 
+std::optional<std::pair<double, double>> MotionCurveEditor::valueRange(const motion::PropertyTarget& target, const std::string& property) const {
+    const auto spec = motion::specFor(processor.document.project(), target.id, property);
+    return spec.has_value() ? std::optional(std::pair {spec->minimum, spec->maximum}) : std::nullopt;
+}
+
 double MotionCurveEditor::constrainedValue(const motion::PropertyTarget& target, double value, const std::string& property) const {
-    if (target.isAudio) { return property == "pan" ? std::clamp(value, -1.0, 1.0) : std::clamp(value, 0.0, 4.0); }
-    if (target.beam) {
-        const auto* spec = motion::findPropertySpec(motion::beamPropertySpecs, property);
-        return spec != nullptr ? spec->clamp(value) : value;
-    }
-    if (target.isEffect) {
-        const auto* effect = motion::findEffect(processor.document.project(), target.id);
-        const auto* definition = effect != nullptr ? motion::effectDefinition(effect->type) : nullptr;
-        if (definition != nullptr) {
-            for (const auto& parameter : definition->parameters) {
-                if (parameter.id == property) { return std::clamp(value, parameter.min, parameter.max); }
-            }
-        }
-    }
-    if (!target.isEffect && !target.camera && !target.beam) {
-        if (property == "red" || property == "green" || property == "blue") { return std::clamp(value, 0.0, 1.0); }
-        if (property == "opacity") { return std::clamp(value, 0.0, 100.0); }
-    }
-    return target.camera && property == "fov" ? std::clamp(value, 0.001, 179.999) : value;
+    const auto range = valueRange(target, property);
+    return range.has_value() ? std::clamp(value, range->first, range->second) : value;
 }
 
 double MotionCurveEditor::snappedTime(const motion::PropertyTarget& clip, double time, juce::ModifierKeys modifiers) const {
@@ -1323,11 +1315,13 @@ void MotionCurveEditor::fit(bool primaryOnly) {
     auto withDrivers = *curve;
     withDrivers.drivers = resultDrivers(*curve);
     // Include sampled extrema of cubic segments as well as exact key values.
+    const auto range = valueRange(*clip, propertyName);
     for (int i = 0; i <= 256; ++i) {
         const auto local = clip->localTime(std::lerp(first, last, i / 256.0));
         const auto base = curve->evaluateBase(local);
         low = std::min(low, base); high = std::max(high, base);
-        const auto value = constrainedValue(*clip, withDrivers.evaluate(local), propertyName);
+        const auto driven = withDrivers.evaluate(local);
+        const auto value = range.has_value() ? std::clamp(driven, range->first, range->second) : driven;
         low = std::min(low, value);
         high = std::max(high, value);
     }

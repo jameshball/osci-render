@@ -208,6 +208,8 @@ private:
     static double segmentSpan(const motion::Curve& curve, const motion::Keyframe& key, DragMode mode);
     // Handles sit on the true Bezier control points of cubic segments.
     std::optional<juce::Point<float>> tangentPoint(const motion::PropertyTarget& clip, const motion::Curve& curve, const motion::Keyframe& key, DragMode mode) const;
+    // The range a property's values keep to, as specified; none when it has no spec.
+    std::optional<std::pair<double, double>> valueRange(const motion::PropertyTarget& target, const std::string& property) const;
     double constrainedValue(const motion::PropertyTarget& target, double value, const std::string& property) const;
 
     double snappedTime(const motion::PropertyTarget& clip, double time, juce::ModifierKeys modifiers) const;
