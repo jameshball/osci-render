@@ -115,7 +115,8 @@ void MotionPropertyInspector::refresh() {
         const auto* generator = targetGenerator();
         if (generator != nullptr) { specList.assign(generator->parameters.begin(), generator->parameters.end()); }
         const auto base = motion::propertySpecs(*found);
-        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [generator](const auto& spec) { return motion::hasProperty(generator, spec.id); });
+        const auto surface = motion::hasSurface(processor.document.project(), target);
+        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [generator, surface](const auto& spec) { return motion::hasProperty(generator, spec.id, surface); });
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
     }
     const auto specs = std::span<const motion::PropertySpec>(specList);

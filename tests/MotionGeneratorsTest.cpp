@@ -21,6 +21,12 @@ public:
             values.front() += 1;
             expect(first != cache.at(sphere, values), "other values give another");
             expect(first->bytes() > first->shapeCount() * sizeof(void*), "a drawing reckons the memory it holds");
+            // A source has a surface (for Surface's lines and Mirror) where its drawings have faces.
+            const auto& arc = motion::generatorNamed("arc");
+            std::vector<double> arcValues;
+            for (const auto& spec : arc.parameters) { arcValues.push_back(spec.defaultValue); }
+            expect(motion::PreparedSource({first}, 30.0).hasFaces(), "a sphere has a surface");
+            expect(!motion::PreparedSource({cache.at(arc, arcValues)}, 30.0).hasFaces(), "an arc has none");
         }
 
         beginTest("A generator decodes at its defaults, and its clip holds its parameters");

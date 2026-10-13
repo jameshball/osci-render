@@ -1700,8 +1700,9 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
         if (generator != nullptr) {
             for (const auto& spec : generator->parameters) { add(spec.id); }
         }
+        const auto surface = motion::hasSurface(processor.document.project(), id);
         for (const auto& spec : motion::propertySpecs(*target)) {
-            if (motion::hasProperty(generator, spec.id)) { add(spec.id); }
+            if (motion::hasProperty(generator, spec.id, surface)) { add(spec.id); }
         }
         // A Lua clip's slider curves are graphable once they exist.
         for (const auto& spec : motion::luaSliderSpecs) {

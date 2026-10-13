@@ -3,6 +3,7 @@
 #include "PreparedDrawing.h"
 #include "PreparedPointFrames.h"
 #include "FrameTiming.h"
+#include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -13,7 +14,7 @@ namespace motion {
 class PreparedSource {
 public:
     PreparedSource(std::vector<std::shared_ptr<const motion::PreparedDrawing>> frames, double framesPerSecond)
-        : frames(std::move(frames)), framesPerSecond(framesPerSecond) {}
+        : frames(std::move(frames)), framesPerSecond(framesPerSecond), faced(anyFaces(this->frames)) {}
 
     explicit PreparedSource(std::shared_ptr<const PreparedPointFrames> points)
         : framesPerSecond(points != nullptr ? points->frameRate() : 0), points(std::move(points)) {}
@@ -26,13 +27,16 @@ public:
     }
 
     PreparedSource(std::vector<std::shared_ptr<const motion::PreparedDrawing>> frameDrawings, std::shared_ptr<const FrameTiming> frameTiming)
-        : frames(std::move(frameDrawings)), framesPerSecond(frameTiming != nullptr ? frameTiming->averageFrameRate() : 0), timing(std::move(frameTiming)) {
+        : frames(std::move(frameDrawings)), framesPerSecond(frameTiming != nullptr ? frameTiming->averageFrameRate() : 0), timing(std::move(frameTiming)), faced(anyFaces(frames)) {
         if (frames.empty() || timing == nullptr || frames.size() != timing->frameCount()) {
             throw std::invalid_argument("Prepared drawing frames and timing must have matching frame counts.");
         }
     }
 
     std::size_t frameCount() const { return points != nullptr ? points->frameCount() : frames.size(); }
+    // Whether any of its drawings has faces (a mesh, or a filled shape): a
+    // surface for lines to be laid on and to reflect with.
+    bool hasFaces() const { return faced; }
     double frameRate() const { return framesPerSecond; }
     std::size_t previewSampleCount() const { return points != nullptr ? points->pointsPerFrame() : 512; }
     double previewPhaseSpan() const { return points != nullptr ? 0.0 : 1.0 / 512; }
@@ -109,5 +113,10 @@ private:
     const double framesPerSecond;
     const std::shared_ptr<const PreparedPointFrames> points;
     const std::shared_ptr<const FrameTiming> timing;
+    const bool faced = false;
+
+    static bool anyFaces(const std::vector<std::shared_ptr<const motion::PreparedDrawing>>& drawings) {
+        return std::any_of(drawings.begin(), drawings.end(), [](const auto& drawing) { return drawing != nullptr && !drawing->faces().empty(); });
+    }
 };
 }

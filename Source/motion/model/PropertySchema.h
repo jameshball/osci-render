@@ -19,10 +19,12 @@ inline std::span<const PropertySpec> propertySpecs(const PropertyTarget& target)
 // of the object specs. A light draws nothing: it takes no share of the beam,
 // lights or reflects nothing of itself, and has no size; it has a place
 // (point and spot) and a way it shines (spot and directional), no more. A
-// curve has no surface to reflect with or draw lines on.
-inline bool hasProperty(const GeneratorDefinition* generator, std::string_view id) {
+// curve, or another source with no `surface` (see hasSurface), has nothing to
+// reflect with or draw lines on.
+inline bool hasProperty(const GeneratorDefinition* generator, std::string_view id, bool surface = true) {
     const auto category = generator != nullptr ? std::optional(generator->category) : std::nullopt;
     const auto onSurface = id == "reflects" || isLinesProperty(id);
+    if (onSurface && !surface) { return false; }
     if (category == GeneratorCategory::curve) { return !onSurface; }
     if (category != GeneratorCategory::light) { return true; }
     if (onSurface || id == "beam" || id == "lit" || id.starts_with("scale.") || id.starts_with("anchor.")) { return false; }
@@ -62,6 +64,26 @@ const GeneratorDefinition* generatorFor(const ProjectType& project, Id target) {
         }
     }
     return nullptr;
+}
+
+// Whether a clip's source, other than a generator's (see hasProperty), has a
+// surface: faces (a mesh, or a filled shape) for lines to be laid on and to
+// reflect with. A source not made yet, or a composition, may have.
+template <typename ProjectType>
+bool hasSurface(const ProjectType& project, Id target) {
+    if constexpr (requires { project.assets; }) {
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id != target || clip.asset == 0) { continue; }
+                for (const auto& asset : project.assets) {
+                    if (asset == nullptr || asset->id != clip.asset) { continue; }
+                    return generatorOf(*asset) != nullptr || asset->source == nullptr || asset->source->hasFaces();
+                }
+                return true;
+            }
+        }
+    }
+    return true;
 }
 
 // A generator clip's own parameter, when the target is one.
