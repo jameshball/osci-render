@@ -12,6 +12,13 @@ namespace motion::hidden {
 // frame: its corners and faces as surface lines take them, its normals, and
 // the patterns laid on it. Fixed to the drawing (its source kept alive, so
 // its address is never another's).
+// The pattern properties are in Pattern's order, one each.
+static_assert(patternCount == static_cast<std::size_t>(surface::Pattern::rings) + 1);
+static_assert(objectPropertySpecs[patternsIndex + static_cast<std::size_t>(surface::Pattern::spiral)].id == "spiral"
+    && objectPropertySpecs[patternsIndex + static_cast<std::size_t>(surface::Pattern::noise)].id == "noise"
+    && objectPropertySpecs[patternsIndex + static_cast<std::size_t>(surface::Pattern::slices)].id == "slices"
+    && objectPropertySpecs[patternsIndex + static_cast<std::size_t>(surface::Pattern::rings)].id == "rings");
+
 class LaidSurfaces {
 public:
     struct Surface {

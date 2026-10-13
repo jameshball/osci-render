@@ -578,8 +578,9 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     };
     for (auto& piece : pieces) { piece = {parents[piece.face], onParent(piece.face, piece.from), onParent(piece.face, piece.to)}; }
     // Then pieces that follow on over one face joined while they stay near
-    // straight (a fiftieth of the spacing), so a line is as few pieces as
-    // draw it well: the beam has only so many points a cycle.
+    // straight (within a 250th of the spacing: looser visibly flattens
+    // curves), so a line is as few pieces as draw it well: the beam has only
+    // so many points a cycle.
     const auto tolerance = (kind == Pattern::spiral ? std::min(spacing, climbing) : kind == Pattern::slices ? std::min(spacing, along) : spacing) * .004;
     const auto flat = [&](const Piece& piece, const Weights& weights) { return at(corners, faces[piece.face], weights); };
     std::vector<Piece> joined;
