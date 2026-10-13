@@ -230,6 +230,9 @@ public:
     bool canReferenceComposition(Id definition) const;
     juce::Result makeCompositionUnique(Id clipId, Id& definitionId);
     juce::Result createComposition(const std::vector<Id>& clipIds, juce::String name, Id& instanceId);
+    // A new group holding `ids` (tracks or groups), where they sat when they
+    // shared a parent; `made` is its id.
+    juce::Result groupTracks(const std::vector<Id>& ids, Id& made);
     juce::Result duplicateClips(const std::vector<Id>& sourceIds, std::vector<Id>& duplicateIds);
     // Clipboard contents are value copies, so pasting survives source deletion.
     struct CopiedClip { Id track = 0; TrackKind kind = TrackKind::visual; std::string trackName; Clip clip; };

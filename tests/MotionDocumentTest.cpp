@@ -1147,6 +1147,43 @@ private:
         expect(motion::trackIsAudible(project, project.tracks[0]));
         expect(!motion::trackIsAudible(project, project.tracks[1]));
 
+        beginTest("Grouping tracks makes a group where they were, in one undo step, and no deeper than groups go");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            motion::Project tracks;
+            for (motion::Id id = 1; id <= 3; ++id) {
+                motion::Track track;
+                track.id = id;
+                track.name = "Track " + std::to_string(id);
+                tracks.tracks.push_back(track);
+            }
+            document.reset(tracks);
+            motion::Id inner = 0, outer = 0;
+            expect(document.groupTracks({1, 2}, inner).wasOk());
+            const auto* group = motion::findGroup(document.project(), inner);
+            expect(group != nullptr && group->parent == 0, "the group sits at the top, where its tracks were");
+            expect(document.project().tracks[0].group == inner && document.project().tracks[1].group == inner && document.project().tracks[2].group == 0);
+            expect(document.groupTracks({inner, 3}, outer).wasOk());
+            expect(motion::findGroup(document.project(), inner)->parent == outer, "a group can be grouped");
+            // Wrapped again and again, groups go no deeper than they may.
+            auto outermost = outer;
+            bool refusedDeep = false;
+            for (std::size_t level = 0; level <= motion::maximumGroupDepth && !refusedDeep; ++level) {
+                motion::Id wrapper = 0;
+                refusedDeep = document.groupTracks({outermost}, wrapper).failed();
+                if (!refusedDeep) { outermost = wrapper; }
+            }
+            expect(refusedDeep, "nesting deeper than groups go is refused");
+            const auto before = document.project().groups.size();
+            motion::Id refused = 0;
+            const auto gone = document.groupTracks({inner, 99}, refused);
+            expect(gone.failed() && document.project().groups.size() == before, "a track that is gone groups nothing");
+            expect(document.groupTracks({}, refused).failed(), "nothing picked groups nothing");
+            expect(undo.undo());
+            expect(motion::findGroup(document.project(), outermost) == nullptr, "a grouping is one undo step");
+        }
+
         beginTest("Group persistence and undo preserve nested values, IDs and shared assets");
         juce::UndoManager undo;
         motion::Document document(undo);

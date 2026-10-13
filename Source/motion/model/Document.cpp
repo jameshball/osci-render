@@ -1247,6 +1247,39 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     return juce::Result::ok();
 }
 
+juce::Result Document::groupTracks(const std::vector<Id>& ids, Id& made) {
+    if (ids.empty()) { return juce::Result::fail("Pick tracks to group."); }
+    const auto& current = project();
+    // The new group sits where its members did when they shared a parent.
+    std::optional<Id> shared;
+    bool same = true;
+    for (const auto id : ids) {
+        const auto* group = findGroup(current, id);
+        const auto track = std::find_if(current.tracks.begin(), current.tracks.end(), [id](const auto& item) { return item.id == id; });
+        if (group == nullptr && track == current.tracks.end()) { return juce::Result::fail("A track to group no longer exists."); }
+        const auto parent = group != nullptr ? group->parent : track->group;
+        if (shared.has_value() && *shared != parent) { same = false; }
+        shared = parent;
+    }
+    Group group;
+    group.id = newId();
+    group.name = "Group " + std::to_string(current.groups.size() + 1);
+    group.parent = same && shared.has_value() ? *shared : 0;
+    const auto grouped = tryEdit(ids.size() > 1 ? "Group tracks" : "Group track", [&ids, &group](Project& updated) {
+        updated.groups.push_back(group);
+        for (const auto id : ids) {
+            auto* member = findGroup(updated, id);
+            if (member != nullptr) { member->parent = group.id; }
+            auto* track = updated.tracks.changeById(id);
+            if (track != nullptr) { track->group = group.id; }
+        }
+        return validGroupHierarchy(updated);
+    });
+    if (!grouped) { return juce::Result::fail("Those tracks cannot share a group."); }
+    made = group.id;
+    return juce::Result::ok();
+}
+
 juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::String name, Id& instanceId) {
     const auto& state = project();
     instanceId = 0;

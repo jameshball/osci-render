@@ -109,40 +109,15 @@ void MotionTimelineView::groupTracks(const std::vector<motion::Id>& ids) {
         if (onError) { onError("Select tracks to group: " + motion::style::shortcutText("Cmd-click") + " their names."); }
         return;
     }
-    const auto& project = processor.document.project();
-    // The new group sits where its members did when they shared a parent.
-    std::optional<motion::Id> shared;
-    bool same = true;
-    for (const auto id : ids) {
-        const auto* group = motion::findGroup(project, id);
-        const auto track = std::find_if(project.tracks.begin(), project.tracks.end(), [id](const auto& item) { return item.id == id; });
-        const auto parent = group != nullptr ? group->parent : track != project.tracks.end() ? track->group : motion::Id(0);
-        if (shared.has_value() && *shared != parent) { same = false; }
-        shared = parent;
-    }
-    motion::Group group;
-    group.id = processor.document.newId();
-    group.name = "Group " + std::to_string(project.groups.size() + 1);
-    group.parent = same && shared.has_value() ? *shared : 0;
-    auto candidate = project;
-    candidate.groups.push_back(group);
-    for (const auto id : ids) {
-        auto* member = motion::findGroup(candidate, id);
-        if (member != nullptr) { member->parent = group.id; }
-        auto* track = candidate.tracks.changeById(id);
-        if (track != nullptr) { track->group = group.id; }
-    }
-    if (!motion::validGroupHierarchy(candidate)) {
-        if (onError) { onError("Those tracks cannot share a group."); }
+    motion::Id made = 0;
+    const auto grouped = processor.document.groupTracks(ids, made);
+    if (grouped.failed()) {
+        if (onError) { onError(grouped.getErrorMessage()); }
         return;
     }
-    processor.document.edit(ids.size() > 1 ? "Group tracks" : "Group track", [candidate](motion::Project& updated) {
-        updated.groups = candidate.groups;
-        updated.tracks = candidate.tracks;
-    });
     selectedTracks.clear();
     refreshTracks();
-    selectClip(group.id);
+    selectClip(made);
 }
 
 MotionTimelineView::ViewState MotionTimelineView::viewState() const {
