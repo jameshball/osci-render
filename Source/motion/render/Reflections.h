@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -210,6 +211,7 @@ struct Mirror {
             std::map<std::pair<std::uint32_t, std::uint32_t>, int> edges;
         };
         std::vector<Group> groups;
+        std::map<std::tuple<long long, long long, long long, long long>, std::vector<std::size_t>> byPlane;
         double size = 0;
         for (const auto& corner : corners) {
             if (corner.has_value()) { size = std::max({size, std::abs(corner->x), std::abs(corner->y), std::abs(corner->z)}); }
@@ -222,13 +224,27 @@ struct Mirror {
             if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
             const auto normal = (*b - *a).cross(*c - *a).normalized(1.0e-12);
             if (!normal.has_value()) { continue; }
-            auto found = std::find_if(groups.begin(), groups.end(), [&](const Group& group) {
-                const auto facing = group.normal.dot(*normal);
-                return std::abs(facing) > 1 - 1.0e-9 && std::abs(group.offset - group.normal.dot(*a)) < slack;
+            // Its plane's group, looked up by the plane rounded (its normal
+            // turned one way), then matched exactly.
+            auto unit = *normal;
+            auto offset = unit.dot(*a);
+            const auto flip = unit.x < 0 || (unit.x == 0 && (unit.y < 0 || (unit.y == 0 && unit.z < 0)));
+            if (flip) {
+                unit = unit * -1.0;
+                offset = -offset;
+            }
+            const std::tuple key {std::llround(unit.x * 1.0e6), std::llround(unit.y * 1.0e6), std::llround(unit.z * 1.0e6), std::llround(offset / (slack * 8))};
+            auto& candidates = byPlane[key];
+            const auto match = std::find_if(candidates.begin(), candidates.end(), [&](std::size_t index) {
+                const auto& group = groups[index];
+                return std::abs(group.normal.dot(*normal)) > 1 - 1.0e-9 && std::abs(group.offset - group.normal.dot(*a)) < slack;
             });
-            if (found == groups.end()) {
-                groups.push_back({*normal, normal->dot(*a), {}});
-                found = groups.end() - 1;
+            Group* found = nullptr;
+            if (match != candidates.end()) {
+                found = &groups[*match];
+            } else {
+                candidates.push_back(groups.size());
+                found = &groups.emplace_back(Group {*normal, normal->dot(*a), {}});
             }
             for (std::size_t side = 0; side < 3; ++side) {
                 const auto from = face[side], to = face[(side + 1) % 3];
