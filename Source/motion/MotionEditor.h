@@ -51,7 +51,11 @@ public:
     void projectSaved() override { processor.document.markSaved(); }
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
     // `below`: under the anchor, wherever there is more room.
-    void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, bool below = false);
+    // Where a popover goes: the side with room, under its button (though
+    // wider than the column it is in), or left of what it edits, leaving it
+    // in view.
+    enum class Placement { best, below, left };
+    void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, Placement placement = Placement::best);
     static void dismissPopover(juce::Component* content);
     using PopoverEdit = std::function<juce::Result(motion::Document&)>;
     std::function<void(PopoverEdit)> popoverEdit(juce::Component* panel, std::function<void(const juce::String&)> showError = {});

@@ -306,13 +306,13 @@ MotionEditor::~MotionEditor() {
     setLookAndFeel(nullptr);
 }
 
-void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, bool below) {
+void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, Placement placement) {
     auto* panel = content.get();
     motion::style::styleFields(*panel);
     auto& box = juce::CallOutBox::launchAsynchronously(std::move(content), anchor, this);
     box.setArrowSize(9.0f);
-    // Below its button, though wider than the column it is in.
-    if (below) { box.updatePosition(anchor, getLocalBounds().withTop(anchor.getBottom())); }
+    if (placement == Placement::below) { box.updatePosition(anchor, getLocalBounds().withTop(anchor.getBottom())); }
+    if (placement == Placement::left) { box.updatePosition(anchor, getLocalBounds().withRight(anchor.getX())); }
     popover = &box;
     // Escape in a field closes the popover, as it does anywhere else in it.
     std::vector<juce::TextEditor*> fields;

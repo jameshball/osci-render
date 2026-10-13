@@ -432,7 +432,7 @@ void MotionEditor::setUpProperties() {
     };
     propertyInspector.selectedKeyTime = [this](motion::Id id) { return composition.selectedKeyContentTime(id); };
     propertyInspector.onKeyTimeEdited = [this] { composition.retainSelectedKeyAfterEdit(); };
-    propertyInspector.onShowPopover = [this](std::unique_ptr<juce::Component> content, juce::Component& anchor) { showPopover(std::move(content), getLocalArea(&anchor, anchor.getLocalBounds())); };
+    propertyInspector.onShowPopover = [this](std::unique_ptr<juce::Component> content, juce::Component& anchor) { showPopover(std::move(content), getLocalArea(&anchor, anchor.getLocalBounds()), Placement::left); };
 }
 
 void MotionEditor::setUpTimeline() {
@@ -595,7 +595,7 @@ void MotionEditor::showAddLight() {
         } else {
             addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[index]);
         }
-    }), getLocalArea(&addLightButton, addLightButton.getLocalBounds()), true);
+    }), getLocalArea(&addLightButton, addLightButton.getLocalBounds()), Placement::below);
 }
 
 void MotionEditor::showAddMirror() {
@@ -606,7 +606,7 @@ void MotionEditor::showAddMirror() {
     std::vector<motion::ui::AddPicker::Section> sections {{{}, std::move(choices), 2}};
     showPopover(std::make_unique<motion::ui::AddPicker>("Add a mirror", std::move(sections), [this](std::size_t, std::size_t index) {
         addMirror(motion::mirrorPresets[index]);
-    }), getLocalArea(&addMirrorButton, addMirrorButton.getLocalBounds()), true);
+    }), getLocalArea(&addMirrorButton, addMirrorButton.getLocalBounds()), Placement::below);
 }
 
 // A preset's generator reflecting wholly (every preset names one: see MirrorPresets.h).

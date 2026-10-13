@@ -810,7 +810,8 @@ void MotionPropertyInspector::openColourPicker(Row& row) {
         });
     };
     picker->onEnd = [this] { endGesture("Change colour"); };
-    onShowPopover(std::move(picker), *row.swatch);
+    // Beside the whole row, so its red, green and blue stay in view.
+    onShowPopover(std::move(picker), row);
 }
 
 void MotionPropertyInspector::commitValue(const std::string& property, double value, const juce::String& label) {
