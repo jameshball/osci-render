@@ -91,6 +91,8 @@ void writePreviews(const Composition& composition, const std::vector<double>& ti
     for (int index = 0; index < count; ++index) {
         const juce::Rectangle<int> cell(size * (index % across), size * (index / across), size, size);
         const auto time = times[static_cast<std::size_t>(index)];
+        // An image is drawn at the opacity of the colour last set (the cell's faint border).
+        g.setOpacity(1.0f);
         g.drawImageAt(BeamFrame::at(composition, time).preview(size), cell.getX(), cell.getY());
         g.setColour(juce::Colours::white.withAlpha(.6f));
         g.drawText(juce::String(time, 2) + " s", cell.reduced(8).removeFromTop(16), juce::Justification::topLeft);
