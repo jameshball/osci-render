@@ -314,7 +314,7 @@ MotionModulatorLibrary::ShapeButton::ShapeButton(const juce::String& text, motio
 void MotionModulatorLibrary::ShapeButton::paintButton(juce::Graphics& g, bool, bool down) {
     const auto bounds = getLocalBounds().toFloat();
     const auto on = getToggleState();
-    g.setColour(on ? motion::style::onFill().withMultipliedAlpha(down ? 1.3f : 1.0f) : juce::Colours::white.withAlpha(down ? .12f : .04f + .05f * fade.value()));
+    g.setColour(on ? motion::style::onFill().withMultipliedAlpha(down ? 1.3f : 1.0f) : down ? motion::style::pressFill() : juce::Colours::white.withAlpha(.04f + .05f * fade.value()));
     g.fillRoundedRectangle(bounds, motion::style::radius);
     motion::ui::paintModulatorShape(g, shape, bounds.reduced(5, 8), on ? juce::Colours::white : osci::Colours::text().withAlpha(.6f + .4f * fade.value()), 1.3f);
 }

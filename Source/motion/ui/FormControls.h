@@ -40,10 +40,10 @@ public:
             if (index == selected) {
                 g.setColour(osci::Colours::surfaceRaised().brighter(.12f));
                 g.fillRoundedRectangle(segment, style::radius);
-                g.setColour(juce::Colours::white.withAlpha(.07f));
+                g.setColour(style::hairline());
                 g.drawRoundedRectangle(segment.reduced(.5f), style::radius, 1.0f);
             } else if (index == hover && isEnabled()) {
-                g.setColour(juce::Colours::white.withAlpha(.05f));
+                g.setColour(style::hoverFill());
                 g.fillRoundedRectangle(segment, style::radius);
             }
             g.setFont(compact ? style::caption() : style::body());

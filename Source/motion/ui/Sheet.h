@@ -84,7 +84,7 @@ public:
             g.drawText(subtitle, header, juce::Justification::centredLeft, true);
         }
         if (!footer) { return; }
-        g.setColour(juce::Colours::white.withAlpha(.07f));
+        g.setColour(motion::style::hairline());
         g.fillRect(0, getHeight() - footerHeight - footerGap / 2 - 1, getWidth(), 1);
     }
     void resized() override {
@@ -302,7 +302,7 @@ public:
         Sheet::paint(g);
         // A thin track that fills in the accent; without a measure it waits.
         if (progress) {
-            g.setColour(juce::Colours::white.withAlpha(.08f));
+            g.setColour(motion::style::hairline());
             g.fillRoundedRectangle(bar, bar.getHeight() * .5f);
             g.setColour(osci::Colours::accentColor().withAlpha(.8f));
             g.fillRoundedRectangle(bar.withWidth(bar.getWidth() * static_cast<float>(std::clamp(shown, 0.0, 1.0))), bar.getHeight() * .5f);

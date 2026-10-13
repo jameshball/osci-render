@@ -517,7 +517,7 @@ void MotionCompositionView::paintOrientation(juce::Graphics& g) const {
     g.setColour(osci::Colours::veryDark().withAlpha(.6f));
     g.fillEllipse(juce::Rectangle<float>(80, 80).withCentre(centre));
     if (hoverCorner) {
-        g.setColour(juce::Colours::white.withAlpha(.05f));
+        g.setColour(motion::style::hoverFill());
         g.fillEllipse(juce::Rectangle<float>(80, 80).withCentre(centre));
     }
     struct Axis { motion::Vec3 direction; juce::Colour colour; const char* label; ViewPreset preset; };

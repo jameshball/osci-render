@@ -140,12 +140,12 @@ void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, std::optional<
     const auto area = plot();
     const auto grid = processor.document.project().timeGrid();
     // Whole-pixel hairlines stay crisp; minor lines sit at half strength.
-    const auto vertical = [&](double time, float alpha) {
-        g.setColour(juce::Colours::white.withAlpha(alpha));
+    const auto vertical = [&](double time, juce::Colour colour) {
+        g.setColour(colour);
         g.fillRect(std::round(timeX(time)), area.getY(), 1.0f, area.getHeight());
     };
-    if (minorStep.has_value()) { grid.forEachTick(viewStart, viewEnd, *minorStep, [&](double time) { vertical(time, .022f); }); }
-    grid.forEachTick(viewStart, viewEnd, step, [&](double time) { vertical(time, .05f); });
+    if (minorStep.has_value()) { grid.forEachTick(viewStart, viewEnd, *minorStep, [&](double time) { vertical(time, motion::style::gridMinor()); }); }
+    grid.forEachTick(viewStart, viewEnd, step, [&](double time) { vertical(time, motion::style::gridMajor()); });
     const auto valueTick = valueStep(high - low, std::max(3, juce::roundToInt(area.getHeight() / 30)));
     const auto decimals = std::clamp(static_cast<int>(-std::floor(std::log10(valueTick))), 0, 6);
     g.setFont(motion::style::caption());
@@ -156,7 +156,7 @@ void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, std::optional<
         const auto y = std::round(valueY(value));
         const auto major = static_cast<long long>(first + index) % 2 == 0;
         const auto zero = std::abs(value) < valueTick * 1e-6;
-        g.setColour(juce::Colours::white.withAlpha(zero ? .12f : major ? .05f : .022f));
+        g.setColour(zero ? motion::style::gridZero() : major ? motion::style::gridMajor() : motion::style::gridMinor());
         g.fillRect(area.getX(), y, area.getWidth(), 1.0f);
         if (!major || y < area.getY() - 1 || y > area.getBottom() + 1) { continue; }
         g.setColour(osci::Colours::text().withAlpha(zero ? .75f : .5f));
@@ -393,7 +393,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         auto legend = juce::Rectangle<int>(area.toNearestInt().getX() + 8, area.toNearestInt().getY() + 6, width, 20);
         g.setColour(osci::Colours::veryDark().withAlpha(.92f));
         g.fillRoundedRectangle(legend.toFloat(), 10.0f);
-        g.setColour(juce::Colours::white.withAlpha(.07f));
+        g.setColour(motion::style::hairline());
         g.drawRoundedRectangle(legend.toFloat().reduced(.5f), 10.0f, 1.0f);
         legend.removeFromLeft(10);
         g.setFont(motion::style::caption());

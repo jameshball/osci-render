@@ -36,7 +36,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
     // The plus adds a camera at the playhead, drawn like an icon button.
     const auto add = addCameraBounds().toFloat();
     if (addHover) {
-        g.setColour(juce::Colours::white.withAlpha(.08f));
+        g.setColour(motion::style::hoverFill());
         g.fillRoundedRectangle(add, motion::style::radius + 1);
     }
     motion::icons::draw(g, motion::icons::Icon::add, add, addHover ? osci::Colours::text() : osci::Colours::text().withAlpha(.72f), 16.0f);
@@ -48,7 +48,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
         const auto left = std::max(namesWidth, timeX(from)), right = std::min(getWidth(), timeX(end));
         if (right <= left) { return; }
         if (defaultSelected) {
-            g.setColour(juce::Colours::white.withAlpha(.07f));
+            g.setColour(motion::style::restFill());
             g.fillRect(left, top + 2, right - left, cameraBandHeight - 4);
         }
         g.setColour(osci::Colours::textMuted().withAlpha(defaultSelected ? .9f : .55f));

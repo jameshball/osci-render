@@ -125,7 +125,7 @@ public:
     static constexpr int rowsPerSection = 3;
     static constexpr int preferredHeight() { return hairline + 2 * (headingBlock + rowsPerSection * rowHeight + (rowsPerSection - 1) * rowGap) + sectionEnd; }
     void paint(juce::Graphics& g) override {
-        g.setColour(juce::Colours::white.withAlpha(.06f));
+        g.setColour(motion::style::hairline());
         for (const auto y : rules) { g.fillRect(0, y, getWidth(), 1); }
     }
 

@@ -155,10 +155,10 @@ public:
             g.setColour(osci::Colours::surface());
             g.fillRect(band);
         }
-        g.setColour(juce::Colours::white.withAlpha(.06f));
+        g.setColour(motion::style::hairline());
         g.fillRect(bar.withTop(bar.getBottom() - 1));
         g.fillRect(footer.withHeight(1));
-        g.setColour(juce::Colours::white.withAlpha(.1f));
+        g.setColour(motion::style::hairline());
         for (const auto& separator : separators) { g.fillRect(separator); }
     }
 

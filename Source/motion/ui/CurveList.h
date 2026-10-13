@@ -28,7 +28,7 @@ public:
         animatedOnly.setTooltip("Show only keyed or modulated properties");
         animatedOnly.setToggleState(true, juce::dontSendNotification);
         // A filter, not a status: on reads as pressed, not green.
-        animatedOnly.setOnColour(juce::Colours::white.withAlpha(.14f));
+        animatedOnly.setOnColour(motion::style::onFill());
         animatedOnly.onClick = [this] { layout(); };
         addAndMakeVisible(animatedOnly);
     }
@@ -136,12 +136,12 @@ private:
             const auto animated = channel.keyed || channel.driven;
             // Selection is neutral, marked by a bar in the channel's colour.
             if (selected) {
-                g.setColour(juce::Colours::white.withAlpha(.07f));
+                g.setColour(motion::style::restFill());
                 g.fillRect(bounds);
                 g.setColour(channel.colour);
                 g.fillRect(bounds.removeFromLeft(2));
             } else if (hovered) {
-                g.setColour(juce::Colours::white.withAlpha(.04f));
+                g.setColour(motion::style::hoverFill());
                 g.fillRect(bounds);
             }
             bounds = getLocalBounds().withTrimmedLeft(indent);

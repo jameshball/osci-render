@@ -372,7 +372,7 @@ void MotionPropertyInspector::Row::resized() {
 
 void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
     for (const auto& [y, title] : sections) {
-        g.setColour(juce::Colours::white.withAlpha(.06f));
+        g.setColour(motion::style::hairline());
         g.fillRect(0, y, getWidth(), 1);
         g.setFont(motion::style::heading());
         g.setColour(osci::Colours::text());

@@ -84,7 +84,7 @@ public:
         // The bake settings: a rule above, on the page's colour.
         g.setColour(osci::Colours::surface());
         g.fillRect(footer);
-        g.setColour(juce::Colours::white.withAlpha(.06f));
+        g.setColour(motion::style::hairline());
         g.fillRect(footer.removeFromTop(1));
         if (problem.isVisible()) {
             // Once the code changes the problem is the last bake's, dimmed.

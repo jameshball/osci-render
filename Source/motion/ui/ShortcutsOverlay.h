@@ -77,7 +77,7 @@ private:
             const auto cap = area.removeFromRight(width).withSizeKeepingCentre(width, 18).toFloat();
             g.setColour(osci::Colours::surfaceRaised().brighter(.08f));
             g.fillRoundedRectangle(cap, motion::style::radius);
-            g.setColour(juce::Colours::white.withAlpha(.06f));
+            g.setColour(motion::style::hairline());
             g.drawRoundedRectangle(cap.reduced(.5f), motion::style::radius, 1.0f);
             g.setColour(osci::Colours::text());
             g.drawText(text, cap, juce::Justification::centred, false);
@@ -94,7 +94,7 @@ private:
                 any = true;
                 // Sections break the list; rows within one need no rules.
                 if (y > 0) {
-                    g.setColour(juce::Colours::white.withAlpha(.07f));
+                    g.setColour(motion::style::hairline());
                     g.fillRect(0, y + 4, getWidth(), 1);
                 }
                 g.setColour(osci::Colours::text());

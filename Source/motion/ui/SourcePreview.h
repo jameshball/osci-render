@@ -72,7 +72,7 @@ public:
         const auto bounds = getLocalBounds().toFloat();
         g.setColour(juce::Colours::black);
         g.fillRoundedRectangle(bounds, style::radius + 1);
-        g.setColour(juce::Colours::white.withAlpha(.06f));
+        g.setColour(style::hairline());
         g.drawRoundedRectangle(bounds.reduced(.5f), style::radius + 1, 1.0f);
         // The drawing leaves room at the foot for its caption.
         const auto side = std::min(bounds.getWidth(), bounds.getHeight() - 20) - 24;

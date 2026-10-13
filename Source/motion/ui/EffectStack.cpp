@@ -303,11 +303,11 @@ void MotionEffectStack::Card::paint(juce::Graphics& g) {
     // A raised card with a hairline edge, so it reads clearly against the panel.
     g.setColour(osci::Colours::surfaceRaised().withAlpha(.6f));
     g.fillRoundedRectangle(bounds, motion::style::radius + 1);
-    g.setColour(juce::Colours::white.withAlpha(.08f));
+    g.setColour(motion::style::hairline());
     g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
     const auto header = getLocalBounds().removeFromTop(headerHeight);
     if (isMouseOver(true) && getMouseXYRelative().y < headerHeight) {
-        g.setColour(juce::Colours::white.withAlpha(.05f));
+        g.setColour(motion::style::hoverFill());
         g.fillRoundedRectangle(header.toFloat(), motion::style::radius + 1);
     }
     // The fold triangle: down when open, right when folded.

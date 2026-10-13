@@ -210,7 +210,7 @@ public:
         const auto bounds = getLocalBounds().toFloat();
         // Opaque, so strokes behind it never show through the tools.
         motion::style::fillFloatingPanel(g, bounds, osci::Colours::veryDark());
-        g.setColour(juce::Colours::white.withAlpha(.1f));
+        g.setColour(motion::style::hairline());
         for (const auto at : separators) {
             const auto across = static_cast<float>(inset + 4), along = static_cast<float>(at), extent = static_cast<float>(cell - 8);
             if (horizontal) {

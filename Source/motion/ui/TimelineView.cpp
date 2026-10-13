@@ -676,16 +676,16 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     const auto step = grid.tickStep(pixelsPerSecond);
     const auto minorStep = grid.snapStep(pixelsPerSecond, step);
     if (minorStep.has_value()) {
-        g.setColour(juce::Colours::white.withAlpha(0.035f));
+        g.setColour(motion::style::gridMinor());
         grid.forEachTick(scrollTime, viewEnd, *minorStep, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
     }
-    g.setColour(juce::Colours::white.withAlpha(0.06f));
+    g.setColour(motion::style::gridMajor());
     grid.forEachTick(scrollTime, viewEnd, step, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
     motion::ui::paintRulerLabels(g, grid, scrollTime, viewEnd, step, {0, 0, getWidth(), 26}, [this](double time) { return timeX(time); });
     paintLoop(g);
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(0, 0, namesWidth, toolsHeight);
-    g.setColour(juce::Colours::white.withAlpha(.1f));
+    g.setColour(motion::style::hairline());
     g.fillRect(snapButton.getX() - 5, 7, 1, toolsHeight - 14);
     const auto& tracks = processor.document.project().tracks;
     g.saveState();

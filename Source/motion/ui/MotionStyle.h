@@ -25,6 +25,18 @@ inline juce::Colour accentFill() { return accent().withAlpha(.12f); }
 inline juce::Colour accentStrong() { return accent().withAlpha(.5f); }
 // A toggle, tool or switch that is on.
 inline juce::Colour onFill() { return juce::Colours::white.withAlpha(.16f); }
+// Neutral washes over the dark surfaces, faintest first: what the pointer is
+// over; a control at rest, or a neutral selection; a hairline (a rule, a
+// separator, a border); and a control pressed.
+inline juce::Colour hoverFill() { return juce::Colours::white.withAlpha(.05f); }
+inline juce::Colour restFill() { return juce::Colours::white.withAlpha(.07f); }
+inline juce::Colour hairline() { return juce::Colours::white.withAlpha(.08f); }
+inline juce::Colour pressFill() { return juce::Colours::white.withAlpha(.12f); }
+// The time and value grids behind the timeline and the Graph: the snap
+// grid's fine lines, the labelled ticks', and the Graph's zero.
+inline juce::Colour gridMinor() { return juce::Colours::white.withAlpha(.03f); }
+inline juce::Colour gridMajor() { return juce::Colours::white.withAlpha(.055f); }
+inline juce::Colour gridZero() { return juce::Colours::white.withAlpha(.12f); }
 
 // The only type styles in osci-motion. All UI text uses one of these;
 // MotionTypographyTest fails if code anywhere else asks for a font.
@@ -215,7 +227,7 @@ inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
 inline void fillFloatingPanel(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour fill) {
     g.setColour(fill);
     g.fillRoundedRectangle(bounds, panelRadius + 1);
-    g.setColour(juce::Colours::white.withAlpha(.08f));
+    g.setColour(hairline());
     g.drawRoundedRectangle(bounds.reduced(.5f), panelRadius + 1, 1.0f);
 }
 // The dark well behind a thumbnail or preview.
@@ -340,7 +352,7 @@ public:
     // Quiet like the transport's icons until hovered; an open menu lifts.
     void drawMenuBarItem(juce::Graphics& g, int width, int height, int, const juce::String& text, bool over, bool open, bool, juce::MenuBarComponent& bar) override {
         if (open || (over && bar.isEnabled())) {
-            g.setColour(juce::Colours::white.withAlpha(open ? .12f : .08f));
+            g.setColour(open ? pressFill() : hairline());
             g.fillRoundedRectangle(juce::Rectangle<float>(static_cast<float>(width), static_cast<float>(height)).reduced(0.0f, 4.0f), radius + 1);
         }
         g.setColour(osci::Colours::text().withAlpha(bar.isEnabled() ? (open || over ? 1.0f : .72f) : .4f));
@@ -367,7 +379,7 @@ public:
         g.drawImageAt(cachedImage, 0, 0);
         g.setColour(popoverSurface());
         g.fillPath(path);
-        g.setColour(juce::Colours::white.withAlpha(.08f));
+        g.setColour(hairline());
         g.strokePath(path, juce::PathStrokeType(1.0f));
     }
     int getCallOutBoxBorderSize(const juce::CallOutBox&) override { return 16; }

@@ -21,7 +21,7 @@ public:
         const auto active = getToggleState();
         if (quiet && !active) {
             if (highlighted || down) {
-                g.setColour(juce::Colours::white.withAlpha(down ? .12f : .07f));
+                g.setColour(down ? motion::style::pressFill() : motion::style::restFill());
                 g.fillRoundedRectangle(bounds, style::radius);
             }
             paintContent(g, bounds, osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .6f));
