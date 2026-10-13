@@ -13,7 +13,7 @@ namespace motion::cli {
 // is made again exactly whatever the project format comes to be.
 //
 //   {
-//     "duration": 8, "fps": 60, "bpm": 120, "rateRatio": 4, "beam": {"intensity": 20},
+//     "name": "Ball", "duration": 8, "fps": 60, "bpm": 120, "rateRatio": 4, "beam": {"intensity": 20},
 //     "camera": {"lookAt": "Ball",
 //                "properties": {"position.z": 4, "hideLines": 100}, "keys": {"position.x": [[0, -1], [8, 1, "linear"]]}},
 //     "objects": [
@@ -59,6 +59,7 @@ private:
 
     juce::Result make(const juce::var& recipe) {
         if (!recipe.isObject()) { return juce::Result::fail("A recipe is a JSON object."); }
+        if (recipe.hasProperty("name")) { project.name = recipe["name"].toString(); }
         project.duration = number(recipe, "duration", 8);
         project.frameRate = number(recipe, "fps", 60);
         project.bpm = number(recipe, "bpm", 120);

@@ -83,7 +83,26 @@ void MotionEditor::projectNotLoaded(const juce::File& file) {
     if (commandLineProject == CommandLineProject::waiting && file == commandLineProjectFile) { commandLineProject = CommandLineProject::failed; }
 }
 
-void MotionEditor::loadProject(const juce::File& file) {
+void MotionEditor::openExample(const juce::String& resource) {
+    int size = 0;
+    const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);
+    const juce::String name = BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8());
+    if (data == nullptr || name.isEmpty()) { return; }
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    afterDiscarding("Open the " + name.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' ') + " example", [owner, data, size, name] {
+        if (owner == nullptr) { return; }
+        // Read from a copy, as any project is.
+        const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion examples");
+        const auto file = folder.getChildFile(name);
+        if (!folder.createDirectory().wasOk() || !file.replaceWithData(data, static_cast<std::size_t>(size))) {
+            owner->statusBar.show("Could not prepare the example " + name + ".");
+            return;
+        }
+        owner->loadProject(file, true);
+    });
+}
+
+void MotionEditor::loadProject(const juce::File& file, bool example) {
     if (projectLoad != nullptr) { projectLoad->cancelled.store(true); }
     if (projectLoadOverlay != nullptr) { dismissOverlay(projectLoadOverlay.getComponent()); }
     auto task = std::make_shared<ProjectLoad>();
@@ -117,7 +136,7 @@ void MotionEditor::loadProject(const juce::File& file) {
     };
     projectLoadOverlay = overlay.get();
     showOverlay(std::move(overlay));
-    imports.addJob([owner, task, file, generation, revision] {
+    imports.addJob([owner, task, file, generation, revision, example] {
         auto result = juce::Result::fail("Project loading cancelled.");
         if (!task->cancelled.load()) {
             try {
@@ -126,7 +145,7 @@ void MotionEditor::loadProject(const juce::File& file) {
                 result = juce::Result::fail("Couldn't open the project: " + juce::String(error.what()));
             }
         }
-        juce::MessageManager::callAsync([owner, task, file, generation, revision, result] {
+        juce::MessageManager::callAsync([owner, task, file, generation, revision, result, example] {
             if (owner == nullptr || owner->projectLoad != task || task->cancelled.load()) { return; }
             auto* overlay = owner->projectLoadOverlay.getComponent();
             owner->projectLoadOverlay = nullptr;
@@ -145,9 +164,14 @@ void MotionEditor::loadProject(const juce::File& file) {
             const auto notes = task->file.notes;
             owner->processor.applyPreparedProject(std::move(task->file.project), *task->file.xml);
             if (owner->commandLineProject == CommandLineProject::waiting && file == owner->commandLineProjectFile) { owner->commandLineProject = CommandLineProject::loaded; }
-            owner->processor.currentProjectFile = file.getFullPathName();
-            owner->processor.setLastOpenedDirectory(file.getParentDirectory());
-            owner->processor.addRecentProjectFile(file);
+            // An example is a new project: saving it asks where.
+            if (example) {
+                owner->processor.currentProjectFile = {};
+            } else {
+                owner->processor.currentProjectFile = file.getFullPathName();
+                owner->processor.setLastOpenedDirectory(file.getParentDirectory());
+                owner->processor.addRecentProjectFile(file);
+            }
             owner->updateTitle();
             // Saved by a version with things this one can't use: what was left out.
             if (!notes.empty()) {

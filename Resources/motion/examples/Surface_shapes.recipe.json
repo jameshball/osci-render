@@ -1,0 +1,569 @@
+{
+  "name": "Surface shapes",
+  "duration": 30,
+  "fps": 60,
+  "beam": {
+    "intensity": 20,
+    "persistence": 0.2
+  },
+  "camera": {
+    "path": {
+      "every": 0.1,
+      "position": [
+        "0.6 * sin(2 * pi * t / 8)",
+        "0.9",
+        "5.4"
+      ],
+      "look": [
+        "0",
+        "0",
+        "0"
+      ]
+    },
+    "keys": {
+      "hideLines": [
+        [
+          0,
+          0
+        ],
+        [
+          4.5,
+          0
+        ],
+        [
+          5.5,
+          100
+        ]
+      ]
+    }
+  },
+  "objects": [
+    {
+      "name": "Box",
+      "generator": "box",
+      "properties": {
+        "position.x": -1.05,
+        "generator.width": 0.5,
+        "generator.height": 0.5,
+        "generator.depth": 0.5,
+        "rotation.x": 20,
+        "fillDetail": 14,
+        "noiseFlow": 0.6
+      },
+      "keys": {
+        "rotation.y": {
+          "expression": "45 * t",
+          "every": 0.5
+        },
+        "edges": [
+          [
+            0,
+            100
+          ],
+          [
+            9.5,
+            100
+          ],
+          [
+            10.5,
+            0
+          ]
+        ],
+        "outline": [
+          [
+            0,
+            0
+          ],
+          [
+            9.5,
+            0
+          ],
+          [
+            10.5,
+            100
+          ]
+        ],
+        "spiral": [
+          [
+            0,
+            0
+          ],
+          [
+            9.5,
+            0
+          ],
+          [
+            10.5,
+            100
+          ],
+          [
+            14.5,
+            100
+          ],
+          [
+            15.5,
+            0
+          ]
+        ],
+        "noise": [
+          [
+            0,
+            0
+          ],
+          [
+            24.5,
+            0
+          ],
+          [
+            25.5,
+            100
+          ]
+        ],
+        "slices": [
+          [
+            0,
+            0
+          ],
+          [
+            19.5,
+            0
+          ],
+          [
+            20.5,
+            100
+          ],
+          [
+            24.5,
+            100
+          ],
+          [
+            25.5,
+            0
+          ]
+        ],
+        "rings": [
+          [
+            0,
+            0
+          ],
+          [
+            14.5,
+            0
+          ],
+          [
+            15.5,
+            100
+          ],
+          [
+            19.5,
+            100
+          ],
+          [
+            20.5,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Ball",
+      "generator": "sphere",
+      "properties": {
+        "position.x": -0.35,
+        "generator.radius": 0.3,
+        "generator.segments": 24,
+        "generator.rings": 12,
+        "fillDetail": 14,
+        "noiseFlow": 0.6
+      },
+      "keys": {
+        "edges": [
+          [
+            0,
+            100
+          ],
+          [
+            9.5,
+            100
+          ],
+          [
+            10.5,
+            0
+          ]
+        ],
+        "outline": [
+          [
+            0,
+            0
+          ],
+          [
+            9.5,
+            0
+          ],
+          [
+            10.5,
+            100
+          ]
+        ],
+        "spiral": [
+          [
+            0,
+            0
+          ],
+          [
+            9.5,
+            0
+          ],
+          [
+            10.5,
+            100
+          ],
+          [
+            14.5,
+            100
+          ],
+          [
+            15.5,
+            0
+          ]
+        ],
+        "noise": [
+          [
+            0,
+            0
+          ],
+          [
+            24.5,
+            0
+          ],
+          [
+            25.5,
+            100
+          ]
+        ],
+        "slices": [
+          [
+            0,
+            0
+          ],
+          [
+            19.5,
+            0
+          ],
+          [
+            20.5,
+            100
+          ],
+          [
+            24.5,
+            100
+          ],
+          [
+            25.5,
+            0
+          ]
+        ],
+        "rings": [
+          [
+            0,
+            0
+          ],
+          [
+            14.5,
+            0
+          ],
+          [
+            15.5,
+            100
+          ],
+          [
+            19.5,
+            100
+          ],
+          [
+            20.5,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Torus",
+      "generator": "torus",
+      "properties": {
+        "position.x": 0.38,
+        "rotation.x": 60,
+        "generator.radius": 0.26,
+        "generator.thickness": 0.1,
+        "generator.segments": 32,
+        "generator.sides": 14,
+        "fillDetail": 14,
+        "noiseFlow": 0.6
+      },
+      "keys": {
+        "rotation.y": {
+          "expression": "45 * t",
+          "every": 0.5
+        },
+        "edges": [
+          [
+            0,
+            100
+          ],
+          [
+            9.5,
+            100
+          ],
+          [
+            10.5,
+            0
+          ]
+        ],
+        "outline": [
+          [
+            0,
+            0
+          ],
+          [
+            9.5,
+            0
+          ],
+          [
+            10.5,
+            100
+          ]
+        ],
+        "spiral": [
+          [
+            0,
+            0
+          ],
+          [
+            9.5,
+            0
+          ],
+          [
+            10.5,
+            100
+          ],
+          [
+            14.5,
+            100
+          ],
+          [
+            15.5,
+            0
+          ]
+        ],
+        "noise": [
+          [
+            0,
+            0
+          ],
+          [
+            24.5,
+            0
+          ],
+          [
+            25.5,
+            100
+          ]
+        ],
+        "slices": [
+          [
+            0,
+            0
+          ],
+          [
+            19.5,
+            0
+          ],
+          [
+            20.5,
+            100
+          ],
+          [
+            24.5,
+            100
+          ],
+          [
+            25.5,
+            0
+          ]
+        ],
+        "rings": [
+          [
+            0,
+            0
+          ],
+          [
+            14.5,
+            0
+          ],
+          [
+            15.5,
+            100
+          ],
+          [
+            19.5,
+            100
+          ],
+          [
+            20.5,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Cone",
+      "generator": "cone",
+      "properties": {
+        "position.x": 1.05,
+        "position.y": -0.05,
+        "generator.radius": 0.28,
+        "generator.height": 0.6,
+        "fillDetail": 14,
+        "noiseFlow": 0.6
+      },
+      "keys": {
+        "edges": [
+          [
+            0,
+            100
+          ],
+          [
+            9.5,
+            100
+          ],
+          [
+            10.5,
+            0
+          ]
+        ],
+        "outline": [
+          [
+            0,
+            0
+          ],
+          [
+            9.5,
+            0
+          ],
+          [
+            10.5,
+            100
+          ]
+        ],
+        "spiral": [
+          [
+            0,
+            0
+          ],
+          [
+            9.5,
+            0
+          ],
+          [
+            10.5,
+            100
+          ],
+          [
+            14.5,
+            100
+          ],
+          [
+            15.5,
+            0
+          ]
+        ],
+        "noise": [
+          [
+            0,
+            0
+          ],
+          [
+            24.5,
+            0
+          ],
+          [
+            25.5,
+            100
+          ]
+        ],
+        "slices": [
+          [
+            0,
+            0
+          ],
+          [
+            19.5,
+            0
+          ],
+          [
+            20.5,
+            100
+          ],
+          [
+            24.5,
+            100
+          ],
+          [
+            25.5,
+            0
+          ]
+        ],
+        "rings": [
+          [
+            0,
+            0
+          ],
+          [
+            14.5,
+            0
+          ],
+          [
+            15.5,
+            100
+          ],
+          [
+            19.5,
+            100
+          ],
+          [
+            20.5,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Fill",
+      "generator": "ambientLight",
+      "properties": {
+        "light.intensity": 0.12
+      }
+    },
+    {
+      "name": "Key",
+      "generator": "pointLight",
+      "properties": {
+        "light.intensity": 2.4,
+        "light.range": 8,
+        "light.shadows": 100,
+        "position.y": 1.6
+      },
+      "keys": {
+        "position.x": {
+          "expression": "1.8 * cos(2 * pi * t / 8 + 2.3)",
+          "every": 0.25
+        },
+        "position.z": {
+          "expression": "1.8 * sin(2 * pi * t / 8 + 2.3)",
+          "every": 0.25
+        }
+      }
+    }
+  ],
+  "rateRatio": 4
+}

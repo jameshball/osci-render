@@ -12,10 +12,30 @@ void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, j
     commands.push_back({menu, std::move(name), std::move(shortcut), key, std::move(action)});
 }
 
+namespace {
+// The example projects that ship with osci-motion, as resources.
+juce::StringArray exampleProjects() {
+    juce::StringArray resources;
+    for (int index = 0; index < BinaryData::namedResourceListSize; ++index) {
+        if (juce::String(BinaryData::getNamedResourceOriginalFilename(BinaryData::namedResourceList[index])).endsWithIgnoreCase(".osci-motion")) { resources.add(BinaryData::namedResourceList[index]); }
+    }
+    return resources;
+}
+constexpr int firstExampleId = 1200;
+}
+
 void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     menu.addItem(motion::style::menuItem("New project", 1001, "Cmd+N"));
     menu.addItem(motion::style::menuItem("Open project...", 1002, "Cmd+O"));
     menus.addRecentProjectsSubmenu(menu, processor, 1100, 1099, true);
+    // Each opens as a new project, to look into or start from.
+    juce::PopupMenu examples;
+    const auto resources = exampleProjects();
+    for (int index = 0; index < resources.size(); ++index) {
+        const juce::String file = BinaryData::getNamedResourceOriginalFilename(resources[index].toRawUTF8());
+        examples.addItem(firstExampleId + index, file.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' '));
+    }
+    if (examples.getNumItems() > 0) { menu.addSubMenu("Examples", examples); }
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Save project", 1003, "Cmd+S"));
     menu.addItem(motion::style::menuItem("Save project as...", 1004, "Cmd+Shift+S"));
@@ -35,6 +55,11 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
 
 bool MotionEditor::fileMenuItemSelected(int id) {
     if (menus.handleRecentProjectMenuItem(id, processor, *this, 1100, 1099)) { return true; }
+    const auto examples = exampleProjects();
+    if (id >= firstExampleId && id < firstExampleId + examples.size()) {
+        openExample(examples[id - firstExampleId]);
+        return true;
+    }
     switch (id) {
         case 1001: resetToDefault(); return true;
         case 1002: CommonPluginEditor::openProject(); return true;

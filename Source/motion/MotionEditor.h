@@ -66,7 +66,10 @@ private:
     // Runs `then` at once when nothing would be lost, else once the user
     // agrees to discard the unsaved changes; `doing` says what discards them.
     void afterDiscarding(const juce::String& doing, std::function<void()> then);
-    void loadProject(const juce::File& file);
+    // `example`: one of those that ship with osci-motion, opened as a new
+    // project of its own (saving asks where), not as that file.
+    void loadProject(const juce::File& file, bool example = false);
+    void openExample(const juce::String& resource);
     // Where an export goes unless told otherwise: in the last folder used,
     // named for the project. A name chosen without the extension gets it.
     juce::File defaultExportFile(const juce::String& extension) const;
