@@ -26,6 +26,7 @@ public:
         stats.setColour(juce::Label::textColourId, osci::Colours::textSubtle());
         addAndMakeVisible(stats);
         action.setName("Status action");
+        action.getProperties().set(motion::style::captionButton, true);
         action.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
         action.setColour(juce::TextButton::textColourOffId, motion::style::accent());
         action.setMouseCursor(juce::MouseCursor::PointingHandCursor);
@@ -87,18 +88,20 @@ public:
         const auto statsWidth = juce::roundToInt(juce::TextLayout::getStringWidth(stats.getFont(), stats.getText())) + 8;
         stats.setBounds(area.removeFromRight(std::min(statsWidth, area.getWidth() / 2)));
         area.removeFromRight(motion::style::padding);
+        // The action keeps its whole label; the message gives way to it.
+        constexpr int actionHeight = 20;
+        const auto actionWidth = action.isVisible() ? std::min(area.getWidth(), juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::buttonFont(action), action.getButtonText())) + 16) : 0;
+        const auto messageArea = area.withTrimmedRight(actionWidth > 0 ? actionWidth + motion::style::gap : 0);
         const auto problem = current != Kind::notice;
         const auto text = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), message.getText())) + 2;
         const auto lead = problem ? 20 : 0, trail = dismiss.isVisible() ? 22 : 0;
-        pill = area.withWidth(std::min(area.getWidth(), lead + text + trail + (problem ? 4 : 0))).withSizeKeepingCentre(std::min(area.getWidth(), lead + text + trail + (problem ? 4 : 0)), 18).withX(area.getX());
+        const auto pillWidth = std::max(0, std::min(messageArea.getWidth(), lead + text + trail + (problem ? 4 : 0)));
+        pill = messageArea.withWidth(pillWidth).withSizeKeepingCentre(pillWidth, 18).withX(messageArea.getX());
         auto inside = pill;
         inside.removeFromLeft(lead);
         if (dismiss.isVisible()) { dismiss.setBounds(inside.removeFromRight(trail).withSizeKeepingCentre(14, 14)); }
         message.setBounds(inside.withY(area.getY()).withHeight(area.getHeight()));
-        if (action.isVisible()) {
-            const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), action.getButtonText())) + 16;
-            action.setBounds(pill.getRight() + motion::style::gap, area.getY() + (area.getHeight() - 20) / 2, std::min(width, std::max(0, area.getRight() - pill.getRight() - motion::style::gap)), 20);
-        }
+        if (action.isVisible()) { action.setBounds(pill.getRight() + motion::style::gap, area.getY() + (area.getHeight() - actionHeight) / 2, actionWidth, actionHeight); }
     }
 
 private:

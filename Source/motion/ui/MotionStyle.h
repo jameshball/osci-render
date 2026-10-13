@@ -38,6 +38,10 @@ inline juce::String dot() { return juce::String::fromUTF8(" \xc2\xb7 "); }
 inline juce::Font title() { return juce::Font(juce::FontOptions(13.0f, juce::Font::bold)); }
 inline juce::Font body() { return juce::Font(juce::FontOptions(13.0f)); }
 inline juce::Font caption() { return juce::Font(juce::FontOptions(11.0f)); }
+// A text button set with this property true is lettered in caption() rather
+// than body(): one sitting in a line of caption text.
+inline const juce::Identifier captionButton {"motionCaptionButton"};
+inline juce::Font buttonFont(const juce::Button& button) { return button.getProperties()[captionButton] ? caption() : body(); }
 inline juce::Font heading() { return juce::Font(juce::FontOptions(11.0f, juce::Font::bold)); }
 inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)); }
 // A shortcut written "Cmd+Shift+F9" as the platform shows it: ⇧⌘F9 on macOS,
@@ -350,7 +354,7 @@ public:
         PluginLookAndFeel::getIdealPopupMenuItemSize(text, separator, standardHeight, width, height);
         if (!separator) { width += 22; }
     }
-    juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
+    juce::Font getTextButtonFont(juce::TextButton& button, int) override { return buttonFont(button); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
     void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& colour, bool highlighted, bool down) override { paintButtonBackground(g, button, colour, highlighted, down); }
     // Popovers float a step above the panels they point at, with a shadow.
@@ -403,7 +407,7 @@ public:
         setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
     }
     juce::Font getPopupMenuFont() override { return body(); }
-    juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
+    juce::Font getTextButtonFont(juce::TextButton& button, int) override { return buttonFont(button); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
     void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& colour, bool highlighted, bool down) override { paintButtonBackground(g, button, colour, highlighted, down); }
     void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override { paintComboBox(g, width, height, box); }
