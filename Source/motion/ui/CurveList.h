@@ -119,7 +119,7 @@ private:
                 motion::icons::draw(g, shown ? motion::icons::Icon::visibility : motion::icons::Icon::visibilityOff, getLocalBounds().toFloat(), osci::Colours::text().withAlpha(alpha), 13.0f);
             }
         } eye;
-        std::function<void()> onClick;
+        std::function<void()> onClick, onMenu;
         explicit Row(Channel value) : channel(std::move(value)) {
             setName("Curve " + channel.label);
             setTitle(getName());
@@ -165,7 +165,12 @@ private:
         void resized() override { eye.setBounds(getLocalBounds().removeFromRight(28).withSizeKeepingCentre(20, 16)); }
         void mouseEnter(const juce::MouseEvent&) override { hovered = true; repaint(); }
         void mouseExit(const juce::MouseEvent&) override { hovered = false; repaint(); }
-        void mouseUp(const juce::MouseEvent& event) override { if (!event.mouseWasDraggedSinceMouseDown() && onClick) { onClick(); } }
+        // A click edits its curve; a right-click offers what can be done with it.
+        void mouseUp(const juce::MouseEvent& event) override {
+            if (event.mouseWasDraggedSinceMouseDown()) { return; }
+            const auto callback = event.mods.isPopupMenu() ? onMenu : onClick;
+            if (callback) { callback(); }
+        }
         // A selectable list item for assistive tools (and UI automation).
         std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override {
             struct Handler final : juce::AccessibilityHandler {
@@ -192,15 +197,38 @@ private:
             auto row = std::make_unique<Row>(channel);
             const auto id = channel.id;
             row->onClick = [this, id] { if (onChoose) { onChoose(id); } };
-            row->eye.onClick = [this, id] {
-                const auto show = !visible.contains(id);
-                if (show) { visible.insert(id); } else { visible.erase(id); }
-                if (onShow) { onShow(id, show); }
-            };
+            row->onMenu = [this, id, raw = row.get()] { showMenu(id, *raw); };
+            row->eye.onClick = [this, id] { show(id, !visible.contains(id)); };
             content.addAndMakeVisible(*row);
             rows.push_back(std::move(row));
         }
         layout();
+    }
+    // Whether a curve is drawn behind the one being edited.
+    void show(const std::string& id, bool shown) {
+        if (visible.contains(id) == shown) { return; }
+        if (shown) { visible.insert(id); } else { visible.erase(id); }
+        if (onShow) { onShow(id, shown); }
+    }
+    void showMenu(const std::string& id, juce::Component& row) {
+        const auto shown = visible.contains(id);
+        juce::PopupMenu menu;
+        menu.addItem(1, "Edit this curve", id != selected);
+        menu.addItem(2, shown ? "Hide behind the curve edited" : "Show behind the curve edited", id != selected);
+        menu.addSeparator();
+        menu.addItem(3, "Show every curve");
+        menu.addItem(4, "Hide the other curves");
+        menu.setLookAndFeel(&getLookAndFeel());
+        const juce::Component::SafePointer<MotionCurveList> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&row), [owner, id, shown](int choice) {
+            if (owner == nullptr) { return; }
+            if (choice == 1 && owner->onChoose) { owner->onChoose(id); }
+            if (choice == 2) { owner->show(id, !shown); }
+            for (const auto& channel : owner->channels) {
+                if (choice == 3) { owner->show(channel.id, true); }
+                if (choice == 4) { owner->show(channel.id, channel.id == id); }
+            }
+        });
     }
     void layout() {
         // Rows run edge to edge unless a scroll bar is actually showing.
