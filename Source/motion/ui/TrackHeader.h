@@ -55,7 +55,11 @@ public:
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
         lock.setVisible(!group);
-        disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Key lanes " + juce::String(id));
+        // Automation finds the controls by their names, which say whose they
+        // are by id; read out, they say it by the track's name.
+        const juce::String label(track.name);
+        disclosure.setName(group ? "Fold group " + juce::String(id) : "Key lanes " + juce::String(id));
+        disclosure.setTitle(group ? "Fold " + label : "Key lanes of " + label);
         disclosure.setTooltip(group ? "Fold or unfold this group" : "Show or hide key lanes");
         name.setFont(group ? motion::style::title() : motion::style::body());
         if (!name.isBeingEdited()) { name.setText(juce::String(track.name), juce::dontSendNotification); }
@@ -64,12 +68,12 @@ public:
         mute.setName("Mute track " + juce::String(track.id));
         solo.setName("Solo track " + juce::String(track.id));
         grip.setName("Reorder track " + juce::String(track.id));
-        name.setTitle(name.getName());
-        mute.setTitle(mute.getName());
-        solo.setTitle(solo.getName());
-        grip.setTitle(grip.getName());
+        name.setTitle(label);
+        mute.setTitle("Mute " + label);
+        solo.setTitle("Solo " + label);
+        grip.setTitle("Reorder " + label);
         lock.setName("Lock track " + juce::String(track.id));
-        lock.setTitle(lock.getName());
+        lock.setTitle("Lock " + label);
         mute.setToggleState(track.muted, juce::dontSendNotification);
         solo.setToggleState(track.solo, juce::dontSendNotification);
         lock.setToggleState(track.locked, juce::dontSendNotification);

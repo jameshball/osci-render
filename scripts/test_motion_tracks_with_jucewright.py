@@ -59,36 +59,36 @@ try:
     tree = snapshot()
     first = find(tree, lambda node: str(node.get("componentName", "")).startswith("Track name ") and node.get("value") == "cube.obj")
     track_id = first["componentName"].split()[-1]
-    step("mute object track", "click", "--name", "Mute track " + track_id, "--exact")
+    step("mute object track", "click", "--component-name", "Mute track " + track_id, "--exact")
     wait_undo("Mute track")
     step("muted output", "screenshot", "--file", session.artifact_dir / "muted-track.png")
     step("undo mute", "click", "--name", "Undo", "--exact")
-    step("solo object track", "click", "--name", "Solo track " + track_id, "--exact")
+    step("solo object track", "click", "--component-name", "Solo track " + track_id, "--exact")
     wait_undo("Solo track")
     label = find(snapshot(), lambda node: node.get("componentName") == "Track name " + track_id)
     step("rename object track", "fill", label["ref"], "Main geometry")
     step("commit track name", "press", "Return")
     wait_undo("Rename track")
     tree = snapshot()
-    grip = find(tree, lambda node: node.get("name") == "Reorder track " + track_id)["bounds"]
+    grip = find(tree, lambda node: node.get("componentName") == "Reorder track " + track_id)["bounds"]
     timeline = find(tree, lambda node: node.get("class") == "MotionTimelineView")["bounds"]
     step("reorder layers", "drag-xy", grip["x"] + grip["w"] // 2, grip["y"] + grip["h"] // 2,
          timeline["x"] + 20, timeline["y"] + 109, "--steps", 20)
     wait_undo("Reorder track")
-    after = find(snapshot(), lambda node: node.get("name") == "Reorder track " + track_id)["bounds"]
+    after = find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + track_id)["bounds"]
     if after["y"] <= grip["y"]:
         raise RuntimeError("Track header did not move down")
     step("undo reorder", "click", "--name", "Undo", "--exact")
-    restored = find(snapshot(), lambda node: node.get("name") == "Reorder track " + track_id)["bounds"]
+    restored = find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + track_id)["bounds"]
     if restored["y"] != grip["y"]:
         raise RuntimeError("Track order did not restore")
-    step("track actions", "click", "--name", "Reorder track " + track_id, "--exact")
+    step("track actions", "click", "--component-name", "Reorder track " + track_id, "--exact")
     step("delete populated track", "click", "--name", "Delete track", "--role", "menuItem", "--exact")
     wait_undo("Delete track")
-    if find(snapshot(), lambda node: node.get("name") == "Reorder track " + track_id) is not None:
+    if find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + track_id) is not None:
         raise RuntimeError("Deleted track header remains")
     step("undo track deletion", "click", "--name", "Undo", "--exact")
-    command("wait-for-locator", "--name", "Reorder track " + track_id, "--exact")
+    command("wait-for-locator", "--component-name", "Reorder track " + track_id, "--exact")
     step("tracks screenshot", "screenshot", "--file", session.artifact_dir / "track-controls.png")
     print("Motion track controls smoke passed", flush=True)
 finally:

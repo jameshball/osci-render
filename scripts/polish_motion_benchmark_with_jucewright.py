@@ -113,7 +113,7 @@ def keys(property_, values):
 def menu(name):
     target, _ = header(name)
     id_ = target["componentName"].split()[-1]
-    step("actions for " + name, "click", "--name", "Reorder track " + id_, "--exact")
+    step("actions for " + name, "click", "--component-name", "Reorder track " + id_, "--exact")
 
 
 def move_to(name, group):
@@ -169,7 +169,7 @@ try:
     step("open effects library", "click", effect_tab["ref"])
     tree = snapshot()
     effect = find(tree, lambda n: n.get("role") == "listItem" and n.get("name") == "Swirl")["bounds"]
-    target = find(tree, lambda n: n.get("name") == "Reorder track " + group_id)["bounds"]
+    target = find(tree, lambda n: n.get("componentName") == "Reorder track " + group_id)["bounds"]
     step("drop swirl on orbital group", "drag-xy", effect["x"] + effect["w"] // 2, effect["y"] + effect["h"] // 2,
          target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
     for time, value in [(0, 0), (112, 0), (120, .08), (128, -.08), (136, .06), (144, 0)]:

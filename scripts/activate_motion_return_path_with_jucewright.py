@@ -110,7 +110,7 @@ try:
     # Retain the prior bridge/packet layers muted for comparison.
     for track in (41,44):
         select_track(track,140)
-        step("mute superseded bridge layer", "click", "--name", "Mute track " + str(track), "--exact")
+        step("mute superseded bridge layer", "click", "--component-name", "Mute track " + str(track), "--exact")
     select_track(38,140)
     for moment,value in [(124.8,40),(128,0),(153.6,6),(166.4,6),(172.8,12)]:
         seek(moment); edit("opacity",value)

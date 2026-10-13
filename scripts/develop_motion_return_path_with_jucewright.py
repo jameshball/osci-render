@@ -112,7 +112,7 @@ def keys(property_, values):
 def menu(name):
     target, _ = header(name)
     id_ = target["componentName"].split()[-1]
-    step("actions for " + name, "click", "--name", "Reorder track " + id_, "--exact")
+    step("actions for " + name, "click", "--component-name", "Reorder track " + id_, "--exact")
 
 
 def move_to(name, group):

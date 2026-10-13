@@ -57,7 +57,7 @@ def header_id(label):
 
 
 def header_bounds(id):
-    return find(snapshot(), lambda node: node.get("name") == "Reorder track " + id)["bounds"]
+    return find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + id)["bounds"]
 
 
 try:
@@ -66,7 +66,7 @@ try:
     step("import object", "drop-files", "--file", session.root_dir / "Resources/models/cube.obj", "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "cube.obj", "--role", "label", "--exact")
     track = header_id("cube.obj")
-    step("track menu", "click", "--name", "Reorder track " + track, "--exact")
+    step("track menu", "click", "--component-name", "Reorder track " + track, "--exact")
     step("group track", "click", "--name", "Group track", "--role", "menuItem", "--exact")
     wait_undo("Group track")
     group = header_id("Group 1")
@@ -88,12 +88,12 @@ try:
     wait_undo("Change Position X")
     step("key group position", "click", "--name", "Key position", "--exact")
     wait_undo("Key position")
-    step("fold group", "click", "--name", "Fold group " + group, "--exact")
-    hidden = find(snapshot(), lambda node: node.get("name") == "Reorder track " + track and node.get("visible"))
+    step("fold group", "click", "--component-name", "Fold group " + group, "--exact")
+    hidden = find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + track and node.get("visible"))
     if hidden is not None:
         raise RuntimeError("Collapsed group kept child track visible")
-    step("unfold group", "click", "--name", "Fold group " + group, "--exact")
-    step("group menu", "click", "--name", "Reorder track " + group, "--exact")
+    step("unfold group", "click", "--component-name", "Fold group " + group, "--exact")
+    step("group menu", "click", "--component-name", "Reorder track " + group, "--exact")
     step("create nested group", "click", "--name", "Add nested group", "--role", "menuItem", "--exact")
     wait_undo("Create group")
     nested = header_id("Group 2")
@@ -117,7 +117,7 @@ try:
     wait_undo("Add Scale")
     command("wait-for-locator", "--component-name", "Effect scaleX", "--exact")
     step("group effects screenshot", "screenshot", "--file", session.artifact_dir / "group-effects.png")
-    step("empty grouped track menu", "click", "--name", "Reorder track " + group, "--exact")
+    step("empty grouped track menu", "click", "--component-name", "Reorder track " + group, "--exact")
     step("add empty grouped track", "click", "--name", "Add track to group", "--role", "menuItem", "--exact")
     wait_undo("Add track")
     empty = header_id("New track")
@@ -132,13 +132,13 @@ try:
     swirl = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and node.get("componentName") == "Swirl")
     step("add group swirl", "click", swirl["ref"], "--click-count", 2)
     wait_undo("Add Swirl")
-    step("delete parent menu", "click", "--name", "Reorder track " + group, "--exact")
+    step("delete parent menu", "click", "--component-name", "Reorder track " + group, "--exact")
     step("delete group", "click", "--name", "Delete group and its tracks", "--role", "menuItem", "--exact")
     wait_undo("Delete group")
-    if find(snapshot(), lambda node: node.get("name") == "Reorder track " + track) is not None:
+    if find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + track) is not None:
         raise RuntimeError("Group deletion left descendant track")
     step("undo group deletion", "click", "--name", "Undo", "--exact")
-    command("wait-for-locator", "--name", "Reorder track " + track, "--exact")
+    command("wait-for-locator", "--component-name", "Reorder track " + track, "--exact")
     step("restored group screenshot", "screenshot", "--file", session.artifact_dir / "group-restored.png")
     print("Motion group workflow smoke passed", flush=True)
 finally:
