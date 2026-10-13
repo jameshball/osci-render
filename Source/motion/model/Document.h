@@ -44,7 +44,8 @@ struct Marker {
     Id id = 0;
     double time = 0;
     juce::String name;
-    static bool validName(const juce::String& name) { return name.trim().isNotEmpty() && name.length() <= 120 && !name.containsAnyOf("\r\n"); }
+    static constexpr int longestName = 120;
+    static bool validName(const juce::String& name) { return name.trim().isNotEmpty() && name.length() <= longestName && !name.containsAnyOf("\r\n"); }
     bool valid(double duration) const { return std::isfinite(time) && time >= 0 && time <= duration && validName(name); }
 };
 

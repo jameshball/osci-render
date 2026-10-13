@@ -93,9 +93,15 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
     name.setFont(motion::style::title());
     name.setEditable(false, true);
     name.setTooltip("Double-click to rename");
+    // An empty name leaves it as it was; one too long to save says so.
     name.onTextChange = [this] {
         const auto text = name.getText().trim();
-        if (text.isEmpty() || text.length() > 120) { refresh(); return; }
+        const auto tooLong = text.getNumBytesAsUTF8() > motion::Modulator::longestName;
+        if (tooLong) { report(juce::Result::fail("A modulator's name can be at most " + juce::String(static_cast<int>(motion::Modulator::longestName)) + " characters.")); }
+        if (text.isEmpty() || tooLong) {
+            refresh();
+            return;
+        }
         change([text](auto& modulator) { modulator.name = text.toStdString(); });
     };
     content.addAndMakeVisible(name);

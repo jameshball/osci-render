@@ -152,6 +152,9 @@ private:
     // A source being drawn or written takes over the Scene, one at a time,
     // until it is saved or cancelled, or another project opens.
     std::unique_ptr<juce::Component> sceneEditor;
+    // Whether an editor already fills the Scene: if so it says to finish it
+    // first, and gives it the keyboard.
+    bool sceneEditorOpen();
     std::uint64_t sceneEditorGeneration = 0;
     template <typename Editor>
     Editor* sceneEditorAs() const { return dynamic_cast<Editor*>(sceneEditor.get()); }

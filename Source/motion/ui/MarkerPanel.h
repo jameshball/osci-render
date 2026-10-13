@@ -47,10 +47,10 @@ protected:
 private:
     void refresh() {
         time = position.getText() == initialPosition ? std::optional<double>(originalTime) : grid.parsePosition(position.getText().toStdString());
-        const bool validName = name.getText().trim().isNotEmpty() && name.getText().trim().length() <= 120;
+        const bool validName = motion::Marker::validName(name.getText().trim());
         const bool validTime = time.has_value() && *time >= 0 && *time <= duration;
         primary.setEnabled(validName && validTime);
-        setError(!validName ? "Name: 1-120 characters" : !validTime ? "Outside the composition" : "");
+        setError(!validName ? "Name: 1-" + juce::String(motion::Marker::longestName) + " characters" : !validTime ? "Outside the composition" : "");
     }
     motion::TimeGrid grid;
     double duration, originalTime;

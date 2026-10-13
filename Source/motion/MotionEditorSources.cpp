@@ -574,8 +574,15 @@ void MotionEditor::closeSceneEditor() {
 
 // Draw a new source, or edit a drawn one (`asset`). The drawing is saved as
 // SVG in a temporary folder and imported like any file, relinking an edit.
+bool MotionEditor::sceneEditorOpen() {
+    if (sceneEditor == nullptr) { return false; }
+    statusBar.show("An editor is open in the Scene: finish it or cancel it first.", MotionStatusBar::Kind::warning);
+    sceneEditor->grabKeyboardFocus();
+    return true;
+}
+
 void MotionEditor::showDrawingEditor(motion::Id asset) {
-    if (sceneEditor != nullptr) { return; }
+    if (sceneEditorOpen()) { return; }
     motion::drawing::Drawing initial;
     juce::String name;
     const auto& assets = processor.document.mainProject().assets;
@@ -617,7 +624,7 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
 }
 
 void MotionEditor::showTextEditor(SourceRequest request) {
-    if (request.replacement == nullptr || sceneEditor != nullptr) { return; }
+    if (request.replacement == nullptr || sceneEditorOpen()) { return; }
     const auto& asset = *request.replacement;
     const auto draft = request.editedText.value_or(asset.data.toString());
     const auto settings = request.textSettings.value_or(asset.textSettings);
@@ -658,7 +665,7 @@ void MotionEditor::showTextEditor(SourceRequest request) {
 }
 
 void MotionEditor::showLuaEditor(SourceRequest request) {
-    if (sceneEditor != nullptr) { return; }
+    if (sceneEditorOpen()) { return; }
     const auto editing = request.replacement != nullptr;
     const auto code = editing ? request.editedText.value_or(request.replacement->data.toString())
                               : request.file.loadFileAsString();
