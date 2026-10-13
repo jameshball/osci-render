@@ -576,15 +576,15 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
 }
 }
 
-juce::XmlElement Document::save() const {
-    auto xml = saveCompositionContent(state);
-    xml.setAttribute("scopeDwell", exactNumber(state.scope.dwellMicros));
-    xml.setAttribute("scopeTravel", exactNumber(state.scope.travelMicrosPerUnit));
-    xml.setAttribute("scopeSettle", exactNumber(state.scope.settleMicros));
-    if (state.scope.xyOnly) { xml.setAttribute("scopeXYOnly", true); }
+juce::XmlElement Document::save(const Project& project) {
+    auto xml = saveCompositionContent(project);
+    xml.setAttribute("scopeDwell", exactNumber(project.scope.dwellMicros));
+    xml.setAttribute("scopeTravel", exactNumber(project.scope.travelMicrosPerUnit));
+    xml.setAttribute("scopeSettle", exactNumber(project.scope.settleMicros));
+    if (project.scope.xyOnly) { xml.setAttribute("scopeXYOnly", true); }
     auto* beam = xml.createNewChildElement("scopeBeam");
-    saveProperties(*beam, state.beam.properties);
-    for (const auto& asset : state.assets) {
+    saveProperties(*beam, project.beam.properties);
+    for (const auto& asset : project.assets) {
         auto* item = xml.createNewChildElement("asset");
         item->setAttribute("id", juce::String(asset->id));
         item->setAttribute("name", asset->name);
@@ -646,13 +646,15 @@ juce::XmlElement Document::save() const {
             }
         }
     }
-    for (const auto& definition : state.definitions) {
+    for (const auto& definition : project.definitions) {
         auto* item = xml.createNewChildElement("definition");
         item->setAttribute("id", juce::String(definition->id));
         item->addChildElement(new juce::XmlElement(saveCompositionContent(*definition)));
     }
     return xml;
 }
+
+juce::XmlElement Document::save() const { return save(state); }
 
 juce::Result Document::load(const juce::XmlElement& xml) {
     Project prepared;

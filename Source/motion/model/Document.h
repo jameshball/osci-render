@@ -328,6 +328,8 @@ public:
     void preview(Project project);
     void commit(juce::String label, Project before);
     juce::XmlElement save() const;
+    // Any project as save() writes the document's.
+    static juce::XmlElement save(const Project& project);
     juce::Result load(const juce::XmlElement& xml);
     // Worker-safe preparation; output is replaced only after full validation.
     static juce::Result prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel = nullptr);
