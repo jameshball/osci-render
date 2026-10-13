@@ -103,6 +103,31 @@ public:
             expectEquals(f.clip(f.first)->start, 0.0);
             expectEquals(f.clip(f.second)->start, 4.0);
         }
+        beginTest("Live sources clips draw hold export up, are left out of the rest, and their capture draws in their place");
+        {
+            Fixture f; f.initialise();
+            motion::Id live = 0;
+            expect(f.document.addBlenderSource("Wave", {51650, true}, live).wasOk());
+            expect(f.document.liveSourcesInUse().empty(), "A live source no clip draws holds nothing up");
+            auto project = f.document.mainProject();
+            const auto wave = motion::findAsset(project.assets, live);
+            motion::Track row;
+            row.id = f.document.newId(); row.name = "Live";
+            const auto clip = motion::Document::makeClip(f.document.newId(), *wave, 0);
+            row.insert(clip, motion::Tempo(120));
+            project.tracks.push_back(row);
+            f.document.reset(std::move(project));
+            expect(f.document.liveSourcesInUse().size() == 1);
+            const auto rest = motion::Document::withoutLiveSources(f.document.mainProject());
+            expect(rest.tracks[1].clips.empty() && rest.tracks[0].clips.size() == 2, "Only the live source's clips are left out");
+            const auto triangle = f.clip(f.first)->asset;
+            expect(f.document.drawSourceInstead(live, triangle).wasOk());
+            expect(f.document.liveSourcesInUse().empty());
+            const auto* replaced = f.clip(clip.id);
+            expect(replaced != nullptr && replaced->asset == triangle && replaced->name == "triangle.obj", "The clip draws the capture, renamed after it");
+            expect(f.undo.undo());
+            expect(f.document.liveSourcesInUse().size() == 1);
+        }
         beginTest("Pasting onto occupied time creates one overflow track below the original");
         {
             Fixture f; f.initialise();

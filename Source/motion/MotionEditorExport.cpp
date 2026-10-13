@@ -35,9 +35,33 @@ void MotionEditor::exported(const juce::File& file) {
     statusBar.show("Exported " + file.getFileName(), MotionStatusBar::Kind::notice, reveal, [file] { file.revealToUser(); });
 }
 
-void MotionEditor::exportVideo() {
+bool MotionEditor::waitsForCapture(bool video, std::function<void()> exportWithout) {
+    const auto live = processor.document.liveSourcesInUse();
+    if (live.empty()) { return false; }
+    juce::StringArray names;
+    for (const auto& source : live) { names.add(source->name); }
+    const auto many = live.size() > 1;
+    const auto message = "Export draws every frame offline, so it can't wait for Blender to send them. Record a capture of " + (many ? "each of them" : names[0])
+        + " while it plays in Blender: its clips then draw the capture, and you can export.";
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const auto first = live.front()->id;
+    auto sheet = std::make_unique<motion::ui::MessageSheet>("Capture before exporting", message, "Record capture", [owner, first, video] {
+        if (owner == nullptr) { return; }
+        owner->captureForExport = first;
+        owner->captureForExportGeneration = owner->processor.document.generation();
+        owner->captureForVideo = video;
+        owner->showBlenderSettings(first);
+    }, names.joinIntoString(", "));
+    sheet->addAlternative(many ? "Export without them" : "Export without it", std::move(exportWithout));
+    motion::ui::Sheet::show(*this, std::move(sheet));
+    return true;
+}
+
+void MotionEditor::exportVideo(bool leaveOutLive) {
 #if OSCI_PREMIUM
     if (exportState != nullptr) { return; }
+    const juce::Component::SafePointer<MotionEditor> self(this);
+    if (!leaveOutLive && waitsForCapture(true, [self] { if (self != nullptr) { self->exportVideo(true); } })) { return; }
     if (!processor.ensureFFmpegExists()) { return; }
     std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
     try {
@@ -47,7 +71,7 @@ void MotionEditor::exportVideo() {
         return;
     }
     auto config = recordingSettings.createVideoEncodingConfiguration();
-    const auto project = processor.document.mainProject();
+    const auto project = leaveOutLive ? motion::Document::withoutLiveSources(processor.document.mainProject()) : processor.document.mainProject();
     config.frameRate = project.frameRate;
     const auto renderMode = visualiser.getRenderMode();
     auto state = std::make_shared<ExportState>();
@@ -246,7 +270,9 @@ void MotionEditor::continueCommandLineRender() {
         return;
     }
     auto config = recordingSettings.createVideoEncodingConfiguration();
-    const auto project = processor.document.mainProject();
+    // Nothing waits for Blender here: live sources are left out, and said so.
+    for (const auto& source : processor.document.liveSourcesInUse()) { std::cerr << "osci-motion: leaving out " << source->name << ", a live source; capture it to render it." << std::endl; }
+    const auto project = motion::Document::withoutLiveSources(processor.document.mainProject());
     config.frameRate = project.frameRate;
     config.includeAudio = true;
     auto state = std::make_shared<ExportState>();
@@ -264,10 +290,12 @@ void MotionEditor::continueCommandLineRender() {
 #endif
 }
 
-void MotionEditor::exportSignal() {
+void MotionEditor::exportSignal(bool leaveOutLive) {
     if (exportState != nullptr) {
         return;
     }
+    const juce::Component::SafePointer<MotionEditor> self(this);
+    if (!leaveOutLive && waitsForCapture(false, [self] { if (self != nullptr) { self->exportSignal(true); } })) { return; }
     auto state = std::make_shared<ExportState>();
     exportState = state;
     state->sampleRate = processor.exportSampleRate();
@@ -275,7 +303,7 @@ void MotionEditor::exportSignal() {
         defaultExportFile("wav"), "*.wav");
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-        | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state](const juce::FileChooser& selected) {
+        | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state, leaveOutLive](const juce::FileChooser& selected) {
         if (owner == nullptr) { return; }
         if (selected.getResult() == juce::File()) { owner->exportState.reset(); return; }
         const auto destination = withExtension(selected.getResult(), "wav");
@@ -284,7 +312,7 @@ void MotionEditor::exportSignal() {
             owner->statusBar.show("Signal export requires a .wav filename. Choose Export XYRGB signal again and use that extension.");
             return;
         }
-        const auto project = owner->processor.document.mainProject();
+        const auto project = leaveOutLive ? motion::Document::withoutLiveSources(owner->processor.document.mainProject()) : owner->processor.document.mainProject();
         const auto reach = owner->processor.canvasReach();
         owner->exportBar.setName("Signal export progress");
         owner->exportProgress = 0;

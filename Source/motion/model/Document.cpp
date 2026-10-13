@@ -639,6 +639,59 @@ std::size_t Document::assetUses(Id assetId) const {
     return sourceReferenceCount(mainProject(), assetId);
 }
 
+std::vector<std::shared_ptr<const Asset>> Document::liveSourcesInUse() const {
+    std::vector<std::shared_ptr<const Asset>> result;
+    for (const auto& asset : mainProject().assets) {
+        if (asset != nullptr && asset->liveIdentity != nullptr && assetUses(asset->id) > 0) { result.push_back(asset); }
+    }
+    return result;
+}
+
+juce::Result Document::drawSourceInstead(Id from, Id to) {
+    const auto& assets = mainProject().assets;
+    const auto original = findAsset(assets, from);
+    const auto replacement = findAsset(assets, to);
+    if (original == nullptr || replacement == nullptr) { return juce::Result::fail("The source no longer exists."); }
+    if ((original->audio != nullptr) != (replacement->audio != nullptr)) { return juce::Result::fail("A visual source can only be drawn in place of another visual source."); }
+    if (from == to || assetUses(from) == 0) { return juce::Result::ok(); }
+    // Clips still named after the old source take the new one's name.
+    const auto oldName = original->name.toStdString();
+    const auto newName = replacement->name.toStdString();
+    editProject("Use " + replacement->name, [from, to, &oldName, &newName](Project& project) {
+        const auto trackUses = [from](const Track& track) {
+            return std::any_of(track.clips.begin(), track.clips.end(), [from](const auto& clip) { return clip.asset == from; });
+        };
+        const auto uses = [&](const Composition& composition) { return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackUses); };
+        changeEachComposition(project, uses, [&](Composition& composition) {
+            composition.tracks.changeEach(trackUses, [&](Track& track) {
+                for (auto& clip : track.clips) {
+                    if (clip.asset != from) { continue; }
+                    clip.asset = to;
+                    if (clip.name == oldName) { clip.name = newName; }
+                }
+            });
+        });
+    });
+    return juce::Result::ok();
+}
+
+Project Document::withoutLiveSources(Project project) {
+    std::set<Id> live;
+    for (const auto& asset : project.assets) {
+        if (asset != nullptr && asset->liveIdentity != nullptr) { live.insert(asset->id); }
+    }
+    if (live.empty()) { return project; }
+    const auto trackUses = [&live](const Track& track) {
+        return std::any_of(track.clips.begin(), track.clips.end(), [&live](const auto& clip) { return live.contains(clip.asset); });
+    };
+    const auto uses = [&](const Composition& composition) { return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackUses); };
+    changeEachComposition(project, uses, [&](Composition& composition) {
+        composition.tracks.changeEach(trackUses, [&live](Track& track) { std::erase_if(track.clips, [&live](const auto& clip) { return live.contains(clip.asset); }); });
+        pruneReferences(composition);
+    });
+    return project;
+}
+
 bool Document::setTrackHeight(Id trackId, int height) {
     return setTrackHeights({{trackId, height}});
 }

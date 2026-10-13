@@ -263,16 +263,32 @@ public:
     // `about` names what the message is about (a file), muted beside the
     // title; a `destructive` action is red.
     static void show(juce::Component& owner, const juce::String& heading, const juce::String& message, const juce::String& verb = "OK", std::function<void()> confirmed = {}, const juce::String& about = {}, bool destructive = false) {
-        auto sheet = std::make_unique<MessageSheet>(heading, message, verb, std::move(confirmed), about, destructive);
-        const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
-        osci::OverlayComponent::show(owner, std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false));
+        Sheet::show(owner, std::make_unique<MessageSheet>(heading, message, verb, std::move(confirmed), about, destructive));
+    }
+    // A second way on, quiet at the footer's left ("Export without it").
+    void addAlternative(const juce::String& verb, std::function<void()> chosen) {
+        alternative.setButtonText(verb);
+        alternative.setName(verb);
+        alternative.setTitle(verb);
+        style::makeQuiet(alternative);
+        alternative.onClick = [this, chosen = std::move(chosen)] {
+            auto choice = chosen;
+            close();
+            if (choice) { choice(); }
+        };
+        addAndMakeVisible(alternative);
+        resized();
     }
 
 protected:
-    void layoutBody(juce::Rectangle<int> area) override { text.setBounds(area); }
+    void layoutBody(juce::Rectangle<int> area) override {
+        text.setBounds(area);
+        if (alternative.isVisible()) { alternative.setBounds(footerLeft.withWidth(std::min(footerLeft.getWidth(), alternative.getBestWidthForHeight(footerHeight) + 16))); }
+    }
 
 private:
     std::function<void()> onConfirm;
+    juce::TextButton alternative;
     juce::Label text;
 };
 

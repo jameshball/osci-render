@@ -185,8 +185,21 @@ private:
     // `chosen`: the user picked this property; otherwise a new target opens
     // on its first animated channel.
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen = false);
-    void exportSignal();
-    void exportVideo();
+    // `leaveOutLive`: export without the clips of live sources.
+    void exportSignal(bool leaveOutLive = false);
+    void exportVideo(bool leaveOutLive = false);
+    // Export draws every frame offline, so a live source has to be captured
+    // first. Says so before anything else is asked, with the ways on:
+    // record a capture (its clips then draw it) or export the rest. False
+    // when export can go ahead.
+    bool waitsForCapture(bool video, std::function<void()> exportWithout);
+    // The live source a capture is being recorded for, to export with:
+    // once saved, its clips draw the capture and Export is offered again.
+    motion::Id captureForExport = 0;
+    std::uint64_t captureForExportGeneration = 0;
+    bool captureForVideo = false;
+    // A capture of the live source `live` was saved as `capture`.
+    void captured(motion::Id live, motion::Id capture);
     struct ExportState;
     void startVideoExport(std::shared_ptr<ExportState> state, motion::Project project, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot,
         VisualiserRenderer::RenderMode renderMode, VideoEncodingConfiguration config, juce::File destination, std::function<void(bool)> finished);

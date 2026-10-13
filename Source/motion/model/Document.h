@@ -286,6 +286,14 @@ public:
     // clip or composition references; one undo step.
     juce::Result removeUnusedAssets(std::vector<Id> assetIds, int& removed);
     std::size_t assetUses(Id assetId) const;
+    // The live sources clips draw, anywhere in the project: Export draws
+    // offline, so it needs them captured first.
+    std::vector<std::shared_ptr<const Asset>> liveSourcesInUse() const;
+    // Every clip of `from` draws `to` instead, keeping its keys and effects:
+    // a capture in place of the live source it recorded.
+    juce::Result drawSourceInstead(Id from, Id to);
+    // `project` without the clips of its live sources, to export the rest.
+    static Project withoutLiveSources(Project project);
     // Camera cuts form the camera track: each shows one camera over a range.
     // A cut at `time` ends the cut it falls in and lasts until the next cut.
     juce::Result cutToCamera(Id camera, double time, Id& cutId);
