@@ -555,6 +555,59 @@ inline std::vector<Piece> mended(const std::vector<Vec3>& corners, const std::ve
     }
     return result;
 }
+
+// Pieces following on over one face joined into one while every point they
+// pass stays within `tolerance` of the line from the first's start to the
+// last's end. Pieces whose ends are within `same` follow on.
+inline std::vector<Piece> straightened(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const std::vector<Piece>& pieces, double tolerance, double same) {
+    const auto flat = [&](const Piece& piece, const Weights& weights) { return at(corners, faces[piece.face], weights); };
+    std::vector<Piece> joined;
+    joined.reserve(pieces.size());
+    std::size_t start = 0;
+    while (start < pieces.size()) {
+        auto end = start;
+        const auto from = flat(pieces[start], pieces[start].from);
+        // Each next piece on the same face, starting where the last ended,
+        // taken while every point passed stays near the line to its end.
+        while (end + 1 < pieces.size() && pieces[end + 1].face == pieces[start].face && (flat(pieces[end + 1], pieces[end + 1].from) - flat(pieces[end], pieces[end].to)).length() < same) {
+            const auto to = flat(pieces[end + 1], pieces[end + 1].to);
+            const auto line = to - from;
+            const auto length = line.length();
+            bool straight = true;
+            for (auto passed = start; passed <= end && straight; ++passed) {
+                const auto point = flat(pieces[passed], pieces[passed].to) - from;
+                const auto off = length > 0 ? point.cross(line).length() / length : point.length();
+                straight = off < tolerance;
+            }
+            if (!straight) { break; }
+            ++end;
+        }
+        joined.push_back({pieces[start].face, pieces[start].from, pieces[end].to});
+        start = end + 1;
+    }
+    return joined;
+}
+
+// The lines, less every closed loop shorter than `shortest`.
+inline std::vector<Piece> withoutBeads(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const std::vector<Piece>& pieces, double shortest, double same) {
+    const auto flat = [&](const Piece& piece, const Weights& weights) { return at(corners, faces[piece.face], weights); };
+    const auto followsOn = [same](Vec3 end, Vec3 start) { return (start - end).length() < same; };
+    std::vector<Piece> kept;
+    kept.reserve(pieces.size());
+    std::size_t first = 0;
+    while (first < pieces.size()) {
+        auto last = first;
+        double length = (flat(pieces[first], pieces[first].to) - flat(pieces[first], pieces[first].from)).length();
+        while (last + 1 < pieces.size() && followsOn(flat(pieces[last], pieces[last].to), flat(pieces[last + 1], pieces[last + 1].from))) {
+            ++last;
+            length += (flat(pieces[last], pieces[last].to) - flat(pieces[last], pieces[last].from)).length();
+        }
+        const auto closed = followsOn(flat(pieces[last], pieces[last].to), flat(pieces[first], pieces[first].from));
+        if (!closed || length >= shortest) { kept.insert(kept.end(), pieces.begin() + static_cast<std::ptrdiff_t>(first), pieces.begin() + static_cast<std::ptrdiff_t>(last) + 1); }
+        first = last + 1;
+    }
+    return kept;
+}
 }
 
 // A pattern over the faces, `across` lines across the surface's largest
@@ -728,57 +781,17 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     const auto lineSpacing = kind == Pattern::spiral ? std::min(spacing, climbing) : kind == Pattern::slices ? std::min(spacing, along) : spacing;
     // Within this, a piece starts where the last ends: it follows on.
     const auto same = 1.0e-9 * bounds.size() + 1.0e-12;
-    const auto followsOn = [same](Vec3 end, Vec3 start) { return (start - end).length() < same; };
     pieces = detail::mended(corners, faces, pieces, lineSpacing / 8, same);
     // Then pieces that follow on over one face joined while they stay near
     // straight (within a 250th of the spacing: looser visibly flattens
     // curves), so a line is as few pieces as draw it well: the beam has only
     // so many points a cycle.
-    const auto tolerance = lineSpacing * .004;
-    const auto flat = [&](const Piece& piece, const Weights& weights) { return at(corners, faces[piece.face], weights); };
-    std::vector<Piece> joined;
-    joined.reserve(pieces.size());
-    std::size_t start = 0;
-    while (start < pieces.size()) {
-        auto end = start;
-        const auto from = flat(pieces[start], pieces[start].from);
-        // Each next piece on the same face, starting where the last ended,
-        // taken while every point passed stays near the line to its end.
-        while (end + 1 < pieces.size() && pieces[end + 1].face == pieces[start].face && followsOn(flat(pieces[end], pieces[end].to), flat(pieces[end + 1], pieces[end + 1].from))) {
-            const auto to = flat(pieces[end + 1], pieces[end + 1].to);
-            const auto line = to - from;
-            const auto length = line.length();
-            bool straight = true;
-            for (auto passed = start; passed <= end && straight; ++passed) {
-                const auto point = flat(pieces[passed], pieces[passed].to) - from;
-                const auto off = length > 0 ? point.cross(line).length() / length : point.length();
-                straight = off < tolerance;
-            }
-            if (!straight) { break; }
-            ++end;
-        }
-        joined.push_back({pieces[start].face, pieces[start].from, pieces[end].to});
-        start = end + 1;
-    }
+    pieces = detail::straightened(corners, faces, pieces, lineSpacing * .004, same);
     // A loop shorter than half a spacing (noise's, about a peak or a dip,
     // as it grows from nothing while the noise flows) draws as a bright
     // bead, the beam lingering on its corners: it is left out until it is
     // big enough to draw as a line.
-    std::vector<Piece> kept;
-    kept.reserve(joined.size());
-    std::size_t first = 0;
-    while (first < joined.size()) {
-        auto last = first;
-        double length = (flat(joined[first], joined[first].to) - flat(joined[first], joined[first].from)).length();
-        while (last + 1 < joined.size() && followsOn(flat(joined[last], joined[last].to), flat(joined[last + 1], joined[last + 1].from))) {
-            ++last;
-            length += (flat(joined[last], joined[last].to) - flat(joined[last], joined[last].from)).length();
-        }
-        const auto closed = followsOn(flat(joined[last], joined[last].to), flat(joined[first], joined[first].from));
-        if (!closed || length >= spacing / 2) { kept.insert(kept.end(), joined.begin() + static_cast<std::ptrdiff_t>(first), joined.begin() + static_cast<std::ptrdiff_t>(last) + 1); }
-        first = last + 1;
-    }
-    return kept;
+    return detail::withoutBeads(corners, faces, pieces, spacing / 2, same);
 }
 
 // A surface's normals: each face's own, and at each of its corners the
