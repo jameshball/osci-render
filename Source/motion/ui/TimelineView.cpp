@@ -1881,13 +1881,21 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
     {
         juce::Graphics::ScopedSaveState clipLabel(g);
         g.reduceClipRegion(labelBounds.toNearestInt());
-        g.setFont(audio ? motion::style::caption() : motion::style::body());
+        const auto font = audio ? motion::style::caption() : motion::style::body();
+        const auto textWidth = juce::TextLayout::getStringWidth(font, label);
+        const auto fill = (hovered ? base.brighter(.1f) : base).withAlpha(opacity);
+        // The name sits on the clip's own colour, so the beam share's edge
+        // below never runs through it.
+        if (!audio) {
+            g.setColour(fill);
+            g.fillRoundedRectangle(labelBounds.withX(labelBounds.getX() - 3).withWidth(std::min(textWidth + 6, labelBounds.getWidth() + 3)).withSizeKeepingCentre(std::min(textWidth + 6, labelBounds.getWidth() + 3), font.getHeight() + 2), 3);
+        }
+        g.setFont(font);
         // A muted track's names stay legible (3:1 or better) while its fills dim.
         g.setColour(juce::Colours::white.withAlpha((active ? 1.0f : .88f) * std::max(opacity, .6f)));
         g.drawText(label, labelBounds.withWidth(std::max(labelBounds.getWidth(), 2000.0f)), juce::Justification::centredLeft, false);
-        if (juce::TextLayout::getStringWidth(audio ? motion::style::caption() : motion::style::body(), label) > labelBounds.getWidth()) {
+        if (textWidth > labelBounds.getWidth()) {
             const auto fade = labelBounds.withLeft(labelBounds.getRight() - 14);
-            const auto fill = (hovered ? base.brighter(.1f) : base).withAlpha(opacity);
             g.setGradientFill(juce::ColourGradient(fill.withAlpha(0.0f), fade.getX(), 0, fill, fade.getRight(), 0, false));
             g.fillRect(fade);
         }
