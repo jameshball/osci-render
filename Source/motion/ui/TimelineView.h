@@ -153,14 +153,16 @@ private:
     double scrollTime = 0;
     // Rows without their own height use this; Alt+wheel scales it.
     int defaultTrackHeight = 32;
-    // Track names column; drag its edge to resize (140-420 px).
+    // Track names column; drag its edge to resize, within these (and half the
+    // timeline's width).
+    static constexpr int narrowestNames = 150, widestNames = 420;
     int namesWidth = 220;
     bool resizingNames = false;
     // The resize handle is the strip just inside the names column, so clicks
     // on keys and clips at the start of the timeline are never taken.
     bool onNamesEdge(const juce::MouseEvent& event) const { return event.y >= rulerHeight && event.x >= namesWidth - 5 && event.x < namesWidth; }
-    // The track whose bottom edge (in the names column) is under the pointer.
-    // The row (track or group) whose bottom edge resizes under the point.
+    // The row (track or group) whose bottom edge, in the names column, is
+    // under the point, to resize it.
     int rowEdgeAt(juce::Point<int> point) const;
     int storedHeight(motion::Id id) const;
     struct HeightDrag { motion::Id track; int startHeight, downY, original; };

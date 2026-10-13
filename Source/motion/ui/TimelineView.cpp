@@ -1264,7 +1264,7 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         return;
     }
     if (resizingNames) {
-        namesWidth = std::clamp(event.x, 150, std::max(150, std::min(420, getWidth() / 2)));
+        namesWidth = std::clamp(event.x, narrowestNames, std::max(narrowestNames, std::min(widestNames, getWidth() / 2)));
         refreshTracks();
         repaint();
         return;
@@ -1644,7 +1644,7 @@ void MotionTimelineView::scaleTrackHeights(int y, double factor) {
 }
 
 void MotionTimelineView::setLayout(const Layout& next) {
-    namesWidth = std::clamp(next.namesWidth, 140, 420);
+    namesWidth = std::clamp(next.namesWidth, narrowestNames, widestNames);
     defaultTrackHeight = std::clamp(next.trackHeight, motion::Track::minimumHeight, 120);
     followEnabled = next.follow;
     layoutRows();
