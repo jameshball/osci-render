@@ -591,7 +591,7 @@ void MotionEditor::setUpLibrary() {
                 if (std::find(current.begin(), current.end(), expected) == current.end()) { return; }
                 const auto result = owner->processor.document.removeComposition(id);
                 if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); }
-            });
+            }, {}, true);
     };
     assetLibrary.onOpenComposition = [this](motion::Id id) { enterComposition(id, true); };
     assetLibrary.onMessage = [this](const juce::String& message) { statusBar.show(message, message.startsWith("Removed") || message.startsWith("Tempo now") ? MotionStatusBar::Kind::notice : MotionStatusBar::Kind::warning); };

@@ -107,7 +107,7 @@ public:
             close();
             return true;
         }
-        if (key.getKeyCode() == juce::KeyPress::returnKey && primary.isEnabled()) {
+        if (key.getKeyCode() == juce::KeyPress::returnKey && primary.isEnabled() && returnConfirms) {
             primary.triggerClick();
             return true;
         }
@@ -138,6 +138,8 @@ protected:
         primary.setTitle(name);
     }
     juce::TextButton primary, cancel;
+    // Return clicks the action, unless it loses something.
+    bool returnConfirms = true;
     // Sheets that only show something (a reference) have no footer.
     void removeFooter() {
         footer = false;
@@ -229,9 +231,13 @@ namespace motion::ui {
 // question with a destructive answer (Remove, beside Cancel).
 class MessageSheet final : public Sheet {
 public:
-    MessageSheet(const juce::String& heading, const juce::String& message, const juce::String& verb, std::function<void()> confirmed = {}, const juce::String& about = {})
+    MessageSheet(const juce::String& heading, const juce::String& message, const juce::String& verb, std::function<void()> confirmed = {}, const juce::String& about = {}, bool destructive = false)
         : Sheet(heading, about, verb), onConfirm(std::move(confirmed)) {
         nameAction(verb);
+        if (destructive) {
+            style::makeDestructive(primary);
+            returnConfirms = false;
+        }
         cancel.setVisible(onConfirm != nullptr);
         text.setText(message, juce::dontSendNotification);
         text.setFont(style::body());
@@ -248,9 +254,10 @@ public:
         const auto lines = juce::jmax(1, juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(style::body(), message) / (width - 8.0f))) + message.retainCharacters("\n").length());
         setSize(width, headerHeight + headerGap + lines * 18 + footerGap + footerHeight);
     }
-    // `about` names what the message is about (a file), muted beside the title.
-    static void show(juce::Component& owner, const juce::String& heading, const juce::String& message, const juce::String& verb = "OK", std::function<void()> confirmed = {}, const juce::String& about = {}) {
-        auto sheet = std::make_unique<MessageSheet>(heading, message, verb, std::move(confirmed), about);
+    // `about` names what the message is about (a file), muted beside the
+    // title; a `destructive` action is red.
+    static void show(juce::Component& owner, const juce::String& heading, const juce::String& message, const juce::String& verb = "OK", std::function<void()> confirmed = {}, const juce::String& about = {}, bool destructive = false) {
+        auto sheet = std::make_unique<MessageSheet>(heading, message, verb, std::move(confirmed), about, destructive);
         const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
         osci::OverlayComponent::show(owner, std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false));
     }

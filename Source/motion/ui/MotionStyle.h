@@ -417,6 +417,8 @@ public:
 
 // The one action a panel exists for (Save, Add, Bake) stands out in the accent.
 inline void makePrimary(juce::Button& button) { button.setColour(juce::TextButton::buttonColourId, accentStrong()); }
+// An action that loses something (Discard, Remove): red, not the accent.
+inline void makeDestructive(juce::Button& button) { button.setColour(juce::TextButton::buttonColourId, osci::Colours::danger().darker(.35f)); }
 
 // The Scene while a source is written in it (Lua, text, drawing) is a
 // mode: a raised header names it ("Editing Orbit.lua", "New Lua source")

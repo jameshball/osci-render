@@ -57,6 +57,8 @@ public:
     // Offline render: input audio file -> encoded video using Recording Settings
     void renderAudioFileToVideo();
     virtual void resetToDefault();
+    // Called once the project is written to its file.
+    virtual void projectSaved() {}
     void toggleFullScreen();
     bool isFullScreen();
     void resized() override;

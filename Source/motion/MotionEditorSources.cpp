@@ -56,8 +56,35 @@ bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, s
     return true;
 }
 
+void MotionEditor::afterDiscarding(const juce::String& doing, std::function<void()> then) {
+    if (!processor.document.unsaved()) {
+        then();
+        return;
+    }
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const auto name = processor.currentProjectFile.isEmpty() ? juce::String("This project") : juce::File(processor.currentProjectFile).getFileNameWithoutExtension();
+    motion::ui::MessageSheet::show(*this, "Discard unsaved changes?", name + " has changes that are not saved. " + doing + " and lose them?", "Discard",
+        [owner, then = std::move(then)] {
+            if (owner != nullptr) { then(); }
+        }, {}, true);
+}
+
 void MotionEditor::openProject(const juce::File& file) {
     if (file == juce::File()) { return; }
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    afterDiscarding("Open " + file.getFileName(), [owner, file] {
+        if (owner != nullptr) { owner->loadProject(file); }
+    });
+}
+
+void MotionEditor::resetToDefault() {
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    afterDiscarding("Start a new project", [owner] {
+        if (owner != nullptr) { owner->CommonPluginEditor::resetToDefault(); }
+    });
+}
+
+void MotionEditor::loadProject(const juce::File& file) {
     if (projectLoad != nullptr) { projectLoad->cancelled.store(true); }
     if (projectLoadOverlay != nullptr) { dismissOverlay(projectLoadOverlay.getComponent()); }
     auto task = std::make_shared<ProjectLoad>();

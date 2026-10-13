@@ -423,6 +423,7 @@ void CommonPluginEditor::saveProject() {
             osci::showOverlayMessage(*this, "Save Project Failed", "Could not write:\n" + file.getFullPathName());
             return;
         }
+        projectSaved();
         updateTitle();
     }
 }

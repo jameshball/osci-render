@@ -44,7 +44,11 @@ public:
     bool isInterestedInFileDrag(const juce::StringArray&) override { return true; }
     void filesDropped(const juce::StringArray& files, int, int) override;
     bool keyPressed(const juce::KeyPress& key) override;
+    // Opening another project, or a new one, first asks before unsaved
+    // changes are lost.
     void openProject(const juce::File& file) override;
+    void resetToDefault() override;
+    void projectSaved() override { processor.document.markSaved(); }
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
     // `below`: under the anchor, wherever there is more room.
     void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, bool below = false);
@@ -54,6 +58,11 @@ public:
 
 
 private:
+    // Runs `then` at once when nothing would be lost, else once the user
+    // agrees to discard the unsaved changes; `doing` says what discards them.
+    void afterDiscarding(const juce::String& doing, std::function<void()> then);
+    void loadProject(const juce::File& file);
+
     // Construction, by area of the workspace.
     void setUpMenus();
     void setUpCompositionNavigation();

@@ -175,6 +175,10 @@ public:
     // the one entered going away): edits in progress to the scope give up.
     std::uint64_t scopeGeneration() const { return scopeChanges; }
     std::uint64_t revision() const { return stateRevision; }
+    // Whether the project has changed since it was opened, made or last
+    // saved (an undo back to that point still counts as a change).
+    bool unsaved() const { return contentRevision != savedRevision; }
+    void markSaved() { savedRevision = contentRevision; }
     // Identities stay below the Scope's reserved one, so it never collides.
     static constexpr Id maximumId = beamIdentity - 1;
     Id newId() {
@@ -349,7 +353,7 @@ private:
     Id scopeId = 0;
     Id lastId = 0;
     std::uint64_t projectGeneration = 0, scopeChanges = 0;
-    std::uint64_t stateRevision = 0;
+    std::uint64_t stateRevision = 0, contentRevision = 0, savedRevision = 0;
     bool carryView = true;
     // During undo and redo: the step's opposite snapshot, for carrying view options.
     const Project* carryOptionsFrom = nullptr;

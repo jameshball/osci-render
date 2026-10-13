@@ -278,6 +278,7 @@ static void carryTrackHeights(Project& next, const Project& current) {
 
 void Document::apply(Project value) {
     ++stateRevision;
+    ++contentRevision;
     if (carryView) {
         carryTrackHeights(value, state);
         carryLuaBakes(value, state);
@@ -359,6 +360,7 @@ void Document::reset(Project project) {
     carryView = false;
     apply(std::move(project));
     carryView = true;
+    markSaved();
 }
 
 // In musical time, project-time items keep their beat when the tempo map
