@@ -203,7 +203,7 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->modulate.setOnColour(motion::style::result().withAlpha(.16f));
         row->modulate.onContent = motion::style::result();
         row->modulate.setName("Modulate effect " + juce::String(parameter.id));
-        row->modulate.setTooltip("Modulate " + juce::String(parameter.name).toLowerCase() + ": open it in the Graph. Lit when something drives it.");
+        row->modulate.setTooltip("Modulate " + juce::String(parameter.name).toLowerCase() + ": open it in the Graph to route modulators to it or link it. Lit when something drives it.");
         const auto property = parameter.id;
         row->field.onBegin = [this, property] { stack.beginGesture(id, property); };
         row->field.onChange = [this, property](double value) { stack.setValue(id, property, value); };
@@ -436,7 +436,7 @@ int MotionEffectStack::insertionIndex(int y) const {
 
 void MotionEffectStack::setEnabled(motion::Id id, bool value) {
     if (locked(id)) { return; }
-    processor.document.edit(value ? "Enable effect" : "Bypass effect", [id, value](motion::Project& project) {
+    processor.document.edit(value ? "Turn effect on" : "Turn effect off", [id, value](motion::Project& project) {
         auto* effect = motion::findEffect(project, id);
         if (effect != nullptr) { effect->enabled = value; }
     });
@@ -451,7 +451,7 @@ void MotionEffectStack::showMenu(motion::Id id) {
     menu.addItem(2, "Move up", index > 0);
     menu.addItem(3, "Move down", index + 1 < static_cast<int>(listed.size()));
     menu.addSeparator();
-    menu.addItem(4, "Remove");
+    menu.addItem(4, "Remove effect");
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, index](int result) {
         if (result == 2) { move(id, index - 1); }
         if (result == 3) { move(id, index + 2); }
@@ -504,7 +504,16 @@ void MotionEffectStack::toggleKey(motion::Id id, const std::string& property) {
     if (curve == nullptr) { return; }
     const auto local = target->localTime(frameTime());
     const bool keyed = curve->hasKeyAt(local);
-    processor.document.edit(keyed ? "Remove keyframe" : "Key effect parameter", [id, property, local, keyed](motion::Project& project) {
+    // Named for the parameter: "Key strength", "Remove strength key".
+    juce::String what(property);
+    const auto* effect = motion::findEffect(processor.document.project(), id);
+    const auto* definition = effect != nullptr ? motion::effectDefinition(effect->type) : nullptr;
+    if (definition != nullptr) {
+        for (const auto& parameter : definition->parameters) {
+            if (parameter.id == property) { what = juce::String(parameter.name).toLowerCase(); }
+        }
+    }
+    processor.document.edit(keyed ? "Remove " + what + " key" : "Key " + what, [id, property, local, keyed](motion::Project& project) {
         auto* changed = motion::findPropertyCurve(project, id, property);
         if (changed != nullptr) { motion::keyedit::setKeyed(*changed, local, !keyed); }
     });

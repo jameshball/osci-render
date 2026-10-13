@@ -96,7 +96,7 @@ try:
     step("edit video source", "click", "--name", "Video settings...", "--exact")
     step("change bake rate", "set-value", "--name", "Video bake frame rate", "--exact", "12")
     step("rebuild video source", "click", "--name", "Prepare video", "--exact")
-    wait_undo("Rebuild source cache")
+    wait_undo("Change source settings")
     state = save()
     assert float(state.findall("asset")[-1].find("raster").get("frameRate")) == 12
     step("undo video preparation", "click", "--name", "Undo", "--exact")

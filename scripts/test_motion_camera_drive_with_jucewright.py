@@ -124,7 +124,7 @@ try:
     assert button_says(KEY_ALL), "The camera's Keys button is unavailable with a camera selected"
     # Keying rotation keys a level Z rotation: the camera stays drivable.
     step("key rotation", "click", "--name", "Key rotation", "--exact")
-    session.wait_for_undo("Set keyframe")
+    session.wait_for_undo("Key rotation")
     assert state("Look through camera", "enabled", True), "Keyed rotation blocked Look through camera"
     step("look through", "click", "--name", "Look through camera", "--exact")
     assert state("Look through camera", "checked", True), "Look through camera did not lock"
@@ -171,7 +171,7 @@ try:
     step("playhead to 0 s", "click", "--class", "MotionTimelineView", "--position", f"{x_of(0)},12")
     assert button_says(REMOVE_KEYS), "The camera's Keys button does not show the key at 0 s"
     step("remove camera key", "click", "--name", REMOVE_KEYS, "--exact")
-    session.wait_for_undo("Remove camera key")
+    session.wait_for_undo("Remove camera keys")
     camera = saved_camera()
     for name in camera_properties:
         assert key_times(camera, name) == [], (name, key_times(camera, name))

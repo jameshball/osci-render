@@ -50,9 +50,9 @@ public:
         setName("Part picking");
         horizontal = true;
         for (auto* tool : {&box, &lasso, &connected}) { tool->setRadioGroupId(92); tool->setClickingTogglesState(true); }
-        box.setTooltip("Box");
-        lasso.setTooltip("Lasso");
-        connected.setTooltip("Whole pieces, such as a letter");
+        box.setTooltip("Box: drag a rectangle round parts");
+        lasso.setTooltip("Lasso: draw round parts");
+        connected.setTooltip("Pieces: click to pick a whole piece, such as a letter");
         box.setToggleState(true, juce::dontSendNotification);
         setGroups({{&box, &lasso, &connected}});
     }
@@ -73,12 +73,12 @@ public:
         record.onColour = motion::style::record().withAlpha(.25f);
         textureOutput.setTooltip("Share the Scope's picture with other apps (Syphon/Spout)");
         canvas.setTooltip("Output canvas size");
-        settings.setTooltip("Scope properties: beam, display and timing");
+        settings.setTooltip("Scope settings: beam, display and timing");
         popout.setTooltip("Open the Scope in its own window");
         fullScreen.setTooltip("Full screen");
         setGroups({{&record, &textureOutput}, {&canvas, &settings}, {&popout, &fullScreen}});
     }
-    Tool record {"Record scope", motion::icons::Icon::record}, textureOutput {"Share picture", motion::icons::Icon::cast};
+    Tool record {"Record Scope", motion::icons::Icon::record}, textureOutput {"Share picture", motion::icons::Icon::cast};
     Tool canvas {"Output canvas", motion::icons::Icon::aspectRatio}, settings {"Scope settings", motion::icons::Icon::settings};
-    Tool popout {"Pop out scope", motion::icons::Icon::openInNew}, fullScreen {"Full screen scope", motion::icons::Icon::fullscreen};
+    Tool popout {"Pop out Scope", motion::icons::Icon::openInNew}, fullScreen {"Full screen Scope", motion::icons::Icon::fullscreen};
 };

@@ -74,7 +74,7 @@ try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     step("import two squares", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
-    session.wait_for_undo("Import object")
+    session.wait_for_undo("Import source")
     tree = snapshot()
     window = next(n["bounds"] for n in nodes(tree) if n.get("class") == "MotionEditor")
     scene = next(n["bounds"] for n in nodes(tree) if n.get("class") == "MotionCompositionView")
@@ -103,7 +103,7 @@ try:
     if part_count() != 0:
         raise RuntimeError("Extraction should leave part mode")
     step("undo extraction", "click", "--name", "Undo", "--exact")
-    session.wait_for_undo("Import object")
+    session.wait_for_undo("Import source")
     if "Left square.svg" in names():
         raise RuntimeError("Undo should restore the single source")
     # Escape clears the picked parts, then leaves part mode.

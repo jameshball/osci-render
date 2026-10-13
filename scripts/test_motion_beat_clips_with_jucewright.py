@@ -83,7 +83,7 @@ try:
     command("wait-for-locator", "--name", "Undo Change tempo", "--role", "label", "--exact")
     step("faster musical placement", "screenshot", "--file", session.artifact_dir / "240-bpm.png")
     tempo(60)
-    command("wait-for-locator", "--text", "Cannot change tempo")
+    command("wait-for-locator", "--text", "Couldn't change the tempo")
     step("overlap explanation", "screenshot", "--file", session.artifact_dir / "tempo-conflict.png")
     command("wait-for-locator", "--name", "240.0", "--class", "juce::Label", "--exact")
     step("select musical clip", "click", "--class", "MotionTimelineView", "--position", "360,77")

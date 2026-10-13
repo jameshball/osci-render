@@ -18,7 +18,7 @@ public:
         const std::array<const char*, 4> labels {"Start", "Duration", "Offset", "Speed"};
         const std::array<const char*, 4> names {"Clip start", "Clip duration", "Clip source offset", "Clip speed"};
         const std::array<const char*, 4> hints {
-            "Move the clip without changing its source offset or animation. Uses the ruler's units; add s for seconds.",
+            "Move the clip without changing its source offset or animation. Type a time as the ruler shows it, or add s for seconds.",
             "Change the right edge without stretching the source or animation. Musical lengths read bars.beats (1.2 is a bar and two beats); add s for seconds.",
             "Source offset in seconds: slip the source and its animation inside the existing clip.",
             "Playback multiplier. 1 is normal speed; 2 is twice as fast. Clip duration stays unchanged."
@@ -118,7 +118,7 @@ private:
             parsed = motion::ui::parseNumber(text, index == 2 ? "s" : "");
         }
         if (!parsed.has_value()) {
-            error = index < 2 ? "Enter a time like the ruler shows (" + juce::String(grid.positionLabel(timing.start)) + "), or seconds with s." : "Enter a finite number.";
+            error = index < 2 ? "Enter a time like the ruler shows (" + juce::String(grid.positionLabel(timing.start)) + "), or seconds with s." : "Enter a number, like 1.5.";
             refresh();
             return;
         }

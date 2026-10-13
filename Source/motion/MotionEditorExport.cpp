@@ -43,7 +43,7 @@ void MotionEditor::exportVideo() {
     try {
         beamSnapshot = std::make_shared<OfflineVisualiserParameters>(processor.visualiserParameters, OfflineVisualiserParameters::ExternalModulation::replace);
     } catch (const std::exception& error) {
-        statusBar.show("Cannot capture the beam settings: " + juce::String(error.what()));
+        statusBar.show("Couldn't capture the beam settings: " + juce::String(error.what()));
         return;
     }
     auto config = recordingSettings.createVideoEncodingConfiguration();

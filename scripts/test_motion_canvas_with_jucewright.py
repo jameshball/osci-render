@@ -57,7 +57,7 @@ try:
     step('portrait height', 'wait-for-value', '--name', 'Video height', '--exact', '--value', '1920')
     step('landscape preset', 'select-option', '--name', 'Canvas preset', '--exact', '--index', 2)
     step('landscape width', 'wait-for-value', '--name', 'Video width', '--exact', '--value', '1920')
-    canvas_value('Video width', 127)
+    canvas_value('Video width', 129)
     step('reject invalid canvas', 'click', '--name', 'Apply canvas', '--exact')
     step('validation message', 'wait-for-text', 'Even sizes, 128-4096 px')
     canvas_value('Video width', 1280)

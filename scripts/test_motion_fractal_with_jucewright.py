@@ -58,7 +58,7 @@ try:
     assert fractal_depth() == 4
     step("fractal preparation dialog", "screenshot", "--file", session.artifact_dir / "fractal-settings.png")
     step("prepare Koch snowflake", "click", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
-    wait_undo("Import object")
+    wait_undo("Import source")
     command("wait-for-locator", "--name", "koch_snowflake.lsystem", "--role", "label", "--exact", "--timeout-ms", "30000")
 
     step("open fractal settings", "click", "--name", "Fractal settings...", "--exact")
@@ -66,7 +66,7 @@ try:
     assert fractal_depth() == 4
     step("increase fractal depth", "set-value", "--name", "Fractal depth", "--exact", "5")
     step("reprepare Koch snowflake", "click", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
-    wait_undo("Rebuild source cache")
+    wait_undo("Change source settings")
 
     step("undo fractal reprepare", "click", "--name", "Undo", "--exact")
     step("reopen restored fractal settings", "click", "--name", "Fractal settings...", "--exact")

@@ -70,7 +70,7 @@ try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     step("resize workspace", "resize-window", "--w", 1100, "--h", 800)
     step("import visual", "drop-files", "--file", session.root_dir / "Resources/models/cube.obj", "--class", "MotionEditor", "--exact")
-    wait_undo("Import object")
+    wait_undo("Import source")
     step("import soundtrack", "drop-files", "--file", fixture, "--class", "MotionEditor", "--exact")
     wait_undo("Import soundtrack")
     command("wait-for-locator", "--name", "Property inspector", "--exact")
@@ -85,7 +85,7 @@ try:
     step("waveform workspace screenshot", "screenshot", "--file", session.artifact_dir / "soundtrack-workspace.png")
     step("seek into soundtrack", "click", "--class", "MotionTimelineView", "--position", "325,12")
     step("key soundtrack gain", "click", "--name", "Key gain", "--exact")
-    wait_undo("Set keyframe")
+    wait_undo("Key gain")
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
     step("edit soundtrack gain", "set-value", gain["ref"], "1.25")
     wait_undo("Change Gain")
@@ -98,7 +98,7 @@ try:
     # The output picker shows in the Scope header when there is room (it is
     # also in the Audio menu).
     step("widen workspace", "resize-window", "--w", 1440, "--h", 800)
-    step("select XY output", "select-option", "--name", "Audio output mode", "--text", "Beam X/Y")
+    step("select XY output", "select-option", "--name", "Audio output mode", "--text", "Beam XY")
     if os.environ.get("MOTION_TEST_XYRGB") == "1":
         step("enable five channel output", "select-option", "--name", "Audio output mode", "--text", "Beam XYRGB (5 ch)")
         output = find(snapshot(), lambda node: node.get("componentName") == "Audio output mode")

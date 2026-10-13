@@ -72,7 +72,7 @@ void MotionEditor::registerCommands() {
         const auto graph = graphShown();
         const auto selected = graph ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys();
         if (!selected) {
-            statusBar.show("Select keyframes to ease.", MotionStatusBar::Kind::notice);
+            statusBar.show("Select keys to ease.", MotionStatusBar::Kind::notice);
             return;
         }
         // Smooth keys already ease at their ends, so say what happened.
@@ -92,7 +92,7 @@ void MotionEditor::registerCommands() {
         for (const auto& copied : clips) { ids.push_back(copied.clip.id); }
         if (ids.empty()) { return; }
         const auto result = processor.document.duplicateClips(ids, duplicates);
-        if (result.failed()) { statusBar.show("Cannot duplicate: " + result.getErrorMessage()); return; }
+        if (result.failed()) { statusBar.show("Couldn't duplicate: " + result.getErrorMessage()); return; }
         timeline.selectClips(duplicates);
     });
     menus.addMenuSeparator(2);
@@ -102,7 +102,7 @@ void MotionEditor::registerCommands() {
     addCommand(2, "Move clip end to playhead", juce::KeyPress(']', 0, 0), "]", [this] { placeClipAtPlayhead(false, false); });
     addCommand(2, "Trim clip start to playhead", juce::KeyPress('[', juce::ModifierKeys::altModifier, 0), "Alt+[", [this] { placeClipAtPlayhead(true, true); });
     addCommand(2, "Trim clip end to playhead", juce::KeyPress(']', juce::ModifierKeys::altModifier, 0), "Alt+]", [this] { placeClipAtPlayhead(false, true); });
-    addCommand(2, "Show keyframe lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
+    addCommand(2, "Show key lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
     menus.addMenuSeparator(2);
     const auto alt = juce::ModifierKeys::altModifier;
     for (const auto& [letter, group, name] : std::initializer_list<std::tuple<char, const char*, const char*>> {
@@ -131,8 +131,8 @@ void MotionEditor::registerCommands() {
     addCommand(3, "Loop selected clips", juce::KeyPress('l', shift, 0), "Shift+L", [this] { loopSelection(); });
     // View: what the lower panel shows, zoom, follow and track height.
     menus.addMenuSeparator(5);
-    addCommand(5, "Show timeline", juce::KeyPress('1', juce::ModifierKeys::altModifier, 0), "Alt+1", [this] { timelineTabs.setSelectedIndex(0); });
-    addCommand(5, "Show graph", juce::KeyPress('2', juce::ModifierKeys::altModifier, 0), "Alt+2", [this] { timelineTabs.setSelectedIndex(1); });
+    addCommand(5, "Show Timeline", juce::KeyPress('1', juce::ModifierKeys::altModifier, 0), "Alt+1", [this] { timelineTabs.setSelectedIndex(0); });
+    addCommand(5, "Show Graph", juce::KeyPress('2', juce::ModifierKeys::altModifier, 0), "Alt+2", [this] { timelineTabs.setSelectedIndex(1); });
     menus.addMenuSeparator(5);
     // Zoom acts on whichever lower panel is showing.
     const auto zoom = [this](double factor) {
@@ -141,7 +141,7 @@ void MotionEditor::registerCommands() {
     };
     addCommand(5, "Zoom in", juce::KeyPress('=', command, 0), "Cmd+=", [zoom] { zoom(1.5); });
     addCommand(5, "Zoom out", juce::KeyPress('-', command, 0), "Cmd+-", [zoom] { zoom(1 / 1.5); });
-    addCommand(5, "Fit timeline to project", juce::KeyPress(), "F", [this] { timeline.fitProject(); });
+    addCommand(5, "Fit timeline to composition", juce::KeyPress(), "F", [this] { timeline.fitProject(); });
     addCommand(5, "Taller tracks", juce::KeyPress('=', command | shift, 0), "Cmd+Shift+=", [this] { timeline.setDefaultTrackHeight(timeline.layout().trackHeight + 8); });
     addCommand(5, "Shorter tracks", juce::KeyPress('-', command | shift, 0), "Cmd+Shift+-", [this] { timeline.setDefaultTrackHeight(timeline.layout().trackHeight - 8); });
     menus.addToggleMenuItem(5, "Follow playhead", [this] {
@@ -187,13 +187,13 @@ void MotionEditor::pasteClipboard() {
     const auto time = processor.position.load();
     if (const auto* keys = std::get_if<std::vector<motion::Document::CopiedKey>>(&clipboard)) {
         const auto result = processor.document.pasteKeys(selection, *keys, time);
-        if (result.failed()) { statusBar.show("Cannot paste keys: " + result.getErrorMessage()); }
+        if (result.failed()) { statusBar.show("Couldn't paste keys: " + result.getErrorMessage()); }
         return;
     }
     if (const auto* clips = std::get_if<std::vector<motion::Document::CopiedClip>>(&clipboard)) {
         std::vector<motion::Id> pasted;
         const auto result = processor.document.pasteClips(*clips, time, pasted);
-        if (result.failed()) { statusBar.show("Cannot paste clips: " + result.getErrorMessage()); return; }
+        if (result.failed()) { statusBar.show("Couldn't paste clips: " + result.getErrorMessage()); return; }
         timeline.refreshTracks();
         timeline.selectClips(pasted);
     }

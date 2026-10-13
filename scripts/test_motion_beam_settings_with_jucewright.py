@@ -132,12 +132,12 @@ try:
     open_scope()
     save("save baseline")
     if saved().find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") != "1":
-        step("enable upsampling", "click", "--name", "Upsample Audio", "--exact")
+        step("enable upsampling", "click", "--name", "Upsample audio", "--exact")
     step("set beam intensity", "set-value", intensity()["ref"], "6")
     session.wait_for_undo("Change Intensity")
     step("open scope presets", "click", "--name", "Scope presets", "--exact")
     step("choose laser timing", "click", "--name", "Laser (slow galvo)", "--role", "menuItem", "--exact")
-    command("wait-for-locator", "--name", "Undo Apply Laser (slow galvo) scope timing", "--role", "label", "--exact")
+    command("wait-for-locator", "--name", "Undo Apply laser (slow galvo) preset", "--role", "label", "--exact")
     step("set scope dwell", "set-value", scope_field("dwell")["ref"], "80")
     save("save beam settings")
     state = saved()
@@ -154,7 +154,7 @@ try:
     step("XY-only scope options", "screenshot", "--file", session.artifact_dir / "xy-only.png", "--scale", "2")
     step("open scope presets again", "click", "--name", "Scope presets", "--exact")
     step("choose analog timing", "click", "--name", "Analog scope", "--role", "menuItem", "--exact")
-    command("wait-for-locator", "--name", "Undo Apply Analog scope scope timing", "--role", "label", "--exact")
+    command("wait-for-locator", "--name", "Undo Apply analog scope preset", "--role", "label", "--exact")
     save("save XY-only scope")
     if saved().find("composition").get("scopeXYOnly") not in ("1", "true"):
         raise RuntimeError("XY only is saved, and a timing preset keeps it")
@@ -167,7 +167,7 @@ try:
     # Intensity animates like any property: a key here, a new value later keys there.
     seek(0)
     step("key intensity", "click", "--name", "Key intensity", "--exact")
-    session.wait_for_undo("Set keyframe")
+    session.wait_for_undo("Key intensity")
     seek(10)
     step("intensity later", "set-value", intensity()["ref"], "2")
     session.wait_for_undo("Change Intensity")
@@ -179,7 +179,7 @@ try:
     step("redo the later key", "click", "--name", "Redo", "--exact")
     save("save after redo")
     step("change intensity without saving", "set-value", intensity()["ref"], "9")
-    step("disable upsampling without saving", "click", "--name", "Upsample Audio", "--exact")
+    step("disable upsampling without saving", "click", "--name", "Upsample audio", "--exact")
     step("change settle without saving", "set-value", scope_field("settle")["ref"], "0")
     # Reopening asks before the unsaved changes go.
     session.open_project(project)

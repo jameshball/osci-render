@@ -97,7 +97,7 @@ try:
     # Delete the cut with the keyboard after selecting it.
     step("select cut", "click", "--class", "MotionTimelineView", "--position", "750,37")
     step("delete cut", "press", "Delete", "--class", "MotionTimelineView")
-    wait_undo("Remove camera cut")
+    wait_undo("Delete cut")
     assert saved().find("cameraCut") is None
     step("undo cut delete", "click", "--name", "Undo", "--exact")
     assert saved().find("cameraCut") is not None

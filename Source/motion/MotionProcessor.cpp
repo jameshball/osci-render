@@ -258,16 +258,16 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
         unrestoredState = juce::MemoryBlock(data, static_cast<std::size_t>(std::max(0, size)));
         unrestoredGeneration = document.generation();
         unrestoredRevision = document.revision();
-        restoreError = "The saved project couldn't be opened (" + reason + "). It is kept as it was until you change this one.";
+        restoreError = "The project the host saved couldn't be opened. " + reason + " It is kept as it was until you change this one.";
     };
     auto project = getXmlFromBinary(data, size);
     if (project == nullptr || !project->hasTagName("motion-project") || project->getIntAttribute("schema") != 1) {
-        failed("it isn't an osci-motion project this version reads");
+        failed("It isn't an osci-motion project this version can read.");
         return;
     }
     const auto* compositionXml = project->getChildByName("composition");
     if (compositionXml == nullptr) {
-        failed("it has no composition");
+        failed("It has no composition.");
         return;
     }
     motion::Project prepared;

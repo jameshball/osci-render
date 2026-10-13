@@ -32,7 +32,7 @@ try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     step("import separated vector paths", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
-    command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact")
+    command("wait-for-locator", "--name", "Undo Import source", "--role", "label", "--exact")
     command("wait", "--ms", 500)
     step("frozen beam screenshot", "screenshot", "--file", session.artifact_dir / "frozen.png")
     step("start live timeline", "click", "--name", "Play", "--exact")

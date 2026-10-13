@@ -112,8 +112,8 @@ try:
     step("select camera", "click", "--class", "MotionTimelineView", "--position", "400,39")
     command("wait-for-locator", "--name", "Camera hidden lines", "--exact")
     step("open hidden lines", "click", "--name", "Camera hidden lines", "--exact")
-    step("hide them", "click", "--name", "Hidden", "--role", "menuItem", "--exact")
-    session.wait_for_undo("Hide hidden lines")
+    step("hide them", "click", "--name", "Removed", "--role", "menuItem", "--exact")
+    session.wait_for_undo("Remove hidden lines")
     # Baked in the background; the status bar says when it is done.
     if not status_says("hidden lines removed"):
         raise RuntimeError("The status bar should say the hidden lines are removed once baked")

@@ -10,8 +10,8 @@ MotionDrawingEditor::MotionDrawingEditor(motion::drawing::Drawing initial, const
         button->setTooltip(juce::String::fromUTF8(tip));
         button->onClick = [this, value] { setTool(value); };
     }
-    undoButton.setTooltip("Undo (Cmd+Z)");
-    redoButton.setTooltip("Redo (Shift+Cmd+Z)");
+    undoButton.setTooltip("Undo (" + motion::style::shortcutText("Cmd+Z") + ")");
+    redoButton.setTooltip("Redo (" + motion::style::shortcutText("Cmd+Shift+Z") + ")");
     clearButton.setTooltip("Clear the drawing");
     undoButton.onClick = [this] { undo(); };
     redoButton.onClick = [this] { redo(); };
@@ -41,7 +41,7 @@ MotionDrawingEditor::MotionDrawingEditor(motion::drawing::Drawing initial, const
     cancelButton.setButtonText("Cancel");
     cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
     doneButton.setButtonText(editing ? "Apply" : "Add");
-    doneButton.setTooltip(editing ? "Apply the drawing (Cmd+Return)" : "Add the drawing to the project (Cmd+Return)");
+    doneButton.setTooltip((editing ? "Apply the drawing (" : "Add the drawing to the project (") + motion::style::shortcutText("Cmd+Return") + ")");
     motion::style::makePrimary(doneButton);
     doneButton.onClick = [this] { finish(); };
     for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }

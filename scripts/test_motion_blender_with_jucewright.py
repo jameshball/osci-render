@@ -89,7 +89,7 @@ try:
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Live Blender test", "--timeout-ms", "10000")
     step("resize workspace", "resize-window", "--w", "1440", "--h", "900")
     step("open source menu", "click", "--name", "Add source", "--exact")
-    step("choose Blender input", "click", "--name", "Blender live source...", "--role", "menuItem", "--exact")
+    step("choose Blender input", "click", "--name", "Blender source...", "--role", "menuItem", "--exact")
     step("name Blender input", "fill", "--component-name", "Blender source name", "Live diamond")
     step("set local port", "fill", "--component-name", "Blender port", str(port))
     step("add and listen", "click", "--name", "Add & listen", "--exact")

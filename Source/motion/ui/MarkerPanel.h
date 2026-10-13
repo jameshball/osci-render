@@ -15,7 +15,7 @@ public:
         name.setText(initialName, false);
         initialPosition = juce::String(grid.positionLabel(seconds));
         position.setText(initialPosition, false);
-        position.setTooltip("Use the current time display, or append s for seconds or f for frames.");
+        position.setTooltip("Type a time as the ruler shows it, or add s for seconds or f for frames.");
         // Positions read like the other number fields: right-aligned.
         position.setJustification(juce::Justification::centredRight);
         name.setJustification(juce::Justification::centredLeft);
@@ -116,7 +116,7 @@ private:
     static constexpr int unitWidth = 36;
     juce::TextEditor tempo;
     juce::Label tempoLabel, rampLabel, unit;
-    motion::ui::Switch ramp {"Ramp into tempo"};
+    motion::ui::Switch ramp {"Glide into tempo"};
 };
 
 // Names the part being extracted; the rest keeps its source's name.

@@ -83,7 +83,7 @@ try:
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     for source in ["Resources/models/cube.obj", "Resources/svg/cat.svg"]:
         step("import " + source, "drop-files", "--file", session.root_dir / source, "--class", "MotionEditor", "--exact")
-        session.wait_for_undo("Import object")
+        session.wait_for_undo("Import source")
     tree = snapshot()
     window = next(n["bounds"] for n in nodes(tree) if n.get("class") == "MotionEditor")
     header = next(n["bounds"] for n in nodes(tree) if str(n.get("componentName", "")).startswith("Track name ") and n.get("value") == "cube.obj")
@@ -113,7 +113,7 @@ try:
     command("wait-for-locator", "--component-name", "Next beam key", "--exact", "--timeout-ms", 5000)
     step("undo the key", "click", "--name", "Undo", "--exact")
     step("undo the drag", "click", "--name", "Undo", "--exact")
-    session.wait_for_undo("Import object")
+    session.wait_for_undo("Import source")
     if abs(beam_value() - before) > 1e-6:
         raise RuntimeError("Undo should restore the Beam")
     print("Motion beam workflow passed", flush=True)

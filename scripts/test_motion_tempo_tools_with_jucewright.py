@@ -130,7 +130,7 @@ try:
     step("add tempo", "click", "--name", "Add tempo change here...", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Tempo change BPM", "--timeout-ms", 10000)
     step("bpm", "fill", "--name", "Tempo change BPM", "--class", "juce::TextEditor", "--exact", "90")
-    step("ramp", "click", "--name", "Ramp into tempo", "--exact")
+    step("ramp", "click", "--name", "Glide into tempo", "--exact")
     step("apply", "press", "Return", "--name", "Tempo change BPM", "--class", "juce::TextEditor", "--exact")
     wait_undo("Add tempo change")
     changes = saved().findall("tempo")

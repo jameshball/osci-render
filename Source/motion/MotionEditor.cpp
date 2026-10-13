@@ -355,7 +355,7 @@ void MotionEditor::setUpTransport() {
     monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
     monitorOutput.setColour(juce::ComboBox::arrowColourId, osci::Colours::textMuted());
     monitorOutput.addItem("Soundtrack", 1);
-    monitorOutput.addItem("Beam X/Y", 2);
+    monitorOutput.addItem("Beam XY", 2);
     monitorOutput.addItem("Beam XYRGB (5 ch)", 3);
     refreshOutputChoices();
     monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
@@ -408,7 +408,7 @@ void MotionEditor::setUpTransport() {
     timeLabel.setName("Timeline position");
     timeLabel.setEditable(false, true);
     timeLabel.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
-    timeLabel.setTooltip("Double-click to go to a position. Use the current display, or append s for seconds / f for frames. Musical positions use bar.beat.tick (960 ticks per beat).");
+    timeLabel.setTooltip("Double-click to go to a time. Type it as the ruler shows it, or add s for seconds or f for frames. Bars read bar.beat.tick (960 ticks a beat).");
     timeLabel.onEditorShow = [this] {
         positionEditGrid = processor.document.project().timeGrid();
         positionEditGeneration = processor.document.scopeGeneration();
@@ -429,7 +429,7 @@ void MotionEditor::setUpTransport() {
     };
     tapButton.setName("Tap tempo");
     tapButton.setTitle("Tap tempo");
-    tapButton.setTooltip("Tap on the beat (four taps or more). The tempo is set when you stop tapping. Detect it from the soundtrack in the timing menu.");
+    tapButton.setTooltip("Tap on the beat (four taps or more). The tempo is set when you stop tapping. Detect it from the soundtrack in the Timing menu.");
     tapButton.setWantsKeyboardFocus(false);
     tapButton.onClick = [this] { tap(); };
     tempoValue.setName("Project tempo");
@@ -441,13 +441,14 @@ void MotionEditor::setUpTransport() {
         const auto value = typed.value_or(0);
         if (value < 1 || value > 1000) {
             tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification);
+            statusBar.show("Enter a tempo between 1 and 1000 BPM.", MotionStatusBar::Kind::notice);
             return;
         }
         if (value != processor.document.project().bpm) {
             const auto result = processor.document.changeTempo(value);
             if (result.failed()) {
                 tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification);
-                statusBar.show("Cannot change tempo: " + result.getErrorMessage());
+                statusBar.show("Couldn't change the tempo: " + result.getErrorMessage());
             }
         }
     };
@@ -460,7 +461,7 @@ void MotionEditor::setUpLibrary() {
     modulatorLibrary.onError = [this](const juce::String& text) { statusBar.show(text); };
     libraryTabs.setName("Library tabs");
     styleTabs(libraryTabs);
-    libraryTabs.addTab("Assets");
+    libraryTabs.addTab("Sources");
     libraryTabs.addTab("Effects");
     libraryTabs.addTab("Modulators");
     libraryTabs.onSelectionChanged = [this](int index) {
@@ -531,8 +532,8 @@ void MotionEditor::setUpLibrary() {
             mirrors.addItem(std::move(entry));
         }
         menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
-        menu.addItem(item(1, "Import file...", icons::glyph::folder()));
-        menu.addItem(item(2, "Blender live source...", icons::glyph::live()));
+        menu.addItem(item(1, "Import source...", icons::glyph::folder()));
+        menu.addItem(item(2, "Blender source...", icons::glyph::live()));
         // The examples that ship with osci-motion, by kind, each pictured as
         // it draws (a blank space until its picture is made).
         juce::PopupMenu examples;
@@ -974,7 +975,8 @@ void MotionEditor::resized() {
     timelineDivider.setBounds(area.removeFromBottom(7));
     // Side panels widen on large windows; the preview keeps the rest.
     const auto extra = std::max(0, getWidth() - 1440);
-    libraryBounds = area.removeFromLeft(std::clamp(190 + extra / 10, 190, 280));
+    // Wide enough for its three tabs (Sources, Effects, Modulators) side by side.
+    libraryBounds = area.removeFromLeft(std::clamp(205 + extra / 10, 205, 280));
     auto library = libraryBounds;
     libraryTabs.setBounds(library.removeFromTop(30));
     effectLibrary.setBounds(library.reduced(4, 0));
@@ -1112,7 +1114,8 @@ void MotionEditor::showAddLight() {
     // A point light already moving on its own.
     for (const auto preset : motion::lightPresets) {
         const juce::String name(motion::lightPresetName(preset).data());
-        moving.push_back({motion::ui::pictures::lightPresetShortName(preset), "Add a point light that moves as a " + name.toLowerCase() + " does", {motion::ui::pictures::lightPresetPicture(preset), {}}});
+        const auto& definition = motion::lightPresetDefinition(preset);
+        moving.push_back({motion::ui::pictures::lightPresetShortName(preset), "Add a point light: " + name + ". " + juce::String(definition.description.data(), definition.description.size()), {motion::ui::pictures::lightPresetPicture(preset), {}}});
     }
     std::vector<motion::ui::AddPicker::Section> sections {{"Lights", std::move(lights), 2}, {"Moving on its own", std::move(moving), 2}};
     showPopover(std::make_unique<motion::ui::AddPicker>("Add a light", std::move(sections), [this](std::size_t section, std::size_t index) {

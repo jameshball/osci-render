@@ -15,12 +15,12 @@ public:
         setName("Composition settings");
         motion::style::inspector::styleHeading(title, "Timing");
         addAndMakeVisible(title);
-        const std::array<const char*, 4> labels {"Length", "Rate", "Tempo", "Meter"};
+        const std::array<const char*, 4> labels {"Duration", "Rate", "Tempo", "Meter"};
         for (std::size_t index = 0; index < captions.size(); ++index) {
             motion::style::inspector::styleCaption(captions[index], labels[index]);
             addAndMakeVisible(captions[index]);
         }
-        for (auto [field, name, tip] : {std::tuple {&length, "Composition length", "How long the composition runs, in seconds; it is never shorter than its last clip"},
+        for (auto [field, name, tip] : {std::tuple {&length, "Composition duration", "How long the composition runs, in seconds; it is never shorter than its last clip"},
                                         std::tuple {&tempo, "Composition tempo", "Beats per minute at the start; tempo changes on the ruler take over from there"}}) {
             field->setName(name);
             field->setTitle(name);
@@ -92,7 +92,7 @@ private:
         } else if (*value < lastClip - 1.0e-9) {
             if (onError) { onError("The composition runs at least to its last clip (" + juce::String(lastClip, 2) + " s)."); }
         } else if (std::abs(*value - document.project().duration) > 1.0e-9) {
-            document.edit("Change composition length", [length = *value](motion::Project& project) { project.duration = length; });
+            document.edit("Change composition duration", [length = *value](motion::Project& project) { project.duration = length; });
         }
         refresh();
     }

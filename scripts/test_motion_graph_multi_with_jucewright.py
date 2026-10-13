@@ -154,7 +154,7 @@ try:
     drag("box select", (x_of(0.8), y_of(-1.25)), (x_of(1.2), y_of(0.8)))
     # 2. Dragging the X key moves the Y key too: one undo step on both curves.
     drag("group drag", (x_of(1), y_of(-1)), (x_of(1.5), y_of(-1)))
-    wait_undo("Move animation keys")
+    wait_undo("Move keys")
     model["position.x"] = [(1.5, -1), (2, 0), (3, 1)]
     model["position.y"] = [(1.5, 0.5), (3.21, -0.5)]
     expect(keys(saved()), model, "group drag")
@@ -167,7 +167,7 @@ try:
     # 3. Magnet: the Z key lands exactly on the off-grid Y key at 3.21 s.
     x_of, y_of, graph_pps = mapper(model)
     drag("magnet drag", (x_of(2.4), y_of(0.6)), (x_of(3.21) + 4, y_of(0.6)))
-    wait_undo("Move animation key")
+    wait_undo("Move key")
     model["position.z"] = [(3.21, 0.6)]
     expect(keys(saved()), model, "magnet drag")
 
@@ -179,7 +179,7 @@ try:
     step("scale selection", "screenshot", "--file", session.artifact_dir / "graph-scale-selection.png")
     handle = (x_of(3.21) + 12, (y_of(1) + y_of(-1)) / 2)
     drag("scale right edge", handle, (handle[0] + 0.5 * graph_pps, handle[1]))
-    wait_undo("Scale animation keys")
+    wait_undo("Scale keys")
     edge = round(3.71 * FPS) / FPS
     scale = lambda t: 1.5 + (t - 1.5) * (edge - 1.5) / (3.21 - 1.5)
     model["position.x"] = [(1.5, -1), (scale(2), 0), (scale(3), 1)]
@@ -191,7 +191,7 @@ try:
     x_of, y_of, graph_pps = mapper(model)
     drag("box select for delete", (x_of(1.3), y_of(-1.25)), (x_of(1.7), y_of(0.8)))
     step("delete keys", "press", "Delete", "--class", "MotionCurveEditor")
-    wait_undo("Delete animation keys")
+    wait_undo("Delete keys")
     model["position.x"] = model["position.x"][1:]
     model["position.y"] = model["position.y"][1:]
     expect(keys(saved()), model, "delete")
@@ -203,7 +203,7 @@ try:
     # Cut in the Graph takes its keys, never the clip the Graph is showing.
     drag("box select for cut", (x_of(1.3), y_of(-1.25)), (x_of(1.7), y_of(0.8)))
     step("cut keys", "press", "command + x", "--class", "MotionCurveEditor")
-    wait_undo("Delete animation keys")
+    wait_undo("Delete keys")
     expect(keys(saved()), model, "cut keys, the clip kept")
     step("undo cut", "click", "--name", "Undo", "--exact")
     expect(keys(saved()), restored, "undo cut")
@@ -212,7 +212,7 @@ try:
     # its interpolation.
     click("select one key", 1.5, -1, restored)
     step("type key value", "set-value", "--component-name", "Key value", "--exact", "-0.75")
-    wait_undo("Change animation key")
+    wait_undo("Change key")
     restored["position.x"] = [(1.5, -0.75)] + restored["position.x"][1:]
     expect(keys(saved()), restored, "typed key value")
     step("hold interpolation", "click", "--name", "Hold interpolation", "--exact")
@@ -223,7 +223,7 @@ try:
         raise RuntimeError(f"key bar: interpolation is {first.get('interpolation')}, expected hold (0)")
     # Alt+Right nudges the selected key one frame; Escape then deselects.
     step("nudge key", "press", "alt + right", "--class", "MotionCurveEditor")
-    wait_undo("Nudge animation key")
+    wait_undo("Nudge key")
     restored["position.x"] = [(1.5 + 1 / FPS, -0.75)] + restored["position.x"][1:]
     expect(keys(saved()), restored, "nudge")
     step("deselect", "press", "Escape", "--class", "MotionCurveEditor")
@@ -240,7 +240,7 @@ try:
     if shown is None or shown.get("value") != "1.4.064":
         raise RuntimeError(f"Key time in bars and beats: {shown and shown.get('value')}")
     step("type key time in beats", "set-value", "--component-name", "Key time", "--exact", "1.3.480")
-    wait_undo("Move animation key")
+    wait_undo("Move key")
     restored["position.x"] = [(1.25, -0.75)] + restored["position.x"][1:]
     expect(keys(saved()), restored, "key time typed in bars and beats")
     step("final", "screenshot", "--file", session.artifact_dir / "graph-final.png")

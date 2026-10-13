@@ -111,7 +111,7 @@ public:
                 expectWithinAbsoluteError(pasted[1].time, 1.5, 1e-12);
                 expect(pasted[1].interpolation == motion::Interpolation::cubic && pasted[1].outgoingSlope == 2 && pasted[1].outgoingInfluence == .6);
             }
-            expect(f.undo.getUndoDescription() == "Paste keyframes");
+            expect(f.undo.getUndoDescription() == "Paste keys");
             expect(f.undo.undo());
             expect(!f.clip(f.second)->properties.at("position.x").animated());
         }

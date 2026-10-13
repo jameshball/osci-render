@@ -27,7 +27,7 @@ struct TextSettings {
         if (family.length() > 256) { return "Font family name is too long."; }
         if (style < 0 || style > (juce::Font::bold | juce::Font::italic)) { return "Invalid font style."; }
         if (alignment < 0 || alignment > 2) { return "Invalid text alignment."; }
-        if (!std::isfinite(lineSpacing) || lineSpacing < 0.5 || lineSpacing > 4) { return "Line spacing must be between 0.5 and 4 em."; }
+        if (!std::isfinite(lineSpacing) || lineSpacing < 0.5 || lineSpacing > 4) { return "Line spacing must be between 0.5 and 4 times the line height."; }
         if (!std::isfinite(tracking) || tracking < -0.2 || tracking > 1) { return "Tracking must be between -0.2 and 1 em."; }
         if (static_cast<int>(animation) < 0 || static_cast<int>(animation) > 5) { return "Unknown text animation."; }
         const auto seconds = [](double value) { return std::isfinite(value) && value >= 0 && value <= 30; };

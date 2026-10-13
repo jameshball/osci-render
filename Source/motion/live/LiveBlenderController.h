@@ -26,7 +26,7 @@ public:
                 }
             }
             if (session == nullptr) {
-                if (sessions.size() >= maximumInputs) { return juce::Result::fail("Motion supports up to 16 live Blender inputs in one session."); }
+                if (sessions.size() >= maximumInputs) { return juce::Result::fail("osci-motion listens to at most 16 Blender sources at once. Stop listening on one first."); }
                 sessions.push_back({asset->liveIdentity, asset->blenderSettings.port, std::make_unique<PreparedBlenderInput>()});
                 session = &sessions.back();
             }

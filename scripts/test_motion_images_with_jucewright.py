@@ -69,7 +69,7 @@ try:
     assert combo_value("Image trace mode") == "Outlines"
     step("image settings screenshot", "screenshot", "--file", session.artifact_dir / "settings.png")
     step("prepare outlines", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
-    wait_undo("Import object")
+    wait_undo("Import source")
     command("wait", "--ms", 500)
     step("colored outlines screenshot", "screenshot", "--file", session.artifact_dir / "outlines.png")
     step("open image settings", "click", "--name", "Image settings...", "--exact")
@@ -82,7 +82,7 @@ try:
     assert combo_value("Image detail") == "128 px"
     step("restore scanline detail", "select-option", "--name", "Image detail", "--class", "juce::ComboBox", "--exact", "--text", "64 px")
     step("prepare scanlines", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
-    wait_undo("Rebuild source cache")
+    wait_undo("Change source settings")
     command("wait", "--ms", 500)
     step("scanline screenshot", "screenshot", "--file", session.artifact_dir / "scanlines.png")
     # A Hilbert curve over it, as dense as it is bright.
@@ -93,14 +93,14 @@ try:
     assert combo_value("Image shading") == "Colour", combo_value("Image shading")
     step("Hilbert settings screenshot", "screenshot", "--file", session.artifact_dir / "hilbert-settings.png")
     step("prepare Hilbert by colour", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
-    wait_undo("Rebuild source cache")
+    wait_undo("Change source settings")
     command("wait", "--ms", 500)
     step("Hilbert by colour screenshot", "screenshot", "--file", session.artifact_dir / "hilbert-colour.png")
     step("open image settings for density", "click", "--name", "Image settings...", "--exact")
     step("choose density", "set-value", "--name", "Image shading", "--exact", "Density")
     assert combo_value("Image shading") == "Density"
     step("prepare Hilbert by density", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
-    wait_undo("Rebuild source cache")
+    wait_undo("Change source settings")
     command("wait", "--ms", 500)
     step("Hilbert by density screenshot", "screenshot", "--file", session.artifact_dir / "hilbert-density.png")
     step("undo Hilbert by density", "click", "--name", "Undo", "--exact")

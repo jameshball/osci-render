@@ -99,7 +99,7 @@ juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
                 static_cast<Interpolation>(interpolation), point->getDoubleAttribute("in"), point->getDoubleAttribute("out"),
                 point->getDoubleAttribute("inInfluence", Keyframe::defaultInfluence), point->getDoubleAttribute("outInfluence", Keyframe::defaultInfluence) });
         } catch (const std::invalid_argument&) {
-            return juce::Result::fail("Invalid animation key.");
+            return juce::Result::fail("Invalid key.");
         }
     }
     return juce::Result::ok();
@@ -743,7 +743,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         }
         if (videoSource) {
             const auto* cache = item->getChildByName("video-cache");
-            if (cache == nullptr) { return juce::Result::fail("Video asset is missing its prepared cache. Project loading never launches a decoder."); }
+            if (cache == nullptr) { return juce::Result::fail("A video in this project is missing its prepared frames. Import it again."); }
             asset->bakeKey = cache->getStringAttribute("key");
             if (!readBase64(cache->getAllSubText(), asset->bakedData, BakedSourceArchive::maximumCompressedBytes) || asset->bakedData.getSize() == 0) {
                 return juce::Result::fail("Invalid or oversized video source cache.");
@@ -751,7 +751,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         }
         if (luaSource) {
             auto* bake = item->getChildByName("bake");
-            if (bake == nullptr) { return juce::Result::fail("Lua asset is missing its prepared cache. Project loading never executes scripts."); }
+            if (bake == nullptr) { return juce::Result::fail("A Lua source in this project is missing its prepared frames. Import it again."); }
             asset->bakeSettings.duration = bake->getDoubleAttribute("duration", 0);
             asset->bakeSettings.frameRate = bake->getDoubleAttribute("frameRate", 0);
             asset->bakeSettings.bpm = bake->getDoubleAttribute("bpm", 0);

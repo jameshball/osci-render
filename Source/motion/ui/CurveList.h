@@ -25,7 +25,7 @@ public:
         addAndMakeVisible(viewport);
         animatedOnly.setName("Animated channels only");
         animatedOnly.setTitle(animatedOnly.getName());
-        animatedOnly.setTooltip("Show only keyed or modulated channels, like After Effects' U");
+        animatedOnly.setTooltip("Show only keyed or modulated properties");
         animatedOnly.setToggleState(true, juce::dontSendNotification);
         // A filter, not a status: on reads as pressed, not green.
         animatedOnly.setOnColour(juce::Colours::white.withAlpha(.14f));

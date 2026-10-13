@@ -2370,7 +2370,7 @@ void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
 
 void MotionTimelineView::endKeyDrag() {
     if (keyDrag.has_value() && keyDrag->changed && processor.document.revision() == keyDrag->revision) {
-        processor.document.commit(keyDrag->keys.size() > 1 ? "Move keyframes" : "Move keyframe", std::move(keyDrag->before));
+        processor.document.commit(keyDrag->keys.size() > 1 ? "Move keys" : "Move key", std::move(keyDrag->before));
     }
     keyDrag.reset();
 }
@@ -2408,7 +2408,7 @@ bool MotionTimelineView::easeSelectedKeys(bool in, bool out) {
 
 void MotionTimelineView::deleteSelectedKeys() {
     const auto keys = selectedKeys;
-    const auto removed = processor.document.tryEdit(keys.size() > 1 ? "Delete keyframes" : "Delete keyframe", [&keys](motion::Project& project) {
+    const auto removed = processor.document.tryEdit(keys.size() > 1 ? "Delete keys" : "Delete key", [&keys](motion::Project& project) {
         if (keysLocked(project, keys)) { return false; }
         bool any = false;
         changeKeyedClips(project, keys, [&](motion::Clip& clip) {
@@ -2437,7 +2437,7 @@ void MotionTimelineView::addKeyAt(const Row& lane, int x, juce::ModifierKeys mod
     const auto clipId = target->id;
     const auto local = target->timing(project.tempo()).localTime(time);
     const auto property = lane.lane;
-    const auto added = processor.document.tryEdit("Add keyframe", [&](motion::Project& updated) {
+    const auto added = processor.document.tryEdit("Add key", [&](motion::Project& updated) {
         auto* curve = motion::findPropertyCurve(updated, clipId, property);
         if (curve == nullptr) { return false; }
         curve->setKeyValue(local, curve->evaluateBase(local));
@@ -2973,7 +2973,7 @@ void MotionTimelineView::showMarkerMenu(motion::Id id, double time) {
     if (change != nullptr) {
         menu.addItem(7, "Edit tempo change...");
         menu.addItem(9, "Glide into this tempo", true, change->ramp);
-        menu.addItem(8, "Remove tempo change");
+        menu.addItem(8, "Delete tempo change");
     } else {
         menu.addItem(6, "Add tempo change here...", beat > 0);
     }
@@ -3034,7 +3034,7 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
     menu.addSeparator();
     menu.addItem(2, "Edit clip timing");
     menu.addItem(motion::style::menuItem(many ? "Loop selected clips" : "Loop this clip", 9, "Shift+L"));
-    if (asset != 0) { menu.addItem(10, "Show source in Assets"); }
+    if (asset != 0) { menu.addItem(10, "Show in Sources"); }
     menu.addSeparator();
     menu.addItem(motion::style::menuItem(many ? "Delete clips" : "Delete clip", 7, "Delete").setEnabled(!locked));
     menu.addItem(motion::style::menuItem(many ? "Ripple delete clips" : "Ripple delete clip", 8, "Shift+Delete").setEnabled(!locked));
@@ -3204,7 +3204,7 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
         }
         if (result >= 300 && result < 300 + static_cast<int>(motion::style::trackLabels().size())) {
             const auto label = result - 300;
-            processor.document.tryEdit("Change track colour", [id, label](motion::Project& project) {
+            processor.document.tryEdit("Change label colour", [id, label](motion::Project& project) {
                 auto* track = project.tracks.changeById(id);
                 if (track == nullptr || track->label == label) { return false; }
                 track->label = label;
@@ -3233,7 +3233,8 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
 
 void MotionTimelineView::toggleLock(motion::Id id) {
     cancelGesture();
-    processor.document.edit("Toggle track lock", [id](motion::Project& project) {
+    const auto* current = processor.document.project().tracks.findById(id);
+    processor.document.edit(current != nullptr && current->locked ? "Unlock track" : "Lock track", [id](motion::Project& project) {
         auto* track = project.tracks.changeById(id);
         if (track != nullptr) { track->locked = !track->locked; }
     });
@@ -3241,7 +3242,13 @@ void MotionTimelineView::toggleLock(motion::Id id) {
 
 void MotionTimelineView::toggleTrack(motion::Id id, bool solo) {
     cancelGesture();
-    processor.document.edit(solo ? "Toggle track solo" : "Toggle track mute", [id, solo](motion::Project& project) {
+    // Named for what it does: "Mute track", "Unsolo group".
+    const auto& project = processor.document.project();
+    const auto* group = motion::findGroup(project, id);
+    const auto* track = project.tracks.findById(id);
+    const auto on = group != nullptr ? (solo ? group->solo : group->muted) : track != nullptr && (solo ? track->solo : track->muted);
+    const juce::String what = group != nullptr ? "group" : "track";
+    processor.document.edit((on ? (solo ? "Unsolo " : "Unmute ") : (solo ? "Solo " : "Mute ")) + what, [id, solo](motion::Project& project) {
         auto* group = motion::findGroup(project, id);
         if (group != nullptr) {
             if (solo) { group->solo = !group->solo; } else { group->muted = !group->muted; }

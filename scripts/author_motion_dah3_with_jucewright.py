@@ -149,7 +149,7 @@ def import_source(name, start, duration=None, bake=None, offset=None, depth=3, s
         command("wait-for-locator", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
         step("fractal depth", "set-value", "--name", "Fractal depth", "--role", "slider", "--exact", str(depth))
         step("grow " + name, "click", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
-    label = "Undo Import soundtrack" if name.endswith(".flac") else "Undo Import object"
+    label = "Undo Import soundtrack" if name.endswith(".flac") else "Undo Import source"
     command("wait-for-locator", "--name", label, "--role", "label", "--exact", "--timeout-ms", 120000)
     timing(duration=duration, offset=offset, back="Properties")
 
@@ -215,7 +215,7 @@ def add_effect(effect, parameters=None, scope=None):
     step("add " + effect, "click", "--name", effect, "--role", "listItem", "--click-count", 2)
     for parameter, value in (parameters or {}).items():
         step(f"{effect} {parameter}", "set-value", "--name", "Effect " + parameter, "--role", "slider", str(value))
-    library_tab("Assets")
+    library_tab("Sources")
     tab("Properties")
 
 
@@ -511,7 +511,7 @@ def finale_colour():
     step("add colour", "click", "--name", "Colour", "--role", "listItem", "--click-count", 2)
     key_effect("strength", [(bar(96), 0), (bar(100), 1), (bar(111), 1), (bar(112), 0)])
     key_effect("hue", [(bar(96), 0), (bar(112), 170)])
-    library_tab("Assets")
+    library_tab("Sources")
     step("scope clip", "select-option", "--name", "Effect scope", "--text", "Clip")
     tab("Properties")
     save()

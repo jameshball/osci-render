@@ -123,7 +123,7 @@ void MotionEditor::loadProject(const juce::File& file) {
             try {
                 juce::MemoryBlock bytes;
                 if (!file.loadFileAsData(bytes) || bytes.getSize() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-                    result = juce::Result::fail("Cannot read the project file.");
+                    result = juce::Result::fail("Couldn't read the project file.");
                 } else {
                     task->xml = juce::AudioProcessor::getXmlFromBinary(bytes.getData(), static_cast<int>(bytes.getSize()));
                     const auto* composition = task->xml != nullptr ? task->xml->getChildByName("composition") : nullptr;
@@ -134,7 +134,7 @@ void MotionEditor::loadProject(const juce::File& file) {
                     }
                 }
             } catch (const std::exception& error) {
-                result = juce::Result::fail("Cannot open project: " + juce::String(error.what()));
+                result = juce::Result::fail("Couldn't open the project: " + juce::String(error.what()));
             }
         }
         juce::MessageManager::callAsync([owner, task, file, generation, revision, result] {
@@ -145,7 +145,10 @@ void MotionEditor::loadProject(const juce::File& file) {
             if (overlay != nullptr) { owner->dismissOverlay(overlay); }
             if (result.failed()) {
                 owner->projectNotLoaded(file);
-                motion::ui::MessageSheet::show(*owner, "Couldn't open the project", result.getErrorMessage(), "OK", {}, file.getFileName());
+                // A check of the file's structure failing says what, then why it might.
+                auto message = result.getErrorMessage();
+                if (message.startsWith("Invalid") || message.containsIgnoreCase("identity")) { message << " The file may be damaged, or saved by a newer osci-motion."; }
+                motion::ui::MessageSheet::show(*owner, "Couldn't open the project", message, "OK", {}, file.getFileName());
                 return;
             }
             if (owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) {
@@ -164,7 +167,7 @@ void MotionEditor::loadProject(const juce::File& file) {
 }
 
 void MotionEditor::chooseSourceFile() {
-    chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), osci::files::sourceWildcard());
+    chooser = std::make_unique<juce::FileChooser>("Import source", processor.getLastOpenedDirectory(), osci::files::sourceWildcard());
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [owner](const juce::FileChooser& chosen) {
         if (owner != nullptr && chosen.getResult().existsAsFile()) {
@@ -256,7 +259,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
                     asset->data.replaceAll(archive.bytes.data(), archive.bytes.size());
                     result = motion::decodeAsset(*asset, &task->cancelled, &task->progress);
                 } else { result = juce::Result::fail(archive.error); }
-            } catch (const std::exception& error) { result = juce::Result::fail("Cannot prepare capture: " + juce::String(error.what())); }
+            } catch (const std::exception& error) { result = juce::Result::fail("Couldn't prepare the capture: " + juce::String(error.what())); }
             juce::MessageManager::callAsync([owner, generation, identity, task, asset, result] {
                 if (owner == nullptr) { return; }
                 std::erase(owner->pendingImports, task);
@@ -399,10 +402,10 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 } else if (request.file.getSize() > static_cast<juce::int64>(motion::maximumSourceBytes)) {
                     result = juce::Result::fail("This source exceeds the 64 MiB preparation limit.");
                 } else {
-                    result = request.file.loadFileAsData(asset->data) ? motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder) : juce::Result::fail("Cannot read the source file.");
+                    result = request.file.loadFileAsData(asset->data) ? motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder) : juce::Result::fail("Couldn't read the source file.");
                 }
             } catch (const std::exception& error) {
-                result = juce::Result::fail("Cannot import this source: " + juce::String(error.what()));
+                result = juce::Result::fail("Couldn't import this source: " + juce::String(error.what()));
             }
         }
         juce::MessageManager::callAsync([owner, request, asset, time, result, generation, task] {
@@ -462,7 +465,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                     return;
                 }
                 asset->id = request.replacement->id;
-                document.edit(request.editedText.has_value() ? (asset->extension.equalsIgnoreCase(".lua") ? "Edit Lua source" : "Edit text source") : request.textSettings.has_value() ? "Animate text" : "Rebuild source cache", [&](motion::Project& project) {
+                document.edit(request.editedText.has_value() ? (asset->extension.equalsIgnoreCase(".lua") ? "Edit Lua source" : "Edit text source") : request.textSettings.has_value() ? "Animate text" : "Change source settings", [&](motion::Project& project) {
                     for (auto& item : project.assets) {
                         if (item == request.replacement) { item = asset; }
                     }
@@ -493,7 +496,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             const auto target = std::find_if(tracks.begin(), tracks.end(), [&](const auto& item) { return item.id == request.track; });
             const auto onTrack = request.track != 0 && target != tracks.end() && !target->locked && target->kind == track.kind && target->canPlace(clip, 0, document.project().tempo());
             const auto trackId = onTrack ? request.track : 0;
-            document.edit(asset->audio != nullptr ? "Import soundtrack" : "Import object", [&](motion::Project& project) {
+            document.edit(asset->audio != nullptr ? "Import soundtrack" : "Import source", [&](motion::Project& project) {
                 project.assets.push_back(asset);
                 auto* existing = trackId != 0 ? project.tracks.changeById(trackId) : nullptr;
                 if (existing != nullptr) { existing->insert(clip, project.tempo()); } else { project.tracks.push_back(track); }

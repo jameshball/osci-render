@@ -68,7 +68,7 @@ try:
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Slider study", "--timeout-ms", 60000)
     # Text: rise in, character by character.
     step("import text", "drop-files", "--file", title, "--class", "MotionEditor", "--exact")
-    wait_undo("Import object")
+    wait_undo("Import source")
     # Per-character animation lives in the text clip's Properties.
     command("wait-for-locator", "--name", "Text animation", "--exact", "--timeout-ms", 10000)
     step("rise", "select-option", "--name", "Text animation", "--class", "juce::ComboBox", "--exact", "--text", "Rise in")

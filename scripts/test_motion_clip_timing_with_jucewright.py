@@ -112,7 +112,7 @@ try:
     _, clips = saved()
     assert float(clips['3'].get('rate')) == 2
     edit("Clip source offset", "invalid")
-    command("wait-for-locator", "--name", "Enter a finite number.", "--exact")
+    command("wait-for-locator", "--name", "Enter a number, like 1.5.", "--exact")
     _, clips = saved()
     assert float(clips['3'].get('offset')) == 1.25
     step("select second clip", "click", "--class", "MotionTimelineView", "--position", "970,68")

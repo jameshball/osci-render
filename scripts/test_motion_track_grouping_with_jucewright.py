@@ -72,7 +72,7 @@ try:
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     for source in ["Resources/models/cube.obj", "Resources/models/teapot.obj", "Resources/svg/cat.svg"]:
         step("import " + source, "drop-files", "--file", session.root_dir / source, "--class", "MotionEditor", "--exact")
-        session.wait_for_undo("Import object")
+        session.wait_for_undo("Import source")
     step("pick the cube", "click-xy", *header("cube.obj"))
     step("add the cat", "click-xy", *header("cat.svg"), "--modifiers", "cmd")
     step("menu on the picked tracks", "click-xy", *header("cat.svg"), "--button", "right")

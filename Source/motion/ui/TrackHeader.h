@@ -24,7 +24,7 @@ public:
         addChildComponent(disclosure);
         name.onTextChange = [this] { if (onRename) { onRename(id, name.getText().trim().toStdString()); } };
         mute.setTooltip("Mute this track");
-        solo.setTooltip("Show only soloed tracks");
+        solo.setTooltip("Solo: hear and see only soloed tracks");
         lock.setTooltip("Lock this track against edits");
 
         mute.onClick = [this] { if (onMute) { onMute(id); } };
@@ -55,8 +55,8 @@ public:
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
         lock.setVisible(!group);
-        disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Keyframe lanes " + juce::String(id));
-        disclosure.setTooltip(group ? "Fold or unfold this group" : "Show or hide keyframe lanes");
+        disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Key lanes " + juce::String(id));
+        disclosure.setTooltip(group ? "Fold or unfold this group" : "Show or hide key lanes");
         name.setFont(group ? motion::style::title() : motion::style::body());
         if (!name.isBeingEdited()) { name.setText(juce::String(track.name), juce::dontSendNotification); }
         name.setTooltip(juce::String(track.name) + " - double-click to rename");

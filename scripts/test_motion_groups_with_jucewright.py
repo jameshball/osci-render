@@ -87,7 +87,7 @@ try:
     step("translate group", "set-value", position["ref"], "0.35")
     wait_undo("Change Position X")
     step("key group position", "click", "--name", "Key position", "--exact")
-    wait_undo("Set keyframe")
+    wait_undo("Key position")
     step("fold group", "click", "--name", "Fold group " + group, "--exact")
     hidden = find(snapshot(), lambda node: node.get("name") == "Reorder track " + track and node.get("visible"))
     if hidden is not None:

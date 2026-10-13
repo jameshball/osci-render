@@ -3,6 +3,7 @@
 #include "Document.h"
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <functional>
 #include <optional>
 #include <string>
@@ -79,7 +80,13 @@ inline constexpr std::size_t lightPresetIds = 2 * std::tuple_size_v<decltype(lig
 
 namespace light_preset_detail {
 // What a preset names a light's modulator for one way it moves: "Fire Surge".
-inline std::string driveName(const Definition& definition, const Drive& drive) { return std::string(definition.name) + " " + std::string(drive.role); }
+// "Fire surge"; a preset with one way of moving named for it, "Pulse".
+inline std::string driveName(const Definition& definition, const Drive& drive) {
+    if (drive.role == definition.name) { return std::string(definition.name); }
+    auto role = std::string(drive.role);
+    for (auto& letter : role) { letter = static_cast<char>(std::tolower(static_cast<unsigned char>(letter))); }
+    return std::string(definition.name) + " " + role;
+}
 // A preset modulator's name: the light's, cut short (on a character) to
 // keep within a modulator's name, then how the preset moves it.
 inline std::string modulatorName(const std::string& light, const Definition& definition, const Drive& drive) {

@@ -103,7 +103,7 @@ try:
     step("eight points", "set-value", field("generator.points")["ref"], "8")
     session.wait_for_undo("Change Points")
     step("key points", "click", "--name", "Key points", "--exact")
-    session.wait_for_undo("Set keyframe")
+    session.wait_for_undo("Key points")
     timeline = find(lambda n: n.get("class") == "MotionTimelineView")["bounds"]
     step("fit", "press", "F", "--class", "MotionTimelineView")
     pps = (timeline["w"] - 220 - 20) / 8.0

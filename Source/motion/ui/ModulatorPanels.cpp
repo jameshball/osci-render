@@ -29,7 +29,7 @@ RouteRow::RouteRow(Document& document, std::function<void(const juce::Result&)> 
     amount.onBegin = [this] { this->document.beginHeld("route:" + juce::String(route.id)); };
     amount.onEnd = [this] { this->document.endHeld(); };
     amount.onCancel = [this] { this->document.cancelHeld(); };
-    mode.setTooltip("Add to the value, or multiply it by 1 + amount x modulator");
+    mode.setTooltip(juce::String::fromUTF8("Add to the value, or multiply it by 1 + amount \xc3\x97 modulator"));
     mode.onClick = [this] { apply(amount.getValue(), route.mode == ModulationMode::add ? ModulationMode::multiply : ModulationMode::add); };
     remove.setTooltip("Stop driving this property");
     // A quiet mark beside the mode toggle, not the heaviest thing in the column.

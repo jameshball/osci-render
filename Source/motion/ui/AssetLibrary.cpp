@@ -99,7 +99,7 @@ void MotionAssetLibrary::updateStatus() {
     if (definitionRow(row)) {
         help = document.canReferenceComposition(assetId(row))
             ? "Shared composition. Enter or double-click to insert; drag to place. Open to edit."
-            : "Contains this scope: insertion would create a loop. Open to edit.";
+            : "It contains the composition you're editing, so it can't go inside it. Open to edit.";
     }
     status.setText(importStatus.isNotEmpty() ? importStatus : help, juce::dontSendNotification);
     resized();
@@ -180,7 +180,7 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
         const auto& asset = *assets[static_cast<std::size_t>(row)];
         const auto drawn = asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset.data.toString());
         const auto* generator = motion::generatorOf(asset);
-        detail = asset.liveIdentity != nullptr ? "Live Blender" : asset.extension.equalsIgnoreCase(".blender-capture") ? "Capture" : drawn ? "Drawing"
+        detail = asset.liveIdentity != nullptr ? "Blender source" : asset.extension.equalsIgnoreCase(".blender-capture") ? "Capture" : drawn ? "Drawing"
             : generator != nullptr ? juce::String(motion::generatorCategoryLabel(generator->category).data()) : asset.extension.trimCharactersAtStart(".").toUpperCase();
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {

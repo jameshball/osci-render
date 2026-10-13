@@ -20,7 +20,7 @@ public:
         auto& bake = baking.bakeButton();
         bake.setButtonText(editing ? "Apply" : "Add");
         bake.setTitle("Bake source");
-        bake.setTooltip(editing ? "Bake the source with these changes (Cmd+Return)" : "Bake the source and add it (Cmd+Return)");
+        bake.setTooltip((editing ? "Bake the source with these changes (" : "Bake the source and add it (") + motion::style::shortcutText("Cmd+Return") + ")");
         motion::style::makePrimary(bake);
         addAndMakeVisible(bake);
         baking.onBake = [this](motion::BakeSettings values) { if (onDone) { onDone(values, model.getCode()); } };

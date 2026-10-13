@@ -20,7 +20,7 @@ public:
         doneButton.setName("Apply text");
         doneButton.setTitle("Apply text");
         doneButton.setButtonText("Apply");
-        doneButton.setTooltip("Apply the text (Cmd+Return)");
+        doneButton.setTooltip("Apply the text (" + motion::style::shortcutText("Cmd+Return") + ")");
         motion::style::makePrimary(doneButton);
         doneButton.onClick = [this] { finish(); };
         for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
@@ -53,13 +53,13 @@ public:
                 changed();
             };
         }
-        for (auto [button, value, tip] : {std::tuple {&alignLeft, 0, "Align left"}, std::tuple {&alignCentre, 1, "Centre"}, std::tuple {&alignRight, 2, "Align right"}}) {
+        for (auto [button, value, tip] : {std::tuple {&alignLeft, 0, "Align left"}, std::tuple {&alignCentre, 1, "Align centre"}, std::tuple {&alignRight, 2, "Align right"}}) {
             button->setTooltip(tip);
             button->setRadioGroupId(71);
             button->setClickingTogglesState(true);
             button->onClick = [this, value] { settings.alignment = value; changed(); };
         }
-        for (auto [field, spec, tip] : {std::tuple {&lineSpacing, &lineSpacingSpec, "Line spacing (em)"}, std::tuple {&tracking, &trackingSpec, "Tracking: extra space between letters (em)"}}) {
+        for (auto [field, spec, tip] : {std::tuple {&lineSpacing, &lineSpacingSpec, "Line spacing (times the line height)"}, std::tuple {&tracking, &trackingSpec, "Tracking: extra space between letters (em)"}}) {
             field->setSpec(*spec);
             field->setTooltip(tip);
             field->onChange = [this](double) { readFields(); };

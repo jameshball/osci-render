@@ -53,7 +53,7 @@ try:
     source = session.artifact_dir / "Title.txt"
     source.write_text("MOTION")
     step("import source", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
-    command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact")
+    command("wait-for-locator", "--name", "Undo Import source", "--role", "label", "--exact")
     step("ruler menu", "click", "--class", "MotionTimelineView", "--position", "360,12", "--button", "right")
     step("add ruler marker", "click", "--name", "Add marker here...", "--role", "menuItem", "--exact")
     edit("Marker name", "Verse")

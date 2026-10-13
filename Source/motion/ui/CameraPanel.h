@@ -24,8 +24,8 @@ public:
         parent.setTooltip("Carry this camera with a group's transform");
         lookAt.onChange = [this] { applyRig(); };
         parent.onChange = [this] { applyRig(); };
-        hiddenLines.addItem("Shown", 1);
-        hiddenLines.addItem("Hidden", 2);
+        hiddenLines.addItem("Drawn", 1);
+        hiddenLines.addItem("Removed", 2);
         hiddenLines.setName("Camera hidden lines");
         hiddenLines.setTitle("Camera hidden lines");
         hiddenLines.setTooltip("Hide the lines this camera can't see, behind the faces of 3D meshes, as a solid object would. Baked in the background as you edit.");
@@ -50,7 +50,7 @@ public:
             processor.document.cutToCamera(camera, frameTime(), cut);
             refresh();
         };
-        cutButton.setButtonText("Cut to it at the playhead");
+        cutButton.setButtonText("Cut to camera here");
         addChildComponent(cutButton);
         keyButton.setName("Key camera");
         keyButton.onClick = [this] { toggleKey(); };
@@ -79,7 +79,7 @@ public:
         const auto keyed = isKeyed(found);
         keyButton.setEnabled(found != nullptr);
         keyButton.setButtonText(keyed ? "Remove keys" : "Key all");
-        keyButton.setTooltip(keyed ? "Remove the position, rotation and lens keys at the playhead" : "Key position, rotation and lens at the playhead");
+        keyButton.setTooltip(keyed ? "Remove the position, rotation and field of view keys at the playhead" : "Key position, rotation and field of view at the playhead");
     }
     void resized() override {
         auto area = getLocalBounds();
@@ -170,7 +170,7 @@ private:
         const auto time = frameTime();
         const auto keyed = isKeyed(found);
         const auto id = camera;
-        processor.document.edit(keyed ? "Remove camera key" : "Key camera", [id, time, keyed](motion::Project& project) {
+        processor.document.edit(keyed ? "Remove camera keys" : "Key camera", [id, time, keyed](motion::Project& project) {
             for (auto& item : project.cameras) {
                 if (item.id != id) { continue; }
                 for (const auto& spec : motion::cameraPropertySpecs) {
@@ -186,7 +186,7 @@ private:
     void applyHiddenLines() {
         const auto hide = hiddenLines.getSelectedId() == 2;
         const auto id = camera;
-        processor.document.edit(hide ? "Hide hidden lines" : "Show hidden lines", [id, hide](motion::Project& project) {
+        processor.document.edit(hide ? "Remove hidden lines" : "Draw hidden lines", [id, hide](motion::Project& project) {
             for (auto& item : project.cameras) {
                 if (item.id == id) { item.hideHiddenLines = hide; }
             }

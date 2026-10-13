@@ -77,6 +77,14 @@ public:
         return const_cast<T&>(*item);
     }
     T& change(const_iterator at) { return change(static_cast<std::size_t>(at - begin())); }
+    // The first item with this id, to read; null when none has it.
+    template <typename Id>
+    const T* findById(Id id) const {
+        for (const auto& item : items) {
+            if (item->id == id) { return item.get(); }
+        }
+        return nullptr;
+    }
     // The first item with this id, ready to write; null when none has it.
     template <typename Id>
     T* changeById(Id id) {

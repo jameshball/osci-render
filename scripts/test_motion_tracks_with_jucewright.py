@@ -60,11 +60,11 @@ try:
     first = find(tree, lambda node: str(node.get("componentName", "")).startswith("Track name ") and node.get("value") == "cube.obj")
     track_id = first["componentName"].split()[-1]
     step("mute object track", "click", "--name", "Mute track " + track_id, "--exact")
-    wait_undo("Toggle track mute")
+    wait_undo("Mute track")
     step("muted output", "screenshot", "--file", session.artifact_dir / "muted-track.png")
     step("undo mute", "click", "--name", "Undo", "--exact")
     step("solo object track", "click", "--name", "Solo track " + track_id, "--exact")
-    wait_undo("Toggle track solo")
+    wait_undo("Solo track")
     label = find(snapshot(), lambda node: node.get("componentName") == "Track name " + track_id)
     step("rename object track", "fill", label["ref"], "Main geometry")
     step("commit track name", "press", "Return")

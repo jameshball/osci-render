@@ -156,7 +156,7 @@ try:
     x = 220 + round(13 * pixels)
     # Jucewright places a file drop relative to the drop target (the editor).
     step("drop on track", "drop-files", "--file", extra, "--class", "MotionEditor", "--exact", "--position", f"{area['x'] + x},{area['y'] + track_row(20) + 16}")
-    command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact", "--timeout-ms", 30000)
+    command("wait-for-locator", "--name", "Undo Import source", "--role", "label", "--exact", "--timeout-ms", 30000)
     state = saved()
     clips = track(state, 20).findall("clip")
     assert len(clips) == 2 and abs(float(clips[1].get("start")) - 13) < 0.6, [c.attrib for c in clips]

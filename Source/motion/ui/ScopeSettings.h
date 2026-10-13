@@ -74,8 +74,8 @@ public:
             processor.visualiserParameters.screenOverlay->setUnnormalisedValueNotifyingHost(static_cast<float>(overlay.getSelectedId()));
         };
         addAndMakeVisible(overlay);
-        upsample.setName("Upsample Audio");
-        upsample.setTitle("Upsample Audio");
+        upsample.setName("Upsample audio");
+        upsample.setTitle("Upsample audio");
         upsample.setTooltip(parameters.upsamplingEnabled->getDescription());
         upsample.onClick = [this] {
             processor.lastUndoParamId = {};
@@ -250,13 +250,13 @@ private:
         auto profile = preset.profile;
         profile.xyOnly = processor.document.project().scope.xyOnly;
         if (profile == processor.document.project().scope) { return; }
-        processor.document.edit("Apply " + juce::String(preset.name.data(), preset.name.size()) + " scope timing", [profile](motion::Project& project) { project.scope = profile; });
+        processor.document.edit("Apply " + juce::String(preset.name.data(), preset.name.size()).toLowerCase() + " preset", [profile](motion::Project& project) { project.scope = profile; });
     }
 
     MotionProcessor& processor;
     juce::Label displayTitle, timingTitle, overlayCaption, upsampleCaption, xyCaption;
     juce::ComboBox overlay;
-    motion::ui::Switch upsample {"Upsample Audio"}, xyOnly {"Scope XY only"};
+    motion::ui::Switch upsample {"Upsample audio"}, xyOnly {"Scope XY only"};
     std::array<int, 2> rules {};
     std::array<Field, 3> fields;
     motion::scope::MenuLink presets {"Presets"};

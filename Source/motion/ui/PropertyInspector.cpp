@@ -406,7 +406,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             row->modulate.onContent = motion::style::result();
             row->modulate.setName("Modulate " + row->group.toLowerCase());
             row->modulate.setTitle(row->modulate.getName());
-            row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + ": open it in the Graph with its oscillator, modulator routes and link. Lit when something drives it.");
+            row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + ": open it in the Graph to route modulators to it or link it. Lit when something drives it.");
             row->addAndMakeVisible(row->modulate);
             auto* raw = row.get();
             row->modulate.onClick = [this, raw] {
@@ -527,7 +527,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         for (const auto preset : motion::lightPresets) {
             const auto& definition = motion::lightPresetDefinition(preset);
             const juce::String name(definition.name.data(), definition.name.size());
-            choices.push_back({motion::ui::pictures::lightPresetShortName(preset), name + ": its colour, and it moves on its own as a " + name.toLowerCase() + " does (its modulators are in the Graph)", {motion::ui::pictures::lightPresetPicture(preset), {}}});
+            choices.push_back({motion::ui::pictures::lightPresetShortName(preset), name + ": " + juce::String(definition.description.data(), definition.description.size()) + ". Sets its colour; its modulators are in the Graph.", {motion::ui::pictures::lightPresetPicture(preset), {}}});
         }
         // One at a time, in a row.
         presetTiles = std::make_unique<motion::ui::TileGrid>("Light presets", std::move(choices), 3, motion::ui::TileGrid::Look::chips, true);
@@ -796,7 +796,9 @@ void MotionPropertyInspector::toggleKeys(Row& row) {
         const auto* curve = found->curve(std::string(field->spec.id));
         allKeyed = allKeyed && curve != nullptr && curve->hasKeyAt(time);
     }
-    processor.document.edit(allKeyed ? "Remove keyframe" : "Set keyframe", [&](motion::Project& project) {
+    // Named as its button is: "Key position", "Remove position keys".
+    const auto what = row.group.toLowerCase();
+    processor.document.edit(allKeyed ? "Remove " + what + " keys" : "Key " + what, [&](motion::Project& project) {
         for (auto& field : row.fields) {
             auto* curve = motion::findPropertyCurve(project, target, std::string(field->spec.id));
             if (curve == nullptr) { curve = createSlider(project, std::string(field->spec.id)); }

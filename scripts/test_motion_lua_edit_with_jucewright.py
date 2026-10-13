@@ -71,7 +71,7 @@ try:
     command("wait-for-locator", "--name", "Bake duration", "--exact")
     step("short source cache", "set-value", "--name", "Bake duration", "--exact", "1")
     step("bake initial source", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
-    command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact")
+    command("wait-for-locator", "--name", "Undo Import source", "--role", "label", "--exact")
     step("duplicate shared source", "press", "command + d", "--class", "MotionTimelineView")
     before = saved_asset()
     assert len(saved_clips()) == 2
