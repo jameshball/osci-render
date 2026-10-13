@@ -328,7 +328,9 @@ const std::array<MotionModulatorLibrary::Kind, 7>& MotionModulatorLibrary::kinds
 }
 
 std::size_t MotionModulatorLibrary::kindIndex(const motion::Modulator& modulator) {
-    return std::min<std::size_t>(static_cast<std::size_t>(modulator.shape.waveform), 6);
+    const auto& list = kinds();
+    const auto found = std::find_if(list.begin(), list.end(), [&](const Kind& kind) { return kind.waveform == modulator.shape.waveform; });
+    return found != list.end() ? static_cast<std::size_t>(found - list.begin()) : 0;
 }
 
 void MotionModulatorLibrary::setKind(std::size_t index) {
@@ -535,6 +537,8 @@ void MotionRoutingPanel::showLinkMenu() {
     const auto& project = processor.document.project();
     juce::PopupMenu menu;
     choices.clear();
+    // Clips, groups and cameras, each under its heading, their properties in a submenu each.
+    std::optional<juce::String> heading;
     const auto addOwner = [&](motion::Id owner, const juce::String& title, const motion::PropertyMap& properties) {
         juce::PopupMenu sub;
         for (const auto& [name, curve] : properties) {
@@ -542,13 +546,18 @@ void MotionRoutingPanel::showLinkMenu() {
             choices.push_back({owner, name});
             sub.addItem(static_cast<int>(choices.size()), motion::propertyLabel(project, owner, name));
         }
-        if (sub.getNumItems() > 0) { menu.addSubMenu(title, sub); }
+        if (sub.getNumItems() == 0) { return; }
+        if (heading.has_value()) { menu.addSectionHeader(*std::exchange(heading, std::nullopt)); }
+        menu.addSubMenu(title, sub);
     };
+    heading = "Clips";
     for (const auto& track : project.tracks) {
         for (const auto& clip : track.clips) { addOwner(clip.id, juce::String(clip.name), clip.properties); }
     }
-    for (const auto& group : project.groups) { addOwner(group.id, "Group: " + juce::String(group.name), group.properties); }
-    for (const auto& camera : project.cameras) { addOwner(camera.id, "Camera: " + juce::String(camera.name), camera.properties); }
+    heading = "Groups";
+    for (const auto& group : project.groups) { addOwner(group.id, juce::String(group.name), group.properties); }
+    heading = "Cameras";
+    for (const auto& camera : project.cameras) { addOwner(camera.id, juce::String(camera.name), camera.properties); }
     const auto id = targetId;
     const auto property = propertyName;
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(&link), [this, id, property](int result) {
