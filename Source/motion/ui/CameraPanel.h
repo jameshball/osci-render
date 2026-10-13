@@ -98,7 +98,7 @@ public:
         area.removeFromTop(motion::style::gap);
         shotLabel.setBounds(row.removeFromLeft(left));
         showing.setBounds(row);
-        cutButton.setBounds(row.withWidth(cutButton.getBestWidthForHeight(row.getHeight()) + 20));
+        cutButton.setBounds(row);
         row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
         keysLabel.setBounds(row.removeFromLeft(left));
         keyButton.setBounds(row);
