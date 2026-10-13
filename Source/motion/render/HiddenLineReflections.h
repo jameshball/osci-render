@@ -512,7 +512,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 // In the scene as straight stretches: one for a straight line
                 // nothing bends, else as many as keep close to its path.
                 std::vector<std::pair<double, std::optional<Vec3>>> path;
-                if (!item.bent && dynamic_cast<osci::Line*>(shape) != nullptr) {
+                if (!item.bent && isStraight(*shape)) {
                     path = {{0.0, place(item, shape->nextVector(0))}, {1.0, place(item, shape->nextVector(1))}};
                 } else {
                     double length = 0;

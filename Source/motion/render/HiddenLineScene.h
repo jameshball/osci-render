@@ -161,12 +161,19 @@ public:
     float length() override { return shape->length(); }
     std::unique_ptr<osci::Shape> clone() override { return std::make_unique<DimmedShape>(shape->clone(), factor); }
     float gain() const { return factor; }
+    osci::Shape& whole() const { return *shape; }
     std::string type() override { return "Dimmed"; }
 
 private:
     std::unique_ptr<osci::Shape> shape;
     float factor;
 };
+
+// Straight wherever it is drawn: a line, or one dimmed.
+inline bool isStraight(osci::Shape& shape) {
+    auto* dimmed = dynamic_cast<DimmedShape*>(&shape);
+    return dynamic_cast<osci::Line*>(dimmed != nullptr ? &dimmed->whole() : &shape) != nullptr;
+}
 
 // What can stand between two points of the scene: every surface's faces.
 inline void buildRays(const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world, SceneRays& rays) {

@@ -50,7 +50,7 @@ private:
         jassert(decoded.wasOk());
         return asset;
     }
-    static motion::Project hiddenLineProject(const std::vector<std::shared_ptr<motion::Asset>>& assets, int copies, bool bulge, bool still = false) {
+    static motion::Project hiddenLineProject(const std::vector<std::shared_ptr<motion::Asset>>& assets, int copies, bool bulge, bool still = false, bool styled = false) {
         motion::Project project;
         project.duration = 2;
         project.assets.assign(assets.begin(), assets.end());
@@ -66,6 +66,11 @@ private:
             // Copies overlap, so their surfaces cut through each other.
             clip.properties["position.x"] = motion::Curve(copies == 1 ? 0 : -.45 + .9 * copy / (copies - 1));
             if (bulge) { clip.effects.push_back(motion::makeEffect(next++, *motion::effectDefinition("bulge"))); }
+            // Faint edges and rings laid over it, as a style draws them.
+            if (styled) {
+                clip.properties["edges"] = motion::Curve(40);
+                clip.properties["rings"] = motion::Curve(60);
+            }
             motion::Track track;
             track.id = next++;
             track.insert(clip, project.tempo());
@@ -126,6 +131,7 @@ private:
         benchmarkHiddenLineProject("four crossing teapots", hiddenLineProject({teapot}, 4, false));
         benchmarkHiddenLineProject("two bulged crossing teapots", hiddenLineProject({teapot}, 2, true));
         benchmarkHiddenLineProject("still bulged teapot", hiddenLineProject({teapot}, 1, true, true));
+        benchmarkHiddenLineProject("styled teapot", hiddenLineProject({teapot}, 1, false, false, true));
         // A project of your own: MOTION_BENCHMARK_PROJECT=/path/to.osci-motion
         const auto path = juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_PROJECT", "");
         if (path.isEmpty()) { return; }

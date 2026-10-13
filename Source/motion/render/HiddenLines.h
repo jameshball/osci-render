@@ -32,6 +32,7 @@ public:
         return len;
     }
     std::unique_ptr<osci::Shape> clone() override { return std::make_unique<ShapePart>(*this); }
+    osci::Shape& whole() const { return *shape; }
     std::string type() override { return "Part"; }
 
 private:
@@ -922,6 +923,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 continue;
             }
             const auto line = dynamic_cast<osci::Line*>(shape) != nullptr;
+            const auto straight = line || isStraight(*shape);
             const auto start = shape->nextVector(0), end = shape->nextVector(1);
             const auto from = lastEye.has_value() && start.x == lastEnd.x && start.y == lastEnd.y && start.z == lastEnd.z ? lastEye : eye(*item.clip, start);
             const auto to = eye(*item.clip, end);
@@ -936,7 +938,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     const auto at = place(item, shape->nextVector(static_cast<float>(t)));
                     return at.has_value() && !workspace.rays.blocked(*at, *eyeAt, 1.0e-6, 0, SceneRays::none, grazed);
                 });
-            } else if (line && !item.bent) {
+            } else if (straight && !item.bent) {
                 // Straight through the camera: interpolated exactly.
                 const auto sa = screen(from), sb = screen(to);
                 const auto length = sa.has_value() && sb.has_value() ? std::hypot(sb->x - sa->x, sb->y - sa->y) : 2 * (reach.x + reach.y);
@@ -1016,6 +1018,11 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         std::vector<std::array<float, 3>> light;
         std::vector<double> shades;
         std::vector<std::size_t> breaks;
+        // A kept piece is straight when it is a straight line or a part of one.
+        const auto straightPiece = [](osci::Shape& shape) {
+            auto* part = dynamic_cast<ShapePart*>(&shape);
+            return dynamic_cast<ColouredLine*>(&shape) != nullptr || isStraight(part != nullptr ? part->whole() : shape);
+        };
         for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
             if (cancelled()) { return nullptr; }
             const auto& item = items[surface];
@@ -1039,7 +1046,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 // A straight piece nothing bends is straight in the scene too:
                 // its points there are blended between its ends'.
                 std::optional<Vec3> startsAt, endsAt;
-                if (!item.bent && dynamic_cast<osci::Line*>(shape.get()) != nullptr) {
+                if (!item.bent && straightPiece(*shape)) {
                     startsAt = place(item, shape->nextVector(0));
                     endsAt = place(item, shape->nextVector(1));
                 }
