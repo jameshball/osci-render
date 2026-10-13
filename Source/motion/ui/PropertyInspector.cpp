@@ -165,6 +165,7 @@ void MotionPropertyInspector::refreshValues() {
         for (auto& field : row->fields) { field->editor.setEnabled(!found->locked); }
         row->key.setEnabled(!found->locked);
         if (row->swatch != nullptr) { row->swatch->setEnabled(!found->locked); }
+        if (row->mode != nullptr) { row->mode->setEnabled(!found->locked); }
         row->key.setState(allKeyed && anyAnimated ? osci::KeyframeButton::State::keyed
             : (anyAnimated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
         // Key navigation shows only once there are keys, lit towards them.
@@ -879,6 +880,8 @@ std::optional<std::pair<bool, bool>> MotionPropertyInspector::currentModes() con
 
 void MotionPropertyInspector::setMotionMode(bool path, bool enabled) {
     const auto id = target;
+    const auto found = motion::findPropertyTarget(processor.document.project(), id);
+    if (!found.has_value() || found->locked) { return; }
     const std::string prefix = path ? "position." : "rotation.";
     processor.document.edit(path ? (enabled ? "Use spatial path" : "Use separate position axes") : (enabled ? "Use quaternion rotation" : "Use Euler rotation"),
         [id, path, enabled, prefix](motion::Project& project) {

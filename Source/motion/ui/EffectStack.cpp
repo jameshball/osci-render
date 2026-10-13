@@ -110,9 +110,14 @@ void MotionEffectStack::paint(juce::Graphics& g) {
     }
 }
 
+bool MotionEffectStack::locked(motion::Id id) const {
+    const auto target = motion::findPropertyTarget(processor.document.project(), id);
+    return target.has_value() && target->locked;
+}
+
 bool MotionEffectStack::isInterestedInDragSource(const SourceDetails& details) {
     const auto value = details.description.toString();
-    return owner.has_value() && (value.startsWith("motion-effect:") || value.startsWith("motion-effect-instance:"));
+    return owner.has_value() && !locked(*owner) && (value.startsWith("motion-effect:") || value.startsWith("motion-effect-instance:"));
 }
 
 void MotionEffectStack::itemDragMove(const SourceDetails& details) {
@@ -152,6 +157,7 @@ void MotionEffectStack::itemDropped(const SourceDetails& details) {
 void MotionEffectStack::addEffect(const std::string& type, int index) {
     if (!owner.has_value()) { return; }
     const auto target = *owner;
+    if (locked(target)) { return; }
     const auto* existing = motion::findEffectOwner(processor.document.project(), target);
     const auto* definition = motion::effectDefinition(type);
     if (existing == nullptr || definition == nullptr || existing->size() >= motion::maximumEffectsPerOwner) { return; }
@@ -203,7 +209,7 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->field.onChange = [this, property](double value) { stack.setValue(id, property, value); };
         row->field.onEnd = [this] { stack.finishGesture(); };
         row->field.onCancel = [this] { stack.cancelGesture(); update(); };
-        row->field.onCommit = [this, property](double value) { stack.setValue(id, property, value); };
+        row->field.onCommit = [this, property](double value) { stack.commitValue(id, property, value); };
         row->key.onClick = [this, property] { stack.toggleKey(id, property); };
         row->modulate.onClick = [this, property] { if (stack.onPropertySelected) { stack.onPropertySelected(id, property); } };
         row->previous.onClick = [this, property] { jump(property, false); };
@@ -225,6 +231,12 @@ void MotionEffectStack::Card::update() {
     }
     const auto target = motion::findPropertyTarget(project, id);
     if (!target.has_value()) { return; }
+    // A locked track's effects show but do not edit.
+    for (auto* control : std::initializer_list<juce::Component*> {&power, &close}) { control->setEnabled(!target->locked); }
+    for (auto& row : rows) {
+        row->field.setEnabled(!target->locked);
+        row->key.setEnabled(!target->locked);
+    }
     const auto local = target->localTime(stack.frameTime());
     for (auto& row : rows) {
         const auto* curve = target->curve(row->id);
@@ -423,6 +435,7 @@ int MotionEffectStack::insertionIndex(int y) const {
 }
 
 void MotionEffectStack::setEnabled(motion::Id id, bool value) {
+    if (locked(id)) { return; }
     processor.document.edit(value ? "Enable effect" : "Bypass effect", [id, value](motion::Project& project) {
         auto* effect = motion::findEffect(project, id);
         if (effect != nullptr) { effect->enabled = value; }
@@ -448,6 +461,7 @@ void MotionEffectStack::showMenu(motion::Id id) {
 
 void MotionEffectStack::remove(motion::Id id) {
     cancelGesture();
+    if (locked(id)) { return; }
     processor.document.tryEdit("Remove effect", [id](motion::Project& project) {
         auto* list = motion::findEffectList(project, id);
         if (list == nullptr) { return false; }
@@ -461,6 +475,7 @@ void MotionEffectStack::move(motion::Id id, int index) {
     if (!owner.has_value()) { return; }
     const auto target = *owner;
     cancelGesture();
+    if (locked(id) || locked(target)) { return; }
     processor.document.tryEdit("Move effect", [id, target, index](motion::Project& project) {
         auto* destination = motion::findEffectOwner(project, target);
         if (destination == nullptr) { return false; }
@@ -483,6 +498,7 @@ void MotionEffectStack::move(motion::Id id, int index) {
 
 void MotionEffectStack::toggleKey(motion::Id id, const std::string& property) {
     cancelGesture();
+    if (locked(id)) { return; }
     const auto target = motion::findPropertyTarget(processor.document.project(), id);
     const auto* curve = target.has_value() ? target->curve(property) : nullptr;
     if (curve == nullptr) { return; }
@@ -504,7 +520,7 @@ void MotionEffectStack::beginGesture(motion::Id id, const std::string& property)
 }
 
 void MotionEffectStack::setValue(motion::Id id, const std::string& property, double value) {
-    if (cancelledGesture) { return; }
+    if (cancelledGesture || locked(id)) { return; }
     if (gesture.stale()) { gesture.reset(); cancelledGesture = true; return; }
     const auto time = gesture.active() ? gestureTime : frameTime();
     const auto target = motion::findPropertyTarget(processor.document.project(), id);
@@ -530,6 +546,11 @@ void MotionEffectStack::setValue(motion::Id id, const std::string& property, dou
     } else {
         processor.document.editCoalesced("Change effect parameter", "effect:" + juce::String(id) + ":" + juce::String(property), operation);
     }
+}
+
+void MotionEffectStack::commitValue(motion::Id id, const std::string& property, double value) {
+    cancelledGesture = false;
+    setValue(id, property, value);
 }
 
 void MotionEffectStack::finishGesture() {

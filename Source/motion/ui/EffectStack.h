@@ -109,6 +109,8 @@ private:
     void settleCards();
     int insertionIndex(int y) const;
     double frameTime() const { return processor.document.project().frameTime(processor.position.load()); }
+    // Whether an effect, or what owns effects, is on a locked track: shown, not edited.
+    bool locked(motion::Id id) const;
     void setEnabled(motion::Id id, bool value);
     void showMenu(motion::Id id);
     void remove(motion::Id id);
@@ -117,6 +119,9 @@ private:
     void toggleKey(motion::Id id, const std::string& property);
     void beginGesture(motion::Id id, const std::string& property);
     void setValue(motion::Id id, const std::string& property, double value);
+    // A value typed or stepped in: never part of a scrub, so one Escaped
+    // before doesn't swallow it.
+    void commitValue(motion::Id id, const std::string& property, double value);
     void finishGesture();
     void cancelGesture();
 
