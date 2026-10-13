@@ -117,6 +117,12 @@ private:
 public:
     // The current composition's bake of its hidden lines, when it has one,
     // and how many of its frames are still to bake; message thread.
+    // A launch that only renders: the session saved on quitting is the one
+    // it was launched with, and nothing joins the recent lists.
+    void keepLaunchSession() {
+        keepsLaunchSession = true;
+        remembersFiles = false;
+    }
     std::shared_ptr<const motion::hidden::Bake> hiddenLineBake() const { return publishedBake; }
     std::optional<std::size_t> hiddenLinesRemaining() const { return publishedBake != nullptr && !publishedBake->complete() ? std::optional(publishedBake->remaining()) : std::nullopt; }
     // Bakes from the playhead's frame on, wherever it goes; message thread.
@@ -132,6 +138,8 @@ private:
     // Removes the lines cameras can't see, off the audio thread, from the
     // playhead out. Last, so its workers stop before the rest is destroyed.
     std::shared_ptr<motion::hidden::Bake> publishedBake;
+    bool keepsLaunchSession = false;
+    juce::MemoryBlock launchSession;
     juce::AudioBuffer<float> signal;
     std::atomic<double> requestedPosition { -1.0 };
     std::atomic<std::uint64_t> seekSerial {0};

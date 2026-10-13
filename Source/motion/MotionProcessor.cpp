@@ -242,6 +242,11 @@ void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
         lock.emplace();
         if (!lock->lockWasGained()) { return; }
     }
+    // A launch that only renders leaves the last session as it found it.
+    if (keepsLaunchSession) {
+        destination = launchSession;
+        return;
+    }
     if (unrestoredState.getSize() > 0) {
         if (document.generation() == unrestoredGeneration && document.revision() == unrestoredRevision) {
             destination = unrestoredState;
@@ -259,6 +264,7 @@ void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
 }
 
 void MotionProcessor::setStateInformation(const void* data, int size) {
+    if (!keepsLaunchSession || launchSession.isEmpty()) { launchSession = juce::MemoryBlock(data, static_cast<std::size_t>(std::max(0, size))); }
     motion::ProjectFile file;
     const auto result = motion::ProjectFile::read(data, static_cast<std::size_t>(std::max(0, size)), file);
     if (result.failed()) {

@@ -169,7 +169,7 @@ juce::File CommonAudioProcessor::getRecentProjectFile(int index) const
 
 void CommonAudioProcessor::addRecentProjectFile(const juce::File& file)
 {
-    if (file == juce::File())
+    if (file == juce::File() || !remembersFiles)
         return;
 
     recentProjectFiles.addFile(file);
@@ -216,9 +216,11 @@ void CommonAudioProcessor::recordingExportCompleted(const juce::File& file) {
         return;
     }
 
-    recentRecordingFiles.addFile(file);
-    globalSettings.set("recentRecordingFiles", recentRecordingFiles.toString());
-    globalSettings.save();
+    if (remembersFiles) {
+        recentRecordingFiles.addFile(file);
+        globalSettings.set("recentRecordingFiles", recentRecordingFiles.toString());
+        globalSettings.save();
+    }
     if (globalSettings.getBool("showVideoAfterExport", false)) {
         file.revealToUser();
     }

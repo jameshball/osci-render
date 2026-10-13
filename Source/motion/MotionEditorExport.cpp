@@ -229,6 +229,7 @@ void MotionEditor::handleCommandLine(const juce::String& commandLine) {
         const auto token = tokens[index].trim().unquoted();
         if (token == "--render-video" && index + 1 < tokens.size()) {
             commandLineRender = juce::File::createFileWithoutCheckingPath(tokens[++index].trim().unquoted());
+            processor.keepLaunchSession();
             continue;
         }
         if (token.startsWith("--stills=")) {

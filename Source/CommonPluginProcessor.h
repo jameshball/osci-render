@@ -175,6 +175,9 @@ public:
     // This is used for the File > Open Recent menu in both standalone and DAW plugin builds.
     int getNumRecentProjectFiles() const;
     juce::File getRecentProjectFile(int index) const;
+    // False for a launch that only renders (from the command line): what it
+    // opens and writes isn't added to the recent lists.
+    bool remembersFiles = true;
     void addRecentProjectFile(const juce::File& file);
     int createRecentProjectsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo,
                                           int baseItemId,
