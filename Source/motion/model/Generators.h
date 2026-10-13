@@ -188,10 +188,10 @@ inline constexpr std::array<GeneratorDefinition, 23> generatorDefinitions {{
     {GeneratorKind::torus, "torus", "Torus", GeneratorCategory::solid, generator_specs::torus},
     {GeneratorKind::cylinder, "cylinder", "Cylinder", GeneratorCategory::solid, generator_specs::cylinder},
     {GeneratorKind::cone, "cone", "Cone", GeneratorCategory::solid, generator_specs::cone},
-    {GeneratorKind::ambientLight, "ambientLight", "Ambient light", GeneratorCategory::light, generator_specs::ambientLight},
-    {GeneratorKind::directionalLight, "directionalLight", "Directional light", GeneratorCategory::light, generator_specs::directionalLight},
     {GeneratorKind::pointLight, "pointLight", "Point light", GeneratorCategory::light, generator_specs::pointLight},
     {GeneratorKind::spotLight, "spotLight", "Spot light", GeneratorCategory::light, generator_specs::spotLight},
+    {GeneratorKind::directionalLight, "directionalLight", "Directional light", GeneratorCategory::light, generator_specs::directionalLight},
+    {GeneratorKind::ambientLight, "ambientLight", "Ambient light", GeneratorCategory::light, generator_specs::ambientLight},
 }};
 
 constexpr const GeneratorDefinition* findGenerator(std::string_view id) {
