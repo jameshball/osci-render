@@ -385,15 +385,15 @@ struct PreparedLight {
     std::vector<Curve> parameters;
 
     using State = LightState;
-    // A parameter at the clip's own time, within its range; its default
-    // when the light has none such.
-    double parameter(std::string_view id, double time, double fallback) const {
+    // A parameter at the clip's own time, within its range. A kind of light
+    // without one (an ambient light's range, say) never uses it: 0.
+    double parameter(std::string_view id, double time) const {
         for (std::size_t index = 0; index < specs.size() && index < parameters.size(); ++index) {
             if (specs[index].id != id) { continue; }
             const auto value = parameters[index].evaluate(clip.localTime(time));
             return std::isfinite(value) ? specs[index].clamp(value) : specs[index].defaultValue;
         }
-        return fallback;
+        return 0;
     }
 };
 
@@ -852,11 +852,11 @@ struct PreparedComposition {
         state.position = {at.x, at.y, at.z};
         state.direction = (Vec3 {ahead.x, ahead.y, ahead.z} - state.position).normalized(1.0e-12).value_or(Vec3 {0, 0, -1});
         state.colour = {std::max(0.0f, at.r), std::max(0.0f, at.g), std::max(0.0f, at.b)};
-        state.intensity = light.parameter("light.intensity", time, 1);
-        state.range = light.parameter("light.range", time, 10);
-        state.cone = light.parameter("light.cone", time, 40);
-        state.softness = light.parameter("light.softness", time, 0) / 100;
-        state.shadows = light.parameter("light.shadows", time, 100) / 100;
+        state.intensity = light.parameter("light.intensity", time);
+        state.range = light.parameter("light.range", time);
+        state.cone = light.parameter("light.cone", time);
+        state.softness = light.parameter("light.softness", time) / 100;
+        state.shadows = light.parameter("light.shadows", time) / 100;
         return state;
     }
     // Whether any light shines at a time: without one, everything is as bright as it is.
