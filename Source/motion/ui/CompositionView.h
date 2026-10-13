@@ -215,6 +215,10 @@ private:
     mutable std::optional<PiecesKey> pieceKey;
     mutable std::shared_ptr<const motion::LiveSourceFrames> pieceLive;
     std::uint64_t preparedSerial = 0;
+    // Lighting worked out since the project or the composition edited last
+    // changed: the latest stands in while the next is worked out, so an edit
+    // never flashes the scene unlit, but nothing from before is matched.
+    std::uint64_t lightingScope = 0, lightingSince = 0;
     // A clip's geometry: a vector source's exact shapes (lines straight,
     // curves divided finely enough to look smooth), otherwise its traced beam.
     // `lit`, when the Scene preview has one, is the clip's drawing as the
@@ -227,7 +231,8 @@ private:
     std::unique_ptr<motion::ScenePreview> scenePreview;
     mutable std::shared_ptr<const motion::ScenePreview::Shown> lighting;
     mutable std::optional<std::tuple<std::uint64_t, double, double, double, double, double, double, double, int, int>> lightingAsked;
-    void askForLighting(double time) const;
+    // Whether what is shown looks any different lit, asking for its lighting if so.
+    bool askForLighting(double time) const;
     double clipTime(const motion::PreparedClip& clip, double time) const;
     float depthFade(double depth) const;
     // Effects anywhere above the clip may bend straight lines.

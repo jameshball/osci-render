@@ -156,6 +156,11 @@ void MotionCompositionView::preview(const motion::Project& project) {
     prepared = std::make_unique<motion::PreparedComposition>(project, 48000, nullptr, motion::CompositionPurpose::editorGeometry);
     shownProject = std::make_shared<const motion::Project>(project);
     ++preparedSerial;
+    const auto scope = processor.document.scopeGeneration();
+    if (scope != lightingScope) {
+        lightingScope = scope;
+        lightingSince = preparedSerial;
+    }
     prunePicked();
     repaint();
     if (onPrepared) { onPrepared(); }
@@ -249,29 +254,30 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     }
 }
 
-void MotionCompositionView::askForLighting(double time) const {
+bool MotionCompositionView::askForLighting(double time) const {
     const auto view = camera.view();
-    if (scenePreview == nullptr || shownProject == nullptr || prepared == nullptr || !view.has_value() || getWidth() <= 0 || getHeight() <= 0) { return; }
+    if (scenePreview == nullptr || shownProject == nullptr || prepared == nullptr || !view.has_value() || getWidth() <= 0 || getHeight() <= 0) { return false; }
     // Only a scene with a light, or something that may reflect or draw
     // itself other than by its edges, looks any different worked out.
-    if (std::none_of(prepared->clips.begin(), prepared->clips.end(), [](const motion::PreparedClip& clip) { return clip.light || clip.mayReflect() || clip.mayRestyle(); })) { return; }
+    if (std::none_of(prepared->clips.begin(), prepared->clips.end(), [](const motion::PreparedClip& clip) { return clip.light || clip.mayReflect() || clip.mayRestyle(); })) { return false; }
     const auto asked = std::tuple {preparedSerial, time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, getWidth(), getHeight()};
-    if (lightingAsked == asked) { return; }
+    if (lightingAsked == asked) { return true; }
     lightingAsked = asked;
     // The view's lens as a camera's: its screen spans the aspect across and 1 up.
     const auto aspect = static_cast<double>(getWidth()) / getHeight();
     const motion::hidden::OtherEye eye {{view->position, view->right, view->up, view->forward, 1 / view->tangent}, {aspect * 1.1, 1.1}};
     scenePreview->request(shownProject, preparedSerial, time, eye);
+    return true;
 }
 
 const std::vector<MotionCompositionView::ScreenPiece>& MotionCompositionView::screenPieces() const {
     auto live = processor.liveSourcePreview();
     const auto time = editingTime();
-    askForLighting(time);
-    // The latest lighting for what is shown, at whatever time and from
-    // wherever it was worked out: it catches up as the view moves.
-    auto latest = scenePreview != nullptr ? scenePreview->latest() : nullptr;
-    if (latest != nullptr && latest->revision != preparedSerial) { latest.reset(); }
+    // The latest lighting for what is shown, at whatever time, from wherever
+    // and for whichever edit it was worked out: it catches up as the view
+    // moves and as edits are made.
+    auto latest = askForLighting(time) && scenePreview != nullptr ? scenePreview->latest() : nullptr;
+    if (latest != nullptr && latest->revision < lightingSince) { latest.reset(); }
     const PiecesKey key {preparedSerial, live.get(), latest.get(), time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, selected, getWidth(), getHeight()};
     if (pieceKey == key) { return pieceCache; }
     pieceKey = key;
@@ -308,7 +314,9 @@ const std::vector<MotionCompositionView::ScreenPiece>& MotionCompositionView::sc
     }
     // What mirrors show from this view, as part of the mirror (not pickable
     // shape by shape); in the scene already.
-    for (const auto& reflection : lighting != nullptr && !partMode ? lighting->frame.reflections : std::vector<motion::hidden::Frame::Entry> {}) {
+    static const std::vector<motion::hidden::Frame::Entry> noReflections;
+    const auto& reflections = lighting != nullptr && !partMode ? lighting->frame.reflections : noReflections;
+    for (const auto& reflection : reflections) {
         if (reflection.clip >= lighting->clips.size() || reflection.drawing == nullptr) { continue; }
         const auto mirror = std::find_if(prepared->clips.begin(), prepared->clips.end(), [&](const motion::PreparedClip& clip) { return motion::ScenePreview::identityOf(clip) == lighting->clips[reflection.clip]; });
         if (mirror == prepared->clips.end()) { continue; }
