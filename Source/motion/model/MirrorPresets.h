@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Generators.h"
+#include <algorithm>
 #include <array>
 #include <string_view>
 
@@ -10,4 +12,5 @@ struct MirrorPreset {
     std::string_view name, generator;
 };
 inline constexpr std::array<MirrorPreset, 2> mirrorPresets {{{"Flat mirror", "rectangle"}, {"Mirror ball", "sphere"}}};
+static_assert(std::all_of(mirrorPresets.begin(), mirrorPresets.end(), [](const MirrorPreset& preset) { return findGenerator(preset.generator) != nullptr; }), "Every mirror preset is a generator's");
 }

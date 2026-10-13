@@ -562,11 +562,8 @@ void MotionEditor::setUpLibrary() {
             if (choice == 2) { owner->showBlenderSettings(); }
             if (choice == 3) { owner->showDrawingEditor(0); }
             if (choice >= 1000 && choice - 1000 < static_cast<int>(motion::generatorDefinitions.size())) { owner->addGenerator(motion::generatorDefinitions[static_cast<std::size_t>(choice - 1000)]); }
-            if (choice >= 2000 && choice - 2000 < static_cast<int>(motion::lightPresets.size())) { owner->addGenerator(*motion::findGenerator("pointLight"), motion::lightPresets[static_cast<std::size_t>(choice - 2000)]); }
-            if (choice >= 2100 && choice - 2100 < static_cast<int>(motion::mirrorPresets.size())) {
-                const auto& preset = motion::mirrorPresets[static_cast<std::size_t>(choice - 2100)];
-                owner->addGenerator(*motion::findGenerator(preset.generator), std::nullopt, preset.name, {{"reflects", motion::Curve(100)}});
-            }
+            if (choice >= 2000 && choice - 2000 < static_cast<int>(motion::lightPresets.size())) { owner->addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[static_cast<std::size_t>(choice - 2000)]); }
+            if (choice >= 2100 && choice - 2100 < static_cast<int>(motion::mirrorPresets.size())) { owner->addMirror(motion::mirrorPresets[static_cast<std::size_t>(choice - 2100)]); }
             if (choice >= 100 && choice - 100 < static_cast<int>(resources.size())) { owner->importExample(resources[static_cast<std::size_t>(choice - 100)]); }
         });
     };
@@ -1105,9 +1102,9 @@ void MotionEditor::paint(juce::Graphics& graphics) {
 // points at what was clicked instead of covering the window.
 void MotionEditor::showAddLight() {
     std::vector<motion::ui::TileGrid::Choice> lights, moving;
-    const std::array<const char*, 4> kinds {"pointLight", "spotLight", "directionalLight", "ambientLight"};
+    static constexpr std::array<const motion::GeneratorDefinition*, 4> kinds {&motion::generatorNamed("pointLight"), &motion::generatorNamed("spotLight"), &motion::generatorNamed("directionalLight"), &motion::generatorNamed("ambientLight")};
     for (const auto* kind : kinds) {
-        const auto& definition = *motion::findGenerator(kind);
+        const auto& definition = *kind;
         const juce::String name(definition.name.data(), definition.name.size());
         const auto article = juce::String("aeiou").containsChar(name.toLowerCase()[0]) ? "Add an " : "Add a ";
         lights.push_back({name.upToLastOccurrenceOf(" light", false, true), article + name.toLowerCase(), motion::ui::pictures::ofGenerator(definition)});
@@ -1118,11 +1115,11 @@ void MotionEditor::showAddLight() {
         moving.push_back({motion::ui::pictures::lightPresetShortName(preset), "Add a point light that moves as a " + name.toLowerCase() + " does", {motion::ui::pictures::lightPresetPicture(preset), {}}});
     }
     std::vector<motion::ui::AddPicker::Section> sections {{"Lights", std::move(lights), 2}, {"Moving on its own", std::move(moving), 2}};
-    showPopover(std::make_unique<motion::ui::AddPicker>("Add a light", std::move(sections), [this, kinds](std::size_t section, std::size_t index) {
+    showPopover(std::make_unique<motion::ui::AddPicker>("Add a light", std::move(sections), [this](std::size_t section, std::size_t index) {
         if (section == 0) {
-            addGenerator(*motion::findGenerator(kinds[index]));
+            addGenerator(*kinds[index]);
         } else {
-            addGenerator(*motion::findGenerator("pointLight"), motion::lightPresets[index]);
+            addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[index]);
         }
     }), getLocalArea(&addLightButton, addLightButton.getLocalBounds()), true);
 }
@@ -1133,9 +1130,13 @@ void MotionEditor::showAddMirror() {
         {"Mirror ball", "Add a mirror ball: the whole scene, round on its surface", motion::ui::pictures::mirrorBall()}};
     std::vector<motion::ui::AddPicker::Section> sections {{{}, std::move(choices), 2}};
     showPopover(std::make_unique<motion::ui::AddPicker>("Add a mirror", std::move(sections), [this](std::size_t, std::size_t index) {
-        const auto& preset = motion::mirrorPresets[index];
-        addGenerator(*motion::findGenerator(preset.generator), std::nullopt, preset.name, {{"reflects", motion::Curve(100)}});
+        addMirror(motion::mirrorPresets[index]);
     }), getLocalArea(&addMirrorButton, addMirrorButton.getLocalBounds()), true);
+}
+
+// A preset's generator reflecting wholly (every preset names one: see MirrorPresets.h).
+void MotionEditor::addMirror(const motion::MirrorPreset& preset) {
+    addGenerator(*motion::findGenerator(preset.generator), std::nullopt, preset.name, {{"reflects", motion::Curve(100)}});
 }
 
 void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, bool below) {

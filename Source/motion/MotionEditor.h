@@ -164,6 +164,7 @@ private:
     // A generator's clip, named for a preset when it has one, starting with
     // `settings` over its defaults.
     void addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset = std::nullopt, std::string_view named = {}, const motion::PropertyMap& settings = {});
+    void addMirror(const motion::MirrorPreset& preset);
     void previewDrawing();
     motion::Id drawingAsset = 0;
     // Text sources are written in the Scene, with the Scope previewing them.

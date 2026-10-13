@@ -194,11 +194,17 @@ inline constexpr std::array<GeneratorDefinition, 23> generatorDefinitions {{
     {GeneratorKind::spotLight, "spotLight", "Spot light", GeneratorCategory::light, generator_specs::spotLight},
 }};
 
-inline const GeneratorDefinition* findGenerator(std::string_view id) {
+constexpr const GeneratorDefinition* findGenerator(std::string_view id) {
     for (const auto& definition : generatorDefinitions) {
         if (definition.id == id) { return &definition; }
     }
     return nullptr;
+}
+// A generator named in the code: one that doesn't exist fails the build.
+consteval const GeneratorDefinition& generatorNamed(std::string_view id) {
+    const auto* found = findGenerator(id);
+    if (found == nullptr) { throw "No such generator"; }
+    return *found;
 }
 
 inline std::string_view generatorCategoryName(GeneratorCategory category) {
