@@ -135,8 +135,31 @@ struct TransformPose {
     // How far round its loop the noise is at a time: its phase, and as many
     // turns as its flow has taken it by then.
     static double noiseTurnAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
-        const auto turn = curves[noisePhaseIndex].evaluate(time) / 360 + curves[noiseFlowIndex].evaluate(time) * time;
+        const auto turn = curves[noisePhaseIndex].evaluate(time) / 360 + flowedBy(curves[noiseFlowIndex], time);
         return std::isfinite(turn) ? turn : 0.0;
+    }
+    // The turns a flow (turns a second) has carried the noise by `time`: the
+    // area under it from 0, so a flow eased down slows the noise rather than
+    // running it back. Exact for a steady flow; otherwise Simpson's rule
+    // between its keys, finely enough to follow a modulator driving it.
+    static double flowedBy(const Curve& flow, double time) {
+        const auto driven = flow.drivers != nullptr && (flow.linked() || !flow.drivers->routes.empty());
+        if (!flow.animated() && !driven) { return flow.evaluate(0) * time; }
+        std::vector<double> stops {std::min(0.0, time), std::max(0.0, time)};
+        for (const auto& key : flow.keyframes()) {
+            if (key.time > stops[0] && key.time < stops[1]) { stops.push_back(key.time); }
+        }
+        std::sort(stops.begin(), stops.end());
+        double area = 0;
+        for (std::size_t index = 1; index < stops.size(); ++index) {
+            const auto from = stops[index - 1], to = stops[index];
+            const auto pairs = std::clamp(static_cast<int>(std::ceil((to - from) * (driven ? 60.0 : 8.0))), 8, 2048);
+            const auto step = (to - from) / (2 * pairs);
+            auto sum = flow.evaluate(from) + flow.evaluate(to);
+            for (int sample = 1; sample < 2 * pairs; ++sample) { sum += flow.evaluate(from + sample * step) * (sample % 2 == 1 ? 4 : 2); }
+            area += sum * step / 3;
+        }
+        return time < 0 ? -area : area;
     }
     // A Lines property, 0..1.
     static double linesAmount(const std::array<Curve, objectPropertySpecs.size()>& curves, std::size_t index, double time) {

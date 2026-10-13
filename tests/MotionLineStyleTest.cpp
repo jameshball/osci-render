@@ -309,6 +309,24 @@ public:
             expect(alike(start, drawnAt(2.5, 0)), "a turn later (2 s at half a turn a second) it is as it was");
             expect(alike(start, drawnAt(.5, 360)), "and a whole turn of phase is none");
         }
+
+        beginTest("Noise eased to a stop has flowed as far as its flow carried it, never back");
+        {
+            motion::Curve flow;
+            flow.setKey({0, 1, motion::Interpolation::linear});
+            flow.setKey({2, 0, motion::Interpolation::linear});
+            expectWithinAbsoluteError(motion::TransformPose::flowedBy(flow, 2), 1.0, 1.0e-9);
+            expectWithinAbsoluteError(motion::TransformPose::flowedBy(flow, 3), 1.0, 1.0e-9);
+            double previous = 0;
+            bool forward = true;
+            for (int step = 1; step <= 30; ++step) {
+                const auto flowed = motion::TransformPose::flowedBy(flow, step * .1);
+                forward = forward && flowed >= previous;
+                previous = flowed;
+            }
+            expect(forward, "slowing, it still only goes forward");
+            expectWithinAbsoluteError(motion::TransformPose::flowedBy(motion::Curve(.5), 4), 2.0, 1.0e-12);
+        }
     }
 
 private:
