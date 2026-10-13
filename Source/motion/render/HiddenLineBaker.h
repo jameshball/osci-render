@@ -9,7 +9,7 @@
 namespace motion::hidden {
 // Bakes a composition's hidden lines on worker threads, each with its own
 // prepared copy of the project (a prepared composition is rendered by one
-// thread at a time), starting at a frame and spreading out from it.
+// thread at a time), from the bake's focus on (see Bake::claim).
 class Baker {
 public:
     Baker() = default;
@@ -24,13 +24,14 @@ public:
     void start(std::shared_ptr<Bake> bake, double sampleRate, std::size_t firstFrame) {
         stop();
         if (bake == nullptr || bake->project == nullptr || bake->complete()) { return; }
+        bake->focusOn(firstFrame);
         cancel = std::make_shared<std::atomic<bool>>(false);
         const auto cores = std::thread::hardware_concurrency();
         const auto threads = std::clamp<unsigned>(cores > 2 ? cores - 2 : 1u, 1u, 8u);
         for (unsigned index = 0; index < threads; ++index) {
             auto done = std::make_shared<std::atomic<bool>>(false);
-            auto thread = std::make_unique<WorkerThread>([bake, sampleRate, firstFrame, flag = cancel, done] {
-                run(*bake, sampleRate, [&baking = *bake, firstFrame] { return baking.claim(firstFrame); }, *flag);
+            auto thread = std::make_unique<WorkerThread>([bake, sampleRate, flag = cancel, done] {
+                run(*bake, sampleRate, [&baking = *bake] { return baking.claim(); }, *flag);
                 done->store(true);
             });
             thread->startThread(juce::Thread::Priority::low);
@@ -52,7 +53,8 @@ public:
 
     // Every frame, on this thread and helpers, before an export renders.
     static void bakeAll(Bake& bake, double sampleRate, const std::atomic<bool>& cancel) {
-        onThreads(std::thread::hardware_concurrency(), [&] { run(bake, sampleRate, [&bake] { return bake.claim(0); }, cancel); });
+        bake.focusOn(0);
+        onThreads(std::thread::hardware_concurrency(), [&] { run(bake, sampleRate, [&bake] { return bake.claim(); }, cancel); });
     }
     // Only the frames `times` fall in, likewise: what a look at a few frames
     // needs. For a bake nothing else is baking.
@@ -99,7 +101,7 @@ private:
         // A worker that fails gives its frames up, drawn whole, so the bake
         // still finishes.
         const auto giveUp = [&bake, &next](std::optional<std::size_t> frame) {
-            for (; frame.has_value(); frame = next()) { bake.skip(); }
+            for (; frame.has_value(); frame = next()) { bake.skip(*frame); }
         };
         std::unique_ptr<PreparedComposition> composition;
         try {
@@ -110,24 +112,35 @@ private:
         }
         auto workspace = std::make_unique<Workspace>();
         // The last frame this worker culled and what it depended on: a frame
-        // that depends on just the same is the same, and is copied.
+        // that depends on just the same is the same, and shared; so is one
+        // the bake took over from the bake before it.
         Fingerprint lastPrint, print;
-        std::unique_ptr<Frame> last;
+        std::shared_ptr<const Frame> last;
         while (!cancel.load(std::memory_order_relaxed)) {
             const auto frame = next();
             if (!frame.has_value()) { return; }
             try {
                 const auto time = bake.timeOf(*frame);
                 print.take(*composition, time);
+                const auto hash = print.hash();
                 if (last != nullptr && print == lastPrint) {
-                    bake.publish(*frame, std::make_unique<Frame>(*last));
+                    bake.publish(*frame, last, hash);
                     continue;
                 }
-                auto result = cull(*composition, time, *workspace, &cancel);
-                if (result == nullptr) { return; }
-                last = std::make_unique<Frame>(*result);
+                auto inherited = bake.inherited(hash);
+                if (inherited != nullptr) {
+                    bake.publish(*frame, std::move(inherited), hash);
+                    continue;
+                }
+                std::shared_ptr<const Frame> result = cull(*composition, time, *workspace, &cancel);
+                if (result == nullptr) {
+                    // Cancelled mid-frame: it is free for whoever bakes next.
+                    bake.release(*frame);
+                    return;
+                }
+                last = result;
                 std::swap(lastPrint, print);
-                bake.publish(*frame, std::move(result));
+                bake.publish(*frame, std::move(result), hash);
             } catch (...) {
                 last.reset();
                 giveUp(frame);

@@ -363,6 +363,57 @@ public:
             expect(!(first == second), "a turning cube does not");
         }
 
+        beginTest("A bake claims frames from its focus on, follows it, and finds a frame given back");
+        {
+            motion::hidden::Bake bake(nullptr, 10, 1, {});
+            expectEquals(static_cast<int>(bake.frameCount()), 11);
+            bake.focusOn(8);
+            std::vector<int> order;
+            for (int index = 0; index < 4; ++index) { order.push_back(static_cast<int>(*bake.claim())); }
+            expect(order == std::vector<int> {8, 9, 10, 0}, "from the focus to the end, then the start");
+            expect(bake.state(9) == motion::hidden::Bake::State::baking);
+            bake.focusOn(3);
+            expectEquals(static_cast<int>(*bake.claim()), 3);
+            bake.release(3);
+            bake.focusOn(2);
+            expectEquals(static_cast<int>(*bake.claim()), 2);
+            expectEquals(static_cast<int>(*bake.claim()), 3, "a frame given back is claimed again");
+            for (int frame = 0; frame < 11; ++frame) { bake.skip(static_cast<std::size_t>(frame)); }
+            expect(bake.complete() && !bake.claim().has_value());
+        }
+
+        beginTest("A bake after an edit takes over the frames the edit left as they were");
+        {
+            // A cube turning through its first second; the edit is a key after it.
+            auto project = cubeProject(true);
+            auto& turn = project.tracks.change(0).clips[0].properties["rotation.y"];
+            turn.setKey({0, 0, motion::Interpolation::linear});
+            turn.setKey({1, 90, motion::Interpolation::linear});
+            const motion::PreparedComposition before(project);
+            std::atomic<bool> stop {false};
+            motion::hidden::Baker::bakeAll(*before.hiddenLines, 48000, stop);
+            auto edited = project;
+            edited.tracks.change(0).clips[0].properties["rotation.y"].setKey({1.5, 120, motion::Interpolation::linear});
+            const auto sharedUntil = [&](const motion::PreparedComposition& after) {
+                after.hiddenLines->inherit(*before.hiddenLines);
+                motion::hidden::Baker::bakeAll(*after.hiddenLines, 48000, stop);
+                int kept = 0, changed = 0;
+                for (std::size_t frame = 0; frame < after.hiddenLines->frameCount(); ++frame) {
+                    const auto time = after.hiddenLines->timeOf(frame);
+                    const auto same = after.hiddenLines->at(time) == before.hiddenLines->at(time);
+                    if (time <= 1) { kept += same ? 1 : 0; }
+                    if (time > 1.05 && time < 1.45) { changed += same ? 0 : 1; }
+                }
+                return std::pair(kept, changed);
+            };
+            const auto frames = static_cast<int>(before.hiddenLines->frameOf(1)) + 1;
+            const auto [kept, changed] = sharedUntil(motion::PreparedComposition(edited));
+            expectEquals(kept, frames, "every frame up to the edit is the bake before's");
+            expect(changed > 0, "the frames it changed are baked again");
+            const auto [keptElsewhere, _] = sharedUntil(motion::PreparedComposition(edited, 48000, nullptr, motion::CompositionPurpose::signal, motion::hidden::Reach {2, 2}));
+            expectEquals(keptElsewhere, 0, "nothing is taken over from a bake of what a different Scope shows");
+        }
+
         beginTest("Profile: a frame of real meshes, and baking them");
         for (const auto& [model, bulge] : {std::pair {"teapot.obj", false}, std::pair {"lamp.obj", false}, std::pair {"teapot.obj", true}}) {
             const auto file = juce::File(__FILE__).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);

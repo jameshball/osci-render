@@ -3,6 +3,7 @@
 #include <osci_render_core/osci_render_core.h>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -199,7 +200,15 @@ public:
     const std::vector<std::array<std::int32_t, 2>>& shapeFaces() const { return facesOfShapes; }
     void setShapeFaces(std::vector<std::array<std::int32_t, 2>> value) { facesOfShapes = std::move(value); }
 
+    // This drawing and no other, for as long as the program runs: what a
+    // bake's fingerprints know it by (an address can be reused).
+    std::uint64_t serial() const { return identity; }
+
 private:
+    const std::uint64_t identity = [] {
+        static std::atomic<std::uint64_t> next {1};
+        return next.fetch_add(1, std::memory_order_relaxed);
+    }();
     Mesh meshFaces;
     std::vector<std::array<std::int32_t, 2>> facesOfShapes;
     bool fading = false, turning = false;

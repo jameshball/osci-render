@@ -2,6 +2,7 @@
 
 #include "CompositionRenderer.h"
 #include "SurfaceLines.h"
+#include <bit>
 #include <vector>
 
 namespace motion::hidden {
@@ -52,12 +53,25 @@ public:
             // for a point source the frame.
             const auto frame = clip.source != nullptr ? clip.source->frameIndex(clip.localTime(time)) : 0;
             const auto* drawing = clip.source != nullptr ? clip.source->drawingAt(frame) : nullptr;
-            add(drawing != nullptr ? static_cast<double>(reinterpret_cast<std::uintptr_t>(drawing)) : -2.0 - static_cast<double>(frame));
+            add(drawing != nullptr ? static_cast<double>(drawing->serial()) : -2.0 - static_cast<double>(frame));
             addStage(clip, time);
             for (const auto& ancestor : clip.ancestors) { addStage(ancestor, time); }
         }
     }
     bool operator==(const Fingerprint& other) const { return values == other.values; }
+    // The fingerprint in a word, for a bake to find frames by: FNV-1a over
+    // every value's bits.
+    std::uint64_t hash() const {
+        std::uint64_t result = 14695981039346656037ull ^ values.size();
+        for (const auto value : values) {
+            const auto bits = std::bit_cast<std::uint64_t>(value == 0 ? 0.0 : value);
+            for (int byte = 0; byte < 8; ++byte) {
+                result ^= (bits >> (8 * byte)) & 0xff;
+                result *= 1099511628211ull;
+            }
+        }
+        return result;
+    }
 
 private:
     template <typename... Values>

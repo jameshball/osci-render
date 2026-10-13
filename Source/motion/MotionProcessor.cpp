@@ -76,7 +76,9 @@ void MotionProcessor::handleAsyncUpdate() {
     // that prepared completely.
     if (result->composition != nullptr && preparationError.isEmpty()) {
         result->composition->publicationRevision = result->revision;
-        publishedBake = result->composition->hiddenLines;
+        // What the edit left as it was is already baked.
+        const auto previous = std::exchange(publishedBake, result->composition->hiddenLines);
+        if (publishedBake != nullptr && previous != nullptr) { publishedBake->inherit(*previous); }
         composition.publish(std::move(result->composition));
         if (publishedBake != nullptr) {
             hiddenLineBaker.start(publishedBake, preparationSampleRate, publishedBake->frameOf(position.load()));

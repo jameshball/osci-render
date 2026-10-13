@@ -664,6 +664,68 @@ void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
     selectClip(id);
 }
 
+void MotionTimelineView::updateBake() {
+    const auto bake = processor.hiddenLineBake();
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto finished = bake == nullptr || bake->complete();
+    const auto wasShown = bakeShown;
+    if (bake.get() != bakeSeen) {
+        // A new bake goes on from what the strip showed of the last one.
+        bakeShown = bakeShown && !finished && bakeFinishedAt == 0;
+        bakeSeen = bake.get();
+        bakeSeenAt = now;
+        bakeFinishedAt = 0;
+    }
+    if (!finished && now - bakeSeenAt >= bakeShowAfterMs) { bakeShown = true; }
+    if (finished && bakeFinishedAt == 0) { bakeFinishedAt = now; }
+    // Faded out: nothing more to paint.
+    if (bakeShown && bakeFinishedAt > 0 && now - bakeFinishedAt > bakeFadeMs + 100) { bakeShown = false; }
+    if (bakeShown || wasShown) { repaint(bakeStrip()); }
+}
+
+void MotionTimelineView::paintBake(juce::Graphics& g) const {
+    const auto bake = processor.hiddenLineBake();
+    // Its frames are the main composition's, on its time.
+    if (bake == nullptr || processor.document.editingComposition() != 0) { return; }
+    if (!bakeShown || bake.get() != bakeSeen) { return; }
+    const auto opacity = bakeFinishedAt > 0 ? 1.0 - (juce::Time::getMillisecondCounterHiRes() - bakeFinishedAt) / bakeFadeMs : 1.0;
+    if (opacity <= 0) { return; }
+    const auto strip = bakeStrip();
+    const auto first = std::max(strip.getX(), timeX(0));
+    const auto last = std::min(strip.getRight(), timeX(bake->timeOf(bake->frameCount())));
+    using State = motion::hidden::Bake::State;
+    const auto colour = [opacity](State state) {
+        const auto base = state == State::done ? motion::style::accent().withAlpha(.75f) : osci::Colours::text().withAlpha(state == State::baking ? .55f : .16f);
+        return base.withMultipliedAlpha(static_cast<float>(opacity));
+    };
+    // Each column shows the least done of its frames; runs of one state are
+    // one rectangle.
+    std::optional<State> run;
+    auto runStart = first;
+    for (auto x = first; x <= last; ++x) {
+        std::optional<State> here;
+        if (x < last) {
+            const auto from = bake->frameOf(scrollTime + (x - namesWidth) / pixelsPerSecond);
+            const auto next = bake->frameOf(scrollTime + (x + 1 - namesWidth) / pixelsPerSecond);
+            const auto to = next > from ? next - 1 : from;
+            here = State::done;
+            for (auto frame = from; frame <= to; ++frame) {
+                const auto state = bake->state(frame);
+                if (state == State::baking) { here = state; break; }
+                if (state == State::waiting) { here = state; }
+            }
+        }
+        if (here != run) {
+            if (run.has_value()) {
+                g.setColour(colour(*run));
+                g.fillRect(runStart, strip.getY(), x - runStart, strip.getHeight());
+            }
+            run = here;
+            runStart = x;
+        }
+    }
+}
+
 void MotionTimelineView::paint(juce::Graphics& g) {
     beamLabel.reset();
     ensureTrackRows();
@@ -684,6 +746,7 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     g.setColour(motion::style::gridMajor());
     grid.forEachTick(scrollTime, viewEnd, step, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
     motion::ui::paintRulerLabels(g, grid, scrollTime, viewEnd, step, {0, 0, getWidth(), 26}, [this](double time) { return timeX(time); });
+    paintBake(g);
     paintLoop(g);
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(0, 0, namesWidth, toolsHeight);

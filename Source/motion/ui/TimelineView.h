@@ -89,6 +89,8 @@ public:
     // a shadow all round, its own rows, and its header drawn in place.
     void paintOverChildren(juce::Graphics& g) override;
     void repaintPlayhead() { playheadStrip.moveTo(*this, playheadX()); }
+    // The editor's timer: the bake strip repaints while the bake changes.
+    void updateBake();
     bool isInterestedInDragSource(const SourceDetails& details) override;
 
     void itemDragEnter(const SourceDetails& details) override { itemDragMove(details); }
@@ -474,6 +476,20 @@ private:
     const Row* laneAtY(int y) const;
     int trackY(int track) const;
     int timeX(double time) const { return namesWidth + boundedPixel((time - scrollTime) * pixelsPerSecond); }
+    // Along the ruler's foot, the main composition's hidden-line bake: frames
+    // baked, being baked and still to bake (each drawn whole until it is),
+    // fading once every frame is.
+    void paintBake(juce::Graphics& g) const;
+    juce::Rectangle<int> bakeStrip() const { return {namesWidth, toolsHeight - bakeStripHeight - 1, std::max(0, getWidth() - namesWidth), bakeStripHeight}; }
+    static constexpr int bakeStripHeight = 2;
+    static constexpr double bakeFadeMs = 900;
+    // The bake last seen, when it was first seen, whether the strip shows it
+    // (only once it has baked a moment, so an edit that changes little
+    // doesn't flash it), and when it was seen finished (0 while baking).
+    const void* bakeSeen = nullptr;
+    double bakeSeenAt = 0, bakeFinishedAt = 0;
+    bool bakeShown = false;
+    static constexpr double bakeShowAfterMs = 300;
     int rowY(int row) const;
     juce::Rectangle<int> clipBounds(const motion::Clip& clip, int row) const;
     double snapTime(double time, juce::ModifierKeys modifiers) const {

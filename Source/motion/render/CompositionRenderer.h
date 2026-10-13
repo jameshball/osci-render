@@ -749,7 +749,8 @@ struct PreparedComposition {
         const auto restyled = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayRestyle(); });
         const auto hatches = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.mayHatch(); });
         if (purpose == CompositionPurpose::signal && preparationError.isEmpty() && (hides || !lights.empty() || reflective || restyled || hatches)) {
-            hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach);
+            hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach, sampleRate);
+            hiddenLines->scope = project.scope;
             hiddenLines->hides = hides;
             hiddenLines->lights = !lights.empty();
             hiddenLines->reflects = reflective;

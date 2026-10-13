@@ -65,11 +65,12 @@ public:
         repaint();
     }
     juce::String text() const { return message.getText(); }
-    // Shown whole while it fits in half the bar; its tooltip always has it whole.
-    void setStatistics(const juce::String& text) {
+    // Shown whole while it fits in half the bar; its tooltip has `details`
+    // (or the text itself, whole).
+    void setStatistics(const juce::String& text, const juce::String& details = {}) {
+        stats.setTooltip(details.isNotEmpty() ? details : text);
         if (stats.getText() == text) { return; }
         stats.setText(text, juce::dontSendNotification);
-        stats.setTooltip(text);
         resized();
     }
 

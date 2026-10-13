@@ -431,33 +431,46 @@ void MotionEditor::timerCallback() {
         const auto layers = processor.beamLayers.load(std::memory_order_relaxed);
         const auto simplified = processor.beamSimplified.load(std::memory_order_relaxed);
         const auto dot = motion::style::dot();
-        auto statistics = juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + dot + juce::String(beamRate, beamRate == std::floor(beamRate) ? 0 : 2) + " Hz beam";
-        if (processor.document.project().scope.xyOnly) { statistics += dot + "XY only"; }
+        // A short line of what is out of the ordinary, beside the rates; its
+        // tooltip says the rest. The timeline's ruler shows the bake itself.
+        const auto rates = juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + dot + juce::String(beamRate, beamRate == std::floor(beamRate) ? 0 : 2) + " Hz beam";
+        juce::StringArray line {rates}, details {rates};
+        if (processor.document.project().scope.xyOnly) {
+            line.add("XY only");
+            details.add("XY only: the Scope has no brightness input, so the beam never blanks");
+        }
         if (processor.playing.load() || layers > 0) {
-            statistics += dot + "drawing " + juce::String(layers) + (layers == 1 ? " object" : " objects");
+            details.add("Drawing " + juce::String(layers) + (layers == 1 ? " object" : " objects"));
             // Too much to draw in a cycle: its shortest strokes are left out.
-            if (simplified) { statistics += dot + "dense: simplified to fit (a higher sample rate draws more)"; }
+            if (simplified) {
+                line.add("simplified to fit");
+                details.add("Simplified to fit: too much to draw in one cycle of the beam, so the shortest strokes are left out (a higher sample rate draws more)");
+            }
         }
-        // What the frames are baked for: "hiding lines, lighting and
-        // reflecting 40%" while baking, "hidden lines removed, lit, reflected"
-        // once done.
-        const auto hiding = processor.hiddenLineProgress();
-        juce::StringArray doing, done;
-        if (processor.hidesHiddenLines()) { doing.add("hiding lines"); done.add("hidden lines removed"); }
-        if (processor.lightsFrames()) { doing.add("lighting"); done.add("lit"); }
-        if (processor.reflectsFrames()) { doing.add("reflecting"); done.add("reflected"); }
-        if (processor.restylesFrames()) { doing.add("drawing lines on surfaces"); done.add("lines drawn on surfaces"); }
-        if (processor.hatchesFrames()) { doing.add("hatching"); done.add("hatched"); }
-        if (hiding.has_value() && !doing.isEmpty()) {
-            const auto last = doing.strings.getLast();
-            doing.remove(doing.size() - 1);
-            statistics += dot + (doing.isEmpty() ? last : doing.joinIntoString(", ") + " and " + last) + " " + juce::String(juce::roundToInt(*hiding * 100)) + "%";
-        } else if (!done.isEmpty()) {
-            statistics += dot + done.joinIntoString(", ");
+        // What the frames are baked for, and how many are left: a count,
+        // which a percentage of a bake taking over most of its frames isn't.
+        juce::StringArray baked;
+        if (processor.hidesHiddenLines()) { baked.add("hidden lines removed"); }
+        if (processor.lightsFrames()) { baked.add("lit"); }
+        if (processor.reflectsFrames()) { baked.add("reflections"); }
+        if (processor.restylesFrames()) { baked.add("lines drawn on surfaces"); }
+        if (processor.hatchesFrames()) { baked.add("hatched"); }
+        const auto remaining = processor.hiddenLinesRemaining();
+        if (!baked.isEmpty()) {
+            if (remaining.has_value()) {
+                const auto count = juce::String(static_cast<juce::int64>(*remaining));
+                juce::String grouped;
+                for (int index = 0; index < count.length(); ++index) { grouped << (index > 0 && (count.length() - index) % 3 == 0 ? "," : "") << count[index]; }
+                line.add("baking " + grouped + (*remaining == 1 ? " frame" : " frames"));
+                details.add("Baking " + grouped + (*remaining == 1 ? " frame" : " frames") + " (" + baked.joinIntoString(", ") + "), from the playhead on; a frame not yet baked draws every line");
+            } else {
+                details.add("Every frame baked: " + baked.joinIntoString(", "));
+            }
         }
-        statusBar.setStatistics(statistics);
+        statusBar.setStatistics(line.joinIntoString(dot), details.joinIntoString("\n"));
     }
     processor.collectPreparedState();
+    processor.followPlayhead();
     assetLibrary.updateLiveStatus();
     const auto restoreError = processor.takeRestoreError();
     if (restoreError.isNotEmpty()) { statusBar.show(restoreError, MotionStatusBar::Kind::warning); }
@@ -508,6 +521,7 @@ void MotionEditor::timerCallback() {
     const auto moved = position != lastPaintedPosition || playing;
     lastPaintedPosition = position;
     timeline.followPlayhead(position, playing);
+    timeline.updateBake();
     if (curveEditor.isVisible() && timeline.layout().follow) { curveEditor.followPlayhead(position, playing); }
     if (slowTick) {
         timeline.repaint();
