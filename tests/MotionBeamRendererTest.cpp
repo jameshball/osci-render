@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include <set>
 #include <chrono>
 #include <random>
 #include "../Source/motion/export/SignalExporter.h"
@@ -234,6 +235,25 @@ public:
                 doubled += points[index].x == previous.x && points[index].y == previous.y ? 1 : 0;
             }
             expectEquals(doubled, 0, "no sample doubled up into a bead");
+        }
+
+        beginTest("On an XY-only scope the beam's jumps are in the colour it draws, tinted by the composition's effects too");
+        {
+            auto made = project({{square(1, .2f), -.5}, {square(2, .2f), .5}});
+            made.scope = {12, 30, 5, true};
+            for (std::size_t track = 0; track < 2; ++track) {
+                made.tracks.change(track).clips[0].properties["red"] = motion::Curve(1);
+                made.tracks.change(track).clips[0].properties["green"] = motion::Curve(.25);
+                made.tracks.change(track).clips[0].properties["blue"] = motion::Curve(0);
+            }
+            auto shift = motion::makeEffect(9100, *motion::effectDefinition("colour"));
+            shift.properties["hue"] = motion::Curve(120);
+            made.effects.push_back(shift);
+            const motion::PreparedComposition composition(made, 192000);
+            motion::BeamRenderer beam;
+            std::set<std::array<int, 3>> hues;
+            for (const auto& point : cycle(composition, 192000, 3, beam)) { hues.insert({juce::roundToInt(point.r * 1000), juce::roundToInt(point.g * 1000), juce::roundToInt(point.b * 1000)}); }
+            expectEquals(static_cast<int>(hues.size()), 1, "one hue: the shifted one, drawn and jumping alike, with no samples to spare");
         }
 
         beginTest("On an XY-only scope, opacity takes beam time instead of dimming");

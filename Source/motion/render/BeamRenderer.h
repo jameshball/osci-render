@@ -191,10 +191,12 @@ private:
         if (!(most > 0) || !std::isfinite(most)) { return std::nullopt; }
         return std::array<float, 3> {std::max(0.0f, point.r) / most, std::max(0.0f, point.g) / most, std::max(0.0f, point.b) / most};
     }
-    // A clip's own colour at full brightness, for its samples on an XY-only display.
-    std::array<float, 3> hueOf(const PreparedClip* clip) const {
+    // A clip's own colour at full brightness, through the composition's
+    // effects as its drawing's samples are, for its samples on an XY-only
+    // display.
+    std::array<float, 3> hueOf(const PreparedComposition& composition, const PreparedClip* clip) const {
         if (clip == nullptr) { return {1, 1, 1}; }
-        return fullHue(clip->processPoint(osci::Point(0, 0, 0, -1, -1, -1), planTime)).value_or(std::array<float, 3> {1, 1, 1});
+        return fullHue(composition.applyCompositionEffects(clip->processPoint(osci::Point(0, 0, 0, -1, -1, -1), planTime), planTime)).value_or(std::array<float, 3> {1, 1, 1});
     }
     static bool lit(const osci::Point& point) { return point.r > 0 || point.g > 0 || point.b > 0; }
 
@@ -523,8 +525,10 @@ private:
                 ++given;
             }
             used += given;
-            // Each layer's colour, once: every sample on such a display shows.
-            for (std::size_t i = 0; i < layerCount; ++i) { items[i].hue = hueOf(items[i].clip); }
+        }
+        // On an XY-only display every sample shows: each layer's colour, once.
+        if (composition.scope.xyOnly) {
+            for (std::size_t i = 0; i < layerCount; ++i) { items[i].hue = hueOf(composition, items[i].clip); }
         }
         auto cursor = first;
         const auto hold = [&](const osci::Point& at, std::int64_t count, std::size_t layer) {
