@@ -36,8 +36,7 @@ public:
         const auto share = static_cast<float>(span > 0 ? (along - lengths[index - 1]) / span : 0.0);
         const auto& a = points[index - 1];
         const auto& b = points[index];
-        const auto mix = [share](float x, float y) { return x + (y - x) * share; };
-        return {mix(a.x, b.x), mix(a.y, b.y), mix(a.z, b.z), mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b)};
+        return mixed(a, b, share);
     }
     void scale(float, float, float) override {}
     void translate(float, float, float) override {}
@@ -137,6 +136,16 @@ private:
     double lineLength = 0, pieceWeight = 1;
 };
 
+// A ball's rim is drawn in so many straight stretches.
+inline constexpr int rimStretches = 256;
+
+// A clip's own colour, as its chain and the composition's effects colour a
+// point that has none: none below nothing.
+inline std::array<float, 3> tintOf(const PreparedComposition& composition, const PreparedClip& clip, double time) {
+    const auto own = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, -1, -1, -1), time), time);
+    return {std::max(0.0f, own.r), std::max(0.0f, own.g), std::max(0.0f, own.b)};
+}
+
 // What each surface that reflects shows of the scene, for a frame: every line
 // of every other clip, where the mirror shows it to the eye, and the
 // mirror's own edges (a ball's rim, round, as the eye sees it). Where
@@ -183,18 +192,11 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
     // camera hides lines.
     std::vector<crossing::Triangle> crossingTriangles;
     std::vector<std::pair<std::uint32_t, std::uint32_t>> crossingFaces;
-    for (std::uint32_t surface = 0; depth != nullptr && surface < items.size(); ++surface) {
-        const auto& item = items[surface];
-        if (item.drawing == nullptr) { continue; }
-        const auto& triangles = item.drawing->faces().triangles;
-        for (std::uint32_t face = 0; face < triangles.size(); ++face) {
-            const auto& a = world[surface][triangles[face][0]];
-            const auto& b = world[surface][triangles[face][1]];
-            const auto& c = world[surface][triangles[face][2]];
-            if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
-            crossingTriangles.push_back({{*a, *b, *c}, surface, static_cast<float>(item.mirrors)});
+    if (depth != nullptr) {
+        forEachPlacedFace(items, world, [&](std::uint32_t surface, std::uint32_t face, Vec3 a, Vec3 b, Vec3 c) {
+            crossingTriangles.push_back({{a, b, c}, surface, static_cast<float>(items[surface].mirrors)});
             crossingFaces.emplace_back(surface, face);
-        }
+        });
     }
     const auto crossings = crossing::runsInScene(crossingTriangles, nullptr);
 
@@ -213,8 +215,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         // What it shows keeps its own colours, as bright as the mirror
         // reflects and is (its opacity, or a dim colour, dims it); its edges
         // are in its own colour.
-        const auto own = composition.applyCompositionEffects(items[reflector.surface].clip->processPoint(osci::Point(0, 0, 0, -1, -1, -1), time), time);
-        const std::array<float, 3> tint {std::max(0.0f, own.r), std::max(0.0f, own.g), std::max(0.0f, own.b)};
+        const auto tint = tintOf(composition, *items[reflector.surface].clip, time);
         const auto brightness = std::max({tint[0], tint[1], tint[2]});
         const auto amount = static_cast<float>(reflector.amount) * brightness;
         const std::array<float, 3> gain {amount, amount, amount};
@@ -328,50 +329,26 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                     shades[static_cast<std::size_t>(step)] = shade;
                     brightest = std::max(brightest, light);
                 }, [&](int from, int to) {
-                    const auto& a = colours[static_cast<std::size_t>(from)];
-                    const auto& b = colours[static_cast<std::size_t>(to)];
-                    constexpr float alike = 1.0f / 128;
-                    return std::abs(shades[static_cast<std::size_t>(from)] - shades[static_cast<std::size_t>(to)]) > 1.0e-6
-                        || std::abs(a[0] - b[0]) > alike || std::abs(a[1] - b[1]) > alike || std::abs(a[2] - b[2]) > alike;
+                    return lightsDiffer(colours[static_cast<std::size_t>(from)], colours[static_cast<std::size_t>(to)], shades[static_cast<std::size_t>(from)], shades[static_cast<std::size_t>(to)], 1.0f / 128);
                 }, [&](int step, int from, int to, float share) {
-                    for (std::size_t channel = 0; channel < 3; ++channel) {
-                        colours[static_cast<std::size_t>(step)][channel] = colours[static_cast<std::size_t>(from)][channel] + (colours[static_cast<std::size_t>(to)][channel] - colours[static_cast<std::size_t>(from)][channel]) * share;
-                    }
+                    colours[static_cast<std::size_t>(step)] = mixed(colours[static_cast<std::size_t>(from)], colours[static_cast<std::size_t>(to)], share);
                 });
                 // Its points: where each step is seen, its ends halfway to
                 // the steps either side that don't show (where they are seen
                 // at all), as few as keep within a quarter of a pixel and a
                 // little of its colour all along.
-                kept.assign({0, static_cast<std::size_t>(runSteps)});
-                pending.assign({{0, static_cast<std::size_t>(runSteps)}});
-                while (!pending.empty()) {
-                    const auto [a, b] = pending.back();
-                    pending.pop_back();
-                    double worst = 0;
-                    std::size_t at = a;
+                splitWhereStraying(0, static_cast<std::size_t>(runSteps), 1, [&](std::size_t a, std::size_t middle, std::size_t b) {
+                    const auto share = static_cast<float>(middle - a) / static_cast<float>(b - a);
                     const auto& sa = *onScreen[first + a];
                     const auto& sb = *onScreen[first + b];
-                    for (auto middle = a + 1; middle < b; ++middle) {
-                        const auto share = static_cast<float>(middle - a) / static_cast<float>(b - a);
-                        const auto& sm = *onScreen[first + middle];
-                        auto stray = std::hypot(sm.x - (sa.x + (sb.x - sa.x) * share), sm.y - (sa.y + (sb.y - sa.y) * share)) / (.25 * DepthBuffer::pixel);
-                        for (std::size_t channel = 0; channel < 3; ++channel) {
-                            const auto straight = colours[a][channel] + (colours[b][channel] - colours[a][channel]) * share;
-                            stray = std::max(stray, static_cast<double>(std::abs(colours[middle][channel] - straight)) * 128);
-                        }
-                        if (stray > worst) {
-                            worst = stray;
-                            at = middle;
-                        }
+                    const auto& sm = *onScreen[first + middle];
+                    auto stray = std::hypot(sm.x - (sa.x + (sb.x - sa.x) * share), sm.y - (sa.y + (sb.y - sa.y) * share)) / (.25 * DepthBuffer::pixel);
+                    for (std::size_t channel = 0; channel < 3; ++channel) {
+                        const auto straight = colours[a][channel] + (colours[b][channel] - colours[a][channel]) * share;
+                        stray = std::max(stray, static_cast<double>(std::abs(colours[middle][channel] - straight)) * 128);
                     }
-                    if (worst > 1) {
-                        kept.push_back(at);
-                        pending.push_back({a, at});
-                        pending.push_back({at, b});
-                    }
-                }
-                std::sort(kept.begin(), kept.end());
-                kept.erase(std::unique(kept.begin(), kept.end()), kept.end());
+                    return stray;
+                }, kept, pending);
                 const auto endAt = [&](std::size_t inside, std::size_t outside) {
                     const auto halfway = outside < count ? reflection(pointAt((shares[inside] + shares[outside]) / 2), seenAt[inside]) : std::nullopt;
                     return halfway.has_value() ? *halfway : *seenAt[inside];
@@ -400,9 +377,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 // Round from its lowest point, where a ball rests on what is
                 // under it, so where the loop meets itself is least seen.
                 const auto lowest = std::atan2(-rim->second.y, -rim->first.y);
-                constexpr int around = 256;
-                const auto turn = 2 * 3.14159265358979323846 / around;
-                for (int stretch = 0; stretch < around; ++stretch) { trace(rim->at(lowest + stretch * turn), rim->at(lowest + (stretch + 1) * turn), 0.0, 1.0, atItself, reflector.surface, ownColour); }
+                rim->around(lowest, rimStretches, [&](Vec3 from, Vec3 to) { trace(from, to, 0.0, 1.0, atItself, reflector.surface, ownColour); });
             }
         } else {
             for (const auto& flat : mirror.flats) {
@@ -418,8 +393,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
             const auto response = static_cast<float>(item.clip->lit(time));
             // As bright as it is drawn: by its style, as little as its own
             // surface mirrors, and its light.
-            const auto* dimmed = dynamic_cast<const DimmedShape*>(&shape);
-            const auto drawn = (dimmed != nullptr ? dimmed->gain() : 1.0f) * itself;
+            const auto drawn = gainOf(shape) * itself;
             const auto lineColour = [&](double share, double& shade, float& reaching) {
                 std::array<float, 3> light {1, 1, 1};
                 if (lit) { light = lightAt(lights, from + (to - from) * share, normals.at(start + (end - start) * share), response, &shade); }
@@ -483,22 +457,19 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
             const auto itself = static_cast<float>(1 - item.mirrors);
             const auto other = std::find_if(reflectors.begin(), reflectors.end(), [source](const Reflector& candidate) { return candidate.surface == source; });
             if (other != reflectors.end() && other->mirror.sphere.has_value()) {
-                const auto otherTint = composition.applyCompositionEffects(item.clip->processPoint(osci::Point(0, 0, 0, -1, -1, -1), time), time);
+                const auto otherTint = tintOf(composition, *item.clip, time);
                 const auto otherAmount = static_cast<float>(other->amount);
                 const auto rimColour = [&](double, double&, float&) {
-                    return std::array<float, 3> {std::max(0.0f, otherTint.r) * otherAmount, std::max(0.0f, otherTint.g) * otherAmount, std::max(0.0f, otherTint.b) * otherAmount};
+                    return std::array<float, 3> {otherTint[0] * otherAmount, otherTint[1] * otherAmount, otherTint[2] * otherAmount};
                 };
                 for (const auto& flat : mirror.flats) {
                     const auto rim = other->mirror.sphere->rimFrom(flat.image(eye.position));
                     if (!rim.has_value()) { continue; }
-                    constexpr int around = 256;
-                    const auto turn = 2 * 3.14159265358979323846 / around;
-                    for (int stretch = 0; stretch < around; ++stretch) {
-                        const auto from = rim->at(stretch * turn), to = rim->at((stretch + 1) * turn);
+                    rim->around(0.0, rimStretches, [&](Vec3 from, Vec3 to) {
                         for (const auto& [low, high] : flat.spans(eye.position, from, to)) {
                             trace(from, to, low, high, [&](Vec3 point, std::optional<Vec3>) { return flat.reflectionOf(eye.position, point); }, source, rimColour);
                         }
-                    }
+                    });
                 }
             }
             if (!(itself > 0)) { continue; }
@@ -515,13 +486,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 if (!item.bent && isStraight(*shape)) {
                     path = {{0.0, place(item, shape->nextVector(0))}, {1.0, place(item, shape->nextVector(1))}};
                 } else {
-                    double length = 0;
-                    std::optional<Screen> previous;
-                    for (int probe = 0; probe <= 8; ++probe) {
-                        const auto next = screen(place(item, shape->nextVector(probe / 8.0f)));
-                        length += distance(previous, next);
-                        previous = next;
-                    }
+                    const auto length = screenLength(*shape, 8, [&](const osci::Point& point) { return screen(place(item, point)); });
                     const auto stretches = stepCount(length / (6 * DepthBuffer::pixel), 4, 256);
                     for (int stretch = 0; stretch <= stretches; ++stretch) {
                         const auto progress = static_cast<double>(stretch) / stretches;
@@ -546,11 +511,8 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 if (!(itself > 0)) { continue; }
                 const auto& corners = item.drawing->faces().triangles[face];
                 const auto& vertices = item.drawing->faces().vertices;
-                const auto source = [&](const Weights& weights) {
-                    const auto mixed = [&](float osci::Point::* axis) { return static_cast<float>(vertices[corners[0]].*axis * weights[0] + vertices[corners[1]].*axis * weights[1] + vertices[corners[2]].*axis * weights[2]); };
-                    return osci::Point(mixed(&osci::Point::x), mixed(&osci::Point::y), mixed(&osci::Point::z));
-                };
-                osci::Line line(source(piece.from), source(piece.to));
+                const auto& a = vertices[corners[0]], & b = vertices[corners[1]], & c = vertices[corners[2]];
+                osci::Line line(weighted(a, b, c, piece.from), weighted(a, b, c, piece.to));
                 LineNormals normals;
                 if (lit) { normals.add(normalOf(crossingTriangles[piece.triangle].eye[0], crossingTriangles[piece.triangle].eye[1], crossingTriangles[piece.triangle].eye[2])); }
                 reflectStretch(item, line, normals, piece.eyeFrom, piece.eyeTo, 0.0, 1.0, itself);

@@ -12,6 +12,18 @@
 // of a drawing's shapes, lines coloured at their ends, and shapes lit or
 // dimmed.
 namespace motion::hidden {
+// The point `share` of the way from `a` to `b`, colour and all.
+inline osci::Point mixed(const osci::Point& a, const osci::Point& b, double share) {
+    const auto f = static_cast<float>(share);
+    return osci::Point(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f, a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f);
+}
+// The light (or colour) `share` of the way from `a` to `b`, channel by channel.
+inline std::array<float, 3> mixed(const std::array<float, 3>& a, const std::array<float, 3>& b, float share) {
+    std::array<float, 3> light {};
+    for (std::size_t channel = 0; channel < 3; ++channel) { light[channel] = a[channel] + (b[channel] - a[channel]) * share; }
+    return light;
+}
+
 // The part of a shape between two points of its progress. The shape itself
 // is kept alive by its source.
 class ShapePart final : public osci::Shape {
@@ -40,9 +52,10 @@ class ColouredLine final : public osci::Shape {
 public:
     ColouredLine(osci::Point from, osci::Point to) : a(from), b(to) {}
     osci::Point nextVector(float progress) override {
-        const auto mix = [progress](float x, float y) { return x + (y - x) * progress; };
-        const auto coloured = a.r >= 0 && b.r >= 0;
-        return {mix(a.x, b.x), mix(a.y, b.y), mix(a.z, b.z), coloured ? mix(a.r, b.r) : -1.0f, coloured ? mix(a.g, b.g) : -1.0f, coloured ? mix(a.b, b.b) : -1.0f};
+        auto point = mixed(a, b, progress);
+        // Coloured only where both its ends are.
+        if (!(a.r >= 0 && b.r >= 0)) { point.r = point.g = point.b = -1.0f; }
+        return point;
     }
     void scale(float, float, float) override {}
     void translate(float, float, float) override {}
@@ -92,9 +105,7 @@ public:
         const auto& before = next == lights.begin() ? lights.front() : *(next - 1);
         const auto span = after.at - before.at;
         const auto blend = span > 0 ? std::clamp((progress - before.at) / span, 0.0f, 1.0f) : 0.0f;
-        std::array<float, 3> light {};
-        for (std::size_t channel = 0; channel < 3; ++channel) { light[channel] = before.light[channel] + (after.light[channel] - before.light[channel]) * blend; }
-        return litColour(shape->nextVector(start + (end - start) * progress), light);
+        return litColour(shape->nextVector(start + (end - start) * progress), mixed(before.light, after.light, blend));
     }
     void scale(float, float, float) override {}
     void translate(float, float, float) override {}
@@ -135,6 +146,12 @@ private:
     std::unique_ptr<osci::Shape> shape;
     float factor;
 };
+
+// How bright a shape's style draws it: as dimmed as it is, else fully.
+inline float gainOf(const osci::Shape& shape) {
+    const auto* dimmed = dynamic_cast<const DimmedShape*>(&shape);
+    return dimmed != nullptr ? dimmed->gain() : 1.0f;
+}
 
 // Straight wherever it is drawn: a line, or one dimmed.
 inline bool isStraight(osci::Shape& shape) {

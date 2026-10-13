@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <numbers>
 #include <optional>
 #include <tuple>
 #include <utility>
@@ -107,6 +108,13 @@ struct Circle {
     Vec3 centre, first, second;
     double radius = 1;
     Vec3 at(double angle) const { return centre + (first * std::cos(angle) + second * std::sin(angle)) * radius; }
+    // Round it from `start` (radians) in `count` straight stretches:
+    // `stretch(from, to)` for each.
+    template <typename Stretch>
+    void around(double start, int count, Stretch&& stretch) const {
+        const auto turn = 2 * std::numbers::pi / count;
+        for (int step = 0; step < count; ++step) { stretch(at(start + step * turn), at(start + (step + 1) * turn)); }
+    }
 };
 
 // A round mirror: a ball, seen from outside.

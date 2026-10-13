@@ -15,6 +15,7 @@
 #include "Lighting.h"
 #include "../model/Vec3.h"
 #include <map>
+#include <numbers>
 #include <unordered_map>
 
 namespace motion::hidden {
@@ -451,7 +452,7 @@ private:
         }
         if (state.spot()) {
             // A little past the cone, so its soft edge is all in view.
-            constexpr double radians = 3.14159265358979323846 / 180;
+            constexpr double radians = std::numbers::pi / 180;
             const auto half = std::clamp(state.cone / 2 + 2, 1.0, 87.0);
             return see(Eye::looking(state.position, state.direction), Projection {1 / std::tan(half * radians)}, false);
         }
@@ -542,33 +543,37 @@ private:
     std::vector<Frame::Entry> hatch() {
         const auto amount = frameHatching;
         const auto detail = camera->hatchDetail(time);
-        // Each surface's normals in the scene, as smooth as it is.
-        std::vector<std::optional<surface::Normals>> normals(items.size());
-        std::vector<std::vector<Vec3>> corners(items.size());
+        // Each surface's corners and normals in the scene, as smooth as it
+        // is: a restyled one's are found already.
+        std::vector<std::vector<Vec3>> placed(items.size());
+        std::vector<surface::Normals> smooth(items.size());
+        std::vector<const std::vector<Vec3>*> corners(items.size(), nullptr);
+        std::vector<const surface::Normals*> normals(items.size(), nullptr);
         for (std::size_t index = 0; index < items.size(); ++index) {
             const auto& item = items[index];
             if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
-            for (const auto& corner : world[index]) { corners[index].push_back(corner.value_or(Vec3 {})); }
             if (item.styled != nullptr) {
-                normals[index] = item.styled->normals;
+                corners[index] = &item.styled->corners;
+                normals[index] = &item.styled->normals;
                 continue;
             }
-            const auto& laid = workspace.laid.of(*item.drawing, item.source);
-            normals[index] = laid.smoothing.normals(corners[index], laid.faces);
+            smooth[index] = workspace.laid.of(*item.drawing, item.source).placedAt(world[index], placed[index]);
+            corners[index] = &placed[index];
+            normals[index] = &smooth[index];
         }
         const auto look = [&](double x, double y) -> std::optional<hatching::Seen> {
             if (std::abs(x) > reach.x || std::abs(y) > reach.y) { return std::nullopt; }
             const auto nearest = depth.nearestAt(x, y);
             if (!nearest.has_value() || !(nearest->w > 0)) { return std::nullopt; }
             const auto surface = static_cast<std::uint32_t>(nearest->tag >> 32), face = static_cast<std::uint32_t>(nearest->tag & 0xffffffffu);
-            if (surface >= items.size() || !normals[surface].has_value()) { return std::nullopt; }
+            if (surface >= items.size() || normals[surface] == nullptr) { return std::nullopt; }
             // A mirror shows the scene, not hatching of its own: as much as it
             // reflects, it has none.
             if (!(items[surface].mirrors < 1)) { return std::nullopt; }
             // Where the line from the eye meets the face: exactly on it (the
             // buffer's depth is pushed back, most for a face seen edge on).
             const auto& triangle = items[surface].drawing->faces().triangles[face];
-            const auto& a = corners[surface][triangle[0]], & b = corners[surface][triangle[1]], & c = corners[surface][triangle[2]];
+            const auto& a = (*corners[surface])[triangle[0]], & b = (*corners[surface])[triangle[1]], & c = (*corners[surface])[triangle[2]];
             const auto seen = cameraProjection.unproject({x, y, nearest->w});
             auto at = cameraEye.position + cameraEye.right * seen.x + cameraEye.up * seen.y + cameraEye.forward * seen.z;
             const auto plane = (b - a).cross(c - a);
@@ -695,26 +700,14 @@ private:
         drawnStarts.clear();
     }
 
-    static osci::Point mix(const osci::Point& a, const osci::Point& b, double t) {
-        const auto f = static_cast<float>(t);
-        return osci::Point(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f, a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f);
-    }
-
     // Each surface's faces' normals in the scene, to light the lines on them.
     void findFaceNormals() {
         faceNormals.resize(items.size());
         if (!lit) { return; }
         for (std::size_t surface = 0; surface < items.size(); ++surface) {
-            const auto& item = items[surface];
-            if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
-            const auto& corners = world[surface];
-            for (const auto& triangle : item.drawing->faces().triangles) {
-                const auto& a = corners[triangle[0]];
-                const auto& b = corners[triangle[1]];
-                const auto& c = corners[triangle[2]];
-                faceNormals[surface].push_back(a.has_value() && b.has_value() && c.has_value() ? normalOf(*a, *b, *c) : std::nullopt);
-            }
+            if (items[surface].drawing != nullptr) { faceNormals[surface].assign(items[surface].drawing->faces().triangles.size(), std::nullopt); }
         }
+        forEachPlacedFace(items, world, [&](std::uint32_t surface, std::uint32_t face, Vec3 a, Vec3 b, Vec3 c) { faceNormals[surface][face] = normalOf(a, b, c); });
     }
     // The normals of the faces a surface's line runs along, to light it by.
     LineNormals normalsOf(std::size_t surface, std::size_t shape) {
@@ -798,7 +791,7 @@ private:
             const auto sa = screen(ea), sb = screen(eb);
             const auto length = sa.has_value() && sb.has_value() ? std::hypot(sb->x - sa->x, sb->y - sa->y) : 1.0;
             visibleRuns([&](double t) {
-                if (item.bent) { return screen(eye(*item.clip, mix(a, b, t))); }
+                if (item.bent) { return screen(eye(*item.clip, mixed(a, b, t))); }
                 return ea.has_value() && eb.has_value() ? screen(*ea + (*eb - *ea) * t) : std::optional<Screen>();
             }, length);
             if (runs.size() == 1 && runs.front().first <= 0 && runs.front().second >= 1) {
@@ -806,7 +799,7 @@ private:
                 continue;
             }
             lost = true;
-            for (const auto& [from, to] : runs) { kept.push_back({std::make_unique<ColouredLine>(mix(a, b, from), mix(a, b, to)), true, {}}); }
+            for (const auto& [from, to] : runs) { kept.push_back({std::make_unique<ColouredLine>(mixed(a, b, from), mixed(a, b, to)), true, {}}); }
         }
         commitDrawn();
         // Its whole length, to give it the share of the beam its runs that
@@ -825,10 +818,7 @@ private:
         // How bright a line is drawn: as its clip's style draws it (its
         // Edges, Outline or pattern), and as little as its surface mirrors.
         const auto itself = 1 - item.mirrors;
-        const auto brightnessOf = [&](osci::Shape* shape) -> double {
-            const auto* dimmed = dynamic_cast<const DimmedShape*>(shape);
-            return (dimmed != nullptr ? static_cast<double>(dimmed->gain()) : 1.0) * itself;
-        };
+        const auto brightnessOf = [&](osci::Shape* shape) { return static_cast<double>(gainOf(*shape)) * itself; };
         // A line usually starts where the last ended: its end is reused.
         osci::Point lastEnd;
         std::optional<Vec3> lastEye;
@@ -863,14 +853,7 @@ private:
             } else {
                 // Along its true path: its length on screen, from a few points
                 // (generously: it only sets how finely the path is walked).
-                double length = 0;
-                auto previous = screen(from);
-                for (int probe = 1; probe <= 8; ++probe) {
-                    const auto next = screen(eye(*item.clip, shape->nextVector(probe / 8.0f)));
-                    if (previous.has_value() && next.has_value()) { length += std::hypot(next->x - previous->x, next->y - previous->y); }
-                    previous = next;
-                }
-                length *= 1.25;
+                const auto length = screenLength(*shape, 8, [&](const osci::Point& point) { return screen(eye(*item.clip, point)); }, screen(from)) * 1.25;
                 visibleRuns([&](double t) { return screen(eye(*item.clip, shape->nextVector(static_cast<float>(t)))); }, length);
             }
             if (runs.size() == 1 && runs.front().first <= 0 && runs.front().second >= 1) {
@@ -907,11 +890,7 @@ private:
                 const auto sa = screen(piece.eyeFrom), sb = screen(piece.eyeTo);
                 if (!sa.has_value() || !sb.has_value()) { continue; }
                 const auto& corners = surfaceSources[piece.triangle];
-                const auto source = [&](const Weights& weights) {
-                    const auto mixed = [&](float osci::Point::* axis) { return static_cast<float>(corners[0].*axis * weights[0] + corners[1].*axis * weights[1] + corners[2].*axis * weights[2]); };
-                    return osci::Point(mixed(&osci::Point::x), mixed(&osci::Point::y), mixed(&osci::Point::z));
-                };
-                const auto from = source(piece.from), to = source(piece.to);
+                const auto from = weighted(corners[0], corners[1], corners[2], piece.from), to = weighted(corners[0], corners[1], corners[2], piece.to);
                 visibleRuns([&](double t) { return screen(piece.eyeFrom + (piece.eyeTo - piece.eyeFrom) * t); }, std::hypot(sb->x - sa->x, sb->y - sa->y));
                 commitDrawn();
                 // It lies on the face it was found on.
@@ -922,7 +901,7 @@ private:
                 }
                 for (const auto& [a, b] : runs) {
                     lostBy[surface] = 1;
-                    kept.push_back({std::make_unique<osci::Line>(mix(from, to, a), mix(from, to, b)), true, normals, 1 - items[surface].mirrors});
+                    kept.push_back({std::make_unique<osci::Line>(mixed(from, to, a), mixed(from, to, b)), true, normals, 1 - items[surface].mirrors});
                 }
             }
         }
@@ -964,13 +943,7 @@ private:
         };
         std::shared_ptr<osci::Shape> shape = std::move(piece.shape);
         // Its length in the frame, from a few points of it.
-        double length = 0;
-        std::optional<Screen> previous;
-        for (int probe = 0; probe <= 8; ++probe) {
-            const auto next = onFrame(*item.clip, shape->nextVector(probe / 8.0f));
-            if (previous.has_value() && next.has_value()) { length += std::hypot(next->x - previous->x, next->y - previous->y); }
-            previous = next;
-        }
+        const auto length = screenLength(*shape, 8, [&](const osci::Point& point) { return onFrame(*item.clip, point); });
         const auto steps = stepCount(length * 1.25 / litStep, 1, 4096);
         ts.resize(static_cast<std::size_t>(steps) + 1);
         light.resize(static_cast<std::size_t>(steps) + 1);
@@ -997,15 +970,11 @@ private:
         findSparsely(steps, lightStep, [&](int from, int to) {
             const auto& a = light[static_cast<std::size_t>(from)];
             const auto& b = light[static_cast<std::size_t>(to)];
-            constexpr float alike = 1.0f / 64;
             const auto darkEnd = std::max({a[0], a[1], a[2]}) < dark || std::max({b[0], b[1], b[2]}) < dark;
-            return darkEnd || std::abs(shades[static_cast<std::size_t>(from)] - shades[static_cast<std::size_t>(to)]) > 1.0e-6
-                || std::abs(a[0] - b[0]) > alike || std::abs(a[1] - b[1]) > alike || std::abs(a[2] - b[2]) > alike;
+            return darkEnd || lightsDiffer(a, b, shades[static_cast<std::size_t>(from)], shades[static_cast<std::size_t>(to)], 1.0f / 64);
         }, [&](int step, int from, int to, float share) {
             ts[static_cast<std::size_t>(step)] = static_cast<double>(step) / steps;
-            for (std::size_t channel = 0; channel < 3; ++channel) {
-                light[static_cast<std::size_t>(step)][channel] = light[static_cast<std::size_t>(from)][channel] + (light[static_cast<std::size_t>(to)][channel] - light[static_cast<std::size_t>(from)][channel]) * share;
-            }
+            light[static_cast<std::size_t>(step)] = mixed(light[static_cast<std::size_t>(from)], light[static_cast<std::size_t>(to)], share);
         });
         const auto isDark = [&](std::size_t index) { return std::max({light[index][0], light[index][1], light[index][2]}) < dark; };
         // The parts any light reaches: from halfway to the dark either side.
@@ -1021,34 +990,16 @@ private:
             auto last = index;
             while (last + 1 < ts.size() && !isDark(last + 1)) { ++last; }
             // Breaks where its light strays from a straight blend.
-            breaks.clear();
-            breaks.push_back(index);
-            std::vector<std::pair<std::size_t, std::size_t>> pending {{index, last}};
-            while (!pending.empty()) {
-                const auto [low, high] = pending.back();
-                pending.pop_back();
+            splitWhereStraying(index, last, tolerance, [&](std::size_t low, std::size_t middle, std::size_t high) {
+                const auto blend = (ts[middle] - ts[low]) / (ts[high] - ts[low]);
                 double worst = 0;
-                std::size_t at = low;
-                for (auto middle = low + 1; middle < high; ++middle) {
-                    const auto blend = (ts[middle] - ts[low]) / (ts[high] - ts[low]);
-                    for (std::size_t channel = 0; channel < 3; ++channel) {
-                        const auto straight = light[low][channel] + (light[high][channel] - light[low][channel]) * blend;
-                        const auto stray = std::abs(light[middle][channel] - straight);
-                        if (stray > worst) {
-                            worst = stray;
-                            at = middle;
-                        }
-                    }
+                for (std::size_t channel = 0; channel < 3; ++channel) {
+                    const auto straight = light[low][channel] + (light[high][channel] - light[low][channel]) * blend;
+                    const auto stray = std::abs(light[middle][channel] - straight);
+                    worst = std::max(worst, stray);
                 }
-                if (worst > tolerance) {
-                    breaks.push_back(at);
-                    pending.push_back({low, at});
-                    pending.push_back({at, high});
-                }
-            }
-            breaks.push_back(last);
-            std::sort(breaks.begin(), breaks.end());
-            breaks.erase(std::unique(breaks.begin(), breaks.end()), breaks.end());
+                return worst;
+            }, breaks, lighting.pending);
             const auto from = index == 0 ? 0.0 : (ts[index - 1] + ts[index]) * .5;
             const auto to = last + 1 == ts.size() ? 1.0 : (ts[last] + ts[last + 1]) * .5;
             const auto positionOf = [&](std::size_t sample) { return sample == index ? from : sample == last ? to : ts[sample]; };
@@ -1164,14 +1115,7 @@ private:
     }
     // A piece's length in the frame, from a few points of it.
     double onScreen(osci::Shape& shape, const PreparedClip& clip) const {
-        double length = 0;
-        std::optional<Screen> previous;
-        for (int probe = 0; probe <= 4; ++probe) {
-            const auto next = onFrame(clip, shape.nextVector(probe / 4.0f));
-            if (previous.has_value() && next.has_value()) { length += std::hypot(next->x - previous->x, next->y - previous->y); }
-            previous = next;
-        }
-        return length;
+        return screenLength(shape, 4, [&](const osci::Point& point) { return onFrame(clip, point); });
     }
     // Two straight pieces drawn as one when where they meet is within a pixel
     // of the line joining their far ends, on screen.
@@ -1232,6 +1176,7 @@ private:
         std::vector<std::array<float, 3>> light;
         std::vector<double> shades;
         std::vector<std::size_t> breaks;
+        std::vector<std::pair<std::size_t, std::size_t>> pending;
     };
     LightSamples lighting;
 };
