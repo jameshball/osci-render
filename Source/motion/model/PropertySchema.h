@@ -44,7 +44,7 @@ inline const PropertySpec* findPropertySpec(std::span<const PropertySpec> specs,
 // Effects declare their own parameter ranges in the catalogue.
 inline PropertySpec effectPropertySpec(const EffectParameterDefinition& parameter) {
     const auto span = parameter.max - parameter.min;
-    return {parameter.id, parameter.name, "Effect", "", parameter.min, parameter.max, parameter.defaultValue, span / 200.0, span >= 50 ? 1 : 3, ""};
+    return {parameter.id, parameter.name, "Effect", "", parameter.min, parameter.max, parameter.defaultValue, span / 200.0, parameter.decimals >= 0 ? parameter.decimals : span >= 10 ? 1 : 2, parameter.unit};
 }
 
 // What generates a clip, when the target is a generator's clip. Only
