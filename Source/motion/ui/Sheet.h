@@ -95,6 +95,8 @@ public:
             primary.setBounds(line.removeFromRight(std::max(96, primary.getBestWidthForHeight(footerHeight) + 16)));
             line.removeFromRight(8);
             cancel.setBounds(line.removeFromRight(84));
+            // Room for buttons of its own, kept apart from Cancel.
+            line.removeFromRight(8);
             footerLeft = line;
             area.removeFromBottom(footerGap);
         }

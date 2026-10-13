@@ -115,7 +115,7 @@ private:
             const bool recording = isCapturing && isCapturing();
             const bool listening = isListening && isListening();
             listen.setButtonText(listening ? "Stop listening" : "Start listening");
-            record.setButtonText(recording ? "Stop & save capture" : "Record capture");
+            record.setButtonText(recording ? "Save capture" : "Record capture");
             record.setEnabled(recording || listening);
             cancelCapture.setVisible(recording);
             for (auto* control : std::initializer_list<juce::Component*>{&name, &port, &policy, &primary, &listen}) { control->setEnabled(!recording); }

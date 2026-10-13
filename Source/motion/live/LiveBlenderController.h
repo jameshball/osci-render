@@ -66,7 +66,7 @@ public:
         const auto status = session->input->status();
         if (session->input->capturing()) {
             const auto error = session->input->captureError();
-            return error.isNotEmpty() ? error : "Recording capture" + dot + "stop to save it to Sources";
+            return error.isNotEmpty() ? error : juce::String("Recording capture");
         }
         if (session->input->preparationFailed()) { return "Could not prepare the incoming frame"; }
         if (status.message.isNotEmpty()) { return status.message; }
