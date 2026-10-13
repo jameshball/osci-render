@@ -100,6 +100,14 @@ try:
     assert [t for t, _ in moved] == [0, 1.5, 2], moved
     step("undo key move", "click", "--name", "Undo", "--exact")
     assert [t for t, _ in keys(saved(), 3)] == [0, 1, 2]
+    # Alt+Right nudges the selected key a frame (at the composition's 30 fps).
+    step("select middle key again", "click", "--class", "MotionTimelineView", "--position", f"{x_of(1)},{lane_y}")
+    step("nudge key", "press", "alt + right", "--class", "MotionTimelineView")
+    session.wait_for_undo("Nudge key")
+    nudged = [t for t, _ in keys(saved(), 3)]
+    assert abs(nudged[1] - (1 + 1 / 30)) < 1e-3, nudged
+    step("undo nudge", "click", "--name", "Undo", "--exact")
+    assert [t for t, _ in keys(saved(), 3)] == [0, 1, 2]
     # Copy the last two keys and paste them onto the second clip at 5 s.
     step("select key 1", "click", "--class", "MotionTimelineView", "--position", f"{x_of(1)},{lane_y}")
     step("add key 2", "click", "--class", "MotionTimelineView", "--position", f"{x_of(2)},{lane_y}", "--modifiers", "shift")

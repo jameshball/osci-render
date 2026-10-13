@@ -140,6 +140,24 @@ void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
     repaint();
 }
 
+bool MotionTimelineView::nudgeSelectedKeys(int frames) {
+    if (keyDrag.has_value()) { return true; }
+    const auto& project = processor.document.project();
+    const auto delta = frames / (project.frameRate > 0 ? project.frameRate : 30.0);
+    const auto keys = selectedKeys;
+    // Where each selected key lands, through its clip's own timing.
+    auto moved = keys;
+    for (auto& key : moved) {
+        const auto* owner = motion::findClip(project, key.clip);
+        if (owner != nullptr) { key.time = movedKeyTime(owner->timing(project.tempo()), key.time, delta); }
+    }
+    // Nothing moves onto another key, nor when a key's track is locked.
+    const auto nudged = processor.document.tryEditCoalesced(keys.size() > 1 ? "Nudge keys" : "Nudge key", "timeline.nudge.keys", [this, &keys, delta](motion::Project& updated) { return moveKeys(updated, keys, delta); });
+    if (nudged) { selectedKeys = std::move(moved); }
+    repaint();
+    return true;
+}
+
 void MotionTimelineView::endKeyDrag() {
     if (keyDrag.has_value() && keyDrag->changed && processor.document.revision() == keyDrag->revision) {
         processor.document.commit(keyDrag->keys.size() > 1 ? "Move keys" : "Move key", std::move(keyDrag->before));

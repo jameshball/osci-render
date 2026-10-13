@@ -1726,6 +1726,10 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
         deleteSelectedKeys();
         return true;
     }
+    const auto arrow = key.getKeyCode() == juce::KeyPress::leftKey ? -1 : key.getKeyCode() == juce::KeyPress::rightKey ? 1 : 0;
+    if (arrow != 0 && key.getModifiers().isAltDown() && !key.getModifiers().isCommandDown() && !selectedKeys.empty()) {
+        return nudgeSelectedKeys(arrow * (key.getModifiers().isShiftDown() ? 10 : 1));
+    }
     if (key == juce::KeyPress::escapeKey && (before.has_value() || scrubbing)) {
         cancelGesture();
         return true;

@@ -281,6 +281,9 @@ private:
     void endKeyDrag();
     void cancelKeyDrag();
     void deleteSelectedKeys();
+    // Moves the selected keys `frames` frames along, as Alt+Left and Right
+    // do (Shift: ten); presses in a row are one undo step.
+    bool nudgeSelectedKeys(int frames);
     void addKeyAt(const Row& lane, int x, juce::ModifierKeys modifiers);
     void showKeyMenu();
     void deleteSelectedClips(bool ripple);
