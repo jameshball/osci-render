@@ -412,6 +412,12 @@ void MotionEditor::splitAtPlayhead() {
         });
     });
     if (!canSplit) {
+        statusBar.show("Select a clip under the playhead to split it there.", MotionStatusBar::Kind::notice);
+        return;
+    }
+    const auto* track = motion::findClipTrack(processor.document.project(), selection);
+    if (track != nullptr && track->locked) {
+        statusBar.show("Unlock the track to split its clip.", MotionStatusBar::Kind::notice);
         return;
     }
     const auto id = processor.document.newId();
