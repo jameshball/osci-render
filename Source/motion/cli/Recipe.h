@@ -32,6 +32,12 @@ namespace motion::cli {
 //   "define": {"turn": "2 * pi * t / 16"}
 // A camera can follow a path, looking at a point, both expressions of t:
 //   "camera": {"path": {"position": ["4 * cos(turn)", "2", "4 * sin(turn)"], "look": ["0", "0", "0"], "every": 0.05}}
+// Steady motion is better a modulator than keys: an LFO (sine, triangle,
+// saw, square, smooth noise or held noise) at a rate in Hz, starting
+// `phase` of a cycle in, routed to properties of objects or the camera,
+// each by its own amount (added, or multiplied with "mode": "multiply"):
+//   "modulators": [{"name": "Spin", "waveform": "saw", "rate": 0.125, "phase": 0.5,
+//                   "routes": [{"to": "Box", "property": "rotation.y", "amount": 180}]}]
 // Files are found beside the recipe.
 class Recipe {
 public:
@@ -89,6 +95,13 @@ private:
         if (recipe.hasProperty("camera")) {
             const auto added = addCamera(recipe["camera"]);
             if (added.failed()) { return juce::Result::fail("camera: " + added.getErrorMessage()); }
+        }
+        const auto* modulators = recipe["modulators"].getArray();
+        if (modulators != nullptr) {
+            for (const auto& modulator : *modulators) {
+                const auto added = addModulator(modulator);
+                if (added.failed()) { return juce::Result::fail(modulator["name"].toString() + ": " + added.getErrorMessage()); }
+            }
         }
         return juce::Result::ok();
     }
@@ -158,6 +171,41 @@ private:
             if (followed.failed()) { return juce::Result::fail("path: " + followed.getErrorMessage()); }
         }
         project.cameras.push_back(camera);
+        named["camera"] = camera.id;
+        return juce::Result::ok();
+    }
+
+    juce::Result addModulator(const juce::var& settings) {
+        Modulator modulator;
+        modulator.id = next++;
+        modulator.name = settings["name"].toString().toStdString();
+        if (modulator.name.empty()) { return juce::Result::fail("A modulator needs a \"name\"."); }
+        const auto waveform = settings["waveform"].toString();
+        const std::array<std::pair<const char*, ModulationWaveform>, 6> waveforms {{{"sine", ModulationWaveform::sine}, {"triangle", ModulationWaveform::triangle},
+            {"saw", ModulationWaveform::saw}, {"square", ModulationWaveform::square}, {"smooth noise", ModulationWaveform::noiseSmooth}, {"held noise", ModulationWaveform::noiseHold}}};
+        const auto found = std::find_if(waveforms.begin(), waveforms.end(), [&](const auto& entry) { return waveform.isEmpty() ? entry.second == ModulationWaveform::sine : waveform.equalsIgnoreCase(entry.first); });
+        if (found == waveforms.end()) { return juce::Result::fail("A waveform is sine, triangle, saw, square, smooth noise or held noise, not \"" + waveform + "\"."); }
+        modulator.shape.waveform = found->second;
+        modulator.shape.rateHz = number(settings, "rate", 1);
+        modulator.shape.phase = number(settings, "phase", 0);
+        if (!modulator.shape.valid()) { return juce::Result::fail("Its rate is 0.001-1000 Hz and its phase 0-1 of a cycle."); }
+        const auto* routes = settings["routes"].getArray();
+        if (routes == nullptr || routes->isEmpty()) { return juce::Result::fail("A modulator needs \"routes\" to drive."); }
+        for (const auto& item : *routes) {
+            const auto to = item["to"].toString();
+            const auto target = named.find(to);
+            if (target == named.end()) { return juce::Result::fail("There is no object \"" + to + "\" to drive (or \"camera\")."); }
+            ModulationRoute route;
+            route.id = next++;
+            route.modulator = modulator.id;
+            route.target = target->second;
+            route.property = item["property"].toString().toStdString();
+            route.amount = number(item, "amount", 1);
+            route.mode = item["mode"].toString().equalsIgnoreCase("multiply") ? ModulationMode::multiply : ModulationMode::add;
+            if (!route.valid()) { return juce::Result::fail("A route is {\"to\", \"property\", \"amount\"}."); }
+            project.routes.push_back(route);
+        }
+        project.modulators.push_back(modulator);
         return juce::Result::ok();
     }
 

@@ -7,19 +7,6 @@
     "persistence": 0.2
   },
   "camera": {
-    "path": {
-      "every": 0.1,
-      "position": [
-        "0.6 * sin(2 * pi * t / 8)",
-        "0.9",
-        "5.4"
-      ],
-      "look": [
-        "0",
-        "0",
-        "0"
-      ]
-    },
     "keys": {
       "hideLines": [
         [
@@ -35,6 +22,11 @@
           100
         ]
       ]
+    },
+    "properties": {
+      "position.y": 0.9,
+      "position.z": 5.4,
+      "rotation.x": -9.4623
     }
   },
   "objects": [
@@ -48,13 +40,10 @@
         "generator.depth": 0.5,
         "rotation.x": 20,
         "fillDetail": 14,
-        "noiseFlow": 0.6
+        "noiseFlow": 0.6,
+        "rotation.y": 0
       },
       "keys": {
-        "rotation.y": {
-          "expression": "45 * t",
-          "every": 0.5
-        },
         "edges": [
           [
             0,
@@ -298,13 +287,10 @@
         "generator.segments": 32,
         "generator.sides": 14,
         "fillDetail": 14,
-        "noiseFlow": 0.6
+        "noiseFlow": 0.6,
+        "rotation.y": 0
       },
       "keys": {
-        "rotation.y": {
-          "expression": "45 * t",
-          "every": 0.5
-        },
         "edges": [
           [
             0,
@@ -551,19 +537,75 @@
         "light.intensity": 2.4,
         "light.range": 8,
         "light.shadows": 100,
-        "position.y": 1.6
-      },
-      "keys": {
-        "position.x": {
-          "expression": "1.8 * cos(2 * pi * t / 8 + 2.3)",
-          "every": 0.25
-        },
-        "position.z": {
-          "expression": "1.8 * sin(2 * pi * t / 8 + 2.3)",
-          "every": 0.25
-        }
+        "position.y": 1.6,
+        "position.x": 0,
+        "position.z": 0
       }
     }
   ],
-  "rateRatio": 4
+  "rateRatio": 4,
+  "modulators": [
+    {
+      "name": "Spin",
+      "waveform": "saw",
+      "rate": 0.125,
+      "phase": 0.5,
+      "routes": [
+        {
+          "to": "Box",
+          "property": "rotation.y",
+          "amount": 180
+        },
+        {
+          "to": "Torus",
+          "property": "rotation.y",
+          "amount": 180
+        }
+      ]
+    },
+    {
+      "name": "Sway",
+      "waveform": "sine",
+      "rate": 0.125,
+      "phase": 0,
+      "routes": [
+        {
+          "to": "camera",
+          "property": "position.x",
+          "amount": 0.6
+        },
+        {
+          "to": "camera",
+          "property": "rotation.y",
+          "amount": 6.3402
+        }
+      ]
+    },
+    {
+      "name": "Key orbit X",
+      "waveform": "sine",
+      "rate": 0.125,
+      "phase": 0.616056,
+      "routes": [
+        {
+          "to": "Key",
+          "property": "position.x",
+          "amount": 1.8
+        }
+      ]
+    },
+    {
+      "name": "Key orbit Z",
+      "waveform": "sine",
+      "rate": 0.125,
+      "phase": 0.366056,
+      "routes": [
+        {
+          "to": "Key",
+          "property": "position.z",
+          "amount": 1.8
+        }
+      ]
+    }
+  ]
 }

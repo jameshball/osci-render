@@ -10,17 +10,9 @@
     "lookAt": "Floor",
     "properties": {
       "position.y": 2.7,
-      "hideLines": 100
-    },
-    "keys": {
-      "position.x": {
-        "expression": "6.395991869913532 * cos(0.9162255594715053 + 2 * pi * t / 16)",
-        "every": 1
-      },
-      "position.z": {
-        "expression": "6.395991869913532 * sin(0.9162255594715053 + 2 * pi * t / 16)",
-        "every": 1
-      }
+      "hideLines": 100,
+      "position.x": 0,
+      "position.z": 0
     }
   },
   "objects": [
@@ -106,17 +98,9 @@
         "position.y": -0.2,
         "position.z": 0,
         "generator.radius": 0.26,
-        "generator.height": 0.6
-      },
-      "keys": {
-        "rotation.y": {
-          "expression": "360 * t / 16",
-          "every": 2
-        },
-        "rotation.z": {
-          "expression": "25 * sin(2 * pi * t / 16)",
-          "every": 1
-        }
+        "generator.height": 0.6,
+        "rotation.y": 0,
+        "rotation.z": 0
       }
     },
     {
@@ -139,21 +123,13 @@
         "red": 1,
         "green": 0.78,
         "blue": 0.5,
-        "position.y": 0.72
-      },
-      "keys": {
-        "position.x": {
-          "expression": "cos(2 * pi * t / 8)",
-          "every": 0.5
-        },
-        "position.z": {
-          "expression": "sin(2 * pi * t / 8)",
-          "every": 0.5
-        }
+        "position.y": 0.72,
+        "position.x": 0,
+        "position.z": 0
       }
     },
     {
-      "name": "Light glow",
+      "name": "Glow 1",
       "generator": "arc",
       "properties": {
         "generator.radius": 0.055,
@@ -165,21 +141,13 @@
         "blue": 0.55,
         "position.y": 0.72,
         "rotation.x": 0,
-        "rotation.y": 0
-      },
-      "keys": {
-        "position.x": {
-          "expression": "cos(2 * pi * t / 8)",
-          "every": 0.5
-        },
-        "position.z": {
-          "expression": "sin(2 * pi * t / 8)",
-          "every": 0.5
-        }
+        "rotation.y": 0,
+        "position.x": 0,
+        "position.z": 0
       }
     },
     {
-      "name": "Light glow",
+      "name": "Glow 2",
       "generator": "arc",
       "properties": {
         "generator.radius": 0.055,
@@ -191,21 +159,13 @@
         "blue": 0.55,
         "position.y": 0.72,
         "rotation.x": 90,
-        "rotation.y": 0
-      },
-      "keys": {
-        "position.x": {
-          "expression": "cos(2 * pi * t / 8)",
-          "every": 0.5
-        },
-        "position.z": {
-          "expression": "sin(2 * pi * t / 8)",
-          "every": 0.5
-        }
+        "rotation.y": 0,
+        "position.x": 0,
+        "position.z": 0
       }
     },
     {
-      "name": "Light glow",
+      "name": "Glow 3",
       "generator": "arc",
       "properties": {
         "generator.radius": 0.055,
@@ -217,19 +177,121 @@
         "blue": 0.55,
         "position.y": 0.72,
         "rotation.x": 0,
-        "rotation.y": 90
-      },
-      "keys": {
-        "position.x": {
-          "expression": "cos(2 * pi * t / 8)",
-          "every": 0.5
-        },
-        "position.z": {
-          "expression": "sin(2 * pi * t / 8)",
-          "every": 0.5
-        }
+        "rotation.y": 90,
+        "position.x": 0,
+        "position.z": 0
       }
     }
   ],
-  "rateRatio": 4
+  "rateRatio": 4,
+  "modulators": [
+    {
+      "name": "Camera orbit X",
+      "waveform": "sine",
+      "rate": 0.0625,
+      "phase": 0.395822,
+      "routes": [
+        {
+          "to": "camera",
+          "property": "position.x",
+          "amount": 6.395991869913532
+        }
+      ]
+    },
+    {
+      "name": "Camera orbit Z",
+      "waveform": "sine",
+      "rate": 0.0625,
+      "phase": 0.145822,
+      "routes": [
+        {
+          "to": "camera",
+          "property": "position.z",
+          "amount": 6.395991869913532
+        }
+      ]
+    },
+    {
+      "name": "Cone spin",
+      "waveform": "saw",
+      "rate": 0.0625,
+      "phase": 0.5,
+      "routes": [
+        {
+          "to": "Cone",
+          "property": "rotation.y",
+          "amount": 180
+        }
+      ]
+    },
+    {
+      "name": "Cone sway",
+      "waveform": "sine",
+      "rate": 0.0625,
+      "phase": 0,
+      "routes": [
+        {
+          "to": "Cone",
+          "property": "rotation.z",
+          "amount": 25
+        }
+      ]
+    },
+    {
+      "name": "Light orbit X",
+      "waveform": "sine",
+      "rate": 0.125,
+      "phase": 0.25,
+      "routes": [
+        {
+          "to": "Light",
+          "property": "position.x",
+          "amount": 1
+        },
+        {
+          "to": "Glow 1",
+          "property": "position.x",
+          "amount": 1
+        },
+        {
+          "to": "Glow 2",
+          "property": "position.x",
+          "amount": 1
+        },
+        {
+          "to": "Glow 3",
+          "property": "position.x",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "name": "Light orbit Z",
+      "waveform": "sine",
+      "rate": 0.125,
+      "phase": 0.0,
+      "routes": [
+        {
+          "to": "Light",
+          "property": "position.z",
+          "amount": 1
+        },
+        {
+          "to": "Glow 1",
+          "property": "position.z",
+          "amount": 1
+        },
+        {
+          "to": "Glow 2",
+          "property": "position.z",
+          "amount": 1
+        },
+        {
+          "to": "Glow 3",
+          "property": "position.z",
+          "amount": 1
+        }
+      ]
+    }
+  ]
 }
