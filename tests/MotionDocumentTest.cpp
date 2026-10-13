@@ -199,6 +199,23 @@ public:
             expect(motion::Document::prepareLoad(litDocument.save(), reopened).wasOk(), "the project loads");
         }
         {
+            // An edit made while a gesture previews (Delete mid-drag, an
+            // import finishing) undoes to before the preview, never to the
+            // uncommitted preview itself.
+            juce::UndoManager gestureUndo;
+            motion::Document gesture(gestureUndo);
+            motion::Project plain;
+            plain.duration = 10;
+            gesture.reset(plain);
+            auto dragged = gesture.project();
+            dragged.duration = 20;
+            gesture.preview(dragged);
+            expect(gesture.setMarker(0, 1, "Cue").wasOk());
+            expect(gesture.project().duration == 20 && gesture.project().markers.size() == 1, "the edit keeps what was shown");
+            expect(gestureUndo.undo());
+            expect(gesture.project().duration == 10 && gesture.project().markers.empty(), "undo goes back to before the preview");
+        }
+        {
             // A composition's tempo is its own: the main Scope's keys stay put.
             auto keyed = document.mainProject();
             keyed.beam.properties["intensity"].setKey({2.0, 3.0});

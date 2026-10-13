@@ -361,6 +361,9 @@ private:
     Id lastId = 0;
     std::uint64_t projectGeneration = 0, scopeChanges = 0;
     std::uint64_t stateRevision = 0, contentRevision = 0, savedRevision = 0;
+    // The project before a gesture's first preview, until a step is recorded:
+    // where an edit made meanwhile undoes to.
+    std::optional<Project> previewBase;
     bool carryView = true;
     // During undo and redo: the step's opposite snapshot, for carrying view options.
     const Project* carryOptionsFrom = nullptr;

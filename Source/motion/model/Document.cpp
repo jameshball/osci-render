@@ -56,12 +56,14 @@ struct Document::Change : juce::UndoableAction {
     // Redo and undo keep the current view options; the first perform sets them.
     bool perform() override {
         const juce::ScopedValueSetter<const Project*> carry(owner.carryOptionsFrom, performed ? &before : nullptr);
+        owner.previewBase.reset();
         owner.apply(after);
         performed = true;
         return true;
     }
     bool undo() override {
         const juce::ScopedValueSetter<const Project*> carry(owner.carryOptionsFrom, &after);
+        owner.previewBase.reset();
         owner.apply(before);
         return true;
     }
@@ -303,10 +305,14 @@ void Document::record(const juce::String& label, Project view, bool joinPrevious
         undo.beginNewTransaction(label);
         if (onUndoStep) { onUndoStep(); }
     }
-    undo.perform(new Change(*this, state, finished(std::move(view))));
+    // An edit made while a gesture previews starts from before the preview:
+    // what was shown was never an undo step of its own.
+    auto from = previewBase.has_value() ? std::move(*previewBase) : state;
+    undo.perform(new Change(*this, std::move(from), finished(std::move(view))));
 }
 
 void Document::preview(Project project) {
+    if (!previewBase.has_value()) { previewBase = state; }
     apply(finished(std::move(project)));
 }
 
@@ -322,7 +328,8 @@ void Document::editProject(juce::String label, std::function<void(Project&)> ope
     after.clampLoop();
     undo.beginNewTransaction(label);
     if (onUndoStep) { onUndoStep(); }
-    undo.perform(new Change(*this, state, std::move(after)));
+    auto from = previewBase.has_value() ? std::move(*previewBase) : state;
+    undo.perform(new Change(*this, std::move(from), std::move(after)));
 }
 
 void Document::editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation) {
@@ -360,6 +367,7 @@ void Document::commit(juce::String label, Project before) {
 }
 
 void Document::reset(Project project) {
+    previewBase.reset();
     scopeId = 0;
     ++projectGeneration;
     ++scopeChanges;
