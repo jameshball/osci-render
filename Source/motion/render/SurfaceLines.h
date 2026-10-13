@@ -438,6 +438,21 @@ struct Climb {
 
 inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Pattern kind, double across, double turn = 0) {
     if (faces.empty() || !(across > 0)) { return {}; }
+    // Faces with a corner that isn't finite (a mesh an effect broke) are
+    // left out; the pieces on the rest keep their faces' numbers.
+    const auto finite = [&corners](const Face& face) { return std::all_of(face.begin(), face.end(), [&corners](std::uint32_t corner) { return corners[corner].finite(); }); };
+    if (!std::all_of(faces.begin(), faces.end(), finite)) {
+        std::vector<Face> kept;
+        std::vector<std::uint32_t> original;
+        for (std::uint32_t index = 0; index < faces.size(); ++index) {
+            if (!finite(faces[index])) { continue; }
+            kept.push_back(faces[index]);
+            original.push_back(index);
+        }
+        auto pieces = pattern(corners, kept, kind, across, turn);
+        for (auto& piece : pieces) { piece.face = original[piece.face]; }
+        return pieces;
+    }
     const auto bounds = detail::boundsOf(corners, faces);
     // A surface flat across x or z (a card facing the eye) spirals about the
     // axis through it, as if lying down: its axes swapped to make that its

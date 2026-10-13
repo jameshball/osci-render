@@ -1,6 +1,7 @@
 #include "../../Source/motion/render/SurfaceLines.h"
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <set>
 #include <string>
@@ -144,6 +145,16 @@ int main() {
         const auto pieces = pattern(square, cells, Pattern::spiral, 8);
         check(!pieces.empty() && pieces.size() < 2000, "a flat square's spiral is a few hundred pieces: " + std::to_string(pieces.size()));
         check(linesIn(square, cells, pieces) == 1, "one line: " + std::to_string(linesIn(square, cells, pieces)));
+    }
+    // A mesh an effect broke (a corner not finite) still draws its patterns
+    // on the faces that are whole, and none on the rest.
+    {
+        std::vector<Vec3> broken {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {std::numeric_limits<double>::quiet_NaN(), 0, 0}, {1, 1, std::numeric_limits<double>::infinity()}};
+        std::vector<Face> parts {{0, 1, 2}, {1, 3, 2}, {1, 4, 2}};
+        for (const auto kind : {Pattern::spiral, Pattern::noise, Pattern::slices, Pattern::rings}) {
+            const auto pieces = pattern(broken, parts, kind, 8);
+            check(std::all_of(pieces.begin(), pieces.end(), [](const Piece& piece) { return piece.face == 0; }), "patterns only on the whole face");
+        }
     }
     // Rings and noise lie on the surface too.
     for (const auto kind : {Pattern::rings, Pattern::noise}) {
