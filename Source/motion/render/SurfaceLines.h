@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <unordered_map>
 #include <numbers>
 #include <optional>
 #include <tuple>
@@ -82,10 +83,22 @@ inline std::optional<Meeting> meetingOf(const Face& face, const Weights& weights
 using Place = std::tuple<std::int64_t, std::int64_t, std::int64_t>;
 inline Place placeOf(Vec3 p) { return {std::llround(p.x * 1.0e7), std::llround(p.y * 1.0e7), std::llround(p.z * 1.0e7)}; }
 
+// Places and meetings looked up by hash: a fine grid has a great many.
+struct TripleHash {
+    template <typename A, typename B, typename C>
+    std::size_t operator()(const std::tuple<A, B, C>& triple) const {
+        auto hash = static_cast<std::uint64_t>(std::get<0>(triple)) * 0x9e3779b97f4a7c15ull;
+        hash = (hash ^ static_cast<std::uint64_t>(std::get<1>(triple))) * 0xbf58476d1ce4e5b9ull;
+        hash = (hash ^ static_cast<std::uint64_t>(std::get<2>(triple))) * 0x94d049bb133111ebull;
+        return static_cast<std::size_t>(hash ^ (hash >> 31));
+    }
+};
+
 // The faces with each corner as the first corner at its place: a mesh may
 // repeat a place (a ball's poles, a seam), and lines meet there all the same.
 inline std::vector<Face> byPlace(const std::vector<Vec3>& corners, const std::vector<Face>& faces) {
-    std::map<Place, std::uint32_t> first;
+    std::unordered_map<Place, std::uint32_t, TripleHash> first;
+    first.reserve(corners.size());
     std::vector<Face> placed(faces.size());
     for (std::size_t index = 0; index < faces.size(); ++index) {
         for (std::size_t corner = 0; corner < 3; ++corner) {
@@ -115,7 +128,8 @@ inline std::map<std::pair<Place, Place>, std::vector<std::pair<std::uint32_t, st
 // Pieces put in order along their lines: each one's neighbour is the one
 // meeting a side where it does. Loops go round once; lines go end to end.
 inline std::vector<Piece> chained(std::vector<Found> found) {
-    std::map<Meeting, std::vector<std::size_t>> at;
+    std::unordered_map<Meeting, std::vector<std::size_t>, TripleHash> at;
+    at.reserve(found.size() * 2);
     for (std::size_t index = 0; index < found.size(); ++index) {
         for (const auto& end : found[index].ends) {
             if (end.has_value()) { at[*end].push_back(index); }
@@ -675,11 +689,15 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         std::vector<Weights> weightsOf;
         // How far up the surface each of its points is.
         const auto upAt = [&](const Weights& weights) { return climb.has_value() ? climb->at(index, weights) : 0.0; };
+        // The pattern's value at each, found once: the triangles about a
+        // point share it.
+        std::vector<double> valueOf;
         for (int row = 0; row <= cuts; ++row) {
             for (int column = 0; column <= cuts - row; ++column) {
                 const Weights weights {static_cast<double>(cuts - row - column) / cuts, static_cast<double>(column) / cuts, static_cast<double>(row) / cuts};
                 weightsOf.push_back(weights);
                 fine.push_back(a * weights[0] + b * weights[1] + c * weights[2]);
+                valueOf.push_back(valueAt(fine.back(), from, upAt(weights)));
             }
         }
         const auto pointAt = [&](int row, int column) { return static_cast<std::uint32_t>(gridIndex(cuts, row, column)); };
@@ -687,7 +705,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
             fineFaces.push_back({first + p, first + q, first + r});
             parents.push_back(index);
             placings.push_back({weightsOf[p], weightsOf[q], weightsOf[r]});
-            values.push_back({valueAt(fine[first + p], from, upAt(weightsOf[p])), valueAt(fine[first + q], from, upAt(weightsOf[q])), valueAt(fine[first + r], from, upAt(weightsOf[r]))});
+            values.push_back({valueOf[p], valueOf[q], valueOf[r]});
         };
         for (int row = 0; row < cuts; ++row) {
             for (int column = 0; column < cuts - row; ++column) {
