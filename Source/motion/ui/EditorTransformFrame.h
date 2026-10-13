@@ -31,20 +31,26 @@ struct Affine {
         return { value.x / scale.x, value.y / scale.y, value.z / scale.z };
     }
 };
+// Its position, rotation, scale and anchor, each three of the object
+// properties from X, at `time`: none when any is not a usable number.
 template <typename PropertyMap>
 std::optional<Affine> evaluate(const PropertyMap& properties, double time) {
-    std::array<double, objectPropertySpecs.size()> values;
-    for (std::size_t i = 0; i < values.size(); ++i) {
-        const auto found = properties.find(objectPropertySpecs[i].id);
-        if (found != properties.end() && !found->second.valid()) { return std::nullopt; }
-        values[i] = found == properties.end() ? objectPropertySpecs[i].defaultValue : found->second.evaluate(time);
-        if (!std::isfinite(values[i])) { return std::nullopt; }
-    }
+    constexpr auto positionIndex = specIndex(objectPropertySpecs, "position.x"), rotationIndex = specIndex(objectPropertySpecs, "rotation.x"), scaleIndex = specIndex(objectPropertySpecs, "scale.x");
     constexpr auto radians = std::numbers::pi / 180.0;
-    return Affine { { values[0], values[1], values[2] },
-        { values[3] * radians, values[4] * radians, values[5] * radians },
-        { values[6], values[7], values[8] },
-        { values[anchorIndex], values[anchorIndex + 1], values[anchorIndex + 2] } };
+    bool usable = true;
+    const auto vector = [&](std::size_t first, double unit) {
+        std::array<double, 3> axes {};
+        for (std::size_t axis = 0; axis < 3; ++axis) {
+            const auto& spec = objectPropertySpecs[first + axis];
+            const auto found = properties.find(spec.id);
+            if (found != properties.end() && !found->second.valid()) { usable = false; }
+            axes[axis] = (found == properties.end() ? spec.defaultValue : found->second.evaluate(time)) * unit;
+            usable = usable && std::isfinite(axes[axis]);
+        }
+        return Vec3 {axes[0], axes[1], axes[2]};
+    };
+    const Affine affine {vector(positionIndex, 1), vector(rotationIndex, radians), vector(scaleIndex, 1), vector(anchorIndex, 1)};
+    return usable ? std::optional<Affine>(affine) : std::nullopt;
 }
 }
 
