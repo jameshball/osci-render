@@ -1846,8 +1846,10 @@ bool MotionCompositionView::stepHandleCount(float delta) {
     const auto next = motion::generator::step(*context->definition, parameter, context->values, steps);
     const auto& spec = context->definition->parameters[parameter];
     const auto id = selected;
-    processor.document.tryEdit("Change " + juce::String(spec.label.data(), spec.label.size()), [&](motion::Project& project) { return motion::ui::generator_handles::write(project, id, *context, next); });
-    if (onPropertyEdited) { onPropertyEdited(id, std::string(spec.id)); }
+    // Notches in a row are one undo step.
+    const auto changed = processor.document.tryEditCoalesced("Change " + juce::String(spec.label.data(), spec.label.size()), "handle:" + juce::String(id) + ":" + juce::String(spec.id.data(), spec.id.size()),
+        [&](motion::Project& project) { return motion::ui::generator_handles::write(project, id, *context, next); });
+    if (changed && onPropertyEdited) { onPropertyEdited(id, std::string(spec.id)); }
     repaint();
     return true;
 }

@@ -198,6 +198,8 @@ public:
     // Repeated changes to one control (wheel, arrow keys) within a second
     // join a single undo step instead of one step per increment.
     void editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation);
+    // As editCoalesced, recording nothing when the operation declines.
+    bool tryEditCoalesced(juce::String label, const juce::String& control, std::function<bool(Project&)> operation);
     void reset(Project project);
     juce::Result changeTempo(double bpm);
     // Replace the initial tempo and every change in one undo step.

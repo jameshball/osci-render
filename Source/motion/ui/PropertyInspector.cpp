@@ -771,7 +771,8 @@ void MotionPropertyInspector::commitValue(const std::string& property, double va
         return;
     }
     const auto time = keyTime(*found);
-    processor.document.edit(label, [&](motion::Project& project) { apply(project, property, value, time); });
+    // Arrow-key steps in a row are one undo step.
+    processor.document.editCoalesced(label, "property:" + juce::String(target) + ":" + juce::String(property), [&](motion::Project& project) { apply(project, property, value, time); });
     if (onPropertySelected) { onPropertySelected(target, property); }
     if (onKeyTimeEdited) { onKeyTimeEdited(); }
 }

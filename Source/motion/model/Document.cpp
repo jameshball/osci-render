@@ -333,16 +333,24 @@ void Document::editProject(juce::String label, std::function<void(Project&)> ope
 }
 
 void Document::editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation) {
+    tryEditCoalesced(std::move(label), control, [&operation](Project& project) {
+        operation(project);
+        return true;
+    });
+}
+
+bool Document::tryEditCoalesced(juce::String label, const juce::String& control, std::function<bool(Project&)> operation) {
     const auto now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
     // Joins only while the newest undo step is still this control's: a
     // parameter changed since (it shares the undo manager) has its own.
     const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && now - coalescingTime < 1.0 && undo.getUndoDescription() == label;
     auto after = project();
-    operation(after);
+    if (!operation(after)) { return false; }
     record(label, std::move(after), joins);
     coalescingControl = control;
     coalescingRevision = revision();
     coalescingTime = now;
+    return true;
 }
 
 bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operation) {
