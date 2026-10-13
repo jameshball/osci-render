@@ -391,6 +391,11 @@ bool MotionPropertyInspector::isGeneratorSpec(const motion::PropertySpec& spec) 
     return std::any_of(generator->parameters.begin(), generator->parameters.end(), [&](const auto& own) { return own.id == spec.id; });
 }
 
+bool MotionPropertyInspector::isAdvanced(const Row& row) {
+    if (row.section == "Shading") { return true; }
+    return row.section == "Surface" && !(row.fields.size() == 1 && row.fields.front()->spec.id == "reflects");
+}
+
 juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec) const {
     if (isGeneratorSpec(spec)) {
         const auto* generator = targetGenerator();
@@ -531,6 +536,18 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         rows.back()->addAndMakeVisible(editor);
         rows.back()->fields.push_back(std::move(field));
     }
+    // The sections that open with tiles come first after what makes it:
+    // they're what is seen without scrolling. Mirror leads Surface's rows,
+    // above its advanced ones.
+    const auto tiled = [](const auto& row) { return row->section == "Surface" || row->section == "Shading"; };
+    const auto made = std::find_if(rows.begin(), rows.end(), [](const auto& row) { return !row->first; });
+    const auto tiledEnd = std::stable_partition(made, rows.end(), tiled);
+    std::stable_partition(made, tiledEnd, [](const auto& row) { return !isAdvanced(*row); });
+    advanced.onClick = [this] {
+        refreshValues();
+        layoutContent();
+    };
+    content.addChildComponent(advanced);
     surfaceTiles.reset();
     presetTiles.reset();
     shadingTiles.reset();
@@ -595,6 +612,8 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
 
 bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, double time) {
     bool changed = false;
+    const auto wasAvailable = advancedAvailable;
+    advancedAvailable = false;
     const auto& project = processor.document.project();
     const auto routed = routedProperties();
     const auto valueOf = [&](std::string_view property) {
@@ -623,7 +642,9 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         shadingTiles->tile(0).setTooltip(project.scope.xyOnly ? "Light shows as how bright each line is: on this XY-only scope, by how slowly the beam draws it"
             : "Light shows as how bright each line is drawn");
         // Hatching's rows only while it hatches, or is keyed or driven to.
-        const auto shown = amount > 0 || moves != motion::ui::TileGrid::Moves::no;
+        const auto hatched = amount > 0 || moves != motion::ui::TileGrid::Moves::no;
+        advancedAvailable = hatched;
+        const auto shown = hatched && advanced.getToggleState();
         for (auto& row : rows) {
             if (row->section != "Shading" || row->isVisible() == shown) { continue; }
             row->setVisible(shown);
@@ -636,7 +657,7 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) { presetTiles->setState(index + 1, current == motion::lightPresets[index]); }
         presetTiles->setLocked(found.locked);
     }
-    if (surfaceTiles == nullptr) { return changed; }
+    if (surfaceTiles == nullptr) { return changed || wasAvailable != advancedAvailable; }
     // Whether a property is in play: on, or keyed or driven to be.
     const auto live = [&](std::string_view property) { return valueOf(property) > 0 || movesOf(property) != motion::ui::TileGrid::Moves::no; };
     for (std::size_t index = 0; index < surfaceStyles.size(); ++index) {
@@ -651,13 +672,15 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         // Mirror always shows: it is no style, but how much it reflects.
         const auto property = row->fields.front()->spec.id;
         const auto noiseMotion = property == "noisePhase" || property == "noiseFlow";
-        const auto shown = property == "reflects" || (property == "fillDetail" ? patterned : noiseMotion ? live("noise") || valueOf(property) != 0 : live(property));
+        const auto inPlay = property == "fillDetail" ? patterned : noiseMotion ? live("noise") || valueOf(property) != 0 : live(property);
+        if (isAdvanced(*row)) { advancedAvailable = advancedAvailable || inPlay; }
+        const auto shown = !isAdvanced(*row) || (inPlay && advanced.getToggleState());
         if (row->isVisible() != shown) {
             row->setVisible(shown);
             changed = true;
         }
     }
-    return changed;
+    return changed || wasAvailable != advancedAvailable;
 }
 
 void MotionPropertyInspector::layoutContent() {
@@ -683,6 +706,14 @@ void MotionPropertyInspector::layoutContent() {
                     y += height + motion::style::padding;
                 }
             }
+            // Before a tiled section's first advanced row, the fold that shows them.
+            if (isAdvanced(*row) && (index == from || !isAdvanced(*rows[index - 1]) || row->section != rows[index - 1]->section)) {
+                advanced.setVisible(advancedAvailable);
+                if (advancedAvailable) {
+                    advanced.setBounds(motion::style::padding, y, 120, 20);
+                    y += 20 + motion::style::gap;
+                }
+            }
             if (!row->isVisible()) { continue; }
             row->setBounds(motion::style::padding, y, inner, row->preferredHeight());
             // One-line values stack closer, as a list.
@@ -692,9 +723,15 @@ void MotionPropertyInspector::layoutContent() {
             y += row->preferredHeight() + (row->compact() && nextCompact ? motion::style::gap : motion::style::padding);
         }
     };
+    advanced.setVisible(false);
     std::size_t first = 0;
     while (first < rows.size() && rows[first]->first) { ++first; }
+    // What makes it, then the sections that open with tiles.
+    auto tiled = first;
+    while (tiled < rows.size() && (rows[tiled]->section == "Surface" || rows[tiled]->section == "Shading")) { ++tiled; }
     place(0, first, false);
+    place(first, tiled, first > 0);
+    first = tiled;
     // A light's presets, under what it is.
     if (presetTiles != nullptr) {
         if (first > 0) { y += motion::style::gap; }

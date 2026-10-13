@@ -183,10 +183,11 @@ private:
     bool right;
 };
 
-// "More" / "Less": a caption with a chevron that folds a section open.
+// "More" / "Less" (or its own words): a caption with a chevron that folds a
+// section open.
 class Disclosure final : public juce::Button {
 public:
-    explicit Disclosure(const juce::String& name) : juce::Button(name) {
+    explicit Disclosure(const juce::String& name, juce::String closedText = "More", juce::String openText = "Less") : juce::Button(name), closed(std::move(closedText)), opened(std::move(openText)) {
         setClickingTogglesState(true);
         setWantsKeyboardFocus(false);
     }
@@ -208,8 +209,11 @@ public:
         g.setColour(colour);
         g.strokePath(chevron, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         g.setFont(caption());
-        g.drawText(open ? "Less" : "More", area.withTrimmedLeft(2), juce::Justification::centredLeft, false);
+        g.drawText(open ? opened : closed, area.withTrimmedLeft(2), juce::Justification::centredLeft, false);
     }
+
+private:
+    juce::String closed, opened;
 };
 
 // Properties' rows share one grid: three value columns, then a gutter

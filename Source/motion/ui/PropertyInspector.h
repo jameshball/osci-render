@@ -124,6 +124,12 @@ private:
     std::unique_ptr<motion::ui::TileGrid> presetTiles;
     // How a camera shades: by brightness, or by hatching.
     std::unique_ptr<motion::ui::TileGrid> shadingTiles;
+    // Under Surface's or Shading's tiles, the numbers behind them, folded
+    // away until asked for; shown only when opening it would show some.
+    motion::style::Disclosure advanced {"Advanced settings", "Advanced", "Advanced"};
+    bool advancedAvailable = false;
+    // A row of those numbers (Mirror is no style, and always shows).
+    static bool isAdvanced(const Row& row);
     // Puts the tiles in step with the target at `time`, and shows the
     // Surface rows that are on; true when which show changed.
     bool refreshTiles(const motion::PropertyTarget& found, double time);
