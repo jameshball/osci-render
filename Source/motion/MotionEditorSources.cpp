@@ -79,6 +79,10 @@ void MotionEditor::resetToDefault() {
     });
 }
 
+void MotionEditor::projectNotLoaded(const juce::File& file) {
+    if (commandLineProject == CommandLineProject::waiting && file == commandLineProjectFile) { commandLineProject = CommandLineProject::failed; }
+}
+
 void MotionEditor::loadProject(const juce::File& file) {
     if (projectLoad != nullptr) { projectLoad->cancelled.store(true); }
     if (projectLoadOverlay != nullptr) { dismissOverlay(projectLoadOverlay.getComponent()); }
@@ -87,9 +91,10 @@ void MotionEditor::loadProject(const juce::File& file) {
     const auto generation = processor.document.generation();
     const auto revision = processor.document.revision();
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    auto cancel = [owner, task] {
+    auto cancel = [owner, task, file] {
         task->cancelled.store(true);
         if (owner != nullptr && owner->projectLoad == task) {
+            owner->projectNotLoaded(file);
             const auto editor = owner;
             auto* overlay = editor->projectLoadOverlay.getComponent();
             editor->projectLoadOverlay = nullptr;
@@ -102,9 +107,10 @@ void MotionEditor::loadProject(const juce::File& file) {
     auto sheet = std::make_unique<motion::ui::ProgressSheet>("Opening project", file.getFileName(), "Preparing sources. Your current project stays open until loading succeeds.", nullptr, cancel, "Cancel loading");
     const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
     auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false);
-    overlay->onDismissRequested = [owner, task] {
+    overlay->onDismissRequested = [owner, task, file] {
         task->cancelled.store(true);
         if (owner != nullptr && owner->projectLoad == task) {
+            owner->projectNotLoaded(file);
             owner->projectLoadOverlay = nullptr;
             owner->projectLoad.reset();
         }
@@ -138,15 +144,17 @@ void MotionEditor::loadProject(const juce::File& file) {
             owner->projectLoad.reset();
             if (overlay != nullptr) { owner->dismissOverlay(overlay); }
             if (result.failed()) {
-                owner->projectLoadFailed = true;
+                owner->projectNotLoaded(file);
                 motion::ui::MessageSheet::show(*owner, "Couldn't open the project", result.getErrorMessage(), "OK", {}, file.getFileName());
                 return;
             }
             if (owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) {
+                owner->projectNotLoaded(file);
                 motion::ui::MessageSheet::show(*owner, "Project changed", "The current project changed while loading. Open the file again to replace it.");
                 return;
             }
             owner->processor.applyPreparedProject(std::move(task->prepared), *task->xml);
+            if (owner->commandLineProject == CommandLineProject::waiting && file == owner->commandLineProjectFile) { owner->commandLineProject = CommandLineProject::loaded; }
             owner->processor.currentProjectFile = file.getFullPathName();
             owner->processor.setLastOpenedDirectory(file.getParentDirectory());
             owner->processor.addRecentProjectFile(file);

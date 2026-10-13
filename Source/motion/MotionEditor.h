@@ -188,7 +188,15 @@ private:
     void continueCommandLineRender();
     void failCommandLineRender(const juce::String& message);
     juce::File commandLineRender;
-    bool commandLineRenderStarted = false, commandLineProjectRequested = false, projectLoadFailed = false;
+    bool commandLineRenderStarted = false;
+    // The project a command-line render asked for: renders only once it is
+    // the one open, and fails if it never becomes so.
+    enum class CommandLineProject { none, waiting, loaded, failed };
+    CommandLineProject commandLineProject = CommandLineProject::none;
+    juce::File commandLineProjectFile;
+    // A load of `file` that ended without opening it (failed, cancelled, or
+    // the project changed meanwhile).
+    void projectNotLoaded(const juce::File& file);
     juce::PopupMenu timingMenu();
     bool applyTiming(int result);
     double snapDivision(int index) const;

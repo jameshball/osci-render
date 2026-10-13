@@ -211,8 +211,14 @@ void MotionEditor::handleCommandLine(const juce::String& commandLine) {
             failCommandLineRender("pass an existing .osci-motion project after --render-video <output>.");
             return;
         }
-        projectLoadFailed = false;
-        commandLineProjectRequested = true;
+        // The render is of that project alone: unsaved work open here isn't
+        // discarded or rendered in its place.
+        if (processor.document.unsaved()) {
+            failCommandLineRender("the open project has unsaved changes; save it first.");
+            return;
+        }
+        commandLineProject = CommandLineProject::waiting;
+        commandLineProjectFile = project;
     }
     if (remaining.size() > 0) { CommonPluginEditor::handleCommandLine(remaining.joinIntoString(" ")); }
 }
@@ -227,8 +233,8 @@ void MotionEditor::failCommandLineRender(const juce::String& message) {
 void MotionEditor::continueCommandLineRender() {
 #if OSCI_PREMIUM
     if (commandLineRender == juce::File() || commandLineRenderStarted || projectLoad != nullptr || processor.isPreparingComposition() || exportState != nullptr) { return; }
-    if (projectLoadFailed) { failCommandLineRender("the project could not be opened."); return; }
-    if (!commandLineProjectRequested) { return; }
+    if (commandLineProject == CommandLineProject::failed) { failCommandLineRender("the project could not be opened."); return; }
+    if (commandLineProject != CommandLineProject::loaded) { return; }
     if (processor.getPreparationError().isNotEmpty()) { failCommandLineRender(processor.getPreparationError()); return; }
     commandLineRenderStarted = true;
     if (!processor.ensureFFmpegExists()) { failCommandLineRender("FFmpeg is unavailable."); return; }
