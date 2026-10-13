@@ -64,6 +64,8 @@ public:
 
     bool hasSelectedKeys() const { return !selectedKeys.empty(); }
     bool hasSelectedClips() const { return !selectedClips.empty(); }
+    // Whether Group tracks has tracks to group (see tracksToGroup).
+    bool canGroupTracks() const { return !tracksToGroup().empty(); }
     std::vector<motion::Document::CopiedKey> copiedKeys() const;
     std::vector<motion::Document::CopiedClip> copiedClips() const;
     void deleteSelection();

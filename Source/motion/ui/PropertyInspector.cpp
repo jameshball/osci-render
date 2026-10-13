@@ -827,6 +827,10 @@ void MotionPropertyInspector::commitValue(const std::string& property, double va
     if (onKeyTimeEdited) { onKeyTimeEdited(); }
 }
 
+bool MotionPropertyInspector::showsGroup(const juce::String& group) const {
+    return std::any_of(rows.begin(), rows.end(), [&](const auto& row) { return row->group == group && row->isVisible(); });
+}
+
 bool MotionPropertyInspector::toggleGroupKeys(const juce::String& group) {
     for (auto& row : rows) {
         if (row->group == group && row->isVisible()) {

@@ -156,6 +156,8 @@ private:
 public:
     // Alt+Shift+P/R/S/T, as in After Effects: key a group at the playhead.
     bool toggleGroupKeys(const juce::String& group);
+    // Whether what it shows has `group` (Position, Colour...) to key.
+    bool showsGroup(const juce::String& group) const;
 private:
     void toggleKeys(Row& row);
     void jumpToKey(Row& row, bool forward);

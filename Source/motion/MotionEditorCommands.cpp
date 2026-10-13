@@ -57,7 +57,6 @@ void MotionEditor::registerCommands() {
     addCommand(1, "Delete", juce::KeyPress(), "Delete", [this] {
         if (graphShown()) { curveEditor.deleteSelected(); } else { timeline.deleteSelection(); }
     });
-    addCommand(2, "Group tracks", juce::KeyPress('g', command, 0), "Cmd+G", [this] { timeline.groupSelectedTracks(); });
     // Cut, Copy and Delete act on what the shown editor has selected: the
     // Graph's keys, or the timeline's keys or clips. Paste needs a copy.
     const auto anySelection = [this] { return graphShown() ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
@@ -90,11 +89,15 @@ void MotionEditor::registerCommands() {
         const auto clips = timeline.copiedClips();
         std::vector<motion::Id> ids;
         for (const auto& copied : clips) { ids.push_back(copied.clip.id); }
-        if (ids.empty()) { return; }
+        if (ids.empty()) {
+            statusBar.show("Select clips to duplicate them.", MotionStatusBar::Kind::notice);
+            return;
+        }
         const auto result = processor.document.duplicateClips(ids, duplicates);
         if (result.failed()) { statusBar.show("Couldn't duplicate: " + result.getErrorMessage()); return; }
         timeline.selectClips(duplicates);
     });
+    addCommand(2, "Group tracks", juce::KeyPress('g', command, 0), "Cmd+G", [this] { timeline.groupSelectedTracks(); });
     menus.addMenuSeparator(2);
     // After Effects conventions: [ and ] move the clip's start or end to the
     // playhead; Alt+[ and Alt+] trim it there.
@@ -111,6 +114,15 @@ void MotionEditor::registerCommands() {
         addCommand(2, name, juce::KeyPress(letter, alt | shift, 0), "Alt+Shift+" + juce::String::charToString(letter).toUpperCase(), [this, groupName] {
             if (!propertyInspector.toggleGroupKeys(groupName)) { statusBar.show("Select a clip or camera with " + groupName.toLowerCase() + " to key it."); }
         });
+        menus.setMenuItemEnabled(2, name, [this, groupName] { return propertyInspector.showsGroup(groupName); });
+    }
+    // The Clip menu's commands act on the selection; with none they say so
+    // when their keys are pressed, and show it in the menu first.
+    menus.setMenuItemEnabled(2, "Split at playhead", [this] { return canSplitAtPlayhead(); });
+    menus.setMenuItemEnabled(2, "Group tracks", [this] { return timeline.canGroupTracks(); });
+    for (const auto* name : {"Duplicate", "Show key lanes"}) { menus.setMenuItemEnabled(2, name, [this] { return timeline.hasSelectedClips(); }); }
+    for (const auto* name : {"Move clip start to playhead", "Move clip end to playhead", "Trim clip start to playhead", "Trim clip end to playhead"}) {
+        menus.setMenuItemEnabled(2, name, [this] { return clipSelected(); });
     }
 
     addCommand(3, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { togglePlayback(); });
@@ -405,15 +417,16 @@ void MotionEditor::placeClipAtPlayhead(bool start, bool trim) {
     }
 }
 
+bool MotionEditor::canSplitAtPlayhead() const {
+    const auto& project = processor.document.project();
+    return canSplitClip(motion::findClip(project, selection), processor.position.load(), project.tempo());
+}
+
+bool MotionEditor::clipSelected() const { return timeline.hasSelectedClips() || motion::findClip(processor.document.project(), selection) != nullptr; }
+
 void MotionEditor::splitAtPlayhead() {
     const auto time = processor.position.load();
-    const auto& tracks = processor.document.project().tracks;
-    const bool canSplit = std::any_of(tracks.begin(), tracks.end(), [&](const motion::Track& track) {
-        return std::any_of(track.clips.begin(), track.clips.end(), [&](const motion::Clip& clip) {
-            return clip.id == selection && canSplitClip(&clip, time, processor.document.project().tempo());
-        });
-    });
-    if (!canSplit) {
+    if (!canSplitAtPlayhead()) {
         statusBar.show("Select a clip under the playhead to split it there.", MotionStatusBar::Kind::notice);
         return;
     }

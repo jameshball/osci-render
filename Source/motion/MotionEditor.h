@@ -242,6 +242,10 @@ private:
     void globalFocusChanged(juce::Component*) override { repaint(); }
     juce::Rectangle<int> focusedPanel() const;
     void splitAtPlayhead();
+    // Whether the selected clip is under the playhead, to split there.
+    bool canSplitAtPlayhead() const;
+    // Whether a clip is selected for the Clip menu to act on.
+    bool clipSelected() const;
     void placeClipAtPlayhead(bool start, bool trim);
     void showShortcuts();
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
