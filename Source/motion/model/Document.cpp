@@ -343,14 +343,34 @@ bool Document::tryEditCoalesced(juce::String label, const juce::String& control,
     const auto now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
     // Joins only while the newest undo step is still this control's: a
     // parameter changed since (it shares the undo manager) has its own.
-    const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && now - coalescingTime < 1.0 && undo.getUndoDescription() == label;
+    const auto holding = held.has_value() && control == *held;
+    const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && (holding || now - coalescingTime < 1.0) && undo.getUndoDescription() == label;
     auto after = project();
     if (!operation(after)) { return false; }
     record(label, std::move(after), joins);
     coalescingControl = control;
     coalescingRevision = revision();
     coalescingTime = now;
+    if (holding) { heldRecorded = true; }
     return true;
+}
+
+void Document::beginHeld(const juce::String& control) {
+    held = control;
+    heldRecorded = false;
+    // The drag starts a step of its own, not one a moment ago's.
+    coalescingControl.clear();
+}
+
+void Document::endHeld() {
+    held.reset();
+    heldRecorded = false;
+}
+
+void Document::cancelHeld() {
+    // Only while its step is still the newest.
+    if (held.has_value() && heldRecorded && coalescingControl == *held && revision() == coalescingRevision) { undo.undo(); }
+    endHeld();
 }
 
 bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operation) {

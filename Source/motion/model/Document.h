@@ -200,6 +200,12 @@ public:
     void editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation);
     // As editCoalesced, recording nothing when the operation declines.
     bool tryEditCoalesced(juce::String label, const juce::String& control, std::function<bool(Project&)> operation);
+    // A control dragged through edits of its own (a modulator's rate): its
+    // changes join one undo step however long the drag, and cancelling
+    // takes that step back.
+    void beginHeld(const juce::String& control);
+    void endHeld();
+    void cancelHeld();
     void reset(Project project);
     juce::Result changeTempo(double bpm);
     // Replace the initial tempo and every change in one undo step.
@@ -358,6 +364,9 @@ private:
     juce::String coalescingControl;
     std::uint64_t coalescingRevision = 0;
     double coalescingTime = 0;
+    // The control held (see beginHeld), and whether it recorded a step yet.
+    std::optional<juce::String> held;
+    bool heldRecorded = false;
     void refreshScope();
     struct Change;
     Project state, scopeView;

@@ -236,6 +236,30 @@ public:
             expect(viewDocument.project().markers.empty(), "which undoes the drag");
         }
         {
+            // A modulator's field dragged: one undo step, and Escape takes it back.
+            juce::UndoManager heldUndo;
+            motion::Document held(heldUndo);
+            held.reset(motion::Project {});
+            motion::Modulator lfo;
+            motion::Id lfoId = 0;
+            expect(held.addModulator(lfo, lfoId).wasOk());
+            const auto rateOf = [&] { return held.project().modulators.front().shape.rateHz; };
+            const auto original = rateOf();
+            const auto drag = [&](double rate) {
+                auto changed = held.project().modulators.front();
+                changed.shape.rateHz = rate;
+                expect(held.setModulator(changed).wasOk());
+            };
+            held.beginHeld("modulator:" + juce::String(lfoId));
+            drag(2); drag(3);
+            held.endHeld();
+            expect(rateOf() == 3 && heldUndo.undo() && rateOf() == original, "a drag is one undo step");
+            held.beginHeld("modulator:" + juce::String(lfoId));
+            drag(5);
+            held.cancelHeld();
+            expect(rateOf() == original, "Escape takes the drag back");
+        }
+        {
             // A composition's tempo is its own: the main Scope's keys stay put.
             auto keyed = document.mainProject();
             keyed.beam.properties["intensity"].setKey({2.0, 3.0});

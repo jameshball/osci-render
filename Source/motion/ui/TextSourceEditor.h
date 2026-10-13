@@ -64,6 +64,8 @@ public:
             field->setTooltip(tip);
             field->onChange = [this](double) { readFields(); };
             field->onCommit = [this](double) { readFields(); };
+            // Escape mid-drag has put the field back: so are the settings.
+            field->onCancel = [this] { readFields(); };
             addAndMakeVisible(*field);
         }
         lineSpacing.setName("Text line spacing");

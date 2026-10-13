@@ -25,6 +25,10 @@ RouteRow::RouteRow(Document& document, std::function<void(const juce::Result&)> 
     amount.setSpec(amountSpec);
     amount.onChange = [this](double value) { apply(value, route.mode); };
     amount.onCommit = [this](double value) { apply(value, route.mode); };
+    // A drag is one undo step, and Escape takes it back.
+    amount.onBegin = [this] { this->document.beginHeld("route:" + juce::String(route.id)); };
+    amount.onEnd = [this] { this->document.endHeld(); };
+    amount.onCancel = [this] { this->document.cancelHeld(); };
     mode.setTooltip("Add to the value, or multiply it by 1 + amount x modulator");
     mode.onClick = [this] { apply(amount.getValue(), route.mode == ModulationMode::add ? ModulationMode::multiply : ModulationMode::add); };
     remove.setTooltip("Stop driving this property");
@@ -364,6 +368,13 @@ void MotionModulatorLibrary::change(const std::function<void(motion::Modulator&)
 void MotionModulatorLibrary::bind(motion::ui::LabelledScrub& row, std::function<void(motion::Modulator&, double)> apply) {
     row.field.onChange = [this, apply](double value) { change([&](auto& modulator) { apply(modulator, value); }); };
     row.field.onCommit = row.field.onChange;
+    // A drag is one undo step, and Escape takes it back.
+    row.field.onBegin = [this] { processor.document.beginHeld("modulator:" + juce::String(selected)); };
+    row.field.onEnd = [this] { processor.document.endHeld(); };
+    row.field.onCancel = [this] {
+        processor.document.cancelHeld();
+        refresh();
+    };
 }
 
 void MotionModulatorLibrary::showRoutes() {
@@ -424,6 +435,13 @@ MotionRoutingPanel::MotionRoutingPanel(MotionProcessor& owner) : processor(owner
             report(processor.document.setLink(targetId, propertyName, edited));
         };
         row.field.onCommit = row.field.onChange;
+        // A drag is one undo step, and Escape takes it back.
+        row.field.onBegin = [this] { processor.document.beginHeld("link:" + juce::String(targetId) + ":" + juce::String(propertyName)); };
+        row.field.onEnd = [this] { processor.document.endHeld(); };
+        row.field.onCancel = [this] {
+            processor.document.cancelHeld();
+            refresh();
+        };
     };
     bindLink(scale, [](auto& value, double number) { value.scale = number; });
     bindLink(offset, [](auto& value, double number) { value.offset = number; });
