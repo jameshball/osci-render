@@ -74,7 +74,7 @@ private:
     }
     // How many times a face may be halved, and after how many halvings a
     // continuous bend has cut every piece far smaller than its face.
-    static constexpr int deepest = 40, deepAfter = deepest - 16;
+    static constexpr int deepest = 40, deepAfter = deepest - 12;
     // Where an edge's middle lands within this (squared, in pixels) of one of
     // its ends, however long the edge, the bend jumps across it.
     static constexpr double jumpLength = 1.0e-4;
