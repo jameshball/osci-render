@@ -26,7 +26,7 @@ public:
         parent.onChange = [this] { applyRig(); };
         motion::style::inspector::styleHeading(title, "Rig");
         addAndMakeVisible(title);
-        for (auto [label, text] : {std::pair {&lookAtLabel, "Look at"}, std::pair {&parentLabel, "Parent"}, std::pair {&shotLabel, "Shot"}, std::pair {&keysLabel, "Keys"}}) {
+        for (auto [label, text] : {std::pair {&lookAtLabel, "Look at"}, std::pair {&parentLabel, "Parent"}, std::pair {&shotLabel, "Shot"}}) {
             motion::style::inspector::styleCaption(*label, text);
             addAndMakeVisible(label);
         }
@@ -45,9 +45,18 @@ public:
         };
         cutButton.setButtonText("Cut to camera here");
         addChildComponent(cutButton);
-        keyButton.setName("Key camera");
+        // The shot's keys as any property's: a diamond between the previous
+        // and next key, in the column the property rows keep theirs.
+        keyButton.setName("Key camera shot");
+        keyButton.setTitle("Key camera shot");
+        keyButton.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
+        keyButton.setWantsKeyboardFocus(false);
         keyButton.onClick = [this] { toggleKey(); };
-        addAndMakeVisible(keyButton);
+        previousKey.setTooltip("Go to the camera's previous key");
+        nextKey.setTooltip("Go to the camera's next key");
+        previousKey.onClick = [this] { jumpToKey(false); };
+        nextKey.onClick = [this] { jumpToKey(true); };
+        for (auto* button : std::initializer_list<juce::Component*> {&keyButton, &previousKey, &nextKey}) { addAndMakeVisible(button); }
     }
 
     void setCamera(motion::Id id) {
@@ -55,7 +64,7 @@ public:
         refresh();
     }
     // Rows, then the same room under them as a section of properties leaves.
-    int preferredHeight() const { return camera == 0 ? 0 : motion::style::inspector::headingHeight + 4 * motion::style::controlHeight + 4 * motion::style::gap + motion::style::padding; }
+    int preferredHeight() const { return camera == 0 ? 0 : motion::style::inspector::headingHeight + 3 * motion::style::controlHeight + 3 * motion::style::gap + motion::style::padding; }
 
     void refresh() {
         const auto& project = processor.document.project();
@@ -69,9 +78,22 @@ public:
         // One click keys position, rotation and lens together; on a key, it
         // takes it away again.
         const auto keyed = isKeyed(found);
+        bool animated = false, earlier = false, later = false;
+        const auto now = frameTime();
+        forEachShotCurve(found, [&](const motion::Curve& curve) {
+            animated = animated || curve.animated();
+            for (const auto& key : curve.keyframes()) {
+                earlier = earlier || key.time < now - 1.0e-6;
+                later = later || key.time > now + 1.0e-6;
+            }
+        });
         keyButton.setEnabled(found != nullptr);
-        keyButton.setButtonText(keyed ? "Remove keys" : "Key all");
-        keyButton.setTooltip(keyed ? "Remove the position, rotation and field of view keys at the playhead" : "Key position, rotation and field of view at the playhead");
+        keyButton.setState(keyed ? osci::KeyframeButton::State::keyed : animated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated);
+        keyButton.setTooltip(keyed ? "Remove the shot's keys at the playhead: position, rotation and field of view" : "Key the shot at the playhead: position, rotation and field of view together");
+        previousKey.setVisible(animated);
+        nextKey.setVisible(animated);
+        previousKey.setEnabled(earlier);
+        nextKey.setEnabled(later);
     }
     void resized() override {
         auto area = getLocalBounds();
@@ -86,14 +108,15 @@ public:
             label->setBounds(row.removeFromLeft(left));
             box->setBounds(row);
         }
-        auto row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
+        auto row = area.removeFromTop(motion::style::controlHeight);
         area.removeFromTop(motion::style::gap);
+        nextKey.setBounds(row.removeFromRight(12));
+        keyButton.setBounds(row.removeFromRight(18));
+        previousKey.setBounds(row.removeFromRight(12));
+        row = row.withWidth(right);
         shotLabel.setBounds(row.removeFromLeft(left));
         showing.setBounds(row);
         cutButton.setBounds(row);
-        row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
-        keysLabel.setBounds(row.removeFromLeft(left));
-        keyButton.setBounds(row);
     }
 
 private:
@@ -148,13 +171,35 @@ private:
 
     // A key on every camera property at the playhead (linked ones follow
     // their source and are left alone).
+    // The shot: where the camera is, which way it looks and its lens; not
+    // what it hides or how it shades, which are keyed on their own.
+    static bool isShot(std::string_view property) { return property.starts_with("position.") || property.starts_with("rotation.") || property == "fov"; }
+    template <typename Visit>
+    static void forEachShotCurve(const motion::Camera* found, Visit&& visit) {
+        if (found == nullptr) { return; }
+        for (const auto& [property, curve] : found->properties) {
+            if (isShot(property)) { visit(curve); }
+        }
+    }
     bool isKeyed(const motion::Camera* found) const {
         if (found == nullptr) { return false; }
         const auto time = frameTime();
         return std::all_of(motion::cameraPropertySpecs.begin(), motion::cameraPropertySpecs.end(), [&](const auto& spec) {
+            if (!isShot(spec.id)) { return true; }
             const auto curve = found->properties.find(spec.id);
             return curve != found->properties.end() && (curve->second.link.has_value() || curve->second.hasKeyAt(time));
         });
+    }
+    void jumpToKey(bool forward) {
+        const auto now = frameTime();
+        std::optional<double> best;
+        forEachShotCurve(findCamera(processor.document.project(), camera), [&](const motion::Curve& curve) {
+            for (const auto& key : curve.keyframes()) {
+                const bool candidate = forward ? key.time > now + 1.0e-6 : key.time < now - 1.0e-6;
+                if (candidate && (!best.has_value() || (forward ? key.time < *best : key.time > *best))) { best = key.time; }
+            }
+        });
+        if (best.has_value()) { processor.seek(std::clamp(*best, 0.0, processor.document.project().duration)); }
     }
     void toggleKey() {
         const auto* found = findCamera(processor.document.project(), camera);
@@ -166,6 +211,7 @@ private:
             for (auto& item : project.cameras) {
                 if (item.id != id) { continue; }
                 for (const auto& spec : motion::cameraPropertySpecs) {
+                    if (!isShot(spec.id)) { continue; }
                     auto& curve = item.properties[std::string(spec.id)];
                     // Without keys the camera keeps the pose it had here.
                     if (!curve.link.has_value()) { motion::keyedit::setKeyed(curve, time, !keyed); }
@@ -178,7 +224,9 @@ private:
     MotionProcessor& processor;
     motion::Id camera = 0;
     juce::ComboBox lookAt, parent;
-    juce::Label title, lookAtLabel, parentLabel, shotLabel, keysLabel, showing;
+    juce::Label title, lookAtLabel, parentLabel, shotLabel, showing;
     std::vector<std::pair<motion::Id, juce::String>> listedTargets, listedParents;
-    juce::TextButton cutButton, keyButton;
+    juce::TextButton cutButton;
+    osci::KeyframeButton keyButton;
+    motion::style::ChevronButton previousKey {"Previous camera key", false}, nextKey {"Next camera key", true};
 };
