@@ -8,13 +8,12 @@
 // drawn at 18 px so their 2 px strokes land on whole device pixels on
 // high-density displays. One button draws them all, so toolbars match.
 namespace motion::icons {
-enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, freehand, rectangle, ellipse, erase, lock, trash, undo, redo, check, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, bold, italic, alignLeft, alignCentre, alignRight, lineSpacing, keyframe, close, parts, box, lasso, connected, anchor, centre, folder };
+enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder };
 
 inline const juce::Path& path(Icon icon) {
     static const auto paths = [] {
         std::map<Icon, juce::Path> result;
         const auto add = [&result](Icon key, const char* data) { result[key] = juce::Drawable::parseSVGPath(data); };
-        // A keyframe: an outlined diamond.
         // Ways of picking parts: a dashed box, a lasso, separate pieces.
         add(Icon::box, "M3 5h2V3c-1.1 0-2 .9-2 2zm0 8h2v-2H3v2zm4 8h2v-2H7v2zM3 9h2V7H3v2zm10-6h-2v2h2V3zm6 0v2h2c0-1.1-.9-2-2-2zM5 21v-2H3c0 1.1.9 2 2 2zm-2-4h2v-2H3v2zM9 3H7v2h2V3zm2 18h2v-2h-2v2zm8-8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2zm0-12h2V7h-2v2zm0 8h2v-2h-2v2zm-4 4h2v-2h-2v2zm0-16h2V3h-2v2z");
         add(Icon::connected, "M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z");
@@ -36,7 +35,6 @@ inline const juce::Path& path(Icon icon) {
         // A dashed marquee with a pointer: picking parts.
         add(Icon::parts, "M17 5h-2V3h2v2zm-2 16h2v-2.59L19.59 21 21 19.59 18.41 17H21v-2h-6v6zm4-12h2V7h-2v2zm0 4h2v-2h-2v2zm-8 8h2v-2h-2v2zM7 5h2V3H7v2zM3 17h2v-2H3v2zm2 4v-2H3c0 1.1.9 2 2 2zM19 3v2h2c0-1.1-.9-2-2-2zm-8 2h2V3h-2v2zM3 9h2V7H3v2zm4 12h2v-2H7v2zm-4-8h2v-2H3v2zm0-8h2V3c-1.1 0-2 .9-2 2z");
         add(Icon::close, "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z");
-        add(Icon::keyframe, "M12 3l9 9-9 9-9-9 9-9zm0 3.1L6.1 12 12 17.9 17.9 12 12 6.1z");
         add(Icon::move, "M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z");
         add(Icon::rotate, "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z");
         add(Icon::scale, "M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z");
@@ -61,15 +59,12 @@ inline const juce::Path& path(Icon icon) {
         // Drawing tools.
         add(Icon::pen, "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z");
         add(Icon::line, "M4 18.6L18.6 4 20 5.4 5.4 20 4 18.6zM3 21v-4h4v4H3zM17 7V3h4v4h-4z");
-        add(Icon::freehand, "M4.6 17.9c-.8-.8-.8-2 .1-3 1.6-1.6 4.4-1.3 6.2-3 1.4-1.4.8-3.1-.8-3.2-1.6 0-3 1.5-4.5 1.2-1-.2-1.4-1.2-.8-2C6 6.5 8 5 10.5 5c3.2 0 5 2.4 3.4 5.2-1.4 2.4-4.8 2.6-6.4 4-.6.5-.4 1.2.3 1.2 1.6 0 3.5-1.6 6-1.6 2.2 0 4.2 1.3 4.2 3.3 0 .6-.5 1-1 .9-.5 0-.8-.4-.9-.9-.2-1-1.3-1.4-2.4-1.3-2 .2-3.7 1.9-6.1 2.4-1.2.2-2.3.2-3-.3z");
         add(Icon::rectangle, "M3 5h18v14H3V5zm2 2v10h14V7H5z");
         add(Icon::ellipse, "M12 4C6.48 4 2 7.58 2 12s4.48 8 10 8 10-3.58 10-8-4.48-8-10-8zm0 14c-4.41 0-8-2.69-8-6s3.59-6 8-6 8 2.69 8 6-3.59 6-8 6z");
-        add(Icon::erase, "M15.14 3c-.51 0-1.02.2-1.41.59L2.59 14.73c-.78.77-.78 2.04 0 2.83L5.03 20h7.66l8.72-8.73c.79-.77.79-2.04 0-2.83l-4.85-4.85c-.39-.39-.91-.59-1.42-.59zM6.44 18.03l-2.44-2.44 6.2-6.2 4.85 4.85-3.77 3.79H6.44z");
         add(Icon::lock, "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z");
         add(Icon::trash, "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z");
         add(Icon::undo, "M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z");
         add(Icon::redo, "M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z");
-        add(Icon::check, "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z");
         // The Scope's controls.
         add(Icon::record, "M12 6a6 6 0 1 0 0 12a6 6 0 1 0 0-12z");
         add(Icon::settings, "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z");
@@ -84,7 +79,6 @@ inline const juce::Path& path(Icon icon) {
         add(Icon::alignLeft, "M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z");
         add(Icon::alignCentre, "M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z");
         add(Icon::alignRight, "M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z");
-        add(Icon::lineSpacing, "M6 7h2.5L5 3.5 1.5 7H4v10H1.5L5 20.5 8.5 17H6V7zm4-2v2h12V5H10zm0 14h12v-2H10v2zm0-6h12v-2H10v2z");
         // The pen: a curve between two points with their handles.
         juce::Path curve, bezier;
         curve.startNewSubPath(4, 19);
