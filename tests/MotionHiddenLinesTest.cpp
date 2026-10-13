@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "../Source/motion/export/SignalExporter.h"
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/HiddenLineBaker.h"
@@ -412,6 +413,23 @@ public:
             expect(changed > 0, "the frames it changed are baked again");
             const auto [keptElsewhere, _] = sharedUntil(motion::PreparedComposition(edited, 48000, nullptr, motion::CompositionPurpose::signal, motion::hidden::Reach {2, 2}));
             expectEquals(keptElsewhere, 0, "nothing is taken over from a bake of what a different Scope shows");
+        }
+
+        beginTest("An export taking over the editor's bake writes just what one baking afresh does");
+        {
+            auto project = cubeProject(true);
+            auto& turn = project.tracks.change(0).clips[0].properties["rotation.y"];
+            turn.setKey({0, 0, motion::Interpolation::linear});
+            turn.setKey({1, 90, motion::Interpolation::linear});
+            const motion::PreparedComposition editor(project);
+            std::atomic<bool> stop {false};
+            motion::hidden::Baker::bakeAll(*editor.hiddenLines, 48000, stop);
+            const juce::TemporaryFile fresh(".wav"), reused(".wav");
+            expect(motion::SignalExporter::write(project, fresh.getFile(), 48000, stop).wasOk());
+            expect(motion::SignalExporter::write(project, reused.getFile(), 48000, stop, nullptr, motion::squareScope(), editor.hiddenLines.get()).wasOk());
+            juce::MemoryBlock a, b;
+            expect(fresh.getFile().loadFileAsData(a) && reused.getFile().loadFileAsData(b));
+            expect(a.getSize() > 0 && a == b, "the signal is the same sample for sample");
         }
 
         beginTest("Profile: a frame of real meshes, and baking them");

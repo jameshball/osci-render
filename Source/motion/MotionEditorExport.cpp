@@ -144,7 +144,9 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
         const juce::Component::SafePointer<osci::ComponentOverlay> preparationOverlay(overlay.get());
         owner->showOverlay(std::move(overlay));
         // The worker owns one immutable prepared snapshot for both WAVs.
-        owner->exports.addJob([owner, state, project, beamSnapshot, renderMode, config, destination, preparationOverlay, finished] {
+        // What the editor has baked already isn't baked again.
+        const auto baked = owner->processor.hiddenLineBake();
+        owner->exports.addJob([owner, state, project, beamSnapshot, renderMode, config, destination, preparationOverlay, finished, baked] {
             std::shared_ptr<const motion::PreparedBeam> picture;
             std::shared_ptr<MotionVideoTemporaryFiles> temporary;
             auto result = juce::Result::ok();
@@ -155,7 +157,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                     const auto rate = state->sampleRate;
                     const motion::PreparedComposition prepared(project, rate, &state->cancelled, motion::CompositionPurpose::signal, motion::hidden::Reach::ofCanvas(config.renderSize.width, config.renderSize.height, VisualiserGeometry::signalGain));
                     picture = std::make_shared<const motion::PreparedBeam>(prepared.beam);
-                    result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress);
+                    result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress, baked.get());
                     if (result.wasOk() && config.includeAudio) {
                         result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), rate, state->cancelled, &state->soundtrackProgress);
                     }
@@ -314,12 +316,13 @@ void MotionEditor::exportSignal(bool leaveOutLive) {
         }
         const auto project = leaveOutLive ? motion::Document::withoutLiveSources(owner->processor.document.mainProject()) : owner->processor.document.mainProject();
         const auto reach = owner->processor.canvasReach();
+        const auto baked = owner->processor.hiddenLineBake();
         owner->exportBar.setName("Signal export progress");
         owner->exportProgress = 0;
         owner->exportBar.setVisible(true);
         owner->cancelExport.setVisible(true);
-        owner->exports.addJob([owner, state, project, destination, reach] {
-            const auto result = motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach);
+        owner->exports.addJob([owner, state, project, destination, reach, baked] {
+            const auto result = motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach, baked.get());
             juce::MessageManager::callAsync([owner, state, result, destination] {
                 if (owner == nullptr) {
                     return;
