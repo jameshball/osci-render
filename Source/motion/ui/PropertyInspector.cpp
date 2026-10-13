@@ -507,11 +507,11 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         const auto picture = [](SurfaceLook look) { return motion::ui::pictures::surfacePicture(look); };
         surfaceTiles = std::make_unique<motion::ui::TileGrid>("Surface styles", std::vector<motion::ui::TileGrid::Choice> {
             {"Edges", "Its own edges, as it is made", picture(SurfaceLook::edges)},
-            {"Outline", "Its outline, where it turns from the eye", picture(SurfaceLook::outline)},
-            {"Spiral", "A spiral round it, from bottom to top", picture(SurfaceLook::spiral)},
+            {"Outline", "Its outline, where it turns away from the eye", picture(SurfaceLook::outline)},
+            {"Spiral", "A spiral winding round it from bottom to top, or in from its edge when it is flat", picture(SurfaceLook::spiral)},
             {"Noise", "Contours of noise, which can morph as it plays (Noise flow)", picture(SurfaceLook::noise)},
             {"Slices", "Level slices through it", picture(SurfaceLook::slices)},
-            {"Rings", "Rings round its front", picture(SurfaceLook::rings)},
+            {"Rings", "Rings centred on its front", picture(SurfaceLook::rings)},
             {"Mirror", "It reflects the rest of the scene", picture(SurfaceLook::mirror)}}, 4);
         surfaceTiles->onClick = [this](std::size_t index) {
             const auto on = surfaceTiles->tile(index).getToggleState();
