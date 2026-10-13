@@ -1750,8 +1750,10 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
         return true;
     }
     const auto arrow = key.getKeyCode() == juce::KeyPress::leftKey ? -1 : key.getKeyCode() == juce::KeyPress::rightKey ? 1 : 0;
-    if (arrow != 0 && key.getModifiers().isAltDown() && !key.getModifiers().isCommandDown() && !selectedKeys.empty()) {
-        return nudgeSelectedKeys(arrow * (key.getModifiers().isShiftDown() ? 10 : 1));
+    if (arrow != 0 && key.getModifiers().isAltDown() && !key.getModifiers().isCommandDown()) {
+        const auto frames = arrow * (key.getModifiers().isShiftDown() ? 10 : 1);
+        if (!selectedKeys.empty()) { return nudgeSelectedKeys(frames); }
+        if (!selectedClips.empty()) { return nudgeSelectedClips(frames); }
     }
     if (escape && clipGesture()) {
         cancelGesture();

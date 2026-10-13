@@ -477,7 +477,7 @@ void MotionEditor::showShortcuts() {
     }
     sections.push_back({"Timeline", {{"V / B / S / R", "Move, ripple trim, slip and stretch tools"}, {"M", "Add a marker at the playhead"},
         {"Drag empty space", "Select clips (Shift adds)"}, {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"},
-        {"Double-click a lane", "Add a key"}, {"Alt+Left / Right", "Nudge the selected keys a frame (Shift: ten)"}}});
+        {"Double-click a lane", "Add a key"}, {"Alt+Left / Right", "Nudge the selected keys, or else clips, a frame (Shift: ten)"}}});
     sections.push_back({"Scrolling and zoom (timeline, graph)", {{"Wheel / two fingers", "Pan (Shift: horizontal)"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
         {"Alt+wheel", "Track height, value range or key height"}}});
     sections.push_back({"Graph", {{"Double-click", "Add a key"}, {"Drag a box", "Select keys (Shift adds)"}, {"Drag box edges", "Scale key times"},

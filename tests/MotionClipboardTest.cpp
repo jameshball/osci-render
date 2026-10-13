@@ -86,6 +86,23 @@ public:
             expectEquals(f.clip(f.first)->start, 0.0);
             expect(f.undo.getUndoDescription() == description, "A rejected batch adds no undo step");
         }
+        beginTest("Nudged clips move together, presses in a row one undo step, never onto another or before the start");
+        {
+            Fixture f; f.initialise();
+            const auto description = f.undo.getUndoDescription();
+            expect(f.document.nudgeClips({f.first}, -.1).failed(), "Nothing moves before the start");
+            expect(f.undo.getUndoDescription() == description);
+            expect(f.document.nudgeClips({f.first, f.second}, .5).wasOk());
+            expect(f.document.nudgeClips({f.first, f.second}, .5).wasOk());
+            expectEquals(f.clip(f.first)->start, 1.0);
+            expectEquals(f.clip(f.second)->start, 5.0);
+            expect(f.undo.getUndoDescription() == "Nudge clips");
+            expect(f.document.nudgeClips({f.first}, 2.5).failed(), "A clip can't land on another");
+            expectEquals(f.clip(f.first)->start, 1.0);
+            expect(f.undo.undo());
+            expectEquals(f.clip(f.first)->start, 0.0);
+            expectEquals(f.clip(f.second)->start, 4.0);
+        }
         beginTest("Pasting onto occupied time creates one overflow track below the original");
         {
             Fixture f; f.initialise();

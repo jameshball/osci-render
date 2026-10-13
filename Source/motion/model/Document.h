@@ -223,6 +223,10 @@ public:
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
     // Several clips in one undo step; placement is checked after every change applies.
     juce::Result setClipTimings(const std::vector<std::pair<Id, ClipTiming>>& timings);
+    // Clips moved by `seconds`, as a drag moves them (none onto another, none
+    // on a locked track, none before the start); nudges in a row are one
+    // undo step.
+    juce::Result nudgeClips(const std::vector<Id>& clips, double seconds);
     juce::Result duplicateClip(Id sourceId, Id& duplicateId);
     juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, Asset copy, Id& madeId);
     std::size_t compositionReferenceCount(Id definition) const;
@@ -360,6 +364,8 @@ public:
     }
 
 private:
+    // The timings set, as one undo step (`control` merges steps in a row).
+    juce::Result applyClipTimings(const std::vector<std::pair<Id, ClipTiming>>& timings, const juce::String& label, const juce::String& control);
     // The Scope belongs to the main composition: nothing inside another drives it.
     bool beamOutsideMain(Id target) const { return scopeId != 0 && target == state.beam.id; }
     Id highestId() const;

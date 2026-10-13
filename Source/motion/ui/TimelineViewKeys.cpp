@@ -159,6 +159,16 @@ bool MotionTimelineView::nudgeSelectedKeys(int frames) {
     return true;
 }
 
+bool MotionTimelineView::nudgeSelectedClips(int frames) {
+    if (gesture.index() != 0) { return true; }
+    const auto& project = processor.document.project();
+    const auto delta = frames / (project.frameRate > 0 ? project.frameRate : 30.0);
+    const auto nudged = processor.document.nudgeClips({selectedClips.begin(), selectedClips.end()}, delta);
+    if (nudged.failed() && onError) { onError(nudged.getErrorMessage()); }
+    repaint();
+    return true;
+}
+
 void MotionTimelineView::endKeyDrag() {
     auto* keyDrag = active<KeyDrag>();
     if (keyDrag == nullptr) { return; }

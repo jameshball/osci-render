@@ -1446,6 +1446,27 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
 
 juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming>>& timings) {
     if (timings.size() == 1) { return setClipTiming(timings.front().first, timings.front().second); }
+    return applyClipTimings(timings, "Change clip timing", {});
+}
+
+juce::Result Document::nudgeClips(const std::vector<Id>& clips, double seconds) {
+    const auto& state = project();
+    const auto tempo = state.tempo();
+    std::vector<std::pair<Id, ClipTiming>> timings;
+    for (const auto& track : state.tracks) {
+        for (const auto& clip : track.clips) {
+            if (std::find(clips.begin(), clips.end(), clip.id) == clips.end()) { continue; }
+            auto timing = clip.timing(tempo);
+            if (timing.start + seconds < -1.0e-9) { return juce::Result::fail("Clips can't move before the start."); }
+            timing.moveTo(std::max(0.0, timing.start + seconds));
+            timings.emplace_back(clip.id, timing);
+        }
+    }
+    if (timings.empty()) { return juce::Result::ok(); }
+    return applyClipTimings(timings, timings.size() > 1 ? "Nudge clips" : "Nudge clip", "timeline.nudge.clips");
+}
+
+juce::Result Document::applyClipTimings(const std::vector<std::pair<Id, ClipTiming>>& timings, const juce::String& label, const juce::String& control) {
     const auto& state = project();
     const auto tempo = state.tempo();
     auto tracks = state.tracks;
@@ -1470,7 +1491,7 @@ juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming
         }
     }
     if (!changed) { return juce::Result::ok(); }
-    edit("Change clip timing", [tracks = std::move(tracks), touched = std::move(touched)](Project& project) mutable {
+    auto apply = [tracks = std::move(tracks), touched = std::move(touched)](Project& project) mutable {
         const auto tempo = project.tempo();
         for (const auto index : touched) {
             auto& track = tracks.change(index);
@@ -1478,7 +1499,12 @@ juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming
             track.sortClips(tempo);
         }
         project.tracks = std::move(tracks);
-    });
+    };
+    if (control.isEmpty()) {
+        edit(label, std::move(apply));
+    } else {
+        editCoalesced(label, control, std::move(apply));
+    }
     return juce::Result::ok();
 }
 
