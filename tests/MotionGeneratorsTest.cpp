@@ -10,6 +10,19 @@ public:
     MotionGeneratorsTest() : juce::UnitTest("Motion generators", "Motion") {}
 
     void runTest() override {
+        beginTest("A generator's drawing for values seen before is the one already made");
+        {
+            const auto& sphere = motion::generatorNamed("sphere");
+            std::vector<double> values;
+            for (const auto& spec : sphere.parameters) { values.push_back(spec.defaultValue); }
+            auto& cache = motion::generator::DrawingCache::shared();
+            const auto first = cache.at(sphere, values);
+            expect(first == cache.at(sphere, values), "the same values give the same drawing");
+            values.front() += 1;
+            expect(first != cache.at(sphere, values), "other values give another");
+            expect(first->bytes() > first->shapeCount() * sizeof(void*), "a drawing reckons the memory it holds");
+        }
+
         beginTest("A generator decodes at its defaults, and its clip holds its parameters");
         {
             const auto star = generatorAsset(1, "star");

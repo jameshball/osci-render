@@ -42,7 +42,8 @@ inline std::shared_ptr<const PreparedDrawing> drawingOf(const Geometry& geometry
 // Drawings already made, by generator and values, so a value seen before (a
 // still clip, a held key, an earlier preparation, another clip) is never made
 // again. Shared by every thread that prepares compositions; the least recently
-// used are let go past a limit.
+// used are let go past a budget of memory (an animated generator makes a
+// drawing a frame).
 class DrawingCache {
 public:
     static DrawingCache& shared() {
@@ -62,24 +63,33 @@ public:
             }
         }
         auto made = drawingOf(build(definition, values));
+        const auto size = made->bytes();
+        // Those let go are freed once the lock is released.
+        std::vector<std::shared_ptr<const PreparedDrawing>> released;
         const juce::SpinLock::ScopedLockType lock(guard);
         const auto found = entries.find(key);
         if (found != entries.end()) { return found->second.drawing; }
         order.push_front(key);
-        entries.emplace(std::move(key), Entry {made, order.begin()});
-        while (entries.size() > limit) {
-            entries.erase(order.back());
+        entries.emplace(std::move(key), Entry {made, order.begin(), size});
+        held += size;
+        while (held > budget && entries.size() > 1) {
+            const auto oldest = entries.find(order.back());
+            held -= oldest->second.bytes;
+            released.push_back(std::move(oldest->second.drawing));
+            entries.erase(oldest);
             order.pop_back();
         }
         return made;
     }
 
 private:
-    static constexpr std::size_t limit = 4096;
+    static constexpr std::size_t budget = std::size_t {256} << 20;
     struct Entry {
         std::shared_ptr<const PreparedDrawing> drawing;
         std::list<std::string>::iterator place;
+        std::size_t bytes;
     };
+    std::size_t held = 0;
     static std::string keyOf(const GeneratorDefinition& definition, const std::vector<double>& values) {
         std::string key(definition.id);
         key.push_back(':');

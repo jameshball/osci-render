@@ -181,6 +181,14 @@ public:
     // The exact geometry, for drawing and picking. Evaluating a shape leaves
     // it unchanged (lengths are cached at construction), as sample() relies on.
     std::size_t shapeCount() const { return shapes.size(); }
+    // Roughly how much memory it holds, for a cache to budget by.
+    std::size_t bytes() const {
+        // A shape (a line or a curve), its pointer, its end and its rank.
+        constexpr std::size_t perShape = 96;
+        const auto traversal = [](const Traversal& item) { return item.segments.size() * sizeof(TraversalSegment) + item.strokes.size() * sizeof(TraversalStroke); };
+        return sizeof(*this) + shapes.size() * perShape + discontinuities.size() * sizeof(double) + traversal(detailed) + traversal(coarse)
+            + meshFaces.vertices.size() * sizeof(osci::Point) + meshFaces.triangles.size() * sizeof(meshFaces.triangles[0]) + facesOfShapes.size() * sizeof(facesOfShapes[0]);
+    }
     osci::Shape* shape(std::size_t index) const { return index < shapes.size() ? shapes[index].get() : nullptr; }
     // A mesh's faces, set while it is prepared; empty for line drawings.
     const Mesh& faces() const { return meshFaces; }
