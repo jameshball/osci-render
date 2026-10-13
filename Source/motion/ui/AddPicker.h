@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "GeneratorIcons.h"
+#include "../model/MirrorPresets.h"
 #include "MotionStyle.h"
 #include "TileGrid.h"
 
@@ -101,5 +102,7 @@ inline Picture flatMirror() {
     pane.addPath(glints);
     return {pane, {}};
 }
+// A mirror preset's picture: a ball for a round one, else a pane.
+inline Picture ofMirror(const MirrorPreset& preset) { return preset.generator == "sphere" ? mirrorBall() : flatMirror(); }
 }
 }

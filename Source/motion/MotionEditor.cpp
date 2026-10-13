@@ -109,10 +109,10 @@ void MotionEditor::setUpMenus() {
     // command lists.
     menus.addTopLevelMenu("File");
     menus.customMenuLogic = [this](juce::PopupMenu& menu, int index) {
-        if (index == 0) { buildFileMenu(menu); }
-        if (index == 4) {
+        if (index == fileMenu) { buildFileMenu(menu); }
+        if (index == audioMenu) {
             juce::PopupMenu output;
-            for (int id = 1; id <= 3; ++id) { output.addItem(2000 + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
+            for (int id = 1; id <= monitorOutput.getNumItems(); ++id) { output.addItem(outputMenuId + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
             menu.addSubMenu("Audio interface plays", output);
             InternalSampleRateMenu::addSubmenu(menu, processor, sampleRateMenuId, true);
             menu.addSeparator();
@@ -123,7 +123,7 @@ void MotionEditor::setUpMenus() {
         }
         // Undo and redo name the step and are off with nothing to undo, as
         // the buttons beside the transport are.
-        if (index == 1) {
+        if (index == editMenu) {
             auto& undoManager = processor.getUndoManager();
             const auto undo = undoManager.getUndoDescription(), redo = undoManager.getRedoDescription();
             juce::PopupMenu::Item undoItem(undo.isNotEmpty() ? "Undo " + undo : juce::String("Undo"));
@@ -139,23 +139,23 @@ void MotionEditor::setUpMenus() {
         }
     };
     menus.customMenuSelectedLogic = [this](int id, int index) {
-        if (index == 4 && id > 2000 && id <= 2003) {
-            monitorOutput.setSelectedId(id - 2000);
+        if (index == audioMenu && id > outputMenuId && id <= outputMenuId + monitorOutput.getNumItems()) {
+            monitorOutput.setSelectedId(id - outputMenuId);
             return true;
         }
-        if (index == 4 && InternalSampleRateMenu::handleMenuId(id, sampleRateMenuId, processor, [this] { showPremiumSplashScreen(); })) { return true; }
-        if (index == 1 && (id == undoMenuId || id == redoMenuId)) {
+        if (index == audioMenu && InternalSampleRateMenu::handleMenuId(id, sampleRateMenuId, processor, [this] { showPremiumSplashScreen(); })) { return true; }
+        if (index == editMenu && (id == undoMenuId || id == redoMenuId)) {
             if (id == undoMenuId) { undoRedoControls.undo(); } else { undoRedoControls.redo(); }
             refreshUndo();
             return true;
         }
-        return (index == 0 && fileMenuItemSelected(id)) || (index == timingMenuIndex && applyTiming(id));
+        return (index == fileMenu && fileMenuItemSelected(id)) || (index == timingMenuIndex && applyTiming(id));
     };
     menus.addTopLevelMenu("Edit");
     menus.addTopLevelMenu("Clip");
     menus.addTopLevelMenu("Transport");
     menus.addTopLevelMenu("Audio");
-    menus.addStandaloneAudioSettingsMenuItem(4, processor, *this);
+    menus.addStandaloneAudioSettingsMenuItem(audioMenu, processor, *this);
     menus.addTopLevelMenu("View");
     menus.addTopLevelMenu("Timing");
     registerCommands();
@@ -485,7 +485,7 @@ void MotionEditor::setUpLibrary() {
             result.image = icons::stroked(std::move(glyph), icons::ink());
             return result;
         };
-        menu.addItem(item(3, "Draw a shape...", icons::glyph::pencil()));
+        menu.addItem(item(AddMenuId::drawing, "Draw a shape...", icons::glyph::pencil()));
         // Sources made from a few numbers, by category, each with its picture.
         juce::PopupMenu generate;
         for (const auto category : {motion::GeneratorCategory::shape, motion::GeneratorCategory::curve, motion::GeneratorCategory::grid, motion::GeneratorCategory::solid}) {
@@ -494,7 +494,7 @@ void MotionEditor::setUpLibrary() {
                 const auto& definition = motion::generatorDefinitions[index];
                 if (definition.category != category) { continue; }
                 juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
-                entry.itemID = 1000 + static_cast<int>(index);
+                entry.itemID = AddMenuId::firstGenerator + static_cast<int>(index);
                 entry.image = motion::ui::generatorIcon(definition, icons::ink());
                 generate.addItem(std::move(entry));
             }
@@ -506,7 +506,7 @@ void MotionEditor::setUpLibrary() {
             const auto& definition = motion::generatorDefinitions[index];
             if (definition.category != motion::GeneratorCategory::light) { continue; }
             juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
-            entry.itemID = 1000 + static_cast<int>(index);
+            entry.itemID = AddMenuId::firstGenerator + static_cast<int>(index);
             entry.image = motion::ui::generatorIcon(definition, icons::ink());
             lights.addItem(std::move(entry));
         }
@@ -515,7 +515,7 @@ void MotionEditor::setUpLibrary() {
         for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) {
             const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
             juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
-            entry.itemID = 2000 + static_cast<int>(index);
+            entry.itemID = AddMenuId::firstLightPreset + static_cast<int>(index);
             entry.image = icons::unit(motion::ui::pictures::lightPresetPicture(motion::lightPresets[index]), icons::ink());
             lights.addItem(std::move(entry));
         }
@@ -525,15 +525,14 @@ void MotionEditor::setUpLibrary() {
         for (std::size_t index = 0; index < motion::mirrorPresets.size(); ++index) {
             const auto& preset = motion::mirrorPresets[index];
             juce::PopupMenu::Item entry(juce::String(preset.name.data(), preset.name.size()));
-            entry.itemID = 2100 + static_cast<int>(index);
+            entry.itemID = AddMenuId::firstMirror + static_cast<int>(index);
             // Pictured as the Add a mirror panel pictures them.
-            const auto ball = preset.generator == "sphere";
-            entry.image = icons::unit((ball ? motion::ui::pictures::mirrorBall() : motion::ui::pictures::flatMirror()).lines, icons::ink());
+            entry.image = icons::unit(motion::ui::pictures::ofMirror(preset).lines, icons::ink());
             mirrors.addItem(std::move(entry));
         }
         menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
-        menu.addItem(item(1, "Import source...", icons::glyph::folder()));
-        menu.addItem(item(2, "Blender source...", icons::glyph::live()));
+        menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder()));
+        menu.addItem(item(AddMenuId::blenderSource, "Blender source...", icons::glyph::live()));
         // The examples that ship with osci-motion, by kind, each pictured as
         // it draws (a blank space until its picture is made).
         juce::PopupMenu examples;
@@ -547,7 +546,7 @@ void MotionEditor::setUpLibrary() {
                 if (!file.endsWithIgnoreCase(exampleKind.extension)) { continue; }
                 resources.push_back(BinaryData::namedResourceList[index]);
                 juce::PopupMenu::Item entry(file.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' '));
-                entry.itemID = 100 + static_cast<int>(resources.size()) - 1;
+                entry.itemID = AddMenuId::firstExample + static_cast<int>(resources.size()) - 1;
                 const auto picture = examplePictures.picture(resources.back());
                 entry.image = picture.has_value() ? icons::picture(*picture) : icons::blank();
                 kind.addItem(std::move(entry));
@@ -559,13 +558,22 @@ void MotionEditor::setUpLibrary() {
         menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner, resources](int choice) {
             if (owner == nullptr) { return; }
-            if (choice == 1) { owner->chooseSourceFile(); }
-            if (choice == 2) { owner->showBlenderSettings(); }
-            if (choice == 3) { owner->showDrawingEditor(0); }
-            if (choice >= 1000 && choice - 1000 < static_cast<int>(motion::generatorDefinitions.size())) { owner->addGenerator(motion::generatorDefinitions[static_cast<std::size_t>(choice - 1000)]); }
-            if (choice >= 2000 && choice - 2000 < static_cast<int>(motion::lightPresets.size())) { owner->addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[static_cast<std::size_t>(choice - 2000)]); }
-            if (choice >= 2100 && choice - 2100 < static_cast<int>(motion::mirrorPresets.size())) { owner->addMirror(motion::mirrorPresets[static_cast<std::size_t>(choice - 2100)]); }
-            if (choice >= 100 && choice - 100 < static_cast<int>(resources.size())) { owner->importExample(resources[static_cast<std::size_t>(choice - 100)]); }
+            // Which of a list's items was chosen, if one was.
+            const auto chosen = [choice](int first, std::size_t count) -> std::optional<std::size_t> {
+                if (choice < first || choice - first >= static_cast<int>(count)) { return std::nullopt; }
+                return static_cast<std::size_t>(choice - first);
+            };
+            if (choice == AddMenuId::importFile) { owner->chooseSourceFile(); }
+            if (choice == AddMenuId::blenderSource) { owner->showBlenderSettings(); }
+            if (choice == AddMenuId::drawing) { owner->showDrawingEditor(0); }
+            const auto generator = chosen(AddMenuId::firstGenerator, motion::generatorDefinitions.size());
+            const auto lightPreset = chosen(AddMenuId::firstLightPreset, motion::lightPresets.size());
+            const auto mirror = chosen(AddMenuId::firstMirror, motion::mirrorPresets.size());
+            const auto example = chosen(AddMenuId::firstExample, resources.size());
+            if (generator.has_value()) { owner->addGenerator(motion::generatorDefinitions[*generator]); }
+            if (lightPreset.has_value()) { owner->addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[*lightPreset]); }
+            if (mirror.has_value()) { owner->addMirror(motion::mirrorPresets[*mirror]); }
+            if (example.has_value()) { owner->importExample(resources[*example]); }
         });
     };
     addLightButton.setTooltip("Add a light: what the Scope draws is lit by it");
@@ -1128,9 +1136,10 @@ void MotionEditor::showAddLight() {
 }
 
 void MotionEditor::showAddMirror() {
-    std::vector<motion::ui::TileGrid::Choice> choices {
-        {"Flat mirror", "Add a flat mirror: a pane to stand things before", motion::ui::pictures::flatMirror()},
-        {"Mirror ball", "Add a mirror ball: the whole scene, round on its surface", motion::ui::pictures::mirrorBall()}};
+    std::vector<motion::ui::TileGrid::Choice> choices;
+    for (const auto& preset : motion::mirrorPresets) {
+        choices.push_back({juce::String(preset.name.data(), preset.name.size()), juce::String(preset.description.data(), preset.description.size()), motion::ui::pictures::ofMirror(preset)});
+    }
     std::vector<motion::ui::AddPicker::Section> sections {{{}, std::move(choices), 2}};
     showPopover(std::make_unique<motion::ui::AddPicker>("Add a mirror", std::move(sections), [this](std::size_t, std::size_t index) {
         addMirror(motion::mirrorPresets[index]);

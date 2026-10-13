@@ -200,7 +200,6 @@ private:
     juce::PopupMenu timingMenu();
     bool applyTiming(int result);
     double snapDivision(int index) const;
-    static constexpr int timingMenuIndex = 6;
     void refreshTiming();
     void refreshOutputChoices();
     // Keyboard shortcuts are data: each command appears in a menu with its
@@ -313,8 +312,15 @@ private:
     motion::icons::Button undoButton { "Undo", motion::icons::Icon::undo }, redoButton { "Redo", motion::icons::Icon::redo };
     juce::Label undoDescription;
     void refreshUndo();
-    // Edit menu ids clear of the menu model's own (1-based per item).
-    static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100;
+    // The menu bar's menus, in order, and ids clear of the menu model's own
+    // (1-based per item) for the items added to them here.
+    enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, audioMenu, viewMenu, timingMenuIndex };
+    static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100, outputMenuId = 2000;
+    // The add menu's items, and the first id of each list in it.
+    struct AddMenuId {
+        static constexpr int importFile = 1, blenderSource = 2, drawing = 3;
+        static constexpr int firstExample = 100, firstGenerator = 1000, firstLightPreset = 2000, firstMirror = 3000;
+    };
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
