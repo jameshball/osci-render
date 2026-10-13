@@ -251,7 +251,16 @@ void MotionDrawingEditor::mouseDoubleClick(const juce::MouseEvent& event) {
 }
 
 bool MotionDrawingEditor::keyPressed(const juce::KeyPress& key) {
-    // Edits wait until the mouse is released.
+    // Escape mid-drag puts the drawing back as it was when the drag began
+    // (every drag remembers it first); other edits wait until it ends.
+    if (drag.has_value() && key == juce::KeyPress::escapeKey && !history.empty()) {
+        drawing = history.back();
+        history.pop_back();
+        drag.reset();
+        if (activeStroke >= static_cast<int>(drawing.strokes.size())) { activeStroke = -1; }
+        changed();
+        return true;
+    }
     if (drag.has_value()) { return !name.hasKeyboardFocus(false); }
     const auto command = key.getModifiers().isCommandDown();
     if (command && key.getKeyCode() == 'Z') {

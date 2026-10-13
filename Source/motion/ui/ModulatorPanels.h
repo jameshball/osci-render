@@ -107,7 +107,12 @@ public:
     ~MotionModulatorLibrary() override { processor.document.removeChangeListener(this); }
 
     std::function<void(const juce::String&)> onError;
-    void select(motion::Id id) { selected = id; refresh(); }
+    void select(motion::Id id) {
+        // A rename under way is finished first, on the modulator it began on.
+        if (id != selected && name.isBeingEdited()) { name.hideEditor(false); }
+        selected = id;
+        refresh();
+    }
 
     void refresh();
 

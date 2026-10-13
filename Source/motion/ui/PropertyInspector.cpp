@@ -730,6 +730,24 @@ osci::ColourPicker::Rgb MotionPropertyInspector::colourOf(const Row& row) {
     return rgb;
 }
 
+namespace {
+// The colour picker in its popover. The picker ends its drag when closed
+// mid-drag; closed that way (Escape), the drag is cancelled instead.
+class ColourPopover final : public juce::Component {
+public:
+    ColourPopover(std::unique_ptr<osci::ColourPicker> made, std::function<void()> cancel) : picker(std::move(made)), cancelDrag(std::move(cancel)) {
+        addAndMakeVisible(*picker);
+        setSize(picker->getWidth(), picker->getHeight());
+    }
+    ~ColourPopover() override { picker->onEnd = cancelDrag; }
+    void resized() override { picker->setBounds(getLocalBounds()); }
+
+private:
+    std::unique_ptr<osci::ColourPicker> picker;
+    std::function<void()> cancelDrag;
+};
+}
+
 void MotionPropertyInspector::openColourPicker(Row& row) {
     if (row.swatch == nullptr || !onShowPopover) { return; }
     auto picker = std::make_unique<osci::ColourPicker>(colourOf(row));
