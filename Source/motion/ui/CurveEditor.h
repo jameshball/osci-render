@@ -266,6 +266,12 @@ public:
 
 private:
 
+    void showSpaceMenu(juce::Point<float> position);
+
+    // Adds a key on the curve edited where `position` is (snapped unless `modifiers` say not).
+
+    void addKeyAt(juce::Point<float> position, juce::ModifierKeys modifiers);
+
     void showKeyMenu();
 
     MotionProcessor& processor;

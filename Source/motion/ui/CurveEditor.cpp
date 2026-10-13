@@ -613,6 +613,8 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
     if (event.mods.isPopupMenu()) {
         if (!selection().empty()) {
             showKeyMenu();
+        } else if (plot().contains(event.position)) {
+            showSpaceMenu(event.position);
         }
     } else if (selectedTime.has_value() && event.mods.isLeftButtonDown()) {
         // The primary may have switched curves: resolve it again.
@@ -646,13 +648,19 @@ void MotionCurveEditor::mouseDoubleClick(const juce::MouseEvent& event) {
         repaint();
         return;
     }
-    if (clip->locked) { return; }
+    addKeyAt(event.position, event.mods);
+}
+
+void MotionCurveEditor::addKeyAt(juce::Point<float> position, juce::ModifierKeys modifiers) {
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    const auto* curve = findCurve(clip, propertyName);
+    if (curve == nullptr || clip->locked) { return; }
     motion::Keyframe key;
-    key.time = clip->localTime(snappedTime(*clip, projectTime(event.position.x), event.mods));
-    key.value = constrainedValue(*clip, valueAt(event.position.y), propertyName);
+    key.time = clip->localTime(snappedTime(*clip, projectTime(position.x), modifiers));
+    key.value = constrainedValue(*clip, valueAt(position.y), propertyName);
     // On (or near) the curve the key lands on it, so the shape doesn't change.
     const auto onCurve = curve->evaluateBase(key.time);
-    if (std::isfinite(onCurve) && std::abs(valueY(onCurve) - event.position.y) < 8.0f) { key.value = onCurve; }
+    if (std::isfinite(onCurve) && std::abs(valueY(onCurve) - position.y) < 8.0f) { key.value = onCurve; }
     if (!std::isfinite(key.time) || !std::isfinite(key.value)) { return; }
     const auto id = targetId;
     const auto property = propertyName;
@@ -1430,6 +1438,23 @@ bool MotionCurveEditor::deleteSelected() {
     companions.clear();
     refresh();
     return true;
+}
+
+// Empty space: a key added there, or the view framed on the curves.
+void MotionCurveEditor::showSpaceMenu(juce::Point<float> position) {
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    juce::PopupMenu menu;
+    menu.addItem(motion::style::menuItem("Add key here", 1, "Double-click").setEnabled(clip.has_value() && !clip->locked));
+    menu.addSeparator();
+    menu.addItem(motion::style::menuItem("Frame all curves", 2, "F"));
+    menu.addItem(motion::style::menuItem("Frame this curve", 3, "Shift+F"));
+    const juce::Component::SafePointer<MotionCurveEditor> owner(this);
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, position](int result) {
+        if (owner == nullptr) { return; }
+        if (result == 1) { owner->addKeyAt(position, {}); }
+        if (result == 2) { owner->fit(); }
+        if (result == 3) { owner->fit(true); }
+    });
 }
 
 void MotionCurveEditor::showKeyMenu() {
