@@ -121,17 +121,22 @@ inline std::vector<Piece> chained(std::vector<Found> found) {
             if (end.has_value()) { at[*end].push_back(index); }
         }
     }
-    // The other piece meeting `end`'s place, and which of its ends that is.
+    std::vector<char> used(found.size(), 0);
+    // The other piece meeting `end`'s place, and which of its ends that is:
+    // one not yet drawn, where more than two meet (a saddle), so a line
+    // goes on where it can.
     const auto across = [&](std::size_t index, std::size_t end) -> std::optional<std::pair<std::size_t, std::size_t>> {
         const auto& meeting = found[index].ends[end];
         if (!meeting.has_value()) { return std::nullopt; }
+        std::optional<std::pair<std::size_t, std::size_t>> drawn;
         for (const auto other : at[*meeting]) {
             if (other == index) { continue; }
-            return std::pair {other, found[other].ends[0] == meeting ? std::size_t {0} : std::size_t {1}};
+            const std::pair next {other, found[other].ends[0] == meeting ? std::size_t {0} : std::size_t {1}};
+            if (used[other] == 0) { return next; }
+            if (!drawn.has_value()) { drawn = next; }
         }
-        return std::nullopt;
+        return drawn;
     };
-    std::vector<char> used(found.size(), 0);
     std::vector<Piece> pieces;
     pieces.reserve(found.size());
     for (std::size_t start = 0; start < found.size(); ++start) {
