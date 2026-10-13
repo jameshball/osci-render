@@ -37,6 +37,7 @@ MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : proce
     viewport.setViewedComponent(&content, false);
     viewport.setScrollBarsShown(true, false);
     viewport.setScrollBarThickness(6);
+    viewport.getVerticalScrollBar().addListener(this);
     addAndMakeVisible(viewport);
     title.setFont(motion::style::title());
     title.setColour(juce::Label::textColourId, osci::Colours::text());
@@ -271,6 +272,10 @@ void MotionPropertyInspector::itemDropped(const SourceDetails& details) {
 }
 
 void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
+    if (viewport.getViewPositionY() > 0) {
+        g.setColour(motion::style::hairline());
+        g.fillRect(0, viewport.getY(), getWidth(), 1);
+    }
     if (!modulatorDrag) { return; }
     g.reduceClipRegion(viewport.getBounds());
     std::function<void(juce::Component&)> outline = [&](juce::Component& parent) {

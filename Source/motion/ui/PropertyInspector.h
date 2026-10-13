@@ -15,7 +15,7 @@
 // group, audio clip or camera). Rows group related axes; each row keys all of
 // its axes at once and navigates between its keys. Values edit at the key
 // under the playhead (frame-aligned) or, for animated curves, create one.
-class MotionPropertyInspector final : public juce::Component, public juce::DragAndDropTarget {
+class MotionPropertyInspector final : public juce::Component, public juce::DragAndDropTarget, private juce::ScrollBar::Listener {
 public:
     explicit MotionPropertyInspector(MotionProcessor& owner);
 
@@ -71,6 +71,7 @@ public:
     void itemDragExit(const SourceDetails&) override;
     void itemDropped(const SourceDetails& details) override;
     void paintOverChildren(juce::Graphics& g) override;
+    ~MotionPropertyInspector() override { viewport.getVerticalScrollBar().removeListener(this); }
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -177,6 +178,8 @@ private:
 
     MotionProcessor& processor;
     juce::Viewport viewport;
+    // Scrolled, the rows slide under the heading: a rule marks where.
+    void scrollBarMoved(juce::ScrollBar*, double) override { repaint(0, viewport.getY(), getWidth(), 1); }
     Content content;
     juce::Label title, kind;
     std::vector<std::unique_ptr<Row>> rows;
