@@ -801,7 +801,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     if (!graph) { return juce::Result::fail(graph.error); }
     if (cancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
     // New identities count up from the highest, so they never reach the Scope's.
-    if (highestProjectIdentity(project) >= beamIdentity) { return juce::Result::fail("A project identity is out of range."); }
+    if (highestProjectIdentity(project) > Document::highestLoadedId) { return juce::Result::fail("A project identity is out of range."); }
     output = std::move(project);
     return juce::Result::ok();
 } catch (const std::exception& error) {

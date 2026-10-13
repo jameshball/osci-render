@@ -181,6 +181,9 @@ public:
     void markSaved() { savedRevision = contentRevision; }
     // Identities stay below the Scope's reserved one, so it never collides.
     static constexpr Id maximumId = beamIdentity - 1;
+    // Loaded projects leave this many identities free above their highest,
+    // so editing them never runs out.
+    static constexpr Id highestLoadedId = maximumId - (Id {1} << 40);
     Id newId() {
         jassert(lastId < maximumId);
         return ++lastId;

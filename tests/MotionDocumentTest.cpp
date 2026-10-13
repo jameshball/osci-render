@@ -114,6 +114,10 @@ public:
         auto invalid = document.save();
         invalid.getChildByName("marker")->setAttribute("time", "nan");
         expect(loaded.load(invalid).failed());
+        // An identity so high that new ones would run into the Scope's is refused.
+        auto crowded = document.save();
+        crowded.getChildByName("marker")->setAttribute("id", juce::String(static_cast<juce::uint64>(motion::Document::maximumId)));
+        expect(loaded.load(crowded).failed(), "identities near the reserved one are refused");
         expectEquals(loaded.save().toString(), saved);
 
         motion::Project project;
