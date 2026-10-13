@@ -31,6 +31,8 @@ public:
     }
 
     static constexpr int headerHeight = 28, headerGap = 16, footerHeight = 28, footerGap = 20;
+    // A line of body text in a message.
+    static constexpr int lineHeight = 18;
     // Choices take the control width; numbers a shorter, right-aligned field.
     static constexpr int row = 28, rowGap = 8, caption = 120, control = 192, number = 96;
 
@@ -254,7 +256,7 @@ public:
         };
         const auto width = 380;
         const auto lines = juce::jmax(1, juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(style::body(), message) / (width - 8.0f))) + message.retainCharacters("\n").length());
-        setSize(width, headerHeight + headerGap + lines * 18 + footerGap + footerHeight);
+        setSize(width, headerHeight + headerGap + lines * lineHeight + footerGap + footerHeight);
     }
     // `about` names what the message is about (a file), muted beside the
     // title; a `destructive` action is red.
@@ -295,8 +297,11 @@ public:
         status.setFont(style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         status.setBorderSize({});
+        status.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(status);
-        setSize(380, heightFor(1, 14));
+        // A line of text as a message sheet sets it, and the bar only when
+        // there is a measure to show.
+        setSize(380, headerHeight + headerGap + lineHeight + (progress ? barGap + barHeight : 0) + footerGap + footerHeight);
         if (progress) { startTimerHz(20); }
     }
 
@@ -325,9 +330,9 @@ public:
 
 protected:
     void layoutBody(juce::Rectangle<int> area) override {
-        status.setBounds(area.removeFromTop(row));
-        area.removeFromTop(6);
-        bar = area.removeFromTop(4).toFloat();
+        status.setBounds(area.removeFromTop(lineHeight));
+        area.removeFromTop(barGap);
+        bar = area.removeFromTop(barHeight).toFloat();
     }
 
 private:
@@ -338,6 +343,7 @@ private:
             repaint();
         }
     }
+    static constexpr int barGap = 10, barHeight = 4;
     std::function<double()> progress;
     std::function<void()> stop;
     double shown = 0;
