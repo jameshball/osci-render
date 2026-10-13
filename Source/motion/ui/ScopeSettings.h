@@ -119,9 +119,11 @@ public:
 
     // Two sections, each opened like Properties' own: a hairline across the
     // panel, the heading, then rows on the grid.
-    static constexpr int rowHeight = motion::style::controlHeight, rowGap = motion::style::gap, valueInset = 5;
-    static constexpr int hairline = motion::style::gap, headingTop = 10, headingBlock = 26 + motion::style::gap, sectionEnd = motion::style::padding + motion::style::gap;
-    static constexpr int preferredHeight() { return hairline + headingBlock + 3 * rowHeight + 2 * rowGap + sectionEnd + headingBlock + 3 * rowHeight + 2 * rowGap; }
+    static constexpr int rowHeight = motion::style::controlHeight, rowGap = motion::style::gap;
+    static constexpr int hairline = motion::style::gap, headingTop = 10, headingHeight = 26, headingBlock = headingHeight + motion::style::gap, sectionEnd = motion::style::padding + motion::style::gap;
+    // Each section has three rows: Overlay, Upsample and XY only; Dwell, Travel and Settle.
+    static constexpr int rowsPerSection = 3;
+    static constexpr int preferredHeight() { return hairline + 2 * (headingBlock + rowsPerSection * rowHeight + (rowsPerSection - 1) * rowGap) + sectionEnd; }
     void paint(juce::Graphics& g) override {
         g.setColour(juce::Colours::white.withAlpha(.06f));
         for (const auto y : rules) { g.fillRect(0, y, getWidth(), 1); }
@@ -165,7 +167,7 @@ public:
             area.removeFromTop(index == 0 ? hairline : sectionEnd - rowGap);
             rules[index] = area.getY();
             auto heading = area.removeFromTop(headingBlock);
-            title.setBounds(heading.withTrimmedTop(headingTop).withHeight(26 - headingTop));
+            title.setBounds(heading.withTrimmedTop(headingTop).withHeight(headingHeight - headingTop));
             return heading;
         };
         section(displayTitle, 0);
@@ -177,13 +179,12 @@ public:
         auto xyRow = line(xyCaption);
         xyOnly.setBounds(xyRow.withX(area.getX() + grid.value + grid.column - motion::ui::Switch::width - 2).withWidth(motion::ui::Switch::width + 2));
         auto title = section(timingTitle, 1);
-        presets.setBounds(title.withTrimmedTop(headingTop).withHeight(26 - headingTop).withX(area.getX() + grid.value + grid.column - presets.idealWidth()).withWidth(presets.idealWidth()));
+        presets.setBounds(title.withTrimmedTop(headingTop).withHeight(headingHeight - headingTop).withX(area.getX() + grid.value + grid.column - presets.idealWidth()).withWidth(presets.idealWidth()));
         for (auto& field : fields) { field.editor.setBounds(line(field.caption).withX(area.getX() + grid.value).withWidth(grid.column)); }
         repaint();
     }
 
 private:
-    // The fields' text sits this far inside their right edge.
     static constexpr auto specs = std::to_array<motion::PropertySpec>({
         {"dwell", "Dwell", "Scope", "", 0, motion::ScopeProfile::maximumDwellMicros, 12, 1, 1, " µs"},
         {"travel", "Travel", "Scope", "", 0, motion::ScopeProfile::maximumTravelMicrosPerUnit, 30, 1, 1, " µs/u"},
