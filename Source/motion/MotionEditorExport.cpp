@@ -16,6 +16,25 @@ struct MotionVideoTemporaryFiles {
 };
 }
 
+juce::File MotionEditor::defaultExportFile(const juce::String& extension) const {
+    const auto named = processor.currentProjectFile.isNotEmpty() ? juce::File(processor.currentProjectFile).getFileNameWithoutExtension() : juce::String(processor.document.mainProject().name);
+    const auto stem = juce::File::createLegalFileName(named.trim());
+    return processor.getLastOpenedDirectory().getChildFile((stem.isEmpty() ? juce::String("composition") : stem) + "." + extension);
+}
+
+juce::File MotionEditor::withExtension(juce::File chosen, const juce::String& extension) {
+    return chosen.getFileExtension().isEmpty() ? chosen.withFileExtension(extension) : chosen;
+}
+
+void MotionEditor::exported(const juce::File& file) {
+#if JUCE_MAC
+    const juce::String reveal = "Show in Finder";
+#else
+    const juce::String reveal = "Show in folder";
+#endif
+    statusBar.show("Exported " + file.getFileName(), MotionStatusBar::Kind::notice, reveal, [file] { file.revealToUser(); });
+}
+
 void MotionEditor::exportVideo() {
 #if OSCI_PREMIUM
     if (exportState != nullptr) { return; }
@@ -58,13 +77,12 @@ void MotionEditor::exportVideo() {
                 owner->startVideoExport(state, project, beamSnapshot, renderMode, config, juce::File(automated), {});
                 return;
             }
-            owner->chooser = std::make_unique<juce::FileChooser>("Export composition video",
-                owner->processor.getLastOpenedDirectory().getChildFile("composition." + config.fileExtension), "*." + config.fileExtension);
+            owner->chooser = std::make_unique<juce::FileChooser>("Export composition video", owner->defaultExportFile(config.fileExtension), "*." + config.fileExtension);
             owner->chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
                 | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state, project, beamSnapshot, renderMode, config](const juce::FileChooser& selected) {
                 if (owner == nullptr) { return; }
                 if (selected.getResult() == juce::File()) { owner->exportState.reset(); return; }
-                const auto destination = selected.getResult();
+                const auto destination = withExtension(selected.getResult(), config.fileExtension);
                 if (!destination.getFileExtension().equalsIgnoreCase("." + config.fileExtension)) {
                     owner->exportState.reset();
                     owner->statusBar.show("Video export requires a ." + config.fileExtension + " filename. Choose Export video again and use that extension.");
@@ -146,12 +164,13 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                         };
                     }
                     const auto started = owner->startOfflineVideoRender(temporary->signal(), config.includeAudio ? temporary->soundtrack() : juce::File(),
-                        destination, config, renderMode, [owner, state, temporary, finished] {
+                        destination, config, renderMode, [owner, state, temporary, destination, finished] {
                             // Completion can run from base-editor destruction;
                             // touch derived UI only in a later safe callback.
-                            juce::MessageManager::callAsync([owner, state, finished] {
+                            juce::MessageManager::callAsync([owner, state, destination, finished] {
                                 if (owner == nullptr) { return; }
                                 if (owner->exportState == state) { owner->exportState.reset(); }
+                                if (owner->lastOfflineRenderSucceeded() && !state->cancelled.load()) { owner->exported(destination); }
                                 if (finished) { finished(owner->lastOfflineRenderSucceeded()); }
                             });
                         }, beamSnapshot);
@@ -247,13 +266,13 @@ void MotionEditor::exportSignal() {
     exportState = state;
     state->sampleRate = processor.exportSampleRate();
     chooser = std::make_unique<juce::FileChooser>("Export XYRGB signal - " + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
-        processor.getLastOpenedDirectory().getChildFile("composition.wav"), "*.wav");
+        defaultExportFile("wav"), "*.wav");
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
         | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state](const juce::FileChooser& selected) {
         if (owner == nullptr) { return; }
         if (selected.getResult() == juce::File()) { owner->exportState.reset(); return; }
-        const auto destination = selected.getResult();
+        const auto destination = withExtension(selected.getResult(), "wav");
         if (!destination.getFileExtension().equalsIgnoreCase(".wav")) {
             owner->exportState.reset();
             owner->statusBar.show("Signal export requires a .wav filename. Choose Export XYRGB signal again and use that extension.");
@@ -267,7 +286,7 @@ void MotionEditor::exportSignal() {
         owner->cancelExport.setVisible(true);
         owner->exports.addJob([owner, state, project, destination, reach] {
             const auto result = motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach);
-            juce::MessageManager::callAsync([owner, state, result] {
+            juce::MessageManager::callAsync([owner, state, result, destination] {
                 if (owner == nullptr) {
                     return;
                 }
@@ -276,6 +295,8 @@ void MotionEditor::exportSignal() {
                 owner->cancelExport.setVisible(false);
                 if (result.failed() && !state->cancelled.load()) {
                     owner->statusBar.show(result.getErrorMessage());
+                } else if (result.wasOk() && !state->cancelled.load()) {
+                    owner->exported(destination);
                 }
             });
         });

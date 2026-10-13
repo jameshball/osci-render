@@ -22,9 +22,14 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Import source...", 1005, "Cmd+I"));
     menu.addSeparator();
-    menu.addItem(motion::style::menuItem("Export XYRGB signal...", 1006, {}));
+    // One export at a time.
+    auto signal = motion::style::menuItem("Export XYRGB signal...", 1006, {});
+    signal.isEnabled = exportState == nullptr;
+    menu.addItem(std::move(signal));
 #if OSCI_PREMIUM
-    menu.addItem(motion::style::menuItem("Export video...", 1007, {}));
+    auto video = motion::style::menuItem("Export video...", 1007, {});
+    video.isEnabled = exportState == nullptr;
+    menu.addItem(std::move(video));
 #endif
 }
 
@@ -67,7 +72,7 @@ void MotionEditor::registerCommands() {
         const auto graph = graphShown();
         const auto selected = graph ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys();
         if (!selected) {
-            statusBar.show("Select keyframes to ease.");
+            statusBar.show("Select keyframes to ease.", MotionStatusBar::Kind::notice);
             return;
         }
         // Smooth keys already ease at their ends, so say what happened.
@@ -235,7 +240,7 @@ void MotionEditor::showSceneMenu() {
         if (result == 8) { composition.resetView(); }
         const std::array<const char*, 5> groups {"Position", "Rotation", "Scale", "Colour", "Opacity"};
         if (result >= 20 && result < 25 && !propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
-            statusBar.show("The selection has no such property to key.");
+            statusBar.show("The selection has no such property to key.", MotionStatusBar::Kind::notice);
         }
         if (result == 30) { timelineTabs.setSelectedIndex(0); timeline.revealSelection(); }
         if (result == 40) { composition.setPartMode(true); }
@@ -267,7 +272,7 @@ void MotionEditor::toggleLoop() {
         const auto last = std::max(0.0, tempo.beats(project.duration) - 4 * bar);
         const auto first = std::min(std::floor(tempo.beats(processor.position.load()) / bar) * bar, last);
         if (!setLoop(tempo.seconds(first), std::min(project.duration, tempo.seconds(first + 4 * bar)), true, "Set loop")) {
-            statusBar.show("The composition is too short to loop.");
+            statusBar.show("The composition is too short to loop.", MotionStatusBar::Kind::notice);
         }
         return;
     }
@@ -295,7 +300,7 @@ void MotionEditor::loopSelection() {
             last = std::max(last, timing.end());
         }
     }
-    if (last <= first) { statusBar.show("Select clips to loop."); return; }
+    if (last <= first) { statusBar.show("Select clips to loop.", MotionStatusBar::Kind::notice); return; }
     setLoop(first, last, true, "Loop selection");
 }
 
@@ -609,7 +614,7 @@ void MotionEditor::detectTempo() {
             owner->detectingTempo = false;
             if (owner->processor.document.generation() != generation) { return; }
             if (!estimate.has_value()) {
-                owner->statusBar.show("Could not find a steady tempo in the soundtrack. Set it by hand or tap it.");
+                owner->statusBar.show("Could not find a steady tempo in the soundtrack. Set it by hand or tap it.", MotionStatusBar::Kind::warning);
                 return;
             }
             double moved = 0;

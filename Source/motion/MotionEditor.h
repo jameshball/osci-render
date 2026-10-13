@@ -62,6 +62,12 @@ private:
     // agrees to discard the unsaved changes; `doing` says what discards them.
     void afterDiscarding(const juce::String& doing, std::function<void()> then);
     void loadProject(const juce::File& file);
+    // Where an export goes unless told otherwise: in the last folder used,
+    // named for the project. A name chosen without the extension gets it.
+    juce::File defaultExportFile(const juce::String& extension) const;
+    static juce::File withExtension(juce::File chosen, const juce::String& extension);
+    // Says an export is done, with a way to find it.
+    void exported(const juce::File& file);
 
     // Construction, by area of the workspace.
     void setUpMenus();
