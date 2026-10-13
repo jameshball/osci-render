@@ -130,6 +130,21 @@ public:
         const auto nested = document.project().markers.front();
         expect(document.enterComposition(0).wasOk());
         expectEquals(document.project().markers.front().name, juce::String("Main cue"));
+        {
+            // A composition's tempo is its own: the main Scope's keys stay put.
+            auto keyed = document.mainProject();
+            keyed.beam.properties["intensity"].setKey({2.0, 3.0});
+            auto inBeats = std::make_shared<motion::CompositionDefinition>(*keyed.definitions.front());
+            inBeats->timeDisplay = motion::TimeDisplay::beats;
+            keyed.definitions.front() = inBeats;
+            juce::UndoManager tempoUndo;
+            motion::Document tempoDocument(tempoUndo);
+            tempoDocument.reset(keyed);
+            expect(tempoDocument.enterComposition(100).wasOk());
+            expect(tempoDocument.changeTempo(60).wasOk());
+            const auto& keys = tempoDocument.mainProject().beam.properties.at("intensity").keyframes();
+            expect(keys.size() == 1 && std::abs(keys.front().time - 2.0) < 1.0e-9, "changing a composition's tempo leaves the Scope's keys where they were");
+        }
         motion::Id copied = 0;
         expect(document.makeCompositionUnique(101, copied).wasOk());
         const auto copy = std::find_if(document.project().definitions.begin(), document.project().definitions.end(), [copied](const auto& value) { return value->id == copied; });

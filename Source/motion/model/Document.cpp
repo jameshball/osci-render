@@ -375,7 +375,9 @@ void Document::reset(Project project) {
 // In musical time, project-time items keep their beat when the tempo map
 // changes: markers, cuts, effect ranges and project-level keys (with slopes
 // scaled by the local tempo ratio), and the composition's length in bars.
-static void keepBeats(Project& next, const Tempo& before, const Tempo& after) {
+// The Scope's keys belong to the main timeline: they keep their beats only
+// when it is the main timeline's tempo that changes (`withBeam`).
+static void keepBeats(Project& next, const Tempo& before, const Tempo& after, bool withBeam) {
     const auto remap = [&](double time) { return after.seconds(before.beats(time)); };
     const auto stretch = [&](double time) { return before.bpmAt(time) / after.bpmAt(remap(time)); };
     const auto scaleCurve = [&](Curve& curve) {
@@ -408,7 +410,9 @@ static void keepBeats(Project& next, const Tempo& before, const Tempo& after) {
         cut.duration = spanUntil(cut.start, end);
     }
     for (auto& camera : next.cameras) { for (auto& [name, curve] : camera.properties) { scaleCurve(curve); } }
-    for (auto& [name, curve] : next.beam.properties) { scaleCurve(curve); }
+    if (withBeam) {
+        for (auto& [name, curve] : next.beam.properties) { scaleCurve(curve); }
+    }
     for (auto& group : next.groups) {
         for (auto& [name, curve] : group.properties) { scaleCurve(curve); }
         scaleEffects(group.effects);
@@ -456,7 +460,8 @@ juce::Result Document::changeTempo(double bpm) {
 
 // Builds the project under a new tempo map: project-time items keep their
 // beats in musical display, clips re-sort and overlaps are refused.
-static juce::Result retimed(const Project& state, double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, Project& next) {
+// `main`: the composition retimed is the main timeline, not one inside it.
+static juce::Result retimed(const Project& state, double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, Project& next, bool main) {
     if (changes != nullptr && changes->empty()) { changes.reset(); }
     next = state;
     next.bpm = initialBpm;
@@ -466,7 +471,7 @@ static juce::Result retimed(const Project& state, double initialBpm, std::shared
     if (!after.valid()) { return juce::Result::fail("Tempo must be between 1 and 1000 BPM, with changes after the start at increasing beats."); }
     // In musical time, everything placed in project time keeps its bar
     // position, like beat-anchored clips. Seconds projects keep seconds.
-    if (state.timeDisplay == TimeDisplay::beats) { keepBeats(next, before, after); }
+    if (state.timeDisplay == TimeDisplay::beats) { keepBeats(next, before, after, main); }
     for (std::size_t index = 0; index < next.tracks.size(); ++index) {
         const auto end = next.tracks.change(index).sortClips(after);
         if (!end.has_value()) {
@@ -479,7 +484,7 @@ static juce::Result retimed(const Project& state, double initialBpm, std::shared
 
 juce::Result Document::setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label) {
     Project next;
-    const auto result = retimed(project(), initialBpm, std::move(changes), next);
+    const auto result = retimed(project(), initialBpm, std::move(changes), next, scopeId == 0);
     if (result.failed()) { return result; }
     edit(label, [next = std::move(next)](Project& project) { project = next; });
     return juce::Result::ok();
@@ -488,7 +493,7 @@ juce::Result Document::setTempoMap(double initialBpm, std::shared_ptr<const std:
 juce::Result Document::setTempoFromAudio(Id clipId, double bpm, double downbeat, double& moved) {
     moved = 0;
     Project next;
-    const auto result = retimed(project(), bpm, nullptr, next);
+    const auto result = retimed(project(), bpm, nullptr, next, scopeId == 0);
     if (result.failed()) { return result; }
     const auto tempo = next.tempo();
     const auto* track = findClipTrack(next, clipId);
