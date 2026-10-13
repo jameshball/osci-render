@@ -79,8 +79,27 @@ private:
         project.cameras.push_back(camera);
         return project;
     }
+    // A generator's clip on a track of its own, playing as the teapots do.
+    static void addGenerator(motion::Project& project, const char* kind, motion::Id id, std::initializer_list<std::pair<const char*, double>> properties) {
+        auto asset = std::make_shared<motion::Asset>();
+        asset->id = id;
+        asset->name = motion::findGenerator(kind)->name.data();
+        asset->extension = ".generator";
+        asset->data.append(kind, std::strlen(kind));
+        const auto decoded = motion::decodeAsset(*asset);
+        jassert(decoded.wasOk());
+        project.assets.push_back(asset);
+        auto clip = motion::Document::makeClip(id + 1, *asset, 0);
+        clip.duration = 2;
+        for (const auto& [name, value] : properties) { clip.properties[name] = motion::Curve(value); }
+        motion::Track track;
+        track.id = id + 2;
+        track.insert(clip, project.tempo());
+        project.tracks.push_back(track);
+    }
     // Per frame on one thread, then every frame on all of them, and what was
-    // kept: the same project must keep the same lines however fast it gets.
+    // kept (drawn, reflected and hatched): the same project must keep the
+    // same lines however fast it gets.
     void benchmarkHiddenLineProject(const juce::String& name, const motion::Project& project) {
         // MOTION_BENCHMARK_ONLY=teapot runs only the scenes with that in their name.
         const auto only = juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_ONLY", "");
@@ -106,9 +125,11 @@ private:
         const auto perFrame = milliseconds([&] {
             for (int frame = 0; frame < frames; ++frame) {
                 const auto culled = motion::hidden::cull(prepared, first + (last - first) * frame / frames, depth);
-                for (const auto& entry : culled->drawings) {
-                    kept += entry.drawing->length();
-                    shapes += entry.drawing->shapeCount();
+                for (const auto* entries : {&culled->drawings, &culled->reflections, &culled->hatching}) {
+                    for (const auto& entry : *entries) {
+                        kept += entry.drawing->length();
+                        shapes += entry.drawing->shapeCount();
+                    }
                 }
             }
         }, repeats) / frames;
@@ -132,6 +153,18 @@ private:
         benchmarkHiddenLineProject("styled teapot", hiddenLineProject({teapot}, 1, false, false, {{"edges", 40}, {"rings", 60}}));
         // Noise flowing as it plays: its contours worked out afresh each frame.
         benchmarkHiddenLineProject("flowing noise teapot", hiddenLineProject({teapot}, 1, false, false, {{"edges", 0}, {"noise", 100}, {"noiseFlow", 1}}));
+        // Lit by a point light above and in front, casting shadows.
+        auto lit = hiddenLineProject({teapot}, 1, false);
+        addGenerator(lit, "pointLight", 5000, {{"position.y", 1.5}, {"position.z", 1}, {"light.range", 6}});
+        benchmarkHiddenLineProject("lit teapot", lit);
+        // Beside a mirror ball, which shows it.
+        auto mirrored = hiddenLineProject({teapot}, 1, false);
+        addGenerator(mirrored, "sphere", 5000, {{"position.x", 1.1}, {"scale.x", .5}, {"scale.y", .5}, {"scale.z", .5}, {"reflects", 100}});
+        benchmarkHiddenLineProject("mirrored teapot", mirrored);
+        // Lit, and shaded by the camera's hatching rather than brightness.
+        auto hatched = lit;
+        hatched.cameras.front().properties["hatching"] = motion::Curve(100);
+        benchmarkHiddenLineProject("hatched teapot", hatched);
         // A project of your own: MOTION_BENCHMARK_PROJECT=/path/to.osci-motion
         const auto path = juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_PROJECT", "");
         if (path.isEmpty()) { return; }
