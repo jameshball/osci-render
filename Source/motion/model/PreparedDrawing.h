@@ -92,6 +92,17 @@ public:
     // corners cut by however few samples it gets.
     std::int64_t coarseTraversalSamples() const { return coarse.minimum; }
 
+    // Where a traversal's last sample landed: its stroke, run of shapes and
+    // shape, and where their samples start and end. Kept by whoever samples
+    // the drawing (it is shared between threads), so the next sample, as a
+    // rule in the same run, is found without searching.
+    struct TraversalCursor {
+        const void* traversal = nullptr;
+        std::int64_t count = -1;
+        std::size_t stroke = 0, segment = 0, shape = 0;
+        std::int64_t strokeStart = 0, strokeEnd = -1, segmentFrom = 0, segmentEnd = -1, segmentBefore = 0;
+    };
+
     // Independent from sample(): an integer budget covers complete strokes,
     // including corners and closed-path seams (with too few for corners, their
     // ends alone). Extra samples are apportioned by cumulative length, then
@@ -100,7 +111,7 @@ public:
     // alone however many samples it gets, the rest by length, so it is as
     // bright all along (for an approximation, a mirror's view, whose corners
     // need not be exact).
-    osci::Point sampleTraversal(std::int64_t index, std::int64_t count, bool even = false) const {
+    osci::Point sampleTraversal(std::int64_t index, std::int64_t count, bool even = false, TraversalCursor* cursor = nullptr) const {
         if (coarse.minimum > 0 && count < coarse.minimum) { return sampleLongest(index, count); }
         const auto& traversal = count >= detailed.minimum && !even ? detailed : coarse;
         if (traversal.minimum == 0 || count < traversal.minimum || index < 0 || index >= count) {
@@ -109,24 +120,26 @@ public:
         const auto& segments = traversal.segments;
         const auto& strokes = traversal.strokes;
         const auto extra = count - traversal.minimum;
-        const auto stroke = std::lower_bound(strokes.begin(), strokes.end(), index, [&](const TraversalStroke& item, std::int64_t value) {
-            const auto& last = segments[item.last];
-            return last.baseEnd + 1 + extraThrough(last, extra) < value;
-        });
-        if (stroke == strokes.end()) { return osci::Point(0, 0, 0, 0, 0, 0); }
-        const auto& first = segments[stroke->first];
-        const auto& last = segments[stroke->last];
-        const auto beforeExtra = stroke->first == 0 ? 0 : extraThrough(segments[stroke->first - 1], extra);
-        const auto start = first.baseEnd - 2 + beforeExtra;
-        const auto end = last.baseEnd + 1 + extraThrough(last, extra);
+        TraversalCursor unkept;
+        auto& at = cursor != nullptr ? *cursor : unkept;
+        if (at.traversal != &traversal || at.count != count) { at = {&traversal, count}; }
+        // The stroke the sample is in, and where its samples start and end.
+        if (index < at.strokeStart || index > at.strokeEnd) {
+            const auto found = std::lower_bound(strokes.begin(), strokes.end(), index, [&](const TraversalStroke& item, std::int64_t value) {
+                const auto& last = segments[item.last];
+                return last.baseEnd + 1 + extraThrough(last, extra) < value;
+            });
+            if (found == strokes.end()) { return osci::Point(0, 0, 0, 0, 0, 0); }
+            const auto beforeExtra = found->first == 0 ? 0 : extraThrough(segments[found->first - 1], extra);
+            at.stroke = static_cast<std::size_t>(found - strokes.begin());
+            at.strokeStart = segments[found->first].baseEnd - 2 + beforeExtra;
+            at.strokeEnd = segments[found->last].baseEnd + 1 + extraThrough(segments[found->last], extra);
+            at.segmentEnd = -1;
+        }
+        const auto& stroke = strokes[at.stroke];
         const auto dark = [](osci::Point point) {
             point.r = point.g = point.b = 0;
             return point;
-        };
-        // Where a segment's samples start and end.
-        const auto bounds = [&](std::size_t segmentIndex) {
-            const auto previousEnd = segmentIndex == stroke->first ? start + 1 : segments[segmentIndex - 1].baseEnd + extraThrough(segments[segmentIndex - 1], extra);
-            return std::pair {previousEnd, segments[segmentIndex].baseEnd + extraThrough(segments[segmentIndex], extra)};
         };
         // A fading stroke is dark where it starts and ends, and its first and
         // last lit samples sit half a step in from its ends, so the beam comes
@@ -135,21 +148,29 @@ public:
         // draw a bead, and however few samples it gets it is never lost.
         // Other strokes dwell lit at their ends, so a closed one's seam (a
         // corner) shows like any corner.
-        if (index == start) { return dark(shapes[first.firstShape]->nextVector(0)); }
-        if (index == end) { return dark(shapes[last.lastShape]->nextVector(1)); }
-        const auto segment = std::lower_bound(segments.begin() + stroke->first, segments.begin() + stroke->last + 1, index,
-            [&](const TraversalSegment& item, std::int64_t value) { return item.baseEnd + extraThrough(item, extra) < value; });
-        const auto segmentIndex = static_cast<std::size_t>(segment - segments.begin());
-        const auto [previousEnd, segmentEnd] = bounds(segmentIndex);
-        const auto steps = static_cast<double>(segmentEnd - previousEnd);
-        const auto step = static_cast<double>(index - previousEnd);
+        if (index == at.strokeStart) { return dark(shapes[segments[stroke.first].firstShape]->nextVector(0)); }
+        if (index == at.strokeEnd) { return dark(shapes[segments[stroke.last].lastShape]->nextVector(1)); }
+        // The run of shapes it is in: its samples run on from the one before's
+        // last (the first run's from the stroke's first lit sample).
+        if (index < at.segmentFrom || index > at.segmentEnd) {
+            const auto found = std::lower_bound(segments.begin() + stroke.first, segments.begin() + stroke.last + 1, index,
+                [&](const TraversalSegment& item, std::int64_t value) { return item.baseEnd + extraThrough(item, extra) < value; });
+            at.segment = static_cast<std::size_t>(found - segments.begin());
+            const auto opens = at.segment == stroke.first;
+            at.segmentBefore = opens ? at.strokeStart + 1 : segments[at.segment - 1].baseEnd + extraThrough(segments[at.segment - 1], extra);
+            at.segmentFrom = opens ? at.segmentBefore : at.segmentBefore + 1;
+            at.segmentEnd = found->baseEnd + extraThrough(*found, extra);
+            at.shape = found->firstShape;
+        }
+        const auto& segment = segments[at.segment];
+        const auto steps = static_cast<double>(at.segmentEnd - at.segmentBefore);
+        const auto step = static_cast<double>(index - at.segmentBefore);
         auto progress = step / steps;
-        if (stroke->fades) {
-            const auto opens = segmentIndex == stroke->first, closes = segmentIndex == stroke->last;
+        if (stroke.fades) {
+            const auto opens = at.segment == stroke.first, closes = at.segment == stroke.last;
             progress = opens && closes ? (step + .5) / (steps + 1) : opens ? (step + .5) / (steps + .5) : closes ? step / (steps + .5) : progress;
         }
-        auto point = pointAlong(*segment, segment->lengthStart + (segment->lengthEnd - segment->lengthStart) * progress);
-        return point;
+        return pointAlong(segment, segment.lengthStart + (segment.lengthEnd - segment.lengthStart) * progress, at.shape);
     }
 
     bool empty() const { return shapes.empty() || total <= 0.0; }
@@ -201,12 +222,22 @@ private:
         if (apportioned <= 0) { return 0; }
         return static_cast<std::int64_t>(apportioned);
     }
-    // The point `distance` along the drawing, within a run's shapes.
+    // The point `distance` along the drawing, within a run's shapes: in the
+    // shape `hint`, as a rule (the one the last point was in), which it is
+    // then left at.
     osci::Point pointAlong(const TraversalSegment& segment, double distance) const {
-        const auto found = std::lower_bound(ends.begin() + static_cast<std::ptrdiff_t>(segment.firstShape), ends.begin() + static_cast<std::ptrdiff_t>(segment.lastShape) + 1, distance);
-        auto index = found == ends.begin() + static_cast<std::ptrdiff_t>(segment.lastShape) + 1 ? segment.lastShape : static_cast<std::size_t>(found - ends.begin());
+        auto hint = segment.firstShape;
+        return pointAlong(segment, distance, hint);
+    }
+    osci::Point pointAlong(const TraversalSegment& segment, double distance, std::size_t& hint) const {
         const auto startOf = [&](std::size_t shape) { return shape == 0 ? 0.0 : ends[shape - 1]; };
-        while (index < segment.lastShape && !(ends[index] > startOf(index))) { ++index; }
+        auto index = hint;
+        if (index < segment.firstShape || index > segment.lastShape || !(distance > startOf(index) && distance <= ends[index])) {
+            const auto found = std::lower_bound(ends.begin() + static_cast<std::ptrdiff_t>(segment.firstShape), ends.begin() + static_cast<std::ptrdiff_t>(segment.lastShape) + 1, distance);
+            index = found == ends.begin() + static_cast<std::ptrdiff_t>(segment.lastShape) + 1 ? segment.lastShape : static_cast<std::size_t>(found - ends.begin());
+            while (index < segment.lastShape && !(ends[index] > startOf(index))) { ++index; }
+        }
+        hint = index;
         const auto from = startOf(index), length = ends[index] - from;
         const auto progress = length > 0 ? std::clamp((distance - from) / length, 0.0, 1.0) : 0.0;
         return shapes[index]->nextVector(static_cast<float>(progress));

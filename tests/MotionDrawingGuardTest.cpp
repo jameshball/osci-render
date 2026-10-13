@@ -204,6 +204,35 @@ public:
             if (std::abs(a.x - b.x) > 2) { expect(dark(a) && dark(b), "Every spatial travel has two dark endpoints"); }
         }
 
+        beginTest("A traversal cursor samples just as searching does, in any order");
+        {
+            // Strokes of curves and corners, so samples land in many runs of shapes.
+            std::vector<std::unique_ptr<osci::Shape>> many;
+            for (int stroke = 0; stroke < 6; ++stroke) {
+                const auto x = static_cast<float>(stroke * 3);
+                line(many, x, 0, x + 1, 0);
+                many.push_back(std::make_unique<osci::QuadraticBezierCurve>(x + 1, 0, x + 1.5f, .5f, x + 1, 1));
+                line(many, x + 1, 1, x, 1);
+                line(many, x, 1, x, .25f * static_cast<float>(stroke));
+            }
+            const motion::PreparedDrawing drawing(std::move(many));
+            for (const auto count : {drawing.coarseTraversalSamples(), drawing.minimumTraversalSamples(), drawing.minimumTraversalSamples() + 7, std::int64_t {997}}) {
+                const auto same = [&](std::int64_t index, motion::PreparedDrawing::TraversalCursor& cursor, bool even) {
+                    const auto searched = drawing.sampleTraversal(index, count, even);
+                    const auto kept = drawing.sampleTraversal(index, count, even, &cursor);
+                    return searched.x == kept.x && searched.y == kept.y && searched.r == kept.r;
+                };
+                for (const auto even : {false, true}) {
+                    motion::PreparedDrawing::TraversalCursor forward, backward, jumping;
+                    bool all = true;
+                    for (std::int64_t index = 0; index < count; ++index) { all = all && same(index, forward, even); }
+                    for (std::int64_t index = count - 1; index >= 0; --index) { all = all && same(index, backward, even); }
+                    for (std::int64_t step = 0; step < count; ++step) { all = all && same(step * 37 % count, jumping, even); }
+                    expect(all, "a cursor changes no sample (" + juce::String(count) + (even ? ", even)" : ")"));
+                }
+            }
+        }
+
         std::array<osci::Point, 29> disconnectedOrder;
         for (std::int64_t index = 0; index < 29; ++index) { disconnectedOrder[static_cast<std::size_t>(index)] = uneven.sampleTraversal(index, 29); }
         for (std::int64_t step = 28; step >= 0; --step) {

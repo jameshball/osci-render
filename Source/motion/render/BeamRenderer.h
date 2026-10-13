@@ -66,6 +66,9 @@ public:
         bool floored = true;
         // How bright it is drawn (see finishPlan).
         float gain = 1;
+        // Where its drawing's traversal was last sampled (see
+        // PreparedDrawing::TraversalCursor).
+        mutable PreparedDrawing::TraversalCursor cursor;
         // On a display with no brightness input (XY only), every sample
         // shows: the colour it shows in, at full brightness. Dark where
         // nothing is drawn.
@@ -717,7 +720,7 @@ private:
                 const auto* drawing = segment.drawing;
                 osci::Point raw;
                 if (drawing != nullptr && segment.floored && drawing->coarseTraversalSamples() > 0 && n >= 3) {
-                    raw = drawing->sampleTraversal(step, n, segment.world);
+                    raw = drawing->sampleTraversal(step, n, segment.world, &segment.cursor);
                 } else {
                     const auto span = n > 1 ? 1.0 / static_cast<double>(n - 1) : 1.0;
                     raw = drawing != nullptr ? drawing->sample(static_cast<double>(step) * span, span) : segment.source->sampleFrame(segment.frame, static_cast<double>(step) * span, span);
