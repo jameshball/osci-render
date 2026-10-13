@@ -593,7 +593,9 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
     auto& editor = openSceneEditor(std::make_unique<MotionDrawingEditor>(initial, name, asset != 0));
     editor.onChanged = [this] { previewDrawing(); };
     editor.onDone = [this](const motion::drawing::Drawing& drawing, const juce::String& text) {
-        const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion drawings");
+        // A folder of its own: another drawing of the same name, saved before
+        // this one is read, can't replace it.
+        const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion drawings").getChildFile(juce::Uuid().toString());
         const auto file = folder.getChildFile(juce::File::createLegalFileName(text) + ".svg");
         if (!folder.createDirectory().wasOk() || !file.replaceWithText(motion::drawing::toSvg(drawing))) {
             statusBar.show("Could not save the drawing.");

@@ -277,8 +277,10 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
         return;
     }
     {
+        // Restored: an earlier failure's state and warning no longer apply.
         const juce::MessageManagerLock messageLock;
         unrestoredState.reset();
+        restoreError.clear();
     }
     applyPreparedProject(std::move(prepared), *project);
 }

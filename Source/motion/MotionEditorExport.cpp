@@ -163,7 +163,8 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                             *cursor += samples;
                         };
                     }
-                    const auto started = owner->startOfflineVideoRender(temporary->signal(), config.includeAudio ? temporary->soundtrack() : juce::File(),
+                    // A render that never starts still runs this completion (unsuccessful).
+                    owner->startOfflineVideoRender(temporary->signal(), config.includeAudio ? temporary->soundtrack() : juce::File(),
                         destination, config, renderMode, [owner, state, temporary, destination, finished] {
                             // Completion can run from base-editor destruction;
                             // touch derived UI only in a later safe callback.
@@ -174,7 +175,6 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                                 if (finished) { finished(owner->lastOfflineRenderSucceeded()); }
                             });
                         }, beamSnapshot);
-                    if (!started && finished) { finished(false); }
                 };
                 if (preparationOverlay != nullptr) {
                     owner->dismissOverlay(preparationOverlay.getComponent(), std::move(startRender));
