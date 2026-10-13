@@ -309,6 +309,8 @@ private:
     bool addHover = false;
     const motion::CameraCut* findCut(motion::Id id) const;
     const motion::CameraCut* cutAt(juce::Point<int> point) const;
+    // Delete acts on the camera's key or cut only while one is what was picked last.
+    void clearCameraSelection();
     void cameraBandDown(const juce::MouseEvent& event);
     void cameraBandDrag(const juce::MouseEvent& event);
     void showCutMenu(motion::Id cut, double time);

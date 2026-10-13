@@ -76,7 +76,10 @@ juce::Rectangle<int> MotionTimelineView::rulerAnchor(double seconds) const {
 void MotionTimelineView::setSelection(motion::Id id) {
     ensureTrackRows();
     selectedMarker = 0;
+    // A camera key or cut stays selected only with its camera.
     if (selectedCameraKey.has_value() && selectedCameraKey->first != id) { selectedCameraKey.reset(); }
+    const auto* cut = selectedCut != 0 ? findCut(selectedCut) : nullptr;
+    if (cut == nullptr || cut->camera != id) { selectedCut = 0; }
     selected = id;
     if (!notifyingSelection) {
         // Picked from elsewhere (the Scene, the library): keys selected here
@@ -286,6 +289,7 @@ std::optional<std::pair<double, motion::Id>> MotionTimelineView::dropTarget(juce
 }
 
 void MotionTimelineView::selectClips(const std::vector<motion::Id>& ids) {
+    clearCameraSelection();
     selectedKeys.clear();
     selectedClips = {ids.begin(), ids.end()};
     notifySelection(ids.empty() ? 0 : ids.front());
@@ -912,6 +916,8 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     if (event.y < rulerHeight && event.x < namesWidth) { return; }
     if (event.y >= rulerHeight && laneAtY(event.y) != nullptr) {
         if (event.x < namesWidth) { return; }
+        // Keys in a lane are what Delete acts on now, not a camera's.
+        clearCameraSelection();
         const auto key = keyAt(event.getPosition());
         if (event.mods.isPopupMenu()) {
             if (key.has_value() && !isKeySelected(key->clip, key->property, key->time)) { selectedKeys = {*key}; }
@@ -1958,6 +1964,22 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
         repaint();
         return true;
     }
+    // Escape puts back what a beam share or camera key drag changed.
+    if (key == juce::KeyPress::escapeKey && beamDrag.has_value()) {
+        if (beamDrag->changed && processor.document.revision() == beamDrag->revision) { processor.document.preview(std::move(beamDrag->before)); }
+        beamDrag.reset();
+        repaint();
+        return true;
+    }
+    if (key == juce::KeyPress::escapeKey && cameraKeyDrag.has_value()) {
+        if (processor.document.revision() == cameraKeyDrag->revision && std::abs(cameraKeyDrag->to - cameraKeyDrag->from) > 1.0e-9) {
+            processor.document.preview(std::move(cameraKeyDrag->before));
+            selectedCameraKey = std::make_pair(cameraKeyDrag->camera, cameraKeyDrag->from);
+        }
+        cameraKeyDrag.reset();
+        repaint();
+        return true;
+    }
     if (key == juce::KeyPress::escapeKey && loopDrag.has_value()) {
         if (loopDrag->changed && processor.document.revision() == loopDrag->revision) { processor.document.preview(std::move(loopDrag->before)); }
         loopDrag.reset();
@@ -2865,11 +2887,12 @@ void MotionTimelineView::dragCameraKey(const juce::MouseEvent& event) {
     // A key never lands on another key of the same camera.
     const auto occupied = std::abs(time - drag.from) > 1.0e-6 && std::any_of(camera->properties.begin(), camera->properties.end(), [time](const auto& entry) { return entry.second.hasKeyAt(time); });
     if (occupied) { return; }
-    moveCameraKeys(*camera, drag.from, time);
+    // Back where it started is no move at all.
+    drag.moved = std::abs(time - drag.from) > 1.0e-9;
+    if (drag.moved) { moveCameraKeys(*camera, drag.from, time); }
     processor.document.preview(std::move(updated));
     drag.revision = processor.document.revision();
     drag.to = time;
-    drag.moved = true;
     selectedCameraKey = std::make_pair(drag.camera, time);
     repaint();
 }
@@ -2906,7 +2929,13 @@ const motion::Marker* MotionTimelineView::markerAt(juce::Point<int> point) const
     return nullptr;
 }
 
+void MotionTimelineView::clearCameraSelection() {
+    selectedCut = 0;
+    selectedCameraKey.reset();
+}
+
 void MotionTimelineView::selectMarker(motion::Id id) {
+    clearCameraSelection();
     selected = 0;
     selectedClips.clear();
     if (onSelection) { onSelection(0); }
@@ -3321,11 +3350,15 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
     const auto drag = *trackDrag;
     const auto top = liftedTop();
     trackDrag.reset();
-    const auto [boundary, group] = dropTarget(drag);
-    if (motion::findGroup(processor.document.project(), drag.id) != nullptr) {
-        placeGroup(drag.id, boundary, group);
-    } else {
-        placeTrack(drag.id, boundary, group);
+    // Let go where it was, it stays put: nothing to place.
+    const auto inPlace = drag.group == 0 && drag.boundary >= drag.first && drag.boundary <= drag.last;
+    if (!inPlace) {
+        const auto [boundary, group] = dropTarget(drag);
+        if (motion::findGroup(processor.document.project(), drag.id) != nullptr) {
+            placeGroup(drag.id, boundary, group);
+        } else {
+            placeTrack(drag.id, boundary, group);
+        }
     }
     // The block glides from where it was let go into its new place.
     ensureTrackRows();
@@ -3374,13 +3407,8 @@ std::pair<int, motion::Id> MotionTimelineView::dropTarget(const TrackDrag& drag)
     const auto& project = processor.document.project();
     const auto& tracks = project.tracks;
     const auto count = static_cast<int>(rows.size());
-    const auto own = trackIndex(drag.id);
+    // (Let go where it was, nothing is placed: see dragTrack.)
     if (drag.group != 0) { return {static_cast<int>(tracks.size()), drag.group}; }
-    if (drag.boundary >= drag.first && drag.boundary <= drag.last) {
-        // Let go where it was: a group stays put.
-        const auto* folder = motion::findGroup(project, drag.id);
-        return {own, folder != nullptr ? folder->parent : own >= 0 ? tracks[static_cast<std::size_t>(own)].group : 0};
-    }
     if (drag.boundary >= count) { return {static_cast<int>(tracks.size()), 0}; }
     const auto& row = rows[static_cast<std::size_t>(drag.boundary)];
     if (!row.group()) { return {row.track, tracks[static_cast<std::size_t>(row.track)].group}; }
@@ -3526,6 +3554,7 @@ void MotionTimelineView::notifySelection(motion::Id id) {
 }
 
 void MotionTimelineView::selectClip(motion::Id id) {
+    clearCameraSelection();
     selectedKeys.clear();
     selectedClips.clear();
     if (isClip(id)) { selectedClips.insert(id); }

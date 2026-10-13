@@ -19,6 +19,11 @@ MotionCurveEditor::MotionCurveEditor(MotionProcessor& processor) : processor(pro
 void MotionCurveEditor::setHiddenCurves(std::set<std::string> curves) {
     if (curves == hiddenCurves) { return; }
     hiddenCurves = std::move(curves);
+    // Keys of a curve hidden are no longer selected: Delete, drags and the
+    // Key panel act only on what shows.
+    const auto before = companions.size();
+    std::erase_if(companions, [this](const KeyRef& key) { return hiddenCurves.contains(key.property); });
+    if (companions.size() != before) { selectionChanged(); }
     repaint();
 }
 

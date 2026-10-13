@@ -316,6 +316,8 @@ private:
     motion::TapTempo tapTempo;
     std::optional<double> tappedBpm;
     std::unique_ptr<juce::TimedCallback> tapCommit;
+    // The project and composition tapping began in: the tempo goes to them alone.
+    std::uint64_t tapGeneration = 0, tapScope = 0;
     bool detectingTempo = false;
     double lastPaintedPosition = -1;
     int ticks = 0;

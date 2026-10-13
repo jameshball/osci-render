@@ -553,6 +553,10 @@ bool MotionEditor::applyTiming(int result) {
 }
 
 void MotionEditor::tap() {
+    if (tapTempo.count() == 0) {
+        tapGeneration = processor.document.generation();
+        tapScope = processor.document.scopeGeneration();
+    }
     const auto bpm = tapTempo.tap(juce::Time::getMillisecondCounterHiRes() / 1000);
     tapButton.setButtonText(tapTempo.count() > 1 ? juce::String(static_cast<int>(tapTempo.count())) : "Tap");
     if (bpm.has_value()) {
@@ -567,6 +571,11 @@ void MotionEditor::tap() {
             if (!tappedBpm.has_value()) { return; }
             const auto bpm = *tappedBpm;
             tappedBpm.reset();
+            // Another project or composition opened since: the taps were for the last.
+            if (processor.document.generation() != tapGeneration || processor.document.scopeGeneration() != tapScope) {
+                refreshTiming();
+                return;
+            }
             const auto result = processor.document.changeTempo(bpm);
             if (result.failed()) { statusBar.show(result.getErrorMessage()); } else { statusBar.show("Tempo " + juce::String(bpm, 1) + " BPM from tapping.", MotionStatusBar::Kind::notice); }
             refreshTiming();
