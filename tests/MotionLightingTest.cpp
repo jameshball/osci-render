@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
+#include "../Source/motion/render/HiddenLineFingerprint.h"
 #include "../Source/motion/render/HiddenLines.h"
 #include "../Source/motion/model/LightPresets.h"
 #include "../Source/motion/render/BeamRenderer.h"

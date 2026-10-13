@@ -5,7 +5,6 @@
 #include "HiddenLineCoverage.h"
 #include "HiddenLineCrossings.h"
 #include "HiddenLineDepth.h"
-#include "HiddenLineFingerprint.h"
 #include "HiddenLineHatching.h"
 #include "HiddenLineReflections.h"
 #include "HiddenLineScene.h"
