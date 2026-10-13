@@ -434,7 +434,7 @@ private:
         if (placed == 0) { return; }
         middle = middle / placed;
         const auto draw = [&](Vec3 seenFrom, const FlatMirror* only) {
-            smoothLines(surface, surface::outline(styled.corners, surface.faces, styled.normals, seenFrom), outlineTurn, [&](osci::Point from, osci::Point to, std::uint32_t face, const Weights& starts, const Weights& ends) {
+            smoothLines(surface, surface::outline(styled.corners, surface.faces, styled.normals, surface.topology, seenFrom), outlineTurn, [&](osci::Point from, osci::Point to, std::uint32_t face, const Weights& starts, const Weights& ends) {
                 const auto a = place(item, from), b = place(item, to);
                 if (!a.has_value() || !b.has_value()) { return; }
                 DimmedShape line(std::make_unique<osci::Line>(from, to), static_cast<float>(amount));

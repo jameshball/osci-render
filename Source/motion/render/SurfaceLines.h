@@ -913,12 +913,21 @@ inline int stretchesOf(const Normals& normals, const Piece& piece, double turn =
     return std::clamp(static_cast<int>(std::ceil(std::acos(cosine) / turn)), 1, 8);
 }
 
+// Which faces meet where, by their corners' places: found once for a mesh
+// whose corners only move after (turned, not torn), for its outline each
+// frame.
+struct Topology {
+    std::vector<Face> placed;
+    std::map<std::pair<detail::Place, detail::Place>, std::vector<std::pair<std::uint32_t, std::size_t>>> sides;
+    static Topology of(const std::vector<Vec3>& corners, const std::vector<Face>& faces) { return {detail::byPlace(corners, faces), detail::sidesOf(corners, faces)}; }
+};
+
 // Where faces turn from the eye: within a smooth stretch of surface, where
 // the corners' normals (see Normals) turn edge on to it, so a curved
 // surface's outline is smooth; at a sharper edge between a face toward the
 // eye and one away, along that edge; and along every edge of the surface
 // only one face has (a flat drawing's outline).
-inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Normals& smooth, Vec3 eye, double crease = .7) {
+inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Normals& smooth, const Topology& topology, Vec3 eye, double crease = .7) {
     const auto& normals = smooth.faces;
     const auto cosCrease = std::cos(crease);
     std::vector<std::array<double, 3>> facing(faces.size());
@@ -942,7 +951,7 @@ inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::v
         }
         return (low + high) * .5;
     };
-    const auto placed = detail::byPlace(corners, faces);
+    const auto& placed = topology.placed;
     std::vector<detail::Found> found;
     for (std::uint32_t index = 0; index < faces.size(); ++index) {
         // A face with no area (two corners at one place) has no outline.
@@ -968,7 +977,7 @@ inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::v
     }
     // Sharp edges between a face toward the eye and one away, and edges
     // just one face has.
-    for (const auto& [key, sharing] : detail::sidesOf(corners, faces)) {
+    for (const auto& [key, sharing] : topology.sides) {
         if (std::get<0>(key) == std::get<1>(key)) { continue; }
         const auto [index, side] = sharing.front();
         const auto toward = [&](std::uint32_t face) { return normals[face].dot(eye - corners[faces[face][0]]) > 0; };
@@ -1025,6 +1034,9 @@ inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::v
         }
     }
     return followed;
+}
+inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Normals& smooth, Vec3 eye, double crease = .7) {
+    return outline(corners, faces, smooth, Topology::of(corners, faces), eye, crease);
 }
 inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Vec3 eye, double crease = .7) {
     return outline(corners, faces, normalsOf(corners, faces, crease), eye, crease);

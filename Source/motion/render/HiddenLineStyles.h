@@ -27,6 +27,8 @@ public:
         std::vector<surface::Face> faces;
         surface::Smoothing smoothing;
         surface::Normals normals;
+        // Which faces meet where, for its outline.
+        surface::Topology topology;
         // Whether it is closed (every edge has a face either side), so the
         // eye sees only its near side.
         bool closed = false;
@@ -83,7 +85,8 @@ public:
             made.faces.assign(mesh.triangles.begin(), mesh.triangles.end());
             made.smoothing = surface::Smoothing::of(made.corners, made.faces);
             made.normals = made.smoothing.normals(made.corners, made.faces);
-            const auto sides = surface::detail::sidesOf(made.corners, made.faces);
+            made.topology = surface::Topology::of(made.corners, made.faces);
+            const auto& sides = made.topology.sides;
             made.closed = !sides.empty() && std::all_of(sides.begin(), sides.end(), [](const auto& side) { return side.second.size() == 2; });
             found = laid.emplace(&drawing, Entry {std::move(made), frame}).first;
         }
@@ -227,7 +230,7 @@ inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>&
         add(surface.pattern(static_cast<surface::Pattern>(pattern), static_cast<int>(style.detail), style.noiseTurn), style.patterns[pattern], patternTurn, true);
     }
     styled.eyeOnlyFrom = shapes.size();
-    if (style.outline > 0 && eye.has_value()) { add(surface::outline(styled.corners, surface.faces, styled.normals, *eye), style.outline, outlineTurn, false); }
+    if (style.outline > 0 && eye.has_value()) { add(surface::outline(styled.corners, surface.faces, styled.normals, surface.topology, *eye), style.outline, outlineTurn, false); }
     auto drawing = std::make_shared<PreparedDrawing>(std::move(shapes), true);
     drawing->setFaces(source.faces());
     drawing->setShapeFaces(std::move(faces));
