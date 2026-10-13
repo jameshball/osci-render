@@ -96,7 +96,8 @@ void MotionEditor::setUpMenus() {
         if (index == audioMenu) {
             juce::PopupMenu output;
             for (int id = 1; id <= monitorOutput.getNumItems(); ++id) { output.addItem(outputMenuId + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
-            menu.addSubMenu("Audio interface plays", output);
+            // Named as the chooser beside the transport is.
+            menu.addSubMenu("Output", output);
             InternalSampleRateMenu::addSubmenu(menu, processor, sampleRateMenuId, true);
             menu.addSeparator();
         }
