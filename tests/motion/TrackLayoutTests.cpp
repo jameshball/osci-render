@@ -34,7 +34,7 @@ int main() {
     auto rows = motion::trackRows(project, {});
     const std::vector<motion::Id> expected {10, 11, 1, 3, 2, 4, 12};
     check(rows.size() == expected.size(), "rows.size() == expected.size()");
-    for (std::size_t i = 0; i < expected.size(); ++i) { assert(rows[i].id == expected[i]); }
+    for (std::size_t i = 0; i < expected.size(); ++i) { check(rows[i].id == expected[i], "rows in order"); }
     check(rows[2].track == 0 && rows[2].depth == 2, "rows[2].track == 0 && rows[2].depth == 2");
     check(rows[3].track == 2 && rows[3].depth == 1, "rows[3].track == 2 && rows[3].depth == 1");
     rows = motion::trackRows(project, {10});
