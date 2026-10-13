@@ -40,6 +40,10 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
         g.fillRoundedRectangle(add, motion::style::radius + 1);
     }
     motion::icons::draw(g, motion::icons::Icon::add, add, addHover ? osci::Colours::text() : osci::Colours::text().withAlpha(.72f), 16.0f);
+    // The selected camera's keys show in the band; names start clear of a
+    // key at their start.
+    const auto keysShown = std::any_of(project.cameras.begin(), project.cameras.end(), [this](const auto& item) { return item.id == selected; });
+    const auto nameInset = keysShown ? 14 : 6;
     // Between cuts the first camera shows; label each visible gap.
     const bool defaultSelected = !project.cameras.empty() && selected == project.cameras.front().id;
     const auto label = project.cameras.empty() ? juce::String("Default view") : juce::String(project.cameras.front().name);
@@ -52,7 +56,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
             g.fillRect(left, top + 2, right - left, cameraBandHeight - 4);
         }
         g.setColour(osci::Colours::textMuted().withAlpha(defaultSelected ? .9f : .55f));
-        if (right - left > 60) { g.drawText(label, left + 6, top, right - left - 10, cameraBandHeight, juce::Justification::centredLeft, true); }
+        if (right - left > 60) { g.drawText(label, left + nameInset, top, right - left - nameInset - 4, cameraBandHeight, juce::Justification::centredLeft, true); }
     };
     for (const auto& cut : project.cameraCuts) {
         if (cut.start > from) { gap(cut.start); }
@@ -69,7 +73,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
             g.drawRoundedRectangle(bounds.toFloat().reduced(.5f), 3.0f, 1.2f);
         }
         g.setColour(osci::Colours::text());
-        g.drawText(cameraName(cut.camera), bounds.reduced(6, 0), juce::Justification::centredLeft, true);
+        g.drawText(cameraName(cut.camera), bounds.withTrimmedLeft(nameInset).withTrimmedRight(6), juce::Justification::centredLeft, true);
     }
     // The selected camera's keys, so its moves read on the timeline.
     const auto camera = std::find_if(project.cameras.begin(), project.cameras.end(), [this](const auto& item) { return item.id == selected; });
@@ -81,7 +85,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
     juce::Graphics::ScopedSaveState band(g);
     g.reduceClipRegion(namesWidth, top, getWidth() - namesWidth, cameraBandHeight);
     for (const auto time : times) {
-        const auto centre = juce::Point<float>(static_cast<float>(timeX(time)) + .5f, static_cast<float>(top) + cameraBandHeight * .5f);
+        const auto centre = juce::Point<float>(static_cast<float>(cameraKeyX(time)) + .5f, static_cast<float>(top) + cameraBandHeight * .5f);
         const auto chosen = selectedCameraKey.has_value() && selectedCameraKey->first == camera->id && motion::sameTime(selectedCameraKey->second, time);
         g.setColour(osci::Colours::veryDark());
         motion::style::drawDiamond(g, centre, chosen ? 6.0f : 5.0f, true);
@@ -243,7 +247,7 @@ std::optional<double> MotionTimelineView::cameraKeyAt(int x) const {
     int distance = 6;
     for (const auto& [name, curve] : camera->properties) {
         for (const auto& key : curve.keyframes()) {
-            const auto offset = std::abs(timeX(key.time) - x);
+            const auto offset = std::abs(cameraKeyX(key.time) - x);
             if (offset < distance) {
                 distance = offset;
                 nearest = key.time;

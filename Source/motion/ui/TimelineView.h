@@ -309,6 +309,9 @@ private:
     juce::Rectangle<int> addCameraBounds() const { return {namesWidth - 26, cameraBandTop(), 22, cameraBandHeight}; }
     bool inCameraBand(int y) const { return y >= cameraBandTop() && y < cameraBandTop() + cameraBandHeight; }
     juce::Rectangle<int> cutBounds(const motion::CameraCut& cut) const;
+    // Where a camera key draws: a key at the very start stays clear of the
+    // name column, as a lane's does.
+    int cameraKeyX(double time) const { return std::max(timeX(time), namesWidth + 6); }
     static juce::Colour cameraColour(const motion::Project& project, motion::Id camera);
     juce::String cameraName(motion::Id camera) const;
     void paintCameraBand(juce::Graphics& g) const;
