@@ -683,6 +683,14 @@
               resource="0" file="Source/motion/ui/TimelineView.cpp"/>
         <FILE id="MotTimelineView" name="TimelineView.h" compile="0" resource="0"
               file="Source/motion/ui/TimelineView.h"/>
+        <FILE id="MotuiTimelineViewBandscpp" name="TimelineViewBands.cpp" compile="1"
+              resource="0" file="Source/motion/ui/TimelineViewBands.cpp"/>
+        <FILE id="MotuiTimelineViewBeamcpp" name="TimelineViewBeam.cpp" compile="1"
+              resource="0" file="Source/motion/ui/TimelineViewBeam.cpp"/>
+        <FILE id="MotuiTimelineViewKeyscpp" name="TimelineViewKeys.cpp" compile="1"
+              resource="0" file="Source/motion/ui/TimelineViewKeys.cpp"/>
+        <FILE id="MotuiTimelineViewTrackscpp" name="TimelineViewTracks.cpp"
+              compile="1" resource="0" file="Source/motion/ui/TimelineViewTracks.cpp"/>
         <FILE id="mottrackhdr" name="TrackHeader.h" compile="0" resource="0"
               file="Source/motion/ui/TrackHeader.h"/>
         <FILE id="mottracklayout" name="TrackLayout.h" compile="0" resource="0"
