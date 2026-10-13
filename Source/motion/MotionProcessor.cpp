@@ -105,8 +105,9 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     lastCallbackMs.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
     buffer.clear();
     midi.clear();
-    // A host may send more than it said it would: drawn in pieces no longer
-    // than was prepared for (each referring to the buffer, allocating nothing).
+    // The audio device may send more than it said it would: drawn in pieces
+    // no longer than was prepared for (each referring to the buffer,
+    // allocating nothing).
     const auto capacity = signal.getNumSamples();
     if (capacity <= 0) { return; }
     for (int start = 0; start < buffer.getNumSamples(); start += capacity) {
@@ -229,8 +230,8 @@ juce::AudioProcessorEditor* MotionProcessor::createEditor() {
 }
 
 void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
-    // Hosts may save from any thread; the document belongs to the message
-    // thread, so it is read there or under its lock.
+    // The document belongs to the message thread: it is read there, or
+    // under its lock if the session is saved from elsewhere.
     std::optional<juce::MessageManagerLock> lock;
     if (!juce::MessageManager::existsAndIsCurrentThread()) {
         lock.emplace();
@@ -258,7 +259,7 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
         unrestoredState = juce::MemoryBlock(data, static_cast<std::size_t>(std::max(0, size)));
         unrestoredGeneration = document.generation();
         unrestoredRevision = document.revision();
-        restoreError = "The project the host saved couldn't be opened. " + reason + " It is kept as it was until you change this one.";
+        restoreError = "Your last session couldn't be reopened: " + reason + " It is kept as it was until you change this project.";
     };
     motion::ProjectFile file;
     const auto result = motion::ProjectFile::read(data, static_cast<std::size_t>(std::max(0, size)), file);
@@ -267,16 +268,17 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
         return;
     }
     {
-        // Restored: an earlier failure's state and warning no longer apply.
+        // Restored: an earlier failure's state and warning no longer apply;
+        // what this version couldn't use of it is said instead.
         const juce::MessageManagerLock messageLock;
         unrestoredState.reset();
-        restoreError.clear();
+        restoreError = file.notes.empty() ? juce::String() : "Reopened your last session without " + juce::String(file.notes.count()) + (file.notes.count() == 1 ? " thing" : " things") + " this version can't use: " + file.notes.lines().joinIntoString("; ") + ".";
     }
     applyPreparedProject(std::move(file.project), *file.xml);
 }
 
 void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlElement& state) {
-    // Host state restore is not a realtime operation. Serialize its commit
+    // Restoring a session is not a realtime operation. Serialize its commit
     // with the editor and the live-source owner, after worker preparation.
     const juce::MessageManagerLock messageLock;
     document.reset(std::move(prepared));

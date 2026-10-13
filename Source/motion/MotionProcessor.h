@@ -37,8 +37,9 @@ public:
     MotionProcessor();
     ~MotionProcessor() override;
     void prepareToPlayInternal(double sampleRate, int samplesPerBlock) override;
-    // The standalone app can run faster than the audio device, as osci-render does.
-    bool supportsInternalSampleRateOverride() const override { return OSCI_PREMIUM && wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone; }
+    // osci-motion is an app, never a plugin: it can run faster than the
+    // audio device, as osci-render's standalone does.
+    bool supportsInternalSampleRateOverride() const override { return OSCI_PREMIUM; }
     motion::Document document { getUndoManager() };
     std::atomic<bool> playing { false };
     std::atomic<double> position { 0.0 };
@@ -139,14 +140,15 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     void getStateInformation(juce::MemoryBlock& destination) override;
     void setStateInformation(const void* data, int size) override;
-    // Message-thread publication after standalone background preparation.
+    // Message-thread publication after background preparation.
     void applyPreparedProject(motion::Project prepared, juce::XmlElement& state);
-    // Why the host's saved project couldn't be restored, once; message thread.
+    // What reopening the last session left out, or why it couldn't, once;
+    // message thread.
     juce::String takeRestoreError() { return std::exchange(restoreError, {}); }
 private:
-    // A host's saved state that couldn't be restored: handed back as it was
-    // when the host saves again, until the project is changed or replaced,
-    // so a failed restore never overwrites the user's project with an empty one.
+    // A last session that couldn't be reopened: handed back as it was when
+    // the session is saved again, until the project is changed or replaced,
+    // so a failed reopen never overwrites the user's project with an empty one.
     juce::MemoryBlock unrestoredState;
     std::uint64_t unrestoredGeneration = 0, unrestoredRevision = 0;
     juce::String restoreError;
