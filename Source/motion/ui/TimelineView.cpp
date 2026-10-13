@@ -821,11 +821,13 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     g.setColour(osci::Colours::veryDark().darker(.25f));
     g.fillRect(0, getHeight() - scrollStrip, getWidth(), scrollStrip);
     paintScrollBars(g);
-    if (clipMarquee.has_value()) {
+    // A box being dragged to pick clips or keys, over every row it crosses.
+    for (const auto* box : {clipMarquee.has_value() ? &*clipMarquee : nullptr, marquee.has_value() ? &*marquee : nullptr}) {
+        if (box == nullptr) { continue; }
         g.setColour(osci::Colours::accentColor().withAlpha(.1f));
-        g.fillRect(*clipMarquee);
+        g.fillRect(*box);
         g.setColour(osci::Colours::accentColor().withAlpha(.6f));
-        g.drawRect(*clipMarquee);
+        g.drawRect(*box);
     }
     paintPlayhead(g);
     if (tracks.empty()) {
@@ -1961,12 +1963,6 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
             const auto x = std::max(static_cast<float>(timeX(time)), static_cast<float>(namesWidth) + 4.5f);
             motion::style::drawKey(g, {x, centre}, 4.5f, keys[k], colour, isKeySelected(clip.id, row.lane, keys[k].time), false, behind);
         }
-    }
-    if (marquee.has_value()) {
-        g.setColour(osci::Colours::accentColor().withAlpha(.12f));
-        g.fillRect(*marquee);
-        g.setColour(osci::Colours::accentColor().withAlpha(.6f));
-        g.drawRect(*marquee);
     }
 }
 
