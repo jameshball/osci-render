@@ -27,7 +27,6 @@ public:
 
     void selectAsset(motion::Id id);
 
-    void setError(const juce::String& error);
 
     void updateStatus();
 
@@ -83,6 +82,5 @@ private:
     motion::Id renaming = 0;
     juce::Label status;
     juce::TextButton cancelImport, bakeSettings;
-    juce::String importStatus, errorMessage;
-    bool hasError = false;
+    juce::String importStatus;
 };

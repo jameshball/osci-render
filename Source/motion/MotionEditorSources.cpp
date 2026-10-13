@@ -6,9 +6,6 @@
 #include "ui/FractalSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
 
-namespace {
-}
-
 // Files dropped on the timeline land where they were dropped (time and
 // track, as in Premiere); anywhere else they go in at the playhead.
 void MotionEditor::filesDropped(const juce::StringArray& files, int x, int y) {
@@ -39,9 +36,7 @@ void MotionEditor::replaceSourceFile(motion::Id asset) {
 bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, std::optional<std::pair<double, motion::Id>> placement) {
     const auto extension = file.getFileExtension().toLowerCase();
     if (!osci::files::isSupportedSource(extension)) {
-        importError = "This source type is not connected yet.";
-        statusBar.show(importError);
-        repaint();
+        statusBar.show("This kind of file can't be used as a source.");
         return false;
     }
     SourceRequest request {file, placement.has_value() ? placement->first : processor.position.load(), processor.document.generation(), {}};
@@ -363,7 +358,6 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
         }
         if (!processor.ensureFFmpegExists()) { return; }
     }
-    importError.clear();
     statusBar.clear();
     auto asset = std::make_shared<motion::Asset>();
     asset->name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
@@ -417,9 +411,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             });
             if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
             if (result.failed()) {
-                owner->importError = result.getErrorMessage();
                 owner->textAnimation.clearPending();
-                owner->repaint();
                 // A new script that fails reopens with its code, as an edit
                 // does; the editor shows the error where it is.
                 if (request.replacement == nullptr && request.relink == 0 && request.file.hasFileExtension("lua")) {
@@ -441,7 +433,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                         return;
                     }
                 }
-                owner->statusBar.show(owner->importError);
+                owner->statusBar.show(result.getErrorMessage());
                 return;
             }
             auto& document = owner->processor.document;

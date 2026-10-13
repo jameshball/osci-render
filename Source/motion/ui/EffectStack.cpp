@@ -268,7 +268,7 @@ void MotionEffectStack::Card::resized() {
     // up with the rows above the card; only the captions are inset.
     const motion::style::PropertyGrid grid(area.getWidth());
     for (auto& row : rows) {
-        auto line = area.removeFromTop(motion::style::controlHeight).translated(0, 0);
+        auto line = area.removeFromTop(motion::style::controlHeight);
         area.removeFromTop(motion::style::gap);
         row->next.setBounds(line.removeFromRight(12));
         row->key.setBounds(line.removeFromRight(18));

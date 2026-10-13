@@ -204,7 +204,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         motion::icons::draw(g, motion::icons::Icon::bezier, juce::Rectangle<float>(32.0f, 32.0f).withCentre(centre.toFloat().translated(0.0f, -30.0f)), osci::Colours::textMuted().withAlpha(.5f), 28.0f);
         g.setColour(osci::Colours::text().withAlpha(.85f));
         g.setFont(motion::style::title());
-        g.drawText("No curve to edit", juce::Rectangle<int>(getWidth(), 20).withCentre(centre.translated(0, 0)), juce::Justification::centred);
+        g.drawText("No curve to edit", juce::Rectangle<int>(getWidth(), 20).withCentre(centre), juce::Justification::centred);
         g.setColour(osci::Colours::textMuted());
         g.setFont(motion::style::body());
         g.drawText("Select a clip, then pick a property in the list or key one in Properties.", juce::Rectangle<int>(getWidth(), 20).withCentre(centre.translated(0, 20)), juce::Justification::centred);

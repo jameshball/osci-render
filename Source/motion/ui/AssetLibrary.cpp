@@ -42,7 +42,7 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     rename.onEscapeKey = [this] { finishRename(false); };
     rename.onFocusLost = [this] { finishRename(true); };
     addChildComponent(rename);
-    setError({});
+    updateStatus();
     refresh();
 }
 
@@ -86,15 +86,9 @@ void MotionAssetLibrary::selectAsset(motion::Id id) {
     }
 }
 
-void MotionAssetLibrary::setError(const juce::String& error) {
-    errorMessage = error;
-    hasError = error.isNotEmpty();
-    updateStatus();
-}
-
 void MotionAssetLibrary::updateStatus() {
     cancelImport.setVisible(importStatus.isNotEmpty());
-    status.setColour(juce::Label::textColourId, hasError && importStatus.isEmpty() ? motion::style::error() : osci::Colours::text().withAlpha(0.6f));
+    status.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(0.6f));
     const auto row = list.getSelectedRow();
     // Only say something the row does not already show; the generic
     // how-to lives in the list's tooltip.
@@ -107,7 +101,7 @@ void MotionAssetLibrary::updateStatus() {
             ? "Shared composition. Enter or double-click to insert; drag to place. Open to edit."
             : "Contains this scope: insertion would create a loop. Open to edit.";
     }
-    status.setText(importStatus.isNotEmpty() ? importStatus : (hasError ? errorMessage : help), juce::dontSendNotification);
+    status.setText(importStatus.isNotEmpty() ? importStatus : help, juce::dontSendNotification);
     resized();
 }
 
@@ -121,7 +115,7 @@ void MotionAssetLibrary::resized() {
     const auto row = list.getSelectedRow();
     const bool live = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr;
     // The status line takes room only when it has something to say.
-    const auto statusHeight = status.getText().isEmpty() && importStatus.isEmpty() ? 0 : hasError ? 126 : live ? 92 : 68;
+    const auto statusHeight = status.getText().isEmpty() && importStatus.isEmpty() ? 0 : live ? 92 : 68;
     status.setBounds(area.removeFromBottom(statusHeight).reduced(6, statusHeight > 0 ? 4 : 0));
     if (bakeSettings.isVisible()) { bakeSettings.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
     list.setBounds(area);
