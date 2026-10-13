@@ -53,6 +53,8 @@ public:
             }
         });
         for (const auto id : clear) { document.setLuaBake(id, nullptr); }
+        // A failure is remembered only while its clip still wants a bake.
+        std::erase_if(failedKeys, [&](const auto& failed) { return !wanted.contains(failed.first); });
         // Jobs whose clip no longer wants them (deleted, sliders removed)
         // stop, so they do not hold up the single worker.
         for (auto& [id, job] : jobs) {
