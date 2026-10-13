@@ -116,15 +116,13 @@ private:
         void paint(juce::Graphics& g) override;
     };
     static constexpr int sectionGap = 10, sectionHeading = 26;
-    // How a surface draws itself, as tiles: its edges, outline, patterns and
-    // mirror, each on or off at a click, its rows below only for those on.
+    // How a surface draws itself, as tiles: its edges, outline and patterns,
+    // each on or off at a click, its rows below only for those on.
     std::unique_ptr<motion::ui::TileGrid> surfaceTiles;
     // A light's presets, as tiles: steady, or moving on its own.
     std::unique_ptr<motion::ui::TileGrid> presetTiles;
     // How a camera shades: by brightness, or by hatching.
     std::unique_ptr<motion::ui::TileGrid> shadingTiles;
-    // The surface tiles' properties, in their order.
-    static const std::array<std::string_view, 7>& surfaceProperties();
     // Puts the tiles in step with the target at `time`, and shows the
     // Surface rows that are on; true when which show changed.
     bool refreshTiles(const motion::PropertyTarget& found, double time);

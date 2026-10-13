@@ -2,7 +2,6 @@
 
 #include <JuceHeader.h>
 #include "../model/LightPresets.h"
-#include "../render/Reflections.h"
 #include "../render/HiddenLineHatching.h"
 #include "../render/SurfaceLines.h"
 #include "GeneratorIcons.h"
@@ -17,7 +16,7 @@ struct Picture {
     juce::Path lines, context;
 };
 
-enum class SurfaceLook { edges, outline, spiral, noise, slices, rings, mirror };
+enum class SurfaceLook { edges, outline, spiral, noise, slices, rings };
 
 namespace detail {
 struct Ball {
@@ -134,38 +133,6 @@ inline juce::Path edges() {
     return path;
 }
 
-// A floor of squares below the ball, as the ball shows it from far in front.
-inline juce::Path reflection() {
-    const hidden::SphereMirror mirror {{0, 0, 0}, 1};
-    // The eye, far off along the view, in the ball's own space.
-    const auto back = [](Vec3 seen) {
-        constexpr double yaw = -.45, tip = .38;
-        const auto y = seen.y * std::cos(tip) + seen.z * std::sin(tip);
-        const auto z = -seen.y * std::sin(tip) + seen.z * std::cos(tip);
-        return Vec3 {seen.x * std::cos(yaw) - z * std::sin(yaw), y, seen.x * std::sin(yaw) + z * std::cos(yaw)};
-    };
-    const auto eye = back({0, 0, 60});
-    juce::Path path;
-    const auto trace = [&](Vec3 from, Vec3 to) {
-        constexpr int steps = 160;
-        bool open = false;
-        for (int step = 0; step <= steps; ++step) {
-            const auto seen = mirror.reflectionOf(eye, from + (to - from) * (static_cast<double>(step) / steps));
-            if (!seen.has_value() || !facing(*seen)) {
-                open = false;
-                continue;
-            }
-            if (open) { path.lineTo(onTile(*seen)); } else { path.startNewSubPath(onTile(*seen)); }
-            open = true;
-        }
-    };
-    constexpr double floor = -1.4, reach = 8, spacing = 1.3;
-    for (int line = -2; line <= 2; ++line) {
-        trace({line * spacing, floor, -reach}, {line * spacing, floor, reach});
-        trace({-reach, floor, line * spacing}, {reach, floor, line * spacing});
-    }
-    return path;
-}
 }
 
 inline const Picture& surfacePicture(SurfaceLook look) {
@@ -173,7 +140,7 @@ inline const Picture& surfacePicture(SurfaceLook look) {
         using hidden::surface::Pattern;
         const auto& ball = detail::ball();
         const auto pattern = [&](Pattern kind, double across) { return detail::laid(hidden::surface::pattern(ball.corners, ball.faces, kind, across, .15)); };
-        std::array<Picture, 7> result;
+        std::array<Picture, 6> result;
         const auto outline = detail::circle();
         auto edges = detail::edges();
         edges.addPath(outline);
@@ -183,9 +150,6 @@ inline const Picture& surfacePicture(SurfaceLook look) {
         result[static_cast<std::size_t>(SurfaceLook::noise)] = {pattern(Pattern::noise, 6), outline};
         result[static_cast<std::size_t>(SurfaceLook::slices)] = {pattern(Pattern::slices, 7), outline};
         result[static_cast<std::size_t>(SurfaceLook::rings)] = {pattern(Pattern::rings, 6), outline};
-        auto mirror = outline;
-        mirror.addPath(detail::reflection());
-        result[static_cast<std::size_t>(SurfaceLook::mirror)] = {mirror, {}};
         return result;
     }();
     return made[static_cast<std::size_t>(look)];

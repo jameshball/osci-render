@@ -4,6 +4,34 @@
 #include "../model/LightPresets.h"
 #include "../../parser/FileFormatRegistry.h"
 
+namespace {
+// How a surface can draw itself: a tile each, turning its property on.
+struct SurfaceStyle {
+    std::string_view property, name, tooltip;
+    motion::ui::pictures::SurfaceLook look;
+};
+using Look = motion::ui::pictures::SurfaceLook;
+constexpr std::array<SurfaceStyle, 6> surfaceStyles {{
+    {"edges", "Edges", "Its own edges, as it is made", Look::edges},
+    {"outline", "Outline", "Its outline, where it turns away from the eye", Look::outline},
+    {"spiral", "Spiral", "A spiral winding round it from bottom to top, or in from its edge when it is flat", Look::spiral},
+    {"noise", "Noise", "Contours of noise, which can morph as it plays (Noise flow)", Look::noise},
+    {"slices", "Slices", "Level slices through it", Look::slices},
+    {"rings", "Rings", "Rings centred on its front", Look::rings},
+}};
+
+// The heading each property group sits under (a generator's own numbers sit
+// under its name, a script's sliders under theirs; anything else is Beam).
+constexpr std::array<std::pair<std::string_view, std::string_view>, 22> sectionOfGroup {{
+    {"Position", "Transform"}, {"Rotation", "Transform"}, {"Scale", "Transform"}, {"Anchor", "Transform"},
+    {"Colour", "Appearance"}, {"Opacity", "Appearance"}, {"Lit by lights", "Appearance"}, {"Beam", "Appearance"},
+    {"Edges", "Surface"}, {"Outline", "Surface"}, {"Spiral", "Surface"}, {"Noise", "Surface"}, {"Slices", "Surface"}, {"Rings", "Surface"},
+    {"Fill detail", "Surface"}, {"Noise phase", "Surface"}, {"Noise flow", "Surface"}, {"Mirror", "Surface"},
+    {"Hatching", "Shading"}, {"Hatch detail", "Shading"},
+    {"Gain", "Audio"}, {"Pan", "Audio"},
+}};
+}
+
 MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : processor(owner) {
     setName("Property inspector");
     viewport.setViewedComponent(&content, false);
@@ -355,18 +383,14 @@ bool MotionPropertyInspector::isGeneratorSpec(const motion::PropertySpec& spec) 
 }
 
 juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec) const {
-    const juce::String group(spec.group.data(), spec.group.size());
     if (isGeneratorSpec(spec)) {
         const auto* generator = targetGenerator();
         return juce::String(generator->name.data(), generator->name.size());
     }
-    if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
-    if (group == "Colour" || group == "Opacity" || group == "Lit by lights" || group == "Beam") { return "Appearance"; }
-    if (group == "Edges" || group == "Outline" || group == "Spiral" || group == "Noise" || group == "Slices" || group == "Rings" || group == "Fill detail" || group == "Noise phase" || group == "Noise flow" || group == "Mirror") { return "Surface"; }
-    if (group == "Hatching" || group == "Hatch detail") { return "Shading"; }
-    if (group == "Gain" || group == "Pan") { return "Audio"; }
-    if (group == "Field of view") { return "Lens"; }
-    if (group.startsWith("Slider")) { return "Script sliders"; }
+    const auto found = std::find_if(sectionOfGroup.begin(), sectionOfGroup.end(), [&](const auto& entry) { return entry.first == spec.group; });
+    if (found != sectionOfGroup.end()) { return juce::String(found->second.data(), found->second.size()); }
+    if (spec.group == "Field of view") { return "Lens"; }
+    if (spec.group.starts_with("Slider")) { return "Script sliders"; }
     return "Beam";
 }
 
@@ -505,20 +529,25 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         content.addAndMakeVisible(*shadingTiles);
     }
     if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return motion::isLinesProperty(spec.id); })) {
-        using motion::ui::pictures::SurfaceLook;
-        const auto picture = [](SurfaceLook look) { return motion::ui::pictures::surfacePicture(look); };
-        surfaceTiles = std::make_unique<motion::ui::TileGrid>("Surface styles", std::vector<motion::ui::TileGrid::Choice> {
-            {"Edges", "Its own edges, as it is made", picture(SurfaceLook::edges)},
-            {"Outline", "Its outline, where it turns away from the eye", picture(SurfaceLook::outline)},
-            {"Spiral", "A spiral winding round it from bottom to top, or in from its edge when it is flat", picture(SurfaceLook::spiral)},
-            {"Noise", "Contours of noise, which can morph as it plays (Noise flow)", picture(SurfaceLook::noise)},
-            {"Slices", "Level slices through it", picture(SurfaceLook::slices)},
-            {"Rings", "Rings centred on its front", picture(SurfaceLook::rings)},
-            {"Mirror", "It reflects the rest of the scene", picture(SurfaceLook::mirror)}}, 4);
+        std::vector<motion::ui::TileGrid::Choice> choices;
+        for (const auto& style : surfaceStyles) {
+            choices.push_back({juce::String(style.name.data(), style.name.size()), juce::String(style.tooltip.data(), style.tooltip.size()), motion::ui::pictures::surfacePicture(style.look)});
+        }
+        surfaceTiles = std::make_unique<motion::ui::TileGrid>("Surface styles", std::move(choices), 3);
         surfaceTiles->onClick = [this](std::size_t index) {
+            const auto found = motion::findPropertyTarget(processor.document.project(), target);
+            if (!found.has_value() || found->locked) { return; }
+            // A click is a step of its own; on a keyed style it keys it on
+            // or off at the playhead.
+            const std::string property(surfaceStyles[index].property);
             const auto on = surfaceTiles->tile(index).getToggleState();
+            const auto* curve = found->curve(property);
             const auto name = surfaceTiles->nameOf(index);
-            commitValue(std::string(surfaceProperties()[index]), on ? 0.0 : 100.0, (on ? "Turn off " : "Turn on ") + name);
+            const auto label = curve != nullptr && curve->animated() ? "Key " + name + (on ? " off" : " on") : (on ? "Turn off " : "Turn on ") + name;
+            const auto time = keyTime(*found);
+            processor.document.edit(label, [&](motion::Project& project) { apply(project, property, on ? 0.0 : 100.0, time); });
+            if (onPropertySelected) { onPropertySelected(target, property); }
+            if (onKeyTimeEdited) { onKeyTimeEdited(); }
         };
         content.addAndMakeVisible(*surfaceTiles);
     }
@@ -542,65 +571,68 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
     layoutContent();
 }
 
-const std::array<std::string_view, 7>& MotionPropertyInspector::surfaceProperties() {
-    static const std::array<std::string_view, 7> properties {"edges", "outline", "spiral", "noise", "slices", "rings", "reflects"};
-    return properties;
-}
-
 bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, double time) {
     bool changed = false;
-    if (shadingTiles != nullptr) {
-        const auto* curve = found.curve("hatching");
-        const auto amount = curve != nullptr ? curve->evaluateBase(time) : 0.0;
-        const auto moving = (curve != nullptr && curve->animated()) || isModulated("hatching");
-        const auto badge = moving ? juce::String("~") : amount > 0 && amount < 99.5 ? juce::String(juce::roundToInt(amount)) + "%" : juce::String();
-        shadingTiles->setState(0, !(amount > 0));
-        shadingTiles->setState(1, amount > 0, badge);
-        shadingTiles->setLocked(found.locked);
-        // An XY-only scope shows brightness as the beam's time.
-        shadingTiles->tile(0).setTooltip(processor.document.project().scope.xyOnly ? "Light shows as how bright each line is: on this XY-only scope, by how slowly the beam draws it"
-            : "Light shows as how bright each line is drawn");
-        // Hatching's rows only while it hatches, or is keyed or driven to.
-        for (auto& row : rows) {
-            if (row->section != "Shading") { continue; }
-            const auto shown = amount > 0 || moving;
-            if (row->isVisible() != shown) {
-                row->setVisible(shown);
-                changed = true;
-            }
-        }
+    const auto& project = processor.document.project();
+    // What this target's modulators drive, gathered once.
+    std::vector<std::string_view> routed;
+    for (const auto& route : project.routes) {
+        if (route.target == target) { routed.push_back(route.property); }
     }
-    if (presetTiles != nullptr) {
-        const auto current = motion::currentLightPreset(processor.document.project(), target);
-        presetTiles->setState(0, !current.has_value());
-        for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) { presetTiles->setState(index + 1, current == motion::lightPresets[index]); }
-        presetTiles->setLocked(found.locked);
-    }
-    if (surfaceTiles == nullptr) { return changed; }
     const auto valueOf = [&](std::string_view property) {
         const auto* curve = found.curve(std::string(property));
         if (curve != nullptr) { return curve->evaluateBase(time); }
         const auto spec = std::find_if(specList.begin(), specList.end(), [&](const auto& candidate) { return candidate.id == property; });
         return spec != specList.end() ? spec->defaultValue : 0.0;
     };
-    // Whether a property is in play: on, or keyed or driven to be.
-    const auto live = [&](std::string_view property) {
+    // How a property's value moves: driven by a modulator or a link, keyed, or neither.
+    const auto movesOf = [&](std::string_view property) {
+        using Moves = motion::ui::TileGrid::Moves;
         const auto* curve = found.curve(std::string(property));
-        return valueOf(property) > 0 || (curve != nullptr && curve->animated()) || isModulated(std::string(property));
+        if ((curve != nullptr && curve->link.has_value()) || std::find(routed.begin(), routed.end(), property) != routed.end()) { return Moves::driven; }
+        return curve != nullptr && curve->animated() ? Moves::keyed : Moves::no;
     };
-    for (std::size_t index = 0; index < surfaceProperties().size(); ++index) {
-        const auto value = valueOf(surfaceProperties()[index]);
-        const auto* curve = found.curve(std::string(surfaceProperties()[index]));
-        const auto moving = (curve != nullptr && curve->animated()) || isModulated(std::string(surfaceProperties()[index]));
-        surfaceTiles->setState(index, value > 0, moving ? juce::String("~") : value > 0 && value < 99.5 ? juce::String(juce::roundToInt(value)) + "%" : juce::String());
+    // How much, when part-way.
+    const auto partly = [](double value) { return value > 0 && value < 99.5 ? juce::String(juce::roundToInt(value)) + "%" : juce::String(); };
+    if (shadingTiles != nullptr) {
+        const auto amount = valueOf("hatching");
+        const auto moves = movesOf("hatching");
+        shadingTiles->setState(0, !(amount > 0));
+        shadingTiles->setState(1, amount > 0, partly(amount), moves);
+        shadingTiles->setLocked(found.locked);
+        // An XY-only scope shows brightness as the beam's time.
+        shadingTiles->tile(0).setTooltip(project.scope.xyOnly ? "Light shows as how bright each line is: on this XY-only scope, by how slowly the beam draws it"
+            : "Light shows as how bright each line is drawn");
+        // Hatching's rows only while it hatches, or is keyed or driven to.
+        const auto shown = amount > 0 || moves != motion::ui::TileGrid::Moves::no;
+        for (auto& row : rows) {
+            if (row->section != "Shading" || row->isVisible() == shown) { continue; }
+            row->setVisible(shown);
+            changed = true;
+        }
+    }
+    if (presetTiles != nullptr) {
+        const auto current = motion::currentLightPreset(project, target);
+        presetTiles->setState(0, !current.has_value());
+        for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) { presetTiles->setState(index + 1, current == motion::lightPresets[index]); }
+        presetTiles->setLocked(found.locked);
+    }
+    if (surfaceTiles == nullptr) { return changed; }
+    // Whether a property is in play: on, or keyed or driven to be.
+    const auto live = [&](std::string_view property) { return valueOf(property) > 0 || movesOf(property) != motion::ui::TileGrid::Moves::no; };
+    for (std::size_t index = 0; index < surfaceStyles.size(); ++index) {
+        const auto value = valueOf(surfaceStyles[index].property);
+        surfaceTiles->setState(index, value > 0, partly(value), movesOf(surfaceStyles[index].property));
     }
     surfaceTiles->setLocked(found.locked);
-    const auto patterned = std::any_of(surfaceProperties().begin() + 2, surfaceProperties().begin() + 6, live);
+    bool patterned = false;
+    for (auto index = motion::patternsIndex; index < motion::patternsIndex + motion::patternCount; ++index) { patterned = patterned || live(motion::objectPropertySpecs[index].id); }
     for (auto& row : rows) {
         if (row->section != "Surface" || row->fields.empty()) { continue; }
+        // Mirror always shows: it is no style, but how much it reflects.
         const auto property = row->fields.front()->spec.id;
         const auto noiseMotion = property == "noisePhase" || property == "noiseFlow";
-        const auto shown = property == "fillDetail" ? patterned : noiseMotion ? live("noise") || valueOf(property) != 0 : live(property);
+        const auto shown = property == "reflects" || (property == "fillDetail" ? patterned : noiseMotion ? live("noise") || valueOf(property) != 0 : live(property));
         if (row->isVisible() != shown) {
             row->setVisible(shown);
             changed = true;

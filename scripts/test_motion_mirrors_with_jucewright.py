@@ -115,9 +115,8 @@ try:
 
     add("Generate", "Box")
     set_field("position.x", "-.6", "Change Position X")
-    if tile("Mirror").get("checked"):
-        raise RuntimeError("A box doesn't reflect until asked")
-    field("reflects", present=False)
+    if not str(field("reflects").get("value", "")).startswith("0"):
+        raise RuntimeError("A box doesn't reflect until asked: " + str(field("reflects").get("value")))
 
     add("Mirror", "Mirror ball")
     if not str(field("reflects").get("value", "")).startswith("100"):
@@ -129,12 +128,12 @@ try:
         raise RuntimeError("The status bar says the frames reflect: " + status())
 
     # Not reflecting, it draws its own lines, and nothing of the box.
-    toggle("Mirror", "Turn off Mirror")
+    set_field("reflects", "0", "Change Mirror")
     time.sleep(3)
     plain = scope_lit("plain-ball.png")
     if abs(plain - mirrored) < 20:
         raise RuntimeError("Reflecting should change what the ball draws: " + str((plain, mirrored)))
-    toggle("Mirror", "Turn on Mirror")
+    set_field("reflects", "100", "Change Mirror")
 
     # A curve has no surface to reflect with.
     add("Generate", "Arc")
