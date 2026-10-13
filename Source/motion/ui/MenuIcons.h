@@ -10,9 +10,17 @@
 namespace motion::ui::menu_icons {
 inline constexpr float size = 96, margin = 6, line = 5;
 
-// Shapes drawn in order over the square.
+// Shapes drawn in order over the square. A menu fits an icon by what it
+// draws, so an unseen square under them makes every icon the same size, as
+// laid out, however much of the square its picture fills.
 inline std::unique_ptr<juce::Drawable> inSquare(std::vector<std::unique_ptr<juce::DrawableShape>> shapes) {
     auto icon = std::make_unique<juce::DrawableComposite>();
+    auto frame = std::make_unique<juce::DrawablePath>();
+    juce::Path whole;
+    whole.addRectangle(0, 0, size, size);
+    frame->setPath(whole);
+    frame->setFill(juce::FillType(juce::Colours::transparentBlack));
+    icon->addChild(std::move(frame));
     for (auto& shape : shapes) { icon->addChild(std::move(shape)); }
     const juce::Rectangle<float> square(0, 0, size, size);
     icon->setContentArea(square);
