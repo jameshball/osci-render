@@ -20,10 +20,11 @@ struct PropertySpec {
 };
 
 inline constexpr double unbounded = 1.0e6;
-// 2 atan(1/4): a 0.5-wide frame fills the view at the default distance of 4.
 // The most one object's beam time can be scaled by.
 inline constexpr double maximumBeam = 16;
-inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
+// 2 atan(1/4), in degrees: a 0.5-wide frame fills the view at the default
+// distance of 4.
+inline constexpr double defaultCameraFieldOfView = 28.072486935852957;
 
 // Clips (visual) and groups. The anchor is the point (in the object's own
 // space) that rotation and scale turn about, and that lands on the position,

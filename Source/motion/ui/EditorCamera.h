@@ -6,6 +6,7 @@
 #include <utility>
 #include <numbers>
 #include <optional>
+#include "../model/PropertySpecs.h"
 #include "../model/Vec3.h"
 
 namespace motion::editor {
@@ -17,12 +18,14 @@ struct Ray { Vec3 origin, direction; };
 // positive pitch looks up. NDC is [-1,1] with +Y up; aspect is width/height.
 class Camera {
 public:
-    static constexpr double nearPlane = 0.0001;
+    // How far in front of the eye a point or a line must be to be seen.
+    static constexpr double nearPlane = 0.001;
     static constexpr double minimumDistance = 0.001;
     static constexpr double maximumDistance = 1.0e9;
     static constexpr double maximumCoordinate = 1.0e12;
     static constexpr double pitchLimit = std::numbers::pi * 0.4972222222222222; // 89.5 degrees
-    static constexpr double defaultFieldOfView = 28.072486935852957;
+    // As a camera's, so the Scene first sees what a new camera would.
+    static constexpr double defaultFieldOfView = defaultCameraFieldOfView;
 
     Vec3 position { 0, 0, 4 };
     double yaw = 0, pitch = 0;
@@ -78,7 +81,7 @@ public:
             const auto spread = limit * tangent;
             // Each plane keeps f >= 0, linear along the segment.
             const std::array<std::pair<double, double>, 5> planes {{
-                {a.z - clipNear, b.z - clipNear},
+                {a.z - nearPlane, b.z - nearPlane},
                 {spread * a.z - a.x, spread * b.z - b.x}, {spread * a.z + a.x, spread * b.z + b.x},
                 {spread * a.z - a.y, spread * b.z - b.y}, {spread * a.z + a.y, spread * b.z + b.y}}};
             double first = 0, last = 1;
@@ -90,14 +93,13 @@ public:
             if (first > last) { return std::nullopt; }
             const auto at = [&](double t) {
                 const auto point = a + (b - a) * t;
-                const auto scale = std::max(point.z, clipNear) * tangent;
+                const auto scale = std::max(point.z, nearPlane) * tangent;
                 return Vec2 { point.x / scale, point.y / scale };
             };
             const auto start = at(first), end = at(last);
             if (!std::isfinite(start.x) || !std::isfinite(start.y) || !std::isfinite(end.x) || !std::isfinite(end.y)) { return std::nullopt; }
             return std::make_pair(start, end);
         }
-        static constexpr double clipNear = 0.001;
     };
     std::optional<View> view() const {
         if (!valid()) {
