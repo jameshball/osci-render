@@ -167,9 +167,8 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     bounds.removeFromLeft(8);
     graphics.setColour(osci::Colours::text());
     graphics.setFont(motion::style::body());
-    // The detail line names the kind, so the file extension is left off.
-    const auto name = getNameForRow(row);
-    graphics.drawText(definitionRow(row) || !name.containsChar('.') ? name : name.upToLastOccurrenceOf(".", false, false), bounds.removeFromTop(20), juce::Justification::centredLeft);
+    // The name as the timeline and renaming show it, file extension and all.
+    graphics.drawText(getNameForRow(row), bounds.removeFromTop(20), juce::Justification::centredLeft);
     graphics.setColour(osci::Colours::text().withAlpha(0.55f));
     graphics.setFont(motion::style::caption());
     juce::String detail;
