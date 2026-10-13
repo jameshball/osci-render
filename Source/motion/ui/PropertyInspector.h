@@ -133,6 +133,10 @@ private:
 
     // Driven by a link or a shared modulator route.
     bool isModulated(const std::string& property) const;
+    // The properties the target's modulator routes drive, gathered once for
+    // a refresh, and whether one is driven (by them or a link).
+    std::vector<std::string> routedProperties() const;
+    static bool isDriven(const motion::PropertyTarget& found, const std::vector<std::string>& routed, const std::string& property);
     void build(std::span<const motion::PropertySpec> specs);
     void layoutContent();
 

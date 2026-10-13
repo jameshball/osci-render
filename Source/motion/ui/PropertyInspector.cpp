@@ -171,12 +171,13 @@ void MotionPropertyInspector::refreshValues() {
     const auto found = motion::findPropertyTarget(processor.document.project(), target);
     if (!found.has_value() || found->isEffect) { return; }
     const auto time = keyTime(*found);
+    const auto routed = routedProperties();
     for (auto& row : rows) {
         bool allKeyed = true, anyAnimated = false, modulated = false, earlier = false, later = false;
         for (auto& field : row->fields) {
             const auto property = std::string(field->spec.id);
             const auto* curve = found->curve(property);
-            const auto driven = isModulated(property);
+            const auto driven = isDriven(*found, routed, property);
             modulated = modulated || driven;
             // A driven value says so down its left edge, in the Graph's lilac.
             field->editor.setAccent(driven ? std::optional<juce::Colour>(motion::style::result()) : std::nullopt);
@@ -185,9 +186,11 @@ void MotionPropertyInspector::refreshValues() {
             field->editor.setValue(curve->evaluateBase(time));
             anyAnimated = anyAnimated || curve->animated();
             allKeyed = allKeyed && curve->hasKeyAt(time);
-            for (const auto& key : curve->keyframes()) {
-                earlier = earlier || key.time < time - 1.0e-9;
-                later = later || key.time > time + 1.0e-9;
+            // Keys are in time order: the first and last say whether any is before or after.
+            const auto& keys = curve->keyframes();
+            if (!keys.empty()) {
+                earlier = earlier || keys.front().time < time - 1.0e-9;
+                later = later || keys.back().time > time + 1.0e-9;
             }
         }
         // A locked track's values show but do not edit.
@@ -395,11 +398,21 @@ juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec
 }
 
 bool MotionPropertyInspector::isModulated(const std::string& property) const {
-    const auto& project = processor.document.project();
-    const auto routed = std::any_of(project.routes.begin(), project.routes.end(), [&](const auto& route) { return route.target == target && route.property == property; });
-    const auto found = motion::findPropertyTarget(project, target);
-    const auto* curve = found.has_value() ? found->curve(property) : nullptr;
-    return routed || (curve != nullptr && curve->link.has_value());
+    const auto found = motion::findPropertyTarget(processor.document.project(), target);
+    return found.has_value() && isDriven(*found, routedProperties(), property);
+}
+
+std::vector<std::string> MotionPropertyInspector::routedProperties() const {
+    std::vector<std::string> routed;
+    for (const auto& route : processor.document.project().routes) {
+        if (route.target == target) { routed.push_back(route.property); }
+    }
+    return routed;
+}
+
+bool MotionPropertyInspector::isDriven(const motion::PropertyTarget& found, const std::vector<std::string>& routed, const std::string& property) {
+    const auto* curve = found.curve(property);
+    return (curve != nullptr && curve->link.has_value()) || std::find(routed.begin(), routed.end(), property) != routed.end();
 }
 
 void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs) {
@@ -574,11 +587,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
 bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, double time) {
     bool changed = false;
     const auto& project = processor.document.project();
-    // What this target's modulators drive, gathered once.
-    std::vector<std::string_view> routed;
-    for (const auto& route : project.routes) {
-        if (route.target == target) { routed.push_back(route.property); }
-    }
+    const auto routed = routedProperties();
     const auto valueOf = [&](std::string_view property) {
         const auto* curve = found.curve(std::string(property));
         if (curve != nullptr) { return curve->evaluateBase(time); }
@@ -588,8 +597,9 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
     // How a property's value moves: driven by a modulator or a link, keyed, or neither.
     const auto movesOf = [&](std::string_view property) {
         using Moves = motion::ui::TileGrid::Moves;
-        const auto* curve = found.curve(std::string(property));
-        if ((curve != nullptr && curve->link.has_value()) || std::find(routed.begin(), routed.end(), property) != routed.end()) { return Moves::driven; }
+        const std::string id(property);
+        if (isDriven(found, routed, id)) { return Moves::driven; }
+        const auto* curve = found.curve(id);
         return curve != nullptr && curve->animated() ? Moves::keyed : Moves::no;
     };
     // How much, when part-way.
