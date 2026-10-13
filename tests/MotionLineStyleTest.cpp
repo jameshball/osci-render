@@ -3,6 +3,7 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/BeamRenderer.h"
+#include "../Source/motion/render/HiddenLineBaker.h"
 #include "../Source/motion/render/HiddenLines.h"
 
 // How a surface draws itself: its edges, its outline as the eye sees it, and

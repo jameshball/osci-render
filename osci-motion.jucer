@@ -571,6 +571,10 @@
               compile="0" resource="0" file="Source/motion/render/CompositionPreparationWorker.h"/>
         <FILE id="MotCompositionRenderer" name="CompositionRenderer.h" compile="0"
               resource="0" file="Source/motion/render/CompositionRenderer.h"/>
+        <FILE id="MotrenderHiddenLineBakerh" name="HiddenLineBaker.h" compile="0"
+              resource="0" file="Source/motion/render/HiddenLineBaker.h"/>
+        <FILE id="MotrenderHiddenLineShapesh" name="HiddenLineShapes.h" compile="0"
+              resource="0" file="Source/motion/render/HiddenLineShapes.h"/>
         <FILE id="MotPreparedDrivers" name="PreparedDrivers.h" compile="0"
               resource="0" file="Source/motion/render/PreparedDrivers.h"/>
         <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"

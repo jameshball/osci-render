@@ -2,6 +2,7 @@
 
 #include "CompositionRenderer.h"
 #include "HiddenLineDepth.h"
+#include "HiddenLineShapes.h"
 #include "Lighting.h"
 #include "SceneRays.h"
 #include <algorithm>
@@ -15,7 +16,8 @@ namespace motion::hidden {
 // The shortest run that culling leaves kept, in output units (the frame
 // spans -1 to 1): anything shorter would only draw a dot.
 inline constexpr double shortestOnScreen = .012;
-// Lines are tested every half pixel along their true path.
+// How far apart, at most, the points a line is tested at along its true
+// path are, on screen: a pixel of the camera's depth buffer.
 inline constexpr double testStep = DepthBuffer::pixel;
 // A piece this short at the end of a cut run (two pixels) is too small to
 // see but would cost the beam a sample of its own, so it is trimmed.
@@ -125,54 +127,6 @@ inline std::array<float, 3> lightAt(const std::vector<LightView>& lights, Vec3 p
     std::array<float, 3> light {};
     for (std::size_t channel = 0; channel < 3; ++channel) { light[channel] = 1 + response * (static_cast<float>(total[channel]) - 1); }
     return light;
-}
-
-// A point's own colour (white where it has none) times the light reaching
-// it. Lit brighter than the beam can draw, it is as bright as it can be in
-// its own colour: every channel scaled alike, not each cut off at full,
-// which would turn any strong coloured light white.
-inline osci::Point litColour(osci::Point point, const std::array<float, 3>& light) {
-    point.r = (point.r < 0 ? 1.0f : point.r) * light[0];
-    point.g = (point.g < 0 ? 1.0f : point.g) * light[1];
-    point.b = (point.b < 0 ? 1.0f : point.b) * light[2];
-    const auto brightest = std::max({point.r, point.g, point.b});
-    if (brightest > 1) {
-        point.r /= brightest;
-        point.g /= brightest;
-        point.b /= brightest;
-    }
-    return point;
-}
-
-// A shape drawn dimmer: a mirror's own lines, as it shows the scene in their
-// place, or a surface's, as bright as its Lines say.
-class DimmedShape final : public osci::Shape {
-public:
-    DimmedShape(std::unique_ptr<osci::Shape> whole, float gain) : shape(std::move(whole)), factor(gain) {}
-    osci::Point nextVector(float progress) override {
-        auto point = shape->nextVector(progress);
-        point.r = (point.r < 0 ? 1.0f : point.r) * factor;
-        point.g = (point.g < 0 ? 1.0f : point.g) * factor;
-        point.b = (point.b < 0 ? 1.0f : point.b) * factor;
-        return point;
-    }
-    void scale(float, float, float) override {}
-    void translate(float, float, float) override {}
-    float length() override { return shape->length(); }
-    std::unique_ptr<osci::Shape> clone() override { return std::make_unique<DimmedShape>(shape->clone(), factor); }
-    float gain() const { return factor; }
-    osci::Shape& whole() const { return *shape; }
-    std::string type() override { return "Dimmed"; }
-
-private:
-    std::unique_ptr<osci::Shape> shape;
-    float factor;
-};
-
-// Straight wherever it is drawn: a line, or one dimmed.
-inline bool isStraight(osci::Shape& shape) {
-    auto* dimmed = dynamic_cast<DimmedShape*>(&shape);
-    return dynamic_cast<osci::Line*>(dimmed != nullptr ? &dimmed->whole() : &shape) != nullptr;
 }
 
 // What can stand between two points of the scene: every surface's faces.

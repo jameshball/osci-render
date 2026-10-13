@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../render/BeamRenderer.h"
-#include "../render/HiddenLines.h"
+#include "../render/HiddenLineBaker.h"
 #include "WavExporter.h"
 
 namespace motion {

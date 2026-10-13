@@ -7,7 +7,7 @@
 #include "render/CompositionPreparationWorker.h"
 #include "render/BeamTransitionGuard.h"
 #include "render/BeamRenderer.h"
-#include "render/HiddenLines.h"
+#include "render/HiddenLineBaker.h"
 #include "render/PreparedState.h"
 #include "live/LiveSourceExchange.h"
 #include "live/LiveBlenderController.h"

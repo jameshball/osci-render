@@ -9,60 +9,15 @@
 #include "HiddenLineHatching.h"
 #include "HiddenLineReflections.h"
 #include "HiddenLineScene.h"
+#include "HiddenLineShapes.h"
 #include "HiddenLineStyles.h"
 #include "HiddenLineDicing.h"
 #include "Lighting.h"
 #include "../model/Vec3.h"
 #include <map>
-#include <thread>
 #include <unordered_map>
 
 namespace motion::hidden {
-// The part of a shape between two points of its progress. The shape itself
-// is kept alive by its source.
-class ShapePart final : public osci::Shape {
-public:
-    // `owner` keeps `whole` alive: its source, or the drawing it is of.
-    ShapePart(osci::Shape& whole, std::shared_ptr<const void> owner, float from, float to) : shape(&whole), owner(std::move(owner)), start(from), end(to) {}
-    osci::Point nextVector(float progress) override { return shape->nextVector(start + (end - start) * progress); }
-    void scale(float, float, float) override {}
-    void translate(float, float, float) override {}
-    float length() override {
-        if (len < 0) { len = shape->length() * (end - start); }
-        return len;
-    }
-    std::unique_ptr<osci::Shape> clone() override { return std::make_unique<ShapePart>(*this); }
-    osci::Shape& whole() const { return *shape; }
-    std::string type() override { return "Part"; }
-
-private:
-    osci::Shape* shape;
-    std::shared_ptr<const void> owner;
-    float start, end;
-};
-
-// A line whose ends keep their own colours: a run of a point source.
-class ColouredLine final : public osci::Shape {
-public:
-    ColouredLine(osci::Point from, osci::Point to) : a(from), b(to) {}
-    osci::Point nextVector(float progress) override {
-        const auto mix = [progress](float x, float y) { return x + (y - x) * progress; };
-        const auto coloured = a.r >= 0 && b.r >= 0;
-        return {mix(a.x, b.x), mix(a.y, b.y), mix(a.z, b.z), coloured ? mix(a.r, b.r) : -1.0f, coloured ? mix(a.g, b.g) : -1.0f, coloured ? mix(a.b, b.b) : -1.0f};
-    }
-    void scale(float, float, float) override {}
-    void translate(float, float, float) override {}
-    float length() override {
-        if (len < 0) { len = std::hypot(b.x - a.x, b.y - a.y, b.z - a.z); }
-        return len;
-    }
-    std::unique_ptr<osci::Shape> clone() override { return std::make_unique<ColouredLine>(*this); }
-    std::string type() override { return "Line"; }
-
-private:
-    osci::Point a, b;
-};
-
 // Whether an effect can bend straight lines: one that only colours points,
 // or moves them all alike (turning, scaling, sliding or skewing), keeps a
 // line straight and a face flat, so its faces need no dicing.
@@ -152,43 +107,6 @@ inline std::vector<std::array<std::int32_t, 2>> facesAlong(const PreparedDrawing
     }
     return along;
 }
-
-// A shape, or part of one, lit: it draws its own colours (white where it has
-// none) times the light reaching it, blended between the light at stops along
-// it. One shape for a whole run of light, however its light changes, so the
-// beam walks it in even steps: every shape's end takes a sample of its own,
-// and many short pieces of one line would bunch samples into beads.
-class LitPart final : public osci::Shape {
-public:
-    struct Stop {
-        float at;
-        std::array<float, 3> light;
-    };
-    LitPart(std::shared_ptr<osci::Shape> whole, float from, float to, std::vector<Stop> stops) : shape(std::move(whole)), start(from), end(to), lights(std::move(stops)) {}
-    osci::Point nextVector(float progress) override {
-        const auto next = std::upper_bound(lights.begin(), lights.end(), progress, [](float value, const Stop& stop) { return value < stop.at; });
-        const auto& after = next == lights.end() ? lights.back() : *next;
-        const auto& before = next == lights.begin() ? lights.front() : *(next - 1);
-        const auto span = after.at - before.at;
-        const auto blend = span > 0 ? std::clamp((progress - before.at) / span, 0.0f, 1.0f) : 0.0f;
-        std::array<float, 3> light {};
-        for (std::size_t channel = 0; channel < 3; ++channel) { light[channel] = before.light[channel] + (after.light[channel] - before.light[channel]) * blend; }
-        return litColour(shape->nextVector(start + (end - start) * progress), light);
-    }
-    void scale(float, float, float) override {}
-    void translate(float, float, float) override {}
-    float length() override {
-        if (len < 0) { len = shape->length() * (end - start); }
-        return len;
-    }
-    std::unique_ptr<osci::Shape> clone() override { return std::make_unique<LitPart>(*this); }
-    std::string type() override { return "Lit"; }
-
-private:
-    std::shared_ptr<osci::Shape> shape;
-    float start, end;
-    std::vector<Stop> lights;
-};
 
 // Every surface's faces (meshes', and flat drawings' fills) drawn into a
 // depth buffer as an eye sees them: a camera, to hide lines, or a light, to
@@ -1181,116 +1099,4 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     }
     return frame;
 }
-
-// Bakes a composition's hidden lines on worker threads, each with its own
-// prepared copy of the project (a prepared composition is rendered by one
-// thread at a time), starting at a frame and spreading out from it.
-class Baker {
-public:
-    Baker() = default;
-    ~Baker() {
-        stop();
-        for (auto& worker : retired) { worker.thread->waitForThreadToExit(-1); }
-    }
-
-    // Replaces any bake in progress. Its workers run at low priority, so they
-    // can use every core but two without the editor, the Scope or the audio
-    // waiting on them.
-    void start(std::shared_ptr<Bake> bake, double sampleRate, std::size_t firstFrame) {
-        stop();
-        if (bake == nullptr || bake->project == nullptr || bake->complete()) { return; }
-        cancel = std::make_shared<std::atomic<bool>>(false);
-        const auto cores = std::thread::hardware_concurrency();
-        const auto threads = std::clamp<unsigned>(cores > 2 ? cores - 2 : 1u, 1u, 8u);
-        for (unsigned index = 0; index < threads; ++index) {
-            auto done = std::make_shared<std::atomic<bool>>(false);
-            auto thread = std::make_unique<WorkerThread>([bake, sampleRate, firstFrame, flag = cancel, done] {
-                run(*bake, sampleRate, firstFrame, *flag);
-                done->store(true);
-            });
-            thread->startThread(juce::Thread::Priority::low);
-            workers.push_back({std::move(thread), done});
-        }
-    }
-    // Stops the bake without waiting: its workers finish the step they are
-    // on and are collected later, so an edit never waits for a frame.
-    void stop() {
-        if (cancel != nullptr) { cancel->store(true); }
-        for (auto& worker : workers) { retired.push_back(std::move(worker)); }
-        workers.clear();
-        std::erase_if(retired, [](Worker& worker) {
-            if (!worker.done->load()) { return false; }
-            worker.thread->waitForThreadToExit(-1);
-            return true;
-        });
-    }
-
-    // Every frame, on this thread and helpers, before an export renders.
-    static void bakeAll(Bake& bake, double sampleRate, const std::atomic<bool>& cancel) {
-        const auto threads = std::clamp<unsigned>(std::thread::hardware_concurrency(), 1u, 8u);
-        std::vector<std::thread> helpers;
-        for (unsigned index = 1; index < threads; ++index) { helpers.emplace_back([&] { run(bake, sampleRate, 0, cancel); }); }
-        run(bake, sampleRate, 0, cancel);
-        for (auto& helper : helpers) { helper.join(); }
-    }
-
-private:
-    class WorkerThread final : public juce::Thread {
-    public:
-        explicit WorkerThread(std::function<void()> work) : juce::Thread("Hidden line bake"), body(std::move(work)) {}
-        void run() override { body(); }
-
-    private:
-        std::function<void()> body;
-    };
-    struct Worker {
-        std::unique_ptr<WorkerThread> thread;
-        std::shared_ptr<std::atomic<bool>> done;
-    };
-
-    static void run(Bake& bake, double sampleRate, std::size_t firstFrame, const std::atomic<bool>& cancel) {
-        if (cancel.load()) { return; }
-        // A worker that fails gives its frames up, drawn whole, so the bake
-        // still finishes.
-        const auto giveUp = [&bake, firstFrame](std::optional<std::size_t> frame) {
-            for (; frame.has_value(); frame = bake.claim(firstFrame)) { bake.skip(); }
-        };
-        std::unique_ptr<PreparedComposition> composition;
-        try {
-            composition = std::make_unique<PreparedComposition>(*bake.project, sampleRate, &cancel, CompositionPurpose::culling, bake.reach);
-        } catch (...) {
-            if (!cancel.load()) { giveUp(bake.claim(firstFrame)); }
-            return;
-        }
-        auto workspace = std::make_unique<Workspace>();
-        // The last frame this worker culled and what it depended on: a frame
-        // that depends on just the same is the same, and is copied.
-        Fingerprint lastPrint, print;
-        std::unique_ptr<Frame> last;
-        while (!cancel.load(std::memory_order_relaxed)) {
-            const auto frame = bake.claim(firstFrame);
-            if (!frame.has_value()) { return; }
-            try {
-                const auto time = bake.timeOf(*frame);
-                print.take(*composition, time);
-                if (last != nullptr && print == lastPrint) {
-                    bake.publish(*frame, std::make_unique<Frame>(*last));
-                    continue;
-                }
-                auto result = cull(*composition, time, *workspace, &cancel);
-                if (result == nullptr) { return; }
-                last = std::make_unique<Frame>(*result);
-                std::swap(lastPrint, print);
-                bake.publish(*frame, std::move(result));
-            } catch (...) {
-                last.reset();
-                giveUp(frame);
-                return;
-            }
-        }
-    }
-
-    std::shared_ptr<std::atomic<bool>> cancel;
-    std::vector<Worker> workers, retired;
-};
 }

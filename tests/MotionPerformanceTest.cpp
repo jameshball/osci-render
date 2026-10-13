@@ -3,6 +3,7 @@
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/BeamRenderer.h"
+#include "../Source/motion/render/HiddenLineBaker.h"
 #include "../Source/motion/render/HiddenLines.h"
 #if JUCE_MAC
 #include <malloc/malloc.h>
