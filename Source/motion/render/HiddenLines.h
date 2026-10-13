@@ -447,6 +447,7 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
 
 inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel = nullptr, const OtherEye* from = nullptr) {
     auto& depth = workspace.depth;
+    workspace.laid.nextFrame();
     const auto cancelled = [cancel] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
     auto frame = std::make_unique<Frame>();
     const auto* camera = composition.activeCamera(time);

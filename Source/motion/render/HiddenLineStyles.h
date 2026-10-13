@@ -39,10 +39,28 @@ public:
         }
     };
 
+    // A new frame: surfaces laid before it may be let go of to make room.
+    void nextFrame() { ++frame; }
+
+    // Its surface, laid once and kept while it is used (holding its source,
+    // so the drawing is not freed and its address reused). Past `kept`, the
+    // longest unused go first; none used this frame do, so references
+    // handed out within a frame stay good.
     Surface& of(const PreparedDrawing& drawing, const std::shared_ptr<const PreparedSource>& source) {
         auto found = laid.find(&drawing);
-        if (found == laid.end()) {
-            if (laid.size() > 64) { laid.clear(); }
+        if (found != laid.end()) {
+            found->second.used = frame;
+            return found->second.surface;
+        }
+        while (laid.size() >= kept) {
+            auto oldest = laid.end();
+            for (auto entry = laid.begin(); entry != laid.end(); ++entry) {
+                if (entry->second.used != frame && (oldest == laid.end() || entry->second.used < oldest->second.used)) { oldest = entry; }
+            }
+            if (oldest == laid.end()) { break; }
+            laid.erase(oldest);
+        }
+        {
             Surface made;
             made.source = source;
             const auto& mesh = drawing.faces();
@@ -62,13 +80,19 @@ public:
                 }
             }
             made.closed = !sides.empty() && std::all_of(sides.begin(), sides.end(), [](const auto& side) { return side.second == 2; });
-            found = laid.emplace(&drawing, std::move(made)).first;
+            found = laid.emplace(&drawing, Entry {std::move(made), frame}).first;
         }
-        return found->second;
+        return found->second.surface;
     }
 
 private:
-    std::map<const PreparedDrawing*, Surface> laid;
+    struct Entry {
+        Surface surface;
+        std::uint64_t used = 0;
+    };
+    static constexpr std::size_t kept = 64;
+    std::map<const PreparedDrawing*, Entry> laid;
+    std::uint64_t frame = 0;
 };
 
 // How far a line on a surface follows its curve before it is cut (the turn
