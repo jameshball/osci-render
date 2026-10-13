@@ -25,9 +25,11 @@ public:
         if (notification != juce::dontSendNotification && onChange) { onChange(selected); }
     }
     int preferredWidth() const {
-        auto width = 0;
-        for (const auto& label : labels) { width += juce::roundToInt(juce::TextLayout::getStringWidth(style::body(), label)) + 2 * segmentPadding; }
-        return width + 2 * inset;
+        // Segments are equal, each as wide as the widest label needs.
+        auto widest = 0;
+        const auto font = compact ? style::caption() : style::body();
+        for (const auto& label : labels) { widest = std::max(widest, juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(font, label)))); }
+        return labels.size() * (widest + 2 * (compact ? segmentPadding / 2 + 2 : segmentPadding)) + 2 * inset;
     }
 
     void paint(juce::Graphics& g) override {

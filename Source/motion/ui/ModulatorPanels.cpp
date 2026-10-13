@@ -29,8 +29,9 @@ RouteRow::RouteRow(Document& document, std::function<void(const juce::Result&)> 
     amount.onBegin = [this] { this->document.beginHeld("route:" + juce::String(route.id)); };
     amount.onEnd = [this] { this->document.endHeld(); };
     amount.onCancel = [this] { this->document.cancelHeld(); };
-    mode.setTooltip(juce::String::fromUTF8("Add to the value, or multiply it by 1 + amount \xc3\x97 modulator"));
-    mode.onClick = [this] { apply(amount.getValue(), route.mode == ModulationMode::add ? ModulationMode::multiply : ModulationMode::add); };
+    mode.setTooltip(juce::String::fromUTF8("Add: amount \xc3\x97 modulator is added to the value. Scale: the value is multiplied by 1 + amount \xc3\x97 modulator."));
+    mode.compact = true;
+    mode.onChange = [this](int index) { apply(amount.getValue(), index == 1 ? ModulationMode::multiply : ModulationMode::add); };
     remove.setTooltip("Stop driving this property");
     // A quiet mark beside the mode toggle, not the heaviest thing in the column.
     remove.setIconPadding(7);
@@ -49,14 +50,15 @@ void RouteRow::show(const ModulationRoute& value, const juce::String& text) {
         }
     }
     amount.setValue(route.amount);
-    mode.setButtonText(route.mode == ModulationMode::multiply ? juce::String::fromUTF8("\xc3\x97") : juce::String("+"));
+    mode.setSelected(route.mode == ModulationMode::multiply ? 1 : 0);
 }
 
 void RouteRow::resized() {
     auto area = getLocalBounds();
     label.setBounds(area.removeFromTop(area.getHeight() / 2));
     remove.setBounds(area.removeFromRight(24));
-    mode.setBounds(area.removeFromRight(24).reduced(1));
+    mode.setBounds(area.removeFromRight(mode.preferredWidth()).reduced(0, 1));
+    area.removeFromRight(4);
     amount.setBounds(area.reduced(0, 1));
 }
 

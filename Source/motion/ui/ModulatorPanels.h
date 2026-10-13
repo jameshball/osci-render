@@ -6,6 +6,7 @@
 #include "../model/ModulationGraph.h"
 #include "MotionIcons.h"
 #include "ScrubField.h"
+#include "FormControls.h"
 
 namespace motion::ui {
 inline constexpr PropertySpec rateHzSpec {"rate", "Rate", "", "", 0.001, 1000, 1, .01, 3, " Hz"};
@@ -49,7 +50,9 @@ private:
     ModulationRoute route;
     juce::Label label;
     motion::ui::ScrubField amount;
-    juce::TextButton mode;
+    // Both modes in view, in words, so neither reads as "add another" or
+    // as a second close button.
+    motion::ui::SegmentedControl mode {"Route mode", {"Add", "Scale"}};
     osci::CloseButton remove {"Remove route"};
 };
 }
