@@ -396,6 +396,7 @@ void MotionEditor::refreshUndo() {
     undoButton.setTooltip((undo.isNotEmpty() ? "Undo " + undo : juce::String("Undo")) + undoKeys);
     redoButton.setTooltip((redo.isNotEmpty() ? "Redo " + redo : juce::String("Redo")) + redoKeys);
     undoDescription.setText(undo.isNotEmpty() ? "Undo " + undo : juce::String(), juce::dontSendNotification);
+    undoDescription.setTooltip(undoDescription.getText());
 }
 
 void MotionEditor::timerCallback() {

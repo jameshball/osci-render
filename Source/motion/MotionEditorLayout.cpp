@@ -43,7 +43,9 @@ void MotionEditor::resized() {
         redoButton.setBounds(undo.removeFromRight(28).reduced(1, 3));
         undoButton.setBounds(undo.removeFromRight(28).reduced(1, 3));
         undoDescription.setVisible(wide);
-        undoDescription.setBounds(undo.withTrimmedRight(4));
+        // One line, shortened at its end when long (its tooltip has it whole).
+        const auto line = undo.withTrimmedRight(4);
+        undoDescription.setBounds(line.withSizeKeepingCentre(line.getWidth(), 16));
     }
     top.removeFromRight(8);
     // Transport sits centred in the menu row, leaving the full height below
