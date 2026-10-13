@@ -141,7 +141,7 @@ template <typename ProjectType>
 juce::String describeProperty(const ProjectType& project, Id target, std::string_view property) {
     const auto found = findPropertyTarget(project, target);
     const auto owner = found.has_value() ? juce::String(found->name.data(), found->name.size()) : juce::String("Missing");
-    return owner + juce::String(juce::CharPointer_UTF8(" \xc2\xb7 ")) + propertyLabel(project, target, property);
+    return owner + juce::String::fromUTF8(separator.data(), static_cast<int>(separator.size())) + propertyLabel(project, target, property);
 }
 
 }

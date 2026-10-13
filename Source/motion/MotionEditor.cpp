@@ -1277,7 +1277,7 @@ void MotionEditor::timerCallback() {
         const auto beamRate = motion::beamCycleRate(processor.document.mainProject().frameRate);
         const auto layers = processor.beamLayers.load(std::memory_order_relaxed);
         const auto simplified = processor.beamSimplified.load(std::memory_order_relaxed);
-        const juce::String dot(juce::CharPointer_UTF8("  \xc2\xb7  "));
+        const auto dot = motion::style::dot();
         auto statistics = juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + dot + juce::String(beamRate, beamRate == std::floor(beamRate) ? 0 : 2) + " Hz beam";
         if (processor.document.project().scope.xyOnly) { statistics += dot + "XY only"; }
         if (processor.playing.load() || layers > 0) {

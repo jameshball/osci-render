@@ -5,8 +5,12 @@
 #include "Tempo.h"
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace motion {
+// What separates the parts of a name or a line of facts: "Lamp · Fire".
+inline constexpr std::string_view separator = " \xc2\xb7 ";
+
 // Reusable modulation sources owned by a composition. One modulator can drive
 // any number of properties through routes, so several objects share a single
 // clock (an LFO, a random walk or the soundtrack).

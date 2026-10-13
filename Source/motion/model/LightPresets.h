@@ -90,14 +90,14 @@ inline std::string driveName(const Definition& definition, const Drive& drive) {
 // A preset modulator's name: the light's, cut short (on a character) to
 // keep within a modulator's name, then how the preset moves it.
 inline std::string modulatorName(const std::string& light, const Definition& definition, const Drive& drive) {
-    const auto suffix = " \xc2\xb7 " + driveName(definition, drive);
+    const auto suffix = std::string(separator) + driveName(definition, drive);
     const auto room = Modulator::longestName - std::min(Modulator::longestName, suffix.size());
     auto prefix = juce::String::fromUTF8(light.data(), static_cast<int>(light.size()));
     while (prefix.isNotEmpty() && prefix.getNumBytesAsUTF8() > room) { prefix = prefix.dropLastCharacters(1); }
     return prefix.trimEnd().toStdString() + suffix;
 }
 inline bool namedFor(const Modulator& modulator, const Definition& definition, const Drive& drive) {
-    return modulator.name.ends_with(" \xc2\xb7 " + driveName(definition, drive));
+    return modulator.name.ends_with(std::string(separator) + driveName(definition, drive));
 }
 // The modulators routed to a light that are named for a way some preset
 // moves: those its preset made, whatever the light is called now.

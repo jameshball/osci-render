@@ -362,7 +362,7 @@ void MotionEffectStack::refreshStages() {
     const auto add = [&](const juce::String& label, motion::Id id) {
         const auto* effects = motion::findEffectOwner(project, id);
         if (effects != nullptr && !effects->empty() && (!owner.has_value() || *owner != id)) {
-            found.emplace_back(label + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(static_cast<int>(effects->size())), id);
+            found.emplace_back(label + motion::style::dot() + juce::String(static_cast<int>(effects->size())), id);
         }
     };
     motion::Id group = 0;
@@ -391,7 +391,7 @@ void MotionEffectStack::refreshStages() {
     for (const auto& [label, id] : found) {
         auto chip = std::make_unique<motion::ui::Chip>(label);
         chip->setClickingTogglesState(false);
-        chip->setName("Effects of " + label.upToFirstOccurrenceOf(juce::String::fromUTF8(" \xc2\xb7"), false, false));
+        chip->setName("Effects of " + label.upToFirstOccurrenceOf(motion::style::dot(), false, false));
         chip->setTooltip("Show these effects");
         // Showing another stage rebuilds these chips, so it waits.
         chip->onClick = [this, id = id] {

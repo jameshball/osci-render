@@ -60,7 +60,7 @@ public:
     juce::String statusText(Id id) const {
         const auto asset = liveAsset(id);
         if (asset == nullptr) { return "Source unavailable"; }
-        const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
+        const auto dot = juce::String::fromUTF8(separator.data(), static_cast<int>(separator.size()));
         const auto* session = findSession(asset->liveIdentity);
         if (session == nullptr) { return "Offline" + dot + "start listening to connect Blender"; }
         const auto status = session->input->status();

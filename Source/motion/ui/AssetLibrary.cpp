@@ -176,13 +176,13 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     if (definitionRow(row)) {
         const auto& definition = *definitions[static_cast<std::size_t>(row) - assets.size()];
         const auto clip = motion::Document::makeCompositionClip(0, definition, 0);
-        detail = "Composition" + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(clip.duration, 1) + " s";
+        detail = "Composition" + motion::style::dot() + juce::String(clip.duration, 1) + " s";
     } else {
         const auto& asset = *assets[static_cast<std::size_t>(row)];
         detail = motion::ui::sourceKind(asset);
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
-            detail += juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(asset.source->duration(), 1) + " s";
+            detail += motion::style::dot() + juce::String(asset.source->duration(), 1) + " s";
         }
     }
     graphics.drawText(detail, bounds, juce::Justification::centredLeft);
