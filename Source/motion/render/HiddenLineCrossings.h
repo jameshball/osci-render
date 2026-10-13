@@ -306,8 +306,9 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
 // scene, not just where an eye sees: what a mirror shows can be anywhere.
 // `triangles`' corners are in the scene, surface by surface. Only surfaces
 // whose boxes overlap are paired, and only their triangles inside the other's
-// box, swept along x. None, once `cancel` is set partway.
-inline std::vector<std::vector<Piece>> runsInScene(const std::vector<Triangle>& triangles, const std::atomic<bool>* cancel = nullptr) {
+// box, swept along x. None, once `cancelled()` is true partway.
+template <typename Cancelled>
+std::vector<std::vector<Piece>> runsInScene(const std::vector<Triangle>& triangles, Cancelled&& cancelled) {
     struct Bounds {
         Vec3 low {1.0e300, 1.0e300, 1.0e300}, high {-1.0e300, -1.0e300, -1.0e300};
         void include(const Bounds& other) {
@@ -334,7 +335,7 @@ inline std::vector<std::vector<Piece>> runsInScene(const std::vector<Triangle>& 
     std::vector<std::uint32_t> mine, theirs;
     for (std::size_t one = 0; one < surfaces.size(); ++one) {
         for (auto other = one + 1; other < surfaces.size(); ++other) {
-            if (cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return {}; }
+            if (cancelled()) { return {}; }
             if (!surfaceBoxes[one].overlaps(surfaceBoxes[other])) { continue; }
             const auto within = [&](std::size_t surface, const Bounds& box, std::vector<std::uint32_t>& found) {
                 found.clear();
@@ -346,7 +347,10 @@ inline std::vector<std::vector<Piece>> runsInScene(const std::vector<Triangle>& 
             within(one, surfaceBoxes[other], mine);
             within(other, surfaceBoxes[one], theirs);
             std::size_t first = 0;
-            for (const auto a : mine) {
+            for (std::size_t mineIndex = 0; mineIndex < mine.size(); ++mineIndex) {
+                // Two dense surfaces can pair a great many triangles.
+                if (mineIndex % 1024 == 1023 && cancelled()) { return {}; }
+                const auto a = mine[mineIndex];
                 while (first < theirs.size() && boxes[theirs[first]].high.x < boxes[a].low.x) { ++first; }
                 for (auto index = first; index < theirs.size() && boxes[theirs[index]].low.x <= boxes[a].high.x; ++index) {
                     if (!boxes[a].overlaps(boxes[theirs[index]])) { continue; }

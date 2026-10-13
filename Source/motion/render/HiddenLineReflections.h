@@ -203,7 +203,7 @@ private:
                 crossingFaces.emplace_back(surface, face);
             });
         }
-        crossings = crossing::runsInScene(crossingTriangles, nullptr);
+        crossings = crossing::runsInScene(crossingTriangles, cancelled);
     }
 
     // Starts on a mirror. What it shows keeps its own colours, as bright as

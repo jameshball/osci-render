@@ -25,10 +25,13 @@ public:
         Vec3 a, b, c;
         // The surface it is a face of.
         std::uint32_t surface;
+        bool operator==(const Triangle&) const = default;
     };
 
-    // Takes the scene's faces, replacing any it had.
+    // Takes the scene's faces, replacing any it had; the same faces again
+    // (a still scene) keep the tree already built.
     void build(std::vector<Triangle> faces) {
+        if (!nodes.empty() && faces == triangles) { return; }
         triangles = std::move(faces);
         nodes.clear();
         order.resize(triangles.size());

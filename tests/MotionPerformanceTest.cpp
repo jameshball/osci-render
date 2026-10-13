@@ -162,6 +162,11 @@ private:
         auto mirrored = hiddenLineProject({teapot}, 1, false);
         addGenerator(mirrored, "sphere", 5000, {{"position.x", 1.1}, {"scale.x", .5}, {"scale.y", .5}, {"scale.z", .5}, {"reflects", 100}});
         benchmarkHiddenLineProject("mirrored teapot", mirrored);
+        // Still, with the ball cutting into it: what stands between and where
+        // they cross are found once.
+        auto stillMirrored = hiddenLineProject({teapot}, 1, false, true);
+        addGenerator(stillMirrored, "sphere", 5000, {{"position.x", .6}, {"scale.x", .5}, {"scale.y", .5}, {"scale.z", .5}, {"reflects", 100}});
+        benchmarkHiddenLineProject("still mirrored teapot", stillMirrored);
         // Lit, and shaded by the camera's hatching rather than brightness.
         auto hatched = lit;
         hatched.cameras.front().properties["hatching"] = motion::Curve(100);
