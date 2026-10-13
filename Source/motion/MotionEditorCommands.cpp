@@ -15,7 +15,7 @@ void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, j
 void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     menu.addItem(motion::style::menuItem("New project", 1001, "Cmd+N"));
     menu.addItem(motion::style::menuItem("Open project...", 1002, "Cmd+O"));
-    menus.addRecentProjectsSubmenu(menu, processor, 1100, 1099);
+    menus.addRecentProjectsSubmenu(menu, processor, 1100, 1099, true);
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Save project", 1003, "Cmd+S"));
     menu.addItem(motion::style::menuItem("Save project as...", 1004, "Cmd+Shift+S"));

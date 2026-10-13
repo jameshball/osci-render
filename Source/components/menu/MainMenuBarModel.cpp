@@ -95,15 +95,15 @@ void MainMenuBarModel::addProjectMenuItems(int topLevelMenuIndex, CommonAudioPro
     }
 }
 
-void MainMenuBarModel::addRecentProjectsSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int recentBaseId, int clearRecentId) {
+void MainMenuBarModel::addRecentProjectsSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int recentBaseId, int clearRecentId, bool sentenceCase) {
     juce::PopupMenu recentMenu;
     const int added = processor.createRecentProjectsPopupMenuItems(recentMenu, recentBaseId, true, true);
     if (added == 0) {
-        recentMenu.addItem(recentBaseId, "(No Recent Projects)", false);
+        recentMenu.addItem(recentBaseId, sentenceCase ? "No recent projects" : "(No Recent Projects)", false);
     }
     recentMenu.addSeparator();
-    recentMenu.addItem(clearRecentId, "Clear Recent Projects", added > 0);
-    menu.addSubMenu("Open Recent", recentMenu);
+    recentMenu.addItem(clearRecentId, sentenceCase ? "Clear recent projects" : "Clear Recent Projects", added > 0);
+    menu.addSubMenu(sentenceCase ? "Open recent" : "Open Recent", recentMenu);
 }
 
 bool MainMenuBarModel::handleRecentProjectMenuItem(int menuItemId, CommonAudioProcessor& processor, CommonPluginEditor& editor, int recentBaseId, int clearRecentId) {

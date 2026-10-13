@@ -114,7 +114,7 @@ void MotionEditor::setUpMenus() {
             juce::PopupMenu output;
             for (int id = 1; id <= 3; ++id) { output.addItem(2000 + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
             menu.addSubMenu("Audio interface plays", output);
-            InternalSampleRateMenu::addSubmenu(menu, processor, sampleRateMenuId);
+            InternalSampleRateMenu::addSubmenu(menu, processor, sampleRateMenuId, true);
             menu.addSeparator();
         }
         if (index == timingMenuIndex) {
