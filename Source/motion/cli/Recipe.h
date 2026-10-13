@@ -13,7 +13,7 @@ namespace motion::cli {
 // is made again exactly whatever the project format comes to be.
 //
 //   {
-//     "duration": 8, "fps": 60, "bpm": 120, "beam": {"intensity": 20},
+//     "duration": 8, "fps": 60, "bpm": 120, "rateRatio": 4, "beam": {"intensity": 20},
 //     "camera": {"hidesHiddenLines": true, "lookAt": "Ball",
 //                "properties": {"position.z": 4}, "keys": {"position.x": [[0, -1], [8, 1, "linear"]]}},
 //     "objects": [
@@ -62,6 +62,8 @@ private:
         project.duration = number(recipe, "duration", 8);
         project.frameRate = number(recipe, "fps", 60);
         project.bpm = number(recipe, "bpm", 120);
+        // The audio at this many times the device's rate (1, 2, 4 or 8).
+        project.sampleRateRatio = number(recipe, "rateRatio", 1);
         // Names for parts of expressions, used by any expression after.
         const auto* defined = recipe["define"].getDynamicObject();
         if (defined != nullptr) {

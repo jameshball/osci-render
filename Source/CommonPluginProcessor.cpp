@@ -465,9 +465,9 @@ bool CommonAudioProcessor::canSetInternalSampleRateRatio(double ratio) const {
 #endif
 }
 
-void CommonAudioProcessor::setInternalSampleRateRatio(double ratio) {
+void CommonAudioProcessor::setInternalSampleRateRatio(double ratio, bool remember) {
 #if !OSCI_PREMIUM
-    juce::ignoreUnused(ratio);
+    juce::ignoreUnused(ratio, remember);
     return;
 #else
     if (!supportsInternalSampleRateOverride()) {
@@ -478,8 +478,10 @@ void CommonAudioProcessor::setInternalSampleRateRatio(double ratio) {
         return;
     }
 
-    globalSettings.set(InternalSampleRateController::settingKey, internalSampleRate.getRatio());
-    globalSettings.save();
+    if (remember) {
+        globalSettings.set(InternalSampleRateController::settingKey, internalSampleRate.getRatio());
+        globalSettings.save();
+    }
 
     if (internalSampleRate.hasPreparedDevice()) {
         suspendProcessing(true);

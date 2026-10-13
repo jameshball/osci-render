@@ -622,6 +622,23 @@ public:
         expect(lines.contains(juce::String(juce::CharPointer_UTF8("Clip property this version doesn't have (\xc3\x97" "2): hilbert, sierpinski"))), lines);
         expect(lines.contains("Effect this version doesn't have: warp-drive"), lines);
 
+        beginTest("A project keeps its internal sample rate, and one this version lacks opens at the device's");
+        {
+            juce::UndoManager rateUndo;
+            motion::Document rated(rateUndo);
+            expect(rated.load(xml).wasOk());
+            expectEquals(rated.project().sampleRateRatio, 1.0);
+            rated.edit("Rate", [](motion::Project& project) { project.sampleRateRatio = 4; });
+            const auto saved = rated.save();
+            motion::Project reopened;
+            expect(motion::Document::prepareLoad(saved, reopened).wasOk());
+            expectEquals(reopened.sampleRateRatio, 4.0);
+            auto odd = std::make_unique<juce::XmlElement>(saved);
+            odd->setAttribute("sampleRateRatio", 3);
+            expect(opensLeavingOut(rated, *odd));
+            expectEquals(rated.project().sampleRateRatio, 1.0);
+        }
+
         beginTest("A file that can't open at all says why, and what to do");
         {
             using Problem = motion::ProjectFile::Problem;

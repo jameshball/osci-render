@@ -41,7 +41,8 @@ struct ScopeRender {
     // `project` (a recipe is made into one first) rendered to `destination`
     // by `app`: all of it, or with `stills` only the stretches up to them
     // (see Stretches), one after another, a frame of each in seconds.
-    static juce::Result video(const juce::File& project, const juce::File& destination, const juce::File& app, const std::vector<double>& stills = {}) {
+    // `said`: what the app said of it (its rate among it).
+    static juce::Result video(const juce::File& project, const juce::File& destination, const juce::File& app, const std::vector<double>& stills = {}, juce::String* said = nullptr) {
         if (!app.existsAsFile()) { return juce::Result::fail("There is no osci-motion app to render with: build it, or pass --app=<osci-motion.app>."); }
         auto source = project;
         juce::TemporaryFile made(".osci-motion");
@@ -66,6 +67,7 @@ struct ScopeRender {
         }
         const auto output = process.readAllProcessOutput();
         const auto exitCode = process.getExitCode();
+        if (said != nullptr) { *said = output; }
         if (exitCode != 0 || !destination.existsAsFile()) {
             return juce::Result::fail("The app couldn't render it" + (output.trim().isEmpty() ? juce::String(".") : ":\n" + output.trim()));
         }

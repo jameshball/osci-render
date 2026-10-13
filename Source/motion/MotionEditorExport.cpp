@@ -289,7 +289,7 @@ void MotionEditor::continueCommandLineRender() {
     if (!commandLineStills.empty()) { state->stretches = motion::Stretches::upTo(commandLineStills, project.frameRate); }
     exportState = state;
     const auto destination = commandLineRender;
-    std::cout << "osci-motion rendering " << project.name << " to " << destination.getFullPathName() << std::endl;
+    std::cout << "osci-motion rendering " << project.name << " at " << state->sampleRate << " Hz to " << destination.getFullPathName() << std::endl;
     const juce::Component::SafePointer<MotionEditor> owner(this);
     startVideoExport(state, project, beamSnapshot, visualiser.getRenderMode(), config, destination, [owner, destination](bool succeeded) {
         if (owner == nullptr) { return; }

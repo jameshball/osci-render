@@ -98,7 +98,7 @@ void MotionEditor::setUpMenus() {
             for (int id = 1; id <= monitorOutput.getNumItems(); ++id) { output.addItem(outputMenuId + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
             // Named as the chooser beside the transport is.
             menu.addSubMenu("Output", output);
-            InternalSampleRateMenu::addSubmenu(menu, processor, sampleRateMenuId, true);
+            InternalSampleRateMenu::addSubmenu(menu, processor, processor.document.mainProject().sampleRateRatio, sampleRateMenuId, true);
             menu.addSeparator();
         }
         if (index == timingMenuIndex) {
@@ -127,7 +127,12 @@ void MotionEditor::setUpMenus() {
             monitorOutput.setSelectedId(id - outputMenuId);
             return true;
         }
-        if (index == audioMenu && InternalSampleRateMenu::handleMenuId(id, sampleRateMenuId, processor, [this] { showPremiumSplashScreen(); })) { return true; }
+        // The rate is the project's: an edit, undone as one.
+        const auto chooseRatio = [this](double ratio) {
+            if (processor.document.mainProject().sampleRateRatio == ratio) { return; }
+            processor.document.edit("Change the internal sample rate", [ratio](motion::Project& project) { project.sampleRateRatio = ratio; });
+        };
+        if (index == audioMenu && InternalSampleRateMenu::handleMenuId(id, sampleRateMenuId, processor, [this] { showPremiumSplashScreen(); }, chooseRatio)) { return true; }
         if (index == editMenu && (id == undoMenuId || id == redoMenuId)) {
             if (id == undoMenuId) { undoRedoControls.undo(); } else { undoRedoControls.redo(); }
             refreshUndo();

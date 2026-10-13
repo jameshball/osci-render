@@ -30,8 +30,11 @@ bool getRatioForMenuId(int menuItemId, int baseId, double& selectedRatio) noexce
 
 namespace InternalSampleRateMenu {
 void addSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int baseId, bool sentenceCase) {
+    addSubmenu(menu, processor, processor.getInternalSampleRateRatio(), baseId, sentenceCase);
+}
+
+void addSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, double currentRatio, int baseId, bool sentenceCase) {
     juce::PopupMenu sub;
-    const auto currentRatio = processor.getInternalSampleRateRatio();
     const auto& ratios = osci::IntegerRatioSampleRateAdapter::getSupportedRatios();
 
     for (size_t i = 0; i < ratios.size(); ++i) {
@@ -50,6 +53,10 @@ void addSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int base
 }
 
 bool handleMenuId(int menuItemId, int baseId, CommonAudioProcessor& processor, std::function<void()> showPremiumSplashScreen) {
+    return handleMenuId(menuItemId, baseId, processor, std::move(showPremiumSplashScreen), [&processor](double ratio) { processor.setInternalSampleRateRatio(ratio); });
+}
+
+bool handleMenuId(int menuItemId, int baseId, CommonAudioProcessor& processor, std::function<void()> showPremiumSplashScreen, std::function<void(double)> choose) {
     double ratio = 1.0;
     if (!getRatioForMenuId(menuItemId, baseId, ratio)) {
         return false;
@@ -69,7 +76,7 @@ bool handleMenuId(int menuItemId, int baseId, CommonAudioProcessor& processor, s
         return false;
     }
 
-    processor.setInternalSampleRateRatio(ratio);
+    choose(ratio);
     return true;
 }
 }

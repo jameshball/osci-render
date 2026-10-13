@@ -29,9 +29,11 @@ juce::StringArray positional(const juce::ArgumentList& args) {
     return found;
 }
 
+// --rate, or 0: the project's own (48 kHz times its ratio).
 double sampleRateOf(const juce::ArgumentList& args) {
     const auto text = args.getValueForOption("--rate");
-    const auto rate = text.isEmpty() ? 48000.0 : text.getDoubleValue();
+    if (text.isEmpty()) { return 0; }
+    const auto rate = text.getDoubleValue();
     if (!(rate >= 1000)) { juce::ConsoleApplication::fail("--rate must be a sample rate in Hz, such as 48000."); }
     return rate;
 }
@@ -113,8 +115,13 @@ void writePreviews(const juce::File& video, const std::vector<double>& times, co
 juce::File renderVideo(const juce::ArgumentList& args, const juce::File& project, const juce::File& destination, const std::vector<double>& stills = {}) {
     say("Rendering " + project.getFileName() + (stills.empty() ? juce::String() : " (" + juce::String(static_cast<int>(stills.size())) + " stills)") + " with the app...");
     const auto start = juce::Time::getMillisecondCounterHiRes();
-    const auto rendered = ScopeRender::video(project, destination, ScopeRender::app(args.getValueForOption("--app")), stills);
+    juce::String said;
+    const auto rendered = ScopeRender::video(project, destination, ScopeRender::app(args.getValueForOption("--app")), stills, &said);
     if (rendered.failed()) { juce::ConsoleApplication::fail(rendered.getErrorMessage()); }
+    // The rate it rendered at, as the app said.
+    for (const auto& line : juce::StringArray::fromLines(said)) {
+        if (line.startsWith("osci-motion rendering")) { say(line.fromFirstOccurrenceOf(" at ", false, false).upToFirstOccurrenceOf(" to ", false, false).trim() + " in the app"); }
+    }
     say("Video " + destination.getFullPathName() + " in " + juce::String((juce::Time::getMillisecondCounterHiRes() - start) / 1000.0, 1) + " s");
     return destination;
 }
@@ -303,7 +310,7 @@ int main(int argc, char* argv[]) {
     const juce::ScopedJuceInitialiser_GUI initialiser;
     juce::ConsoleApplication app;
     app.addHelpCommand("--help|-h", "osci-motion-cli: draws osci-motion projects offline, as Export draws them.\n"
-        "Times are in seconds; --rate=Hz sets the sample rate (48000).", true);
+        "Times are in seconds; --rate=Hz sets the sample rate (the project's own: 48000 times its ratio).", true);
     app.addCommand({"make", "make <scene.recipe.json> [--out=scene.osci-motion]",
         "Makes a project from a recipe: objects from generators or files, their properties and keys, a camera.",
         "Every command takes a recipe wherever it takes a project. See Source/motion/cli/Recipe.h for the format.", make});
