@@ -135,8 +135,10 @@ void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::
     if (std::abs(beam - 1) > .005) { text += motion::style::dot() + juce::String(beam, 2) + juce::String(juce::CharPointer_UTF8("\xc3\x97")); }
     const auto width = juce::TextLayout::getStringWidth(motion::style::caption(), text) + 12;
     const auto y = beamY(area, share(x));
-    // Above the edge, where the pointer isn't, even past the clip's top.
-    auto pill = juce::Rectangle<float>(width, 16).withCentre({x, 0}).withY(y - 22);
+    // Above the edge, where the pointer isn't, even past the clip's top; below
+    // it on the top row, where above would be under the bands.
+    const auto above = y - 22 >= static_cast<float>(rulerHeight) + 2;
+    auto pill = juce::Rectangle<float>(width, 16).withCentre({x, 0}).withY(above ? y - 22 : y + 6);
     pill = pill.withX(std::clamp(pill.getX(), left, std::max(left, right - width)));
     beamLabel = std::make_pair(pill, text);
 }
