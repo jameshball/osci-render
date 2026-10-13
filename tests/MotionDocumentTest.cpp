@@ -2238,9 +2238,12 @@ public:
                         expectEquals(reader->lengthInSamples, static_cast<juce::int64>(96000));
                         juce::AudioBuffer<float> signal(5, static_cast<int>(reader->lengthInSamples));
                         expect(reader->read(signal.getArrayOfWritePointers(), 5, 0, signal.getNumSamples()));
-                        motion::PreparedComposition exact(project, 48000);
-                        for (int index = 0; index < signal.getNumSamples(); index += 421) {
-                            const auto point = exact.sample(index / 48000.0, std::fmod(index * 60.0 / 48000, 1.0), 60.0 / 48000, 1.0 / 48000);
+                        // The beam as export draws it: the Scope's timing, sample by sample.
+                        const motion::PreparedComposition exact(project, 48000, nullptr, motion::CompositionPurpose::signal);
+                        motion::BeamRenderer beam;
+                        for (int index = 0; index < signal.getNumSamples(); ++index) {
+                            const auto point = beam.sample(exact, index / 48000.0, index, 48000, true, 1);
+                            if (index % 421 != 0) { continue; }
                             expectEquals(signal.getSample(0, index), point.x); expectEquals(signal.getSample(1, index), point.y);
                             expectEquals(signal.getSample(2, index), point.r); expectEquals(signal.getSample(4, index), point.b);
                         }
