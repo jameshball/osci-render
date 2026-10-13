@@ -182,10 +182,17 @@ void MotionCompositionView::paint(juce::Graphics& g) {
         drawWorldLine(g, {-5, value, 0}, {5, value, 0});
     }
     if (prepared == nullptr || prepared->clips.empty()) {
-        g.setColour(osci::Colours::text().withAlpha(0.5f));
+        // On a pill of its own, so the axes never run through it; clear of
+        // the tool strip on the left, and on two lines in a narrow Scene.
+        const auto message = prepared == nullptr ? juce::String("Preparing...") : emptyMessage();
+        const auto room = getLocalBounds().withTrimmedLeft(48).reduced(12, 0);
+        const auto width = juce::TextLayout::getStringWidth(motion::style::body(), message) + 28;
+        const auto lines = width <= static_cast<float>(room.getWidth()) ? 1 : 2;
+        const auto pill = room.toFloat().withSizeKeepingCentre(std::min(width, static_cast<float>(room.getWidth())), lines * 18.0f + 12.0f);
+        motion::style::fillFloatingPanel(g, pill, osci::Colours::veryDark());
+        g.setColour(osci::Colours::text().withAlpha(0.6f));
         g.setFont(motion::style::body());
-        // Clear of the tool strip on the left; wraps in a narrow Scene.
-        g.drawFittedText(prepared == nullptr ? juce::String("Preparing...") : emptyMessage(), getLocalBounds().withTrimmedLeft(48).reduced(12, 0), juce::Justification::centred, 3);
+        g.drawFittedText(message, pill.toNearestInt().reduced(14, 6), juce::Justification::centred, lines);
         paintOrientation(g);
         return;
     }
@@ -1474,7 +1481,7 @@ juce::String MotionCompositionView::emptyMessage() const {
             if (!silenced && timing.start > now && (!next.has_value() || timing.start < *next)) { next = timing.start; }
         }
     }
-    if (!any) { return "Drop files here to start, or choose Import source (" + motion::style::shortcutText("Cmd+I") + ")"; }
+    if (!any) { return "Drop files here, or use Add source (" + motion::style::shortcutText("Cmd+I") + " imports one)"; }
     if (hidden) { return "Clips here are on muted or un-soloed tracks"; }
     const auto grid = project.timeGrid();
     const auto at = "Nothing on screen at " + juce::String(grid.positionLabel(now));
@@ -1540,7 +1547,7 @@ void MotionCompositionView::paintMotionPath(juce::Graphics& g) {
     g.setFont(motion::style::caption());
     g.setColour(osci::Colours::textMuted());
     g.drawFittedText(motionPath.tooComplex ? "Path hidden: more than 2,048 transform keys"
-        : "Position path (before effects)" + motion::style::dot() + "Click a key to seek", getLocalBounds().removeFromTop(26).withTrimmedLeft(48).reduced(10, 0), juce::Justification::centredLeft, 2);
+        : "Position path (before effects)" + motion::style::dot() + "Click a key to seek", getLocalBounds().removeFromTop(26).withTrimmedLeft(48).withTrimmedRight(96).reduced(10, 0), juce::Justification::centredLeft, 2);
 }
 
 bool MotionCompositionView::seekMotionKey(juce::Point<float> position) {
