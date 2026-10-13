@@ -80,6 +80,15 @@ inline constexpr std::size_t lightPresetIds = 2 * std::tuple_size_v<decltype(lig
 namespace light_preset_detail {
 // What a preset names a light's modulator for one way it moves: "Fire Surge".
 inline std::string driveName(const Definition& definition, const Drive& drive) { return std::string(definition.name) + " " + std::string(drive.role); }
+// A preset modulator's name: the light's, cut short (on a character) to
+// keep within a modulator's name, then how the preset moves it.
+inline std::string modulatorName(const std::string& light, const Definition& definition, const Drive& drive) {
+    const auto suffix = " \xc2\xb7 " + driveName(definition, drive);
+    const auto room = Modulator::longestName - std::min(Modulator::longestName, suffix.size());
+    auto prefix = juce::String::fromUTF8(light.data(), static_cast<int>(light.size()));
+    while (prefix.isNotEmpty() && prefix.getNumBytesAsUTF8() > room) { prefix = prefix.dropLastCharacters(1); }
+    return prefix.trimEnd().toStdString() + suffix;
+}
 inline bool namedFor(const Modulator& modulator, const Definition& definition, const Drive& drive) {
     return modulator.name.ends_with(" \xc2\xb7 " + driveName(definition, drive));
 }
@@ -149,7 +158,7 @@ inline bool applyLightPreset(Composition& composition, Id light, LightPreset pre
         const auto& drive = definition.drives[index];
         Modulator modulator;
         modulator.id = newId();
-        modulator.name = clip->name + " \xc2\xb7 " + light_preset_detail::driveName(definition, drive);
+        modulator.name = light_preset_detail::modulatorName(clip->name, definition, drive);
         modulator.shape.waveform = drive.waveform;
         modulator.shape.rateHz = drive.rateHz;
         // Each its own noise, and each light's its own.

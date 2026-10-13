@@ -3,6 +3,7 @@
 #include <thread>
 #include "../Source/motion/import/FractalPreparation.h"
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/model/LightPresets.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
@@ -166,6 +167,32 @@ public:
             std::vector<motion::Id> made;
             expect(bigDocument.duplicateClips({instance.id}, made).failed(), "a duplicate past the limit is refused");
             expect(made.empty() && bigDocument.project().tracks[0].clips.size() == 1, "and nothing changes");
+        }
+        {
+            // A light with a long name still takes a preset whole: its
+            // modulators' names are cut to fit, on a character.
+            auto bulb = std::make_shared<motion::Asset>();
+            bulb->id = 1; bulb->name = "Point light"; bulb->extension = ".generator";
+            bulb->data.append("pointLight", 10);
+            expect(motion::decodeAsset(*bulb).wasOk());
+            motion::Project lit;
+            lit.assets.push_back(bulb);
+            motion::Track track; track.id = 2;
+            auto clip = motion::Document::makeClip(3, *bulb, 0);
+            juce::String longName;
+            for (int index = 0; index < 60; ++index) { longName << juce::String::fromUTF8("\xe5\x85\x89"); }
+            clip.name = longName.toStdString();
+            expect(track.insert(clip, lit.tempo()));
+            lit.tracks.push_back(track);
+            juce::UndoManager litUndo;
+            motion::Document litDocument(litUndo);
+            litDocument.reset(lit);
+            expect(motion::editLightPreset(litDocument, 3, motion::LightPreset::flickeringBulb));
+            const auto& modulators = litDocument.project().modulators;
+            expect(!modulators.empty() && std::all_of(modulators.begin(), modulators.end(), [](const auto& modulator) { return modulator.valid() && juce::String::fromUTF8(modulator.name.data(), static_cast<int>(modulator.name.size())).isNotEmpty(); }), "its modulators are valid");
+            expect(motion::currentLightPreset(litDocument.project(), 3) == motion::LightPreset::flickeringBulb, "and the preset is still known");
+            motion::Project reopened;
+            expect(motion::Document::prepareLoad(litDocument.save(), reopened).wasOk(), "the project loads");
         }
         {
             // A composition's tempo is its own: the main Scope's keys stay put.

@@ -17,7 +17,9 @@ struct Modulator {
     Modulation shape;
 
     bool operator==(const Modulator&) const = default;
-    bool valid() const { return id != 0 && !name.empty() && name.size() <= 120 && shape.valid(); }
+    // Its name's longest, in UTF-8 bytes.
+    static constexpr std::size_t longestName = 120;
+    bool valid() const { return id != 0 && !name.empty() && name.size() <= longestName && shape.valid(); }
     // Oscillators are bipolar (-1..1); soundtrack loudness is unipolar (0..1).
     bool unipolar() const { return shape.waveform == ModulationWaveform::soundtrack; }
 };
