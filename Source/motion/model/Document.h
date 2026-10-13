@@ -346,7 +346,9 @@ private:
     bool beamOutsideMain(Id target) const { return scopeId != 0 && target == state.beam.id; }
     Id highestId() const;
     juce::Result retempo(std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label);
-    void apply(Project value);
+    // `revises`: whether edits in progress (whose revision moves on) give
+    // up; a view option changing (loop, snapping) leaves them be.
+    void apply(Project value, bool revises = true);
     Project mergeScope(Project view) const;
     // An edited view, made consistent and merged into the whole project.
     Project finished(Project view) const;

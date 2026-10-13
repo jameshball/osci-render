@@ -278,8 +278,8 @@ static void carryTrackHeights(Project& next, const Project& current) {
     changeEachComposition(next, differs, carry);
 }
 
-void Document::apply(Project value) {
-    ++stateRevision;
+void Document::apply(Project value, bool revises) {
+    if (revises) { ++stateRevision; }
     ++contentRevision;
     if (carryView) {
         carryTrackHeights(value, state);
@@ -356,8 +356,24 @@ void Document::changeView(std::function<void(Composition&)> change) {
     auto next = project();
     change(next);
     next.clampLoop();
+    // A gesture under way carries on, and an edit it ends in starts from
+    // before it with the option changed too.
+    if (previewBase.has_value()) {
+        if (scopeId == 0) {
+            change(*previewBase);
+            previewBase->clampLoop();
+        } else {
+            for (auto& definition : previewBase->definitions) {
+                if (definition == nullptr || definition->id != scopeId) { continue; }
+                auto copy = std::make_shared<CompositionDefinition>(*definition);
+                change(*copy);
+                copy->clampLoop();
+                definition = std::move(copy);
+            }
+        }
+    }
     const ViewChange view(*this);
-    apply(mergeScope(std::move(next)));
+    apply(mergeScope(std::move(next)), false);
 }
 
 void Document::commit(juce::String label, Project before) {

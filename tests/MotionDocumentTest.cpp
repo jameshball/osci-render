@@ -4,6 +4,7 @@
 #include "../Source/motion/import/FractalPreparation.h"
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/model/LightPresets.h"
+#include "../Source/motion/ui/PreviewGesture.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
@@ -214,6 +215,25 @@ public:
             expect(gesture.project().duration == 20 && gesture.project().markers.size() == 1, "the edit keeps what was shown");
             expect(gestureUndo.undo());
             expect(gesture.project().duration == 10 && gesture.project().markers.empty(), "undo goes back to before the preview");
+        }
+        {
+            // A view option changed mid-drag (L for loop) leaves the drag to
+            // finish as one undo step.
+            juce::UndoManager viewUndo;
+            motion::Document viewDocument(viewUndo);
+            motion::Project plain;
+            plain.duration = 10;
+            plain.loopStart = 1; plain.loopEnd = 2;
+            viewDocument.reset(plain);
+            motion::ui::PreviewGesture gesture(viewDocument);
+            gesture.begin();
+            gesture.preview([](motion::Project& project) { project.markers.push_back({1, 5, "Dragged"}); });
+            viewDocument.changeView([](motion::Composition& state) { state.looping = !state.looping; });
+            expect(!gesture.stale(), "the drag carries on");
+            expect(gesture.commit("Drag"), "and ends as an undo step");
+            expect(viewDocument.project().markers.size() == 1);
+            expect(viewUndo.undo());
+            expect(viewDocument.project().markers.empty(), "which undoes the drag");
         }
         {
             // A composition's tempo is its own: the main Scope's keys stay put.
