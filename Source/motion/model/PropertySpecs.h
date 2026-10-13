@@ -95,12 +95,29 @@ inline bool isLinesProperty(std::string_view id) {
 // The same properties as Properties shows them: the anchor closes Transform,
 // and Mirror closes Surface, after how the surface draws itself.
 inline constexpr auto objectInspectorSpecs = [] {
-    constexpr auto order = std::to_array<std::size_t>({0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 17, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 18});
-    static_assert(order.size() == objectPropertySpecs.size(), "every property, once");
+    constexpr std::array<std::string_view, objectPropertySpecs.size()> order {"position.x", "position.y", "position.z", "rotation.x", "rotation.y", "rotation.z",
+        "scale.x", "scale.y", "scale.z", "anchor.x", "anchor.y", "anchor.z", "red", "green", "blue", "opacity", "lit", "beam",
+        "edges", "outline", "spiral", "noise", "slices", "rings", "fillDetail", "noisePhase", "noiseFlow", "reflects"};
     std::array<PropertySpec, order.size()> result {};
-    for (std::size_t index = 0; index < order.size(); ++index) { result[index] = objectPropertySpecs[order[index]]; }
+    for (std::size_t index = 0; index < order.size(); ++index) {
+        for (const auto& spec : objectPropertySpecs) {
+            if (spec.id == order[index]) { result[index] = spec; }
+        }
+    }
     return result;
 }();
+// Whether two lists hold the same properties, each once.
+template <std::size_t size>
+consteval bool samePropertiesOnce(const std::array<PropertySpec, size>& a, const std::array<PropertySpec, size>& b) {
+    for (const auto& spec : a) {
+        std::size_t inA = 0, inB = 0;
+        for (const auto& other : a) { inA += other.id == spec.id ? 1 : 0; }
+        for (const auto& other : b) { inB += other.id == spec.id ? 1 : 0; }
+        if (inA != 1 || inB != 1) { return false; }
+    }
+    return true;
+}
+static_assert(samePropertiesOnce(objectPropertySpecs, objectInspectorSpecs), "Properties shows every object property, once");
 
 inline constexpr auto audioPropertySpecs = std::to_array<PropertySpec>({
     {"gain", "Gain", "Gain", "", 0, 4, 1, .01, 2, ""},
@@ -153,6 +170,19 @@ inline constexpr auto beamPropertySpecs = std::to_array<PropertySpec>({
     {"ambient", "Ambient", "Ambient", "", 0, 5, 0, .01, 2, ""},
     {"visualiserSmoothing", "Smoothing", "Smoothing", "", 0, 1, 0, .005, 2, ""},
 });
+
+// Every list's properties are named, each differently.
+template <std::size_t size>
+consteval bool namedOnce(const std::array<PropertySpec, size>& specs) {
+    for (std::size_t index = 0; index < size; ++index) {
+        if (specs[index].id.empty()) { return false; }
+        for (std::size_t other = index + 1; other < size; ++other) {
+            if (specs[other].id == specs[index].id) { return false; }
+        }
+    }
+    return true;
+}
+static_assert(namedOnce(objectPropertySpecs) && namedOnce(audioPropertySpecs) && namedOnce(luaSliderSpecs) && namedOnce(cameraPropertySpecs) && namedOnce(beamPropertySpecs), "every property has a name of its own");
 
 // A new target's properties: each spec's default, unanimated.
 template <std::size_t size>

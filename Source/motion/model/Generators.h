@@ -200,6 +200,30 @@ constexpr const GeneratorDefinition* findGenerator(std::string_view id) {
     }
     return nullptr;
 }
+// Every generator is named differently, and so is each of its parameters,
+// from each other and from the properties every clip has.
+consteval bool generatorsNamedOnce() {
+    for (std::size_t index = 0; index < generatorDefinitions.size(); ++index) {
+        const auto& definition = generatorDefinitions[index];
+        if (definition.id.empty()) { return false; }
+        for (std::size_t other = index + 1; other < generatorDefinitions.size(); ++other) {
+            if (generatorDefinitions[other].id == definition.id) { return false; }
+        }
+        for (std::size_t parameter = 0; parameter < definition.parameters.size(); ++parameter) {
+            const auto id = definition.parameters[parameter].id;
+            if (id.empty()) { return false; }
+            for (std::size_t other = parameter + 1; other < definition.parameters.size(); ++other) {
+                if (definition.parameters[other].id == id) { return false; }
+            }
+            for (const auto& spec : objectPropertySpecs) {
+                if (spec.id == id) { return false; }
+            }
+        }
+    }
+    return true;
+}
+static_assert(generatorsNamedOnce(), "every generator, and each of its parameters, has a name of its own");
+
 // A generator named in the code: one that doesn't exist fails the build.
 consteval const GeneratorDefinition& generatorNamed(std::string_view id) {
     const auto* found = findGenerator(id);
