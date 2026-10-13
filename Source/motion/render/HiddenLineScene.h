@@ -41,7 +41,20 @@ struct SceneItem {
     // How it draws itself this frame, when not by its edges alone (see
     // LineStyle); `drawing` is then the one it draws instead.
     const Styled* styled = nullptr;
+    // What lights do to it this frame (its Lit by lights and its groups'):
+    // at 0 it keeps its own colour, lit or not. Read for every hatching cell
+    // and stretch a mirror shows, so evaluated once.
+    double response = 1;
+    // Its own colour this frame (see tintOf).
+    std::array<float, 3> tint {};
 };
+
+// A clip's own colour, as its chain and the composition's effects colour a
+// point that has none: none below nothing.
+inline std::array<float, 3> tintOf(const PreparedComposition& composition, const PreparedClip& clip, double time) {
+    const auto own = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, -1, -1, -1), time), time);
+    return {std::max(0.0f, own.r), std::max(0.0f, own.g), std::max(0.0f, own.b)};
+}
 
 // Where a point at `weights` on a triangle of a clip's source is, from its
 // corners there: its place alone.

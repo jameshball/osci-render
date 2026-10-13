@@ -337,6 +337,8 @@ private:
             if (drawing == nullptr && points == nullptr) { continue; }
             const auto bent = bends(clip) || std::any_of(clip.ancestors.begin(), clip.ancestors.end(), [](const auto& stage) { return bends(stage); });
             items.push_back({index, &clip, clip.source, drawing, points, sourceFrame, bent, clip.reflects(time)});
+            items.back().response = clip.lit(time);
+            items.back().tint = tintOf(composition, clip, time);
         }
         cameraEye = view.has_value() ? Eye {view->position, view->right, view->up, view->forward} : Eye {};
         cameraProjection = Projection {view.has_value() ? view->focalLength : 1.0};
@@ -590,7 +592,7 @@ private:
             }
             LineNormals facing;
             facing.add(normals[surface]->at(face, weights));
-            const auto light = lightAt(lights, at, facing, static_cast<float>(items[surface].clip->lit(time)));
+            const auto light = lightAt(lights, at, facing, static_cast<float>(items[surface].response));
             const auto brightest = std::max({light[0], light[1], light[2]});
             if (!(brightest > 0)) { return hatching::Seen {surface, at, 0}; }
             return hatching::Seen {surface, at, static_cast<double>(brightest), {light[0] / brightest, light[1] / brightest, light[2] / brightest}};
@@ -605,9 +607,12 @@ private:
         // display with no brightness input, drawn as much more quickly.
         std::vector<std::vector<std::unique_ptr<osci::Shape>>> shapes(items.size());
         std::vector<std::vector<double>> weights(items.size());
+        // A surface's colour runs its clip's chain: once per surface, not stroke.
+        std::vector<std::optional<osci::Point>> colours(items.size());
         for (const auto& stroke : strokes) {
-            const auto& clip = *items[stroke.surface].clip;
-            auto colour = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, 1, 1, 1), time), time);
+            auto& known = colours[stroke.surface];
+            if (!known.has_value()) { known = composition.applyCompositionEffects(items[stroke.surface].clip->processPoint(osci::Point(0, 0, 0, 1, 1, 1), time), time); }
+            auto colour = *known;
             const auto itself = static_cast<float>(1 - items[stroke.surface].mirrors);
             const auto weight = litWeight(itself * amount, composition.scope.xyOnly);
             colour.r *= itself;
@@ -919,7 +924,7 @@ private:
             const auto& item = items[surface];
             std::vector<Kept> litPieces;
             // What lights do to it: at 0 it keeps its own colour, lit or not.
-            const auto response = static_cast<float>(item.clip->lit(time));
+            const auto response = static_cast<float>(item.response);
             for (auto& piece : keptBy[surface]) { lightPiece(item, response, piece, litPieces); }
             keptBy[surface] = std::move(litPieces);
             lostBy[surface] = 1;

@@ -139,13 +139,6 @@ private:
 // A ball's rim is drawn in so many straight stretches.
 inline constexpr int rimStretches = 256;
 
-// A clip's own colour, as its chain and the composition's effects colour a
-// point that has none: none below nothing.
-inline std::array<float, 3> tintOf(const PreparedComposition& composition, const PreparedClip& clip, double time) {
-    const auto own = composition.applyCompositionEffects(clip.processPoint(osci::Point(0, 0, 0, -1, -1, -1), time), time);
-    return {std::max(0.0f, own.r), std::max(0.0f, own.g), std::max(0.0f, own.b)};
-}
-
 // What mirrors show (see reflect), in phases run in turn: the surfaces that
 // reflect, and where surfaces cut through each other; then for each mirror,
 // its own edges, every other clip's lines (and the rims of balls it shows),
@@ -218,7 +211,7 @@ private:
     // edges are in its own colour.
     void begin(const Reflecting& mirror) {
         current = &mirror;
-        tint = tintOf(composition, *items[mirror.surface].clip, time);
+        tint = items[mirror.surface].tint;
         brightness = std::max({tint[0], tint[1], tint[2]});
         const auto amount = static_cast<float>(mirror.amount) * brightness;
         gain = {amount, amount, amount};
@@ -398,7 +391,7 @@ private:
     // mirror's pieces, when given.
     void traceStretch(const SceneItem& item, osci::Shape& shape, const LineNormals& normals, Vec3 from, Vec3 to, double start, double end, float itself, const FlatMirror* only = nullptr, GrazedSurface grazed = {}) {
         const auto& mirror = current->mirror;
-        const auto response = static_cast<float>(item.clip->lit(time));
+        const auto response = static_cast<float>(item.response);
         // As bright as it is drawn: by its style, as little as its own
         // surface mirrors, and its light.
         const auto drawn = gainOf(shape) * itself;
@@ -470,7 +463,7 @@ private:
             const auto itself = static_cast<float>(1 - item.mirrors);
             const auto other = std::find_if(mirrors.begin(), mirrors.end(), [source](const Reflecting& candidate) { return candidate.surface == source; });
             if (other != mirrors.end() && other->mirror.sphere.has_value()) {
-                const auto otherTint = tintOf(composition, *item.clip, time);
+                const auto& otherTint = item.tint;
                 const auto otherAmount = static_cast<float>(other->amount);
                 const auto rimColour = [&](double, double&, float&) {
                     return std::array<float, 3> {otherTint[0] * otherAmount, otherTint[1] * otherAmount, otherTint[2] * otherAmount};
