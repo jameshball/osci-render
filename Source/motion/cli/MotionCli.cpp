@@ -65,16 +65,41 @@ std::vector<BeamFrame::Stats> statsAt(const Composition& composition, const std:
     return stats;
 }
 
-void writePreviews(const Composition& composition, const std::vector<double>& times, const juce::File& folder, const juce::String& name) {
+void writeImage(const juce::Image& image, const juce::File& file) {
+    file.deleteFile();
+    juce::FileOutputStream stream(file);
+    if (!stream.openedOk() || !juce::PNGImageFormat().writeImageToStream(image, stream)) { juce::ConsoleApplication::fail("Couldn't write " + file.getFullPathName() + "."); }
+}
+
+// Each frame's preview as its own image, or with `sheet` all of them on one,
+// in rows of four, each with its time.
+void writePreviews(const Composition& composition, const std::vector<double>& times, const juce::File& folder, const juce::String& name, bool sheet) {
     if (!folder.createDirectory()) { juce::ConsoleApplication::fail("Couldn't make " + folder.getFullPathName() + "."); }
-    for (const auto time : times) {
-        const auto image = BeamFrame::at(composition, time).preview(640);
-        const auto file = folder.getChildFile(name + "-" + juce::String(time, 3) + "s.png");
-        file.deleteFile();
-        juce::FileOutputStream stream(file);
-        if (!stream.openedOk() || !juce::PNGImageFormat().writeImageToStream(image, stream)) { juce::ConsoleApplication::fail("Couldn't write " + file.getFullPathName() + "."); }
-        say("Preview " + file.getFullPathName());
+    if (!sheet) {
+        for (const auto time : times) {
+            const auto file = folder.getChildFile(name + "-" + juce::String(time, 3) + "s.png");
+            writeImage(BeamFrame::at(composition, time).preview(640), file);
+            say("Preview " + file.getFullPathName());
+        }
+        return;
     }
+    constexpr int size = 360, across = 4;
+    const auto count = static_cast<int>(times.size());
+    juce::Image image(juce::Image::RGB, size * std::min(count, across), size * ((count + across - 1) / across), true);
+    juce::Graphics g(image);
+    g.fillAll(juce::Colours::black);
+    for (int index = 0; index < count; ++index) {
+        const juce::Rectangle<int> cell(size * (index % across), size * (index / across), size, size);
+        const auto time = times[static_cast<std::size_t>(index)];
+        g.drawImageAt(BeamFrame::at(composition, time).preview(size), cell.getX(), cell.getY());
+        g.setColour(juce::Colours::white.withAlpha(.6f));
+        g.drawText(juce::String(time, 2) + " s", cell.reduced(8).removeFromTop(16), juce::Justification::topLeft);
+        g.setColour(juce::Colours::white.withAlpha(.12f));
+        g.drawRect(cell);
+    }
+    const auto file = folder.getChildFile(name + "-sheet.png");
+    writeImage(image, file);
+    say("Sheet " + file.getFullPathName());
 }
 
 // A recipe made into a project file, to open in the app.
@@ -109,7 +134,7 @@ void render(const juce::ArgumentList& args) {
         composition.bakeAt(times);
     }
     say("Prepared in " + juce::String(composition.prepareMilliseconds, 1) + " ms, hidden lines in " + juce::String(composition.bakeMilliseconds, 1) + " ms");
-    if (previews.isNotEmpty()) { writePreviews(composition, times, fileArgument(previews), sceneName(project)); }
+    if (previews.isNotEmpty()) { writePreviews(composition, times, fileArgument(previews), sceneName(project), args.containsOption("--sheet")); }
     if (!signal) { return; }
     const auto destination = out.isNotEmpty() ? fileArgument(out) : project.getSiblingFile(sceneName(project) + ".wav");
     const std::atomic<bool> cancel {false};
@@ -222,7 +247,7 @@ void check(const juce::ArgumentList& args) {
             auto object = std::make_unique<juce::DynamicObject>();
             object->setProperty("rate", rate);
             object->setProperty("frames", list);
-            if (!kept.replaceWithText(juce::JSON::toString(juce::var(object.release()), false))) { juce::ConsoleApplication::fail("Couldn't write " + kept.getFullPathName() + "."); }
+            if (!kept.replaceWithText(juce::JSON::toString(juce::var(object.release()), false), false, false, "\n")) { juce::ConsoleApplication::fail("Couldn't write " + kept.getFullPathName() + "."); }
         }
         if (beforeFrames == nullptr) {
             say("NEW      " + name);
@@ -248,9 +273,9 @@ int main(int argc, char* argv[]) {
     app.addCommand({"make", "make <scene.recipe.json> [--out=scene.osci-motion]",
         "Makes a project from a recipe: objects from generators or files, their properties and keys, a camera.",
         "Every command takes a recipe wherever it takes a project. See Source/motion/cli/Recipe.h for the format.", make});
-    app.addCommand({"render", "render <project> [--out=signal.wav] [--previews=folder [--frames=N | --at=t1,t2]] [--rate=Hz]",
+    app.addCommand({"render", "render <project> [--out=signal.wav] [--previews=folder [--sheet] [--frames=N | --at=t1,t2]] [--rate=Hz]",
         "Writes the XYRGB signal (beside the project unless --out), and preview images of frames.",
-        "With --previews and no --out, writes only the previews.", render});
+        "With --previews and no --out, writes only the previews; --sheet puts them on one image.", render});
     app.addCommand({"stats", "stats <project> [--frames=N | --at=t1,t2] [--json] [--rate=Hz]",
         "Each frame's beam in numbers: drawn and travelled length, brightness, a fingerprint of its samples.", {}, stats});
     app.addCommand({"diff", "diff <a.wav> <b.wav> [--tolerance=1e-4] | diff <a> <b> [--frames=N | --at=t1,t2]",
