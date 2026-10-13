@@ -57,17 +57,24 @@ public:
         const auto* session = sessionFor(id);
         return session != nullptr && session->input->capturing();
     }
+    // What the library says of a source: its capture while one runs, else
+    // its connection.
     juce::String statusText(Id id) const {
+        if (!capturing(id)) { return connectionText(id); }
+        const auto error = captureError(id);
+        return error.isNotEmpty() ? error : juce::String("Recording capture");
+    }
+    juce::String captureError(Id id) const {
+        const auto* session = sessionFor(id);
+        return session != nullptr ? session->input->captureError() : juce::String();
+    }
+    juce::String connectionText(Id id) const {
         const auto asset = liveAsset(id);
         if (asset == nullptr) { return "Source unavailable"; }
         const auto dot = juce::String::fromUTF8(separator.data(), static_cast<int>(separator.size()));
         const auto* session = findSession(asset->liveIdentity);
         if (session == nullptr) { return "Offline" + dot + "start listening to connect Blender"; }
         const auto status = session->input->status();
-        if (session->input->capturing()) {
-            const auto error = session->input->captureError();
-            return error.isNotEmpty() ? error : juce::String("Recording capture");
-        }
         if (session->input->preparationFailed()) { return "Could not prepare the incoming frame"; }
         if (status.message.isNotEmpty()) { return status.message; }
         switch (status.state) {

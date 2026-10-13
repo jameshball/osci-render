@@ -130,7 +130,7 @@ try:
     step("recording capture controls", "screenshot", "--file", session.artifact_dir / "blender-capturing.png")
     sender.sendall(b"CLOSE\n"); sender.close(); sender = None
     command("wait", "--ms", "250")
-    step("save portable capture", "click", "--component-name", "Record Blender capture")
+    step("save portable capture", "click", "--component-name", "Save Blender capture")
     command("wait-for-locator", "--class", "juce::ListBox::RowComponent", "--name", "Live diamond capture", "--exact", "--timeout-ms", "15000")
     command("wait", "--ms", "400")
     step("select captured asset", "click", "--class", "juce::ListBox::RowComponent", "--name", "Live diamond capture", "--exact", "--position", "60,20")

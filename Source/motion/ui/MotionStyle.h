@@ -317,20 +317,24 @@ inline void paintComboBox(juce::Graphics& g, int width, int height, juce::ComboB
     g.strokePath(chevron, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
-// A button's fill: one radius everywhere, and a disabled one goes neutral
-// so a dimmed primary never reads as available.
+// A button's fill: one radius everywhere. A disabled button is only an
+// outline, so it never reads as available nor as a twin of the buttons
+// beside it; a quiet button (no fill) shows its shape under the pointer.
 inline void paintButtonBackground(juce::Graphics& g, juce::Button& button, juce::Colour colour, bool highlighted, bool down) {
     // Full bounds, so a button is exactly as tall and wide as a field beside it.
     const auto bounds = button.getLocalBounds().toFloat();
-    auto fill = colour;
     if (!button.isEnabled()) {
-        fill = juce::Colours::white.withAlpha(.06f);
-    } else if (down) {
-        fill = colour.brighter(.25f);
-    } else if (highlighted) {
-        fill = colour.brighter(.12f);
+        if (colour.isTransparent()) { return; }
+        g.setColour(hairline());
+        g.drawRoundedRectangle(bounds.reduced(.5f), buttonRadius, 1.0f);
+        return;
     }
-    g.setColour(fill);
+    if (colour.isTransparent()) {
+        if (!down && !highlighted) { return; }
+        g.setColour(down ? pressFill() : hoverFill());
+    } else {
+        g.setColour(down ? colour.brighter(.25f) : highlighted ? colour.brighter(.12f) : colour);
+    }
     g.fillRoundedRectangle(bounds, buttonRadius);
 }
 
@@ -438,6 +442,12 @@ public:
 inline void makePrimary(juce::Button& button) { button.setColour(juce::TextButton::buttonColourId, accentStrong()); }
 // An action that loses something (Discard, Remove): red, not the accent.
 inline void makeDestructive(juce::Button& button) { button.setColour(juce::TextButton::buttonColourId, osci::Colours::danger().darker(.35f)); }
+// A minor action beside the main ones: text only until hovered, red when
+// it throws something away.
+inline void makeQuiet(juce::Button& button, bool destructive = false) {
+    button.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+    button.setColour(juce::TextButton::textColourOffId, destructive ? error() : osci::Colours::textMuted());
+}
 
 // The Scene while a source is written in it (Lua, text, drawing) is a
 // mode: a raised header names it ("Editing Orbit.lua", "New Lua source")

@@ -2,10 +2,31 @@
 
 #include "Sheet.h"
 #include "../model/BlenderSourceSettings.h"
+#include "../live/BlenderCapture.h"
+
+// Record, with the red dot every recorder uses before its name.
+class MotionRecordButton final : public juce::TextButton {
+public:
+    static constexpr int inset = 10, dot = 8, gap = 6;
+    int bestWidth() { return inset + dot + gap + juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::buttonFont(*this), getButtonText()))) + inset; }
+    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
+        getLookAndFeel().drawButtonBackground(g, *this, findColour(buttonColourId), highlighted, down);
+        auto area = getLocalBounds().reduced(inset, 0);
+        const auto alpha = isEnabled() ? 1.0f : .4f;
+        g.setColour(motion::style::error().withMultipliedAlpha(alpha));
+        g.fillEllipse(area.removeFromLeft(dot).withSizeKeepingCentre(dot, dot).toFloat());
+        area.removeFromLeft(gap);
+        g.setColour(osci::Colours::text().withMultipliedAlpha(isEnabled() ? 1.0f : .5f));
+        g.setFont(motion::style::buttonFont(*this));
+        g.drawText(getButtonText(), area, juce::Justification::centredLeft, false);
+    }
+};
 
 // A live source fed by Blender's add-on: its name, the local port it listens
 // on and what it shows when Blender goes away, then the connection's state
-// with a switch to listen, and capture to a portable recording.
+// with a switch to listen, and capture to a portable recording. Each state
+// sits on the left of its row and what changes it on the right, so the
+// footer holds only Cancel and the sheet's own action.
 class MotionBlenderSourcePanel final : public motion::ui::Sheet, private juce::Timer {
 public:
     MotionBlenderSourcePanel(juce::String initialName, motion::BlenderSourceSettings settings, bool existing)
@@ -26,11 +47,15 @@ public:
             editor->setColour(juce::TextEditor::textColourId, osci::Colours::text());
             editor->setSelectAllWhenFocused(true);
         }
-        for (auto* label : {&nameLabel, &portLabel, &policyLabel, &connectionLabel}) { styleCaption(*label); }
+        for (auto* label : {&nameLabel, &portLabel, &policyLabel, &connectionLabel, &captureLabel}) { styleCaption(*label); }
         status.setName("Blender connection status");
-        status.setFont(motion::style::body());
-        status.setBorderSize({});
-        status.setJustificationType(juce::Justification::centredLeft);
+        captureState.setName("Blender capture state");
+        for (auto* label : {&status, &captureState}) {
+            label->setFont(motion::style::body());
+            label->setBorderSize({});
+            label->setJustificationType(juce::Justification::centredLeft);
+        }
+        captureState.setTooltip("Records what Blender sends, up to " + juce::String(juce::roundToInt(motion::BlenderCapture::maximumSeconds / 60)) + " minutes, as a new source.");
         status.setTooltip("Use the same port in Blender's osci-render add-on.");
         primary.onClick = [this] { submit(!this->existing); };
         listen.setButtonText("Start listening");
@@ -42,22 +67,25 @@ public:
             }
             timerCallback();
         };
-        record.setButtonText("Record capture");
+        record.setButtonText("Record");
         record.setName("Record Blender capture");
         record.setTitle("Record Blender capture");
+        saveCapture.setButtonText("Save");
+        saveCapture.setName("Save Blender capture");
+        saveCapture.setTitle("Save Blender capture");
+        saveCapture.setTooltip("Stop recording and add the capture as a source");
         cancelCapture.setButtonText("Discard");
         cancelCapture.setName("Cancel capture");
         cancelCapture.setTitle("Cancel capture");
-        record.onClick = [this] { if (onRecord) { error = onRecord().getErrorMessage(); } timerCallback(); };
+        motion::style::makeQuiet(cancelCapture, true);
+        record.onClick = [this] { capture(); };
+        saveCapture.onClick = [this] { capture(); };
         cancelCapture.onClick = [this] { if (onCancelCapture) { onCancelCapture(); } error.clear(); timerCallback(); };
         for (auto* component : std::initializer_list<juce::Component*>{&name, &port, &policy, &nameLabel, &portLabel, &policyLabel, &connectionLabel, &status}) { addAndMakeVisible(component); }
-        addChildComponent(listen);
-        addChildComponent(record);
-        addChildComponent(cancelCapture);
-        listen.setVisible(existing);
-        record.setVisible(existing);
-        setSize(widthFor() + 80, heightFor(4));
-        startTimerHz(5);
+        for (auto* component : std::initializer_list<juce::Component*>{&listen, &captureLabel, &captureState, &record, &saveCapture, &cancelCapture}) { addChildComponent(component); }
+        for (auto* component : std::initializer_list<juce::Component*>{&listen, &captureLabel, &captureState, &record}) { component->setVisible(existing); }
+        setSize(widthFor() + 128, heightFor(existing ? 5 : 4));
+        startTimerHz(4);
         timerCallback();
     }
     ~MotionBlenderSourcePanel() override { if (onCancelCapture) { onCancelCapture(); } }
@@ -67,6 +95,8 @@ public:
     std::function<bool()> isCapturing;
     std::function<bool()> isListening;
     std::function<juce::String()> connectionStatus;
+    // Why the running capture stopped taking frames (too long, too big).
+    std::function<juce::String()> captureError;
 
     void paint(juce::Graphics& g) override {
         Sheet::paint(g);
@@ -79,6 +109,12 @@ public:
             : osci::Colours::textMuted().withAlpha(.5f);
         g.setColour(colour);
         g.fillEllipse(juce::Rectangle<float>(7, 7).withCentre(dot.toFloat()));
+        // Recording: the recorder's red dot, dimming every other half second.
+        if (recordingSince > 0) {
+            const auto phase = std::fmod((juce::Time::getMillisecondCounterHiRes() - recordingSince) / 1000.0, 1.0);
+            g.setColour(motion::style::error().withAlpha(phase < .5 ? 1.0f : .35f));
+            g.fillEllipse(juce::Rectangle<float>(7, 7).withCentre(recordingDot.toFloat()));
+        }
     }
 
 protected:
@@ -88,14 +124,26 @@ protected:
         formRow(area, policyLabel, policy);
         auto line = area.removeFromTop(row);
         connectionLabel.setBounds(line.removeFromLeft(caption));
-        if (listen.isVisible()) { listen.setBounds(line.removeFromRight(listen.getBestWidthForHeight(row) + 16).reduced(0, 1)); }
+        if (listen.isVisible()) {
+            listen.setBounds(line.removeFromRight(listen.getBestWidthForHeight(row) + 16).reduced(0, 1));
+            line.removeFromRight(8);
+        }
         dot = {line.getX() + 4, line.getCentreY()};
         status.setBounds(line.withTrimmedLeft(14));
-        // Capturing sits on the footer's left, apart from the settings.
-        auto capture = footerLeft;
-        record.setBounds(capture.removeFromLeft(record.getBestWidthForHeight(capture.getHeight()) + 20));
-        capture.removeFromLeft(8);
-        cancelCapture.setBounds(capture.removeFromLeft(cancelCapture.getBestWidthForHeight(capture.getHeight()) + 20));
+        if (!existing) { return; }
+        area.removeFromTop(rowGap);
+        line = area.removeFromTop(row);
+        captureLabel.setBounds(line.removeFromLeft(caption));
+        if (recordingSince > 0) {
+            saveCapture.setBounds(line.removeFromRight(saveCapture.getBestWidthForHeight(row) + 16).reduced(0, 1));
+            line.removeFromRight(4);
+            cancelCapture.setBounds(line.removeFromRight(cancelCapture.getBestWidthForHeight(row) + 12).reduced(0, 1));
+            recordingDot = {line.getX() + 4, line.getCentreY()};
+            captureState.setBounds(line.withTrimmedLeft(14));
+        } else {
+            record.setBounds(line.removeFromRight(record.bestWidth()).reduced(0, 1));
+            captureState.setBounds(line);
+        }
     }
 
 private:
@@ -103,6 +151,10 @@ private:
         const motion::BlenderSourceSettings settings{port.getText().getIntValue(), policy.getSelected() == 0};
         if (!settings.valid() || name.getText().trim().isEmpty()) { error = "Enter a name and a port from 51600 to 51699."; timerCallback(); return; }
         if (onApply) { const auto result = onApply(name.getText(), settings, start); error = result.getErrorMessage(); }
+        timerCallback();
+    }
+    void capture() {
+        if (onRecord) { error = onRecord().getErrorMessage(); }
         timerCallback();
     }
     void timerCallback() override {
@@ -115,8 +167,16 @@ private:
             const bool recording = isCapturing && isCapturing();
             const bool listening = isListening && isListening();
             listen.setButtonText(listening ? "Stop listening" : "Start listening");
-            record.setButtonText(recording ? "Save capture" : "Record capture");
-            record.setEnabled(recording || listening);
+            if (recording != (recordingSince > 0)) { recordingSince = recording ? juce::Time::getMillisecondCounterHiRes() : 0.0; }
+            const auto seconds = recording ? static_cast<int>((juce::Time::getMillisecondCounterHiRes() - recordingSince) / 1000.0) : 0;
+            const auto problem = recording && captureError ? captureError() : juce::String();
+            captureState.setText(problem.isNotEmpty() ? problem
+                : recording ? "Recording" + motion::style::dot() + juce::String(seconds / 60) + ":" + juce::String(seconds % 60).paddedLeft('0', 2)
+                : listening ? "Not recording" : "Listen to record", juce::dontSendNotification);
+            captureState.setColour(juce::Label::textColourId, problem.isNotEmpty() ? motion::style::error() : recording ? osci::Colours::text() : osci::Colours::textMuted());
+            record.setVisible(!recording);
+            record.setEnabled(listening);
+            saveCapture.setVisible(recording);
             cancelCapture.setVisible(recording);
             for (auto* control : std::initializer_list<juce::Component*>{&name, &port, &policy, &primary, &listen}) { control->setEnabled(!recording); }
             resized();
@@ -127,7 +187,11 @@ private:
     juce::Point<int> dot;
     juce::TextEditor name, port;
     motion::ui::SegmentedControl policy {"Blender disconnect policy", {"Freeze", "Blank"}};
-    juce::Label nameLabel{"", "Name"}, portLabel{"", "Port"}, policyLabel{"", "On disconnect"}, connectionLabel{"", "Connection"}, status;
-    juce::TextButton listen, record, cancelCapture;
+    juce::Label nameLabel{"", "Name"}, portLabel{"", "Port"}, policyLabel{"", "On disconnect"}, connectionLabel{"", "Connection"}, captureLabel{"", "Capture"}, status, captureState;
+    juce::TextButton listen, saveCapture, cancelCapture;
+    MotionRecordButton record;
+    juce::Point<int> recordingDot;
+    // When the capture began (the hi-res millisecond counter), or 0.
+    double recordingSince = 0;
     juce::String error;
 };
