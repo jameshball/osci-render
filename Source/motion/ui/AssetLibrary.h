@@ -13,7 +13,8 @@ public:
     void setEditingSource(bool editing) { bakeSettings.setEnabled(!editing); }
     explicit MotionAssetLibrary(motion::Document& document);
     std::function<void(motion::Id)> onSelectUses;
-    std::function<void(const juce::String&)> onMessage;
+    // A notice (something done) or a problem, for the status bar.
+    std::function<void(const juce::String&, bool problem)> onMessage;
 
     std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition, onReplace, onEditDrawing;
     std::function<void()> onCancelImport;

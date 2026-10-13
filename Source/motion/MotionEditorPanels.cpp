@@ -329,7 +329,7 @@ void MotionEditor::setUpLibrary() {
             }, {}, true);
     };
     assetLibrary.onOpenComposition = [this](motion::Id id) { enterComposition(id, true); };
-    assetLibrary.onMessage = [this](const juce::String& message) { statusBar.show(message, message.startsWith("Removed") || message.startsWith("Tempo now") ? MotionStatusBar::Kind::notice : MotionStatusBar::Kind::warning); };
+    assetLibrary.onMessage = [this](const juce::String& message, bool problem) { statusBar.show(message, problem ? MotionStatusBar::Kind::warning : MotionStatusBar::Kind::notice); };
     assetLibrary.onSelectUses = [this](motion::Id id) {
         std::vector<motion::Id> clips;
         for (const auto& track : processor.document.project().tracks) {

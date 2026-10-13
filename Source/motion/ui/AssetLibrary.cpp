@@ -273,7 +273,7 @@ void MotionAssetLibrary::showSourceMenu(int row) {
             int removed = 0;
             const auto outcome = document.removeUnusedAssets(result == 4 ? std::vector<motion::Id>{id} : std::vector<motion::Id>{}, removed);
             if (onMessage) {
-                onMessage(outcome.failed() ? outcome.getErrorMessage() : "Removed " + juce::String(removed) + (removed == 1 ? " unused source." : " unused sources."));
+                onMessage(outcome.failed() ? outcome.getErrorMessage() : "Removed " + juce::String(removed) + (removed == 1 ? " unused source." : " unused sources."), outcome.failed());
             }
         }
     });
@@ -299,7 +299,7 @@ void MotionAssetLibrary::finishRename(bool accept) {
     const auto id = std::exchange(renaming, 0);
     if (!accept) { return; }
     const auto result = document.renameAsset(id, rename.getText());
-    if (result.failed() && onMessage) { onMessage(result.getErrorMessage()); }
+    if (result.failed() && onMessage) { onMessage(result.getErrorMessage(), true); }
 }
 
 juce::var MotionAssetLibrary::getDragSourceDescription(const juce::SparseSet<int>& rows) {

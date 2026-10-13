@@ -91,17 +91,21 @@ public:
         // The action keeps its whole label; the message gives way to it.
         constexpr int actionHeight = 20;
         const auto actionWidth = action.isVisible() ? std::min(area.getWidth(), juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::buttonFont(action), action.getButtonText())) + 16) : 0;
-        const auto messageArea = area.withTrimmedRight(actionWidth > 0 ? actionWidth + motion::style::gap : 0);
         const auto problem = current != Kind::notice;
+        // A problem's pill holds its close button; a notice with an action
+        // ends in it, after the action, so the action follows the words.
+        const auto closeAtEnd = !problem && action.isVisible() && dismiss.isVisible();
+        const auto messageArea = area.withTrimmedRight((actionWidth > 0 ? actionWidth + motion::style::gap : 0) + (closeAtEnd ? 26 : 0));
         const auto text = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), message.getText())) + 2;
-        const auto lead = problem ? 20 : 0, trail = dismiss.isVisible() ? 22 : 0;
+        const auto lead = problem ? 20 : 0, trail = dismiss.isVisible() && !closeAtEnd ? 22 : 0;
         const auto pillWidth = std::max(0, std::min(messageArea.getWidth(), lead + text + trail + (problem ? 4 : 0)));
         pill = messageArea.withWidth(pillWidth).withSizeKeepingCentre(pillWidth, 18).withX(messageArea.getX());
         auto inside = pill;
         inside.removeFromLeft(lead);
-        if (dismiss.isVisible()) { dismiss.setBounds(inside.removeFromRight(trail).withSizeKeepingCentre(14, 14)); }
+        if (dismiss.isVisible() && !closeAtEnd) { dismiss.setBounds(inside.removeFromRight(trail).withSizeKeepingCentre(14, 14)); }
         message.setBounds(inside.withY(area.getY()).withHeight(area.getHeight()));
         if (action.isVisible()) { action.setBounds(pill.getRight() + motion::style::gap, area.getY() + (area.getHeight() - actionHeight) / 2, actionWidth, actionHeight); }
+        if (closeAtEnd) { dismiss.setBounds(juce::Rectangle<int>(action.getRight() + 4, area.getY(), 22, area.getHeight()).withSizeKeepingCentre(14, 14)); }
     }
 
 private:
