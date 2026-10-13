@@ -53,7 +53,7 @@ public:
         expect(document.revision() == revision);
         beginTest("Disconnect freezes last geometry and changing policy blanks without restarting the source identity");
         expect(send(sender, "CLOSE\n")); sender.close();
-        expect(wait([&] { return controller.statusText(id).contains("Waiting"); }));
+        expect(wait([&] { return controller.statusText(id).containsIgnoreCase("waiting"); }));
         controller.poll();
         expect(frames->resolve(asset->liveIdentity.get()) != nullptr);
         expect(document.setBlenderSource(id, "Live drawing", {port, false}).wasOk());
@@ -124,7 +124,7 @@ public:
         beginTest("Disconnected blank policy seeds a blank capture despite cached receiver geometry");
         expect(send(sender, "CLOSE\n"));
         sender.close();
-        expect(wait([&] { return controller.statusText(id).contains("Waiting"); }));
+        expect(wait([&] { return controller.statusText(id).containsIgnoreCase("waiting"); }));
         expect(document.setBlenderSource(id, "Live drawing", {port, false}).wasOk());
         controller.poll();
         expect(frames->resolve(asset->liveIdentity.get()) == nullptr, "The live preview blanks while disconnected");

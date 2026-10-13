@@ -638,7 +638,7 @@ void MotionEditor::detectTempo() {
             if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
             const auto bpm = juce::String(estimate->bpm, estimate->bpm == std::round(estimate->bpm) ? 0 : 2);
             const auto other = estimate->bpm * 2 <= 200 ? estimate->bpm * 2 : estimate->bpm / 2;
-            owner->statusBar.show("Tempo " + bpm + " BPM from the soundtrack" + (estimate->confidence < 0.4 ? " (low confidence - check it)" : "")
+            owner->statusBar.show("Tempo " + bpm + " BPM from the soundtrack" + (estimate->confidence < 0.4 ? " (low confidence: check it)" : "")
                 + ". If it feels " + (other > estimate->bpm ? "twice as fast" : "half as fast") + ", type " + juce::String(other, other == std::round(other) ? 0 : 2) + " in BPM"
                 + (moved > 0 ? ". Moved it " + juce::String(moved, 3) + " s so its first downbeat is on a bar." : "; its downbeats are already on the bars.")
                 + (bars ? "" : " The ruler now shows bars and beats."), MotionStatusBar::Kind::notice);

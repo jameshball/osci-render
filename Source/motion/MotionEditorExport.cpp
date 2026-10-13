@@ -271,7 +271,7 @@ void MotionEditor::exportSignal() {
     auto state = std::make_shared<ExportState>();
     exportState = state;
     state->sampleRate = processor.exportSampleRate();
-    chooser = std::make_unique<juce::FileChooser>("Export XYRGB signal - " + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
+    chooser = std::make_unique<juce::FileChooser>("Export XYRGB signal" + motion::style::dot() + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
         defaultExportFile("wav"), "*.wav");
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles

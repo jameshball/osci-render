@@ -1469,7 +1469,7 @@ juce::String MotionCompositionView::emptyMessage() const {
     if (hidden) { return "Clips here are on muted or un-soloed tracks"; }
     const auto grid = project.timeGrid();
     const auto at = "Nothing on screen at " + juce::String(grid.positionLabel(now));
-    return next.has_value() ? at + "  -  next clip at " + juce::String(grid.positionLabel(*next)) : at;
+    return next.has_value() ? at + motion::style::dot() + "next clip at " + juce::String(grid.positionLabel(*next)) : at;
 }
 
 double MotionCompositionView::editingTime() const {

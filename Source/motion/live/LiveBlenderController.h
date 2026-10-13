@@ -60,20 +60,21 @@ public:
     juce::String statusText(Id id) const {
         const auto asset = liveAsset(id);
         if (asset == nullptr) { return "Source unavailable"; }
+        const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
         const auto* session = findSession(asset->liveIdentity);
-        if (session == nullptr) { return "Offline - start listening to connect Blender"; }
+        if (session == nullptr) { return "Offline" + dot + "start listening to connect Blender"; }
         const auto status = session->input->status();
         if (session->input->capturing()) {
             const auto error = session->input->captureError();
-            return error.isNotEmpty() ? error : "Recording capture | Stop to save to Assets";
+            return error.isNotEmpty() ? error : "Recording capture" + dot + "stop to save it to Sources";
         }
         if (session->input->preparationFailed()) { return "Could not prepare the incoming frame"; }
         if (status.message.isNotEmpty()) { return status.message; }
         switch (status.state) {
-            case BlenderReceiver::State::connected: return "Connected | " + juce::String(status.acceptedFrames) + (status.acceptedFrames == 1 ? " frame received" : " frames received");
-            case BlenderReceiver::State::listening: return "Listening on port " + juce::String(status.port) + " | Waiting for Blender";
+            case BlenderReceiver::State::connected: return "Connected" + dot + juce::String(status.acceptedFrames) + (status.acceptedFrames == 1 ? " frame received" : " frames received");
+            case BlenderReceiver::State::listening: return "Listening on port " + juce::String(status.port) + dot + "waiting for Blender";
             case BlenderReceiver::State::failed: return "Could not start the listener";
-            case BlenderReceiver::State::stopped: return asset->blenderSettings.freezeOnDisconnect && session->input->frame().source != nullptr ? "Stopped | last frame frozen" : "Stopped";
+            case BlenderReceiver::State::stopped: return asset->blenderSettings.freezeOnDisconnect && session->input->frame().source != nullptr ? "Stopped" + dot + "last frame frozen" : juce::String("Stopped");
         }
         return {};
     }
