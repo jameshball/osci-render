@@ -295,6 +295,33 @@ public:
             expectEquals(shown, 0, "nothing behind the wall shows near the frame's edge (" + juce::String(shown) + " of " + juce::String(total) + ")");
         }
 
+        beginTest("A bend cuts a face as finely as it curves it, and a step in it ends the cutting");
+        {
+            // A face filling much of the frame, a little in front of the eye.
+            const auto through = [](const osci::Point& point) -> std::optional<motion::hidden::Screen> {
+                if (!(point.z > motion::hidden::nearPlane)) { return std::nullopt; }
+                return motion::hidden::Screen {point.x / point.z, point.y / point.z, 1.0 / point.z};
+            };
+            const auto dice = [&](auto&& bend) {
+                const auto corner = [&](float x, float y) { const osci::Point point(x, y, 2); return motion::hidden::DiceCorner {point, bend(point)}; };
+                motion::hidden::Dicer dicer;
+                std::size_t pieces = 0;
+                dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), bend, [&](const auto&, const auto&, const auto&, bool) { ++pieces; });
+                return pieces;
+            };
+            // Seen through the eye alone it stays flat: halved only until small
+            // enough to grid, not into cells a few pixels across (thousands).
+            const auto flat = dice(through);
+            expect(flat > 0 && flat < 1024, "a flat face is cut into few pieces (" + juce::String(static_cast<int>(flat)) + ")");
+            // Bulged, it curves, and is cut finer.
+            const auto bulged = dice([&](const osci::Point& point) { return through(osci::Point(point.x, point.y, point.z - .3f * (1 - point.x * point.x) * (1 - point.y * point.y))); });
+            expect(bulged > flat, "a curved face is cut finer than a flat one (" + juce::String(static_cast<int>(bulged)) + ")");
+            // Crushed into steps, as Bit crush does: an edge across a step stays
+            // as long however often it is halved, so halving it stops there.
+            const auto crushed = dice([&](const osci::Point& point) { return through(osci::Point(std::round(point.x * 8) / 8, std::round(point.y * 8) / 8, point.z)); });
+            expect(crushed > 0 && crushed < 100000, "a stepped face is cut into a bounded number of pieces (" + juce::String(static_cast<int>(crushed)) + ")");
+        }
+
         beginTest("A bake reuses a frame for a time that depends on just the same");
         {
             // A still cube: every frame is the first, shared. Turning it, none is.
