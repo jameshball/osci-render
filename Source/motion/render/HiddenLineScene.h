@@ -40,6 +40,13 @@ struct SceneItem {
     const Styled* styled = nullptr;
 };
 
+// How many steps to take: `wanted` rounded up, within least and most, and
+// defined however long a line is (a huge or NaN length casts to int badly).
+inline int stepCount(double wanted, int least, int most) {
+    if (std::isnan(wanted)) { return least; }
+    return static_cast<int>(std::clamp(std::ceil(wanted), static_cast<double>(least), static_cast<double>(most)));
+}
+
 // How much of the beam's time a part takes for its length, beside the rest,
 // from how bright it is drawn (its brightest light, its style's amount and
 // how little its surface mirrors, together): less the dimmer it is, down to a

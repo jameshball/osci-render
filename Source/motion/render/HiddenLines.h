@@ -678,7 +678,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             runs.emplace_back(0.0, 1.0);
             return;
         }
-        const auto steps = std::clamp(static_cast<int>(std::ceil(length / testStep)), 1, 65536);
+        const auto steps = stepCount(length / testStep, 1, 65536);
         samples.clear();
         for (int step = 0; step <= steps; ++step) { samples.push_back(at(static_cast<double>(step) / steps)); }
         // What the Scope doesn't show is dropped too: drawn, it would only
@@ -1030,7 +1030,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                     if (previous.has_value() && next.has_value()) { length += std::hypot(next->x - previous->x, next->y - previous->y); }
                     previous = next;
                 }
-                const auto steps = std::clamp(static_cast<int>(std::ceil(length * 1.25 / litStep)), 1, 4096);
+                const auto steps = stepCount(length * 1.25 / litStep, 1, 4096);
                 ts.resize(static_cast<std::size_t>(steps) + 1);
                 light.resize(static_cast<std::size_t>(steps) + 1);
                 shades.resize(static_cast<std::size_t>(steps) + 1);

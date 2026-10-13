@@ -187,7 +187,8 @@ inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const 
     constexpr double reach = 1.0e-6;
     using Cell = std::array<std::int64_t, 3>;
     const auto cellOf = [](const Vec3& point) { return Cell {static_cast<std::int64_t>(std::floor(point.x / reach)), static_cast<std::int64_t>(std::floor(point.y / reach)), static_cast<std::int64_t>(std::floor(point.z / reach))}; };
-    const auto hash = [](const Cell& cell) { return static_cast<std::size_t>((cell[0] * 73856093) ^ (cell[1] * 19349663) ^ (cell[2] * 83492791)); };
+    // Unsigned, so the multiplies wrap rather than overflow.
+    const auto hash = [](const Cell& cell) { return static_cast<std::size_t>((static_cast<std::uint64_t>(cell[0]) * 73856093u) ^ (static_cast<std::uint64_t>(cell[1]) * 19349663u) ^ (static_cast<std::uint64_t>(cell[2]) * 83492791u)); };
     std::unordered_multimap<std::size_t, std::size_t> ends;
     ends.reserve(pieces.size() * 2);
     for (std::size_t index = 0; index < pieces.size(); ++index) {

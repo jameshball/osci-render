@@ -241,7 +241,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 length += distance(previous, next);
                 previous = next;
             }
-            const auto steps = std::clamp(static_cast<int>(std::ceil(length * 1.25 / testStep)), 1, 4096);
+            const auto steps = stepCount(length * 1.25 / testStep, 1, 4096);
             const auto count = static_cast<std::size_t>(steps) + 1;
             shares.resize(count);
             seenAt.resize(count);
@@ -522,7 +522,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                         length += distance(previous, next);
                         previous = next;
                     }
-                    const auto stretches = std::clamp(static_cast<int>(std::ceil(length / (6 * DepthBuffer::pixel))), 4, 256);
+                    const auto stretches = stepCount(length / (6 * DepthBuffer::pixel), 4, 256);
                     for (int stretch = 0; stretch <= stretches; ++stretch) {
                         const auto progress = static_cast<double>(stretch) / stretches;
                         path.emplace_back(progress, place(item, shape->nextVector(static_cast<float>(progress))));
