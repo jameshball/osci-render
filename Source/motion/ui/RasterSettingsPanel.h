@@ -32,7 +32,7 @@ public:
         if (initial.mode != motion::RasterSettings::Mode::hilbert) { settings.shading = xyOnlyScope ? motion::RasterSettings::Shading::density : motion::RasterSettings::Shading::colour; }
         shading.setSelected(settings.shading == motion::RasterSettings::Shading::colour ? 1 : 0);
         shading.setTooltip("How the Hilbert curve shows how bright the picture is: by how dense it is, which a scope shows by X and Y alone; "
-            "or by its colour, the curve as dense all over, for a scope with brightness (XYRGB).");
+            "or by how bright it is drawn, in the picture's colours, the curve as dense all over, for a scope with brightness (XYRGB).");
         shading.onChange = [this](int) { refresh(); };
         threshold.setName("Image threshold");
         threshold.setSpec(thresholdSpec);
@@ -179,7 +179,7 @@ private:
     std::vector<int> resolutions;
     std::vector<std::size_t> strides;
     motion::ui::SegmentedControl mode {"Image trace mode", {"Outlines", "Scanlines", "Hilbert"}};
-    motion::ui::SegmentedControl shading {"Image shading", {"Density", "Colour"}};
+    motion::ui::SegmentedControl shading {"Image shading", {"Density", "Brightness"}};
     motion::ui::ScrubField threshold, frameRate;
     juce::ComboBox detail, samples;
     motion::ui::Switch invert {"Invert image"};

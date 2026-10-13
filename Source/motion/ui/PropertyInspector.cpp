@@ -690,7 +690,7 @@ void MotionPropertyInspector::layoutContent() {
     // A light's presets, under what it is.
     if (presetTiles != nullptr) {
         if (first > 0) { y += motion::style::gap; }
-        content.sections.emplace_back(y, "Preset");
+        content.sections.emplace_back(y, "Presets");
         y += sectionHeading + motion::style::gap;
         const auto height = presetTiles->heightFor(inner);
         presetTiles->setBounds(motion::style::padding, y, inner, height);

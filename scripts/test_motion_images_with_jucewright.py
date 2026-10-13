@@ -90,7 +90,7 @@ try:
     step("choose Hilbert", "set-value", "--name", "Image trace mode", "--exact", "Hilbert")
     assert combo_value("Image trace mode") == "Hilbert"
     # A scope with brightness, so by colour unless told otherwise.
-    assert combo_value("Image shading") == "Colour", combo_value("Image shading")
+    assert combo_value("Image shading") == "Brightness", combo_value("Image shading")
     step("Hilbert settings screenshot", "screenshot", "--file", session.artifact_dir / "hilbert-settings.png")
     step("prepare Hilbert by colour", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
     wait_undo("Change source settings")

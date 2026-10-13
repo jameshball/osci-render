@@ -1112,7 +1112,11 @@ void MotionEditor::paint(juce::Graphics& graphics) {
 // points at what was clicked instead of covering the window.
 void MotionEditor::showAddLight() {
     std::vector<motion::ui::TileGrid::Choice> lights, moving;
-    static constexpr std::array<const motion::GeneratorDefinition*, 4> kinds {&motion::generatorNamed("pointLight"), &motion::generatorNamed("spotLight"), &motion::generatorNamed("directionalLight"), &motion::generatorNamed("ambientLight")};
+    // Every kind of light, as the Add menu lists them.
+    std::vector<const motion::GeneratorDefinition*> kinds;
+    for (const auto& definition : motion::generatorDefinitions) {
+        if (definition.category == motion::GeneratorCategory::light) { kinds.push_back(&definition); }
+    }
     for (const auto* kind : kinds) {
         const auto& definition = *kind;
         const juce::String name(definition.name.data(), definition.name.size());
@@ -1125,8 +1129,8 @@ void MotionEditor::showAddLight() {
         const auto& definition = motion::lightPresetDefinition(preset);
         moving.push_back({motion::ui::pictures::lightPresetShortName(preset), "Add a point light: " + name + ". " + juce::String(definition.description.data(), definition.description.size()), {motion::ui::pictures::lightPresetPicture(preset), {}}});
     }
-    std::vector<motion::ui::AddPicker::Section> sections {{"Lights", std::move(lights), 2}, {"Moving on its own", std::move(moving), 2}};
-    showPopover(std::make_unique<motion::ui::AddPicker>("Add a light", std::move(sections), [this](std::size_t section, std::size_t index) {
+    std::vector<motion::ui::AddPicker::Section> sections {{"Lights", std::move(lights), 2}, {"Presets", std::move(moving), 2}};
+    showPopover(std::make_unique<motion::ui::AddPicker>("Add a light", std::move(sections), [this, kinds](std::size_t section, std::size_t index) {
         if (section == 0) {
             addGenerator(*kinds[index]);
         } else {
