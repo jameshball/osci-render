@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../CommonPluginEditor.h"
+#include "export/Stretches.h"
 #include "model/LightPresets.h"
 #include "model/MirrorPresets.h"
 #include "MotionProcessor.h"
@@ -207,6 +208,8 @@ private:
     void continueCommandLineRender();
     void failCommandLineRender(const juce::String& message);
     juce::File commandLineRender;
+    // --stills=t1,t2: a render of just the stretches up to those times.
+    std::vector<double> commandLineStills;
     bool commandLineRenderStarted = false;
     // The project a command-line render asked for: renders only once it is
     // the one open, and fails if it never becomes so.
@@ -388,6 +391,8 @@ private:
         std::atomic<double> soundtrackProgress { 0.0 };
         bool videoWithAudio = false;
         double sampleRate = 48000;
+        // Stills: only the stretches up to them are rendered.
+        std::optional<motion::Stretches> stretches;
     };
     std::shared_ptr<ExportState> exportState;
     juce::ThreadPool exports { 1 };

@@ -11,7 +11,7 @@ namespace motion::cli {
 // lines removed from the frames it draws before anything is sampled.
 struct Composition {
     std::unique_ptr<PreparedComposition> prepared;
-    double sampleRate = 48000;
+    double sampleRate = 48000, frameRate = 60;
     // How long preparing and removing hidden lines took.
     double prepareMilliseconds = 0, bakeMilliseconds = 0;
 
@@ -25,6 +25,7 @@ struct Composition {
     }
     static juce::Result prepare(const Project& project, double sampleRate, Composition& prepared) {
         prepared.sampleRate = sampleRate;
+        prepared.frameRate = project.frameRate;
         const auto start = juce::Time::getMillisecondCounterHiRes();
         prepared.prepared = std::make_unique<PreparedComposition>(project, sampleRate, &never(), CompositionPurpose::signal, squareScope());
         prepared.prepareMilliseconds = juce::Time::getMillisecondCounterHiRes() - start;

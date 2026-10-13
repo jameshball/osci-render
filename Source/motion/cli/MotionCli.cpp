@@ -1,11 +1,13 @@
 #include <JuceHeader.h>
 #include "FrameStats.h"
 #include "SignalDiff.h"
+#include "ScopeRender.h"
 #include "../export/SignalExporter.h"
 
 // osci-motion on the command line: projects drawn offline exactly as Export
-// draws them, to a signal, preview images or numbers, so a change to the
-// renderer can be seen on real projects and compared before and after.
+// draws them, to a signal, numbers, or (rendered by the app) video and
+// pictures of frames, so a change to the renderer can be seen on real
+// projects and compared before and after.
 
 namespace {
 using namespace motion::cli;
@@ -71,18 +73,20 @@ void writeImage(const juce::Image& image, const juce::File& file) {
     if (!stream.openedOk() || !juce::PNGImageFormat().writeImageToStream(image, stream)) { juce::ConsoleApplication::fail("Couldn't write " + file.getFullPathName() + "."); }
 }
 
-// Each frame's preview as its own image, or with `sheet` all of them on one,
-// in rows of four, each with its time.
-void writePreviews(const Composition& composition, const std::vector<double>& times, const juce::File& folder, const juce::String& name, bool sheet) {
+// Each frame as the Scope shows it, taken from a video the app rendered at
+// `at` (its time in the video for each of `times`), as its own image, or with `sheet` all of them
+// on one, in rows of four, each with its time.
+void writePreviews(const juce::File& video, const std::vector<double>& times, const std::function<double(std::size_t)>& at, const juce::File& folder, const juce::String& name, bool sheet) {
     if (!folder.createDirectory()) { juce::ConsoleApplication::fail("Couldn't make " + folder.getFullPathName() + "."); }
-    if (!sheet) {
-        for (const auto time : times) {
-            const auto file = folder.getChildFile(name + "-" + juce::String(time, 3) + "s.png");
-            writeImage(BeamFrame::at(composition, time).preview(640), file);
-            say("Preview " + file.getFullPathName());
-        }
-        return;
+    juce::Array<juce::File> stills;
+    for (std::size_t index = 0; index < times.size(); ++index) {
+        const auto file = folder.getChildFile(name + "-" + juce::String(times[index], 3) + "s.png");
+        const auto taken = ScopeRender::still(video, at(index), file);
+        if (taken.failed()) { juce::ConsoleApplication::fail(taken.getErrorMessage()); }
+        stills.add(file);
+        if (!sheet) { say("Preview " + file.getFullPathName()); }
     }
+    if (!sheet) { return; }
     constexpr int size = 360, across = 4;
     const auto count = static_cast<int>(times.size());
     juce::Image image(juce::Image::RGB, size * std::min(count, across), size * ((count + across - 1) / across), true);
@@ -90,18 +94,38 @@ void writePreviews(const Composition& composition, const std::vector<double>& ti
     g.fillAll(juce::Colours::black);
     for (int index = 0; index < count; ++index) {
         const juce::Rectangle<int> cell(size * (index % across), size * (index / across), size, size);
-        const auto time = times[static_cast<std::size_t>(index)];
+        const auto still = juce::ImageFileFormat::loadFrom(stills[index]);
         // An image is drawn at the opacity of the colour last set (the cell's faint border).
         g.setOpacity(1.0f);
-        g.drawImageAt(BeamFrame::at(composition, time).preview(size), cell.getX(), cell.getY());
+        g.drawImage(still, cell.toFloat(), juce::RectanglePlacement::centred);
         g.setColour(juce::Colours::white.withAlpha(.6f));
-        g.drawText(juce::String(time, 2) + " s", cell.reduced(8).removeFromTop(16), juce::Justification::topLeft);
+        g.drawText(juce::String(times[static_cast<std::size_t>(index)], 2) + " s", cell.reduced(8).removeFromTop(16), juce::Justification::topLeft);
         g.setColour(juce::Colours::white.withAlpha(.12f));
         g.drawRect(cell);
+        stills[index].deleteFile();
     }
     const auto file = folder.getChildFile(name + "-sheet.png");
     writeImage(image, file);
     say("Sheet " + file.getFullPathName());
+}
+
+// A video of the project as Export makes it, rendered by the app.
+juce::File renderVideo(const juce::ArgumentList& args, const juce::File& project, const juce::File& destination, const std::vector<double>& stills = {}) {
+    say("Rendering " + project.getFileName() + (stills.empty() ? juce::String() : " (" + juce::String(static_cast<int>(stills.size())) + " stills)") + " with the app...");
+    const auto start = juce::Time::getMillisecondCounterHiRes();
+    const auto rendered = ScopeRender::video(project, destination, ScopeRender::app(args.getValueForOption("--app")), stills);
+    if (rendered.failed()) { juce::ConsoleApplication::fail(rendered.getErrorMessage()); }
+    say("Video " + destination.getFullPathName() + " in " + juce::String((juce::Time::getMillisecondCounterHiRes() - start) / 1000.0, 1) + " s");
+    return destination;
+}
+
+void video(const juce::ArgumentList& args) {
+    const auto files = positional(args);
+    if (files.size() != 1) { juce::ConsoleApplication::fail("video takes one project."); }
+    const auto project = fileArgument(files[0]);
+    if (!project.existsAsFile()) { juce::ConsoleApplication::fail("There is no project at " + project.getFullPathName() + "."); }
+    const auto out = args.getValueForOption("--out");
+    renderVideo(args, project, out.isNotEmpty() ? fileArgument(out) : project.getSiblingFile(sceneName(project) + ".mp4"));
 }
 
 // A recipe made into a project file, to open in the app.
@@ -127,17 +151,25 @@ void render(const juce::ArgumentList& args) {
     auto composition = open(project, sampleRateOf(args));
     const auto previews = args.getValueForOption("--previews");
     const auto out = args.getValueForOption("--out");
-    // Previews alone need only their frames.
-    const auto signal = out.isNotEmpty() || previews.isEmpty();
-    const auto times = timesOf(args, composition.duration());
-    if (signal) {
-        composition.bakeAll();
-    } else {
-        composition.bakeAt(times);
+    if (previews.isNotEmpty()) {
+        // The Scope's picture, from a video the app renders: of only a short
+        // stretch up to each frame (its persistence built as playing builds
+        // it), or with --whole all of it, kept beside the pictures to watch or
+        // take more from (--video).
+        const auto times = timesOf(args, composition.duration());
+        const auto given = args.getValueForOption("--video");
+        const auto whole = given.isNotEmpty() || args.containsOption("--whole");
+        const auto folder = fileArgument(previews);
+        if (!folder.createDirectory()) { juce::ConsoleApplication::fail("Couldn't make " + folder.getFullPathName() + "."); }
+        const auto stretches = motion::Stretches::upTo(times, composition.frameRate);
+        const auto halfFrame = .5 / (composition.frameRate > 0 ? composition.frameRate : 60.0);
+        const juce::TemporaryFile stills(".mp4");
+        const auto source = given.isNotEmpty() ? fileArgument(given) : renderVideo(args, project, whole ? folder.getChildFile(sceneName(project) + ".mp4") : stills.getFile(), whole ? std::vector<double> {} : times);
+        writePreviews(source, times, [&](std::size_t index) { return whole ? times[index] + halfFrame : stretches.exportTime(index, times[index]) + halfFrame; }, folder, sceneName(project), args.containsOption("--sheet"));
+        if (out.isEmpty()) { return; }
     }
+    composition.bakeAll();
     say("Prepared in " + juce::String(composition.prepareMilliseconds, 1) + " ms, hidden lines in " + juce::String(composition.bakeMilliseconds, 1) + " ms");
-    if (previews.isNotEmpty()) { writePreviews(composition, times, fileArgument(previews), sceneName(project), args.containsOption("--sheet")); }
-    if (!signal) { return; }
     const auto destination = out.isNotEmpty() ? fileArgument(out) : project.getSiblingFile(sceneName(project) + ".wav");
     const std::atomic<bool> cancel {false};
     const auto start = juce::Time::getMillisecondCounterHiRes();
@@ -275,9 +307,12 @@ int main(int argc, char* argv[]) {
     app.addCommand({"make", "make <scene.recipe.json> [--out=scene.osci-motion]",
         "Makes a project from a recipe: objects from generators or files, their properties and keys, a camera.",
         "Every command takes a recipe wherever it takes a project. See Source/motion/cli/Recipe.h for the format.", make});
-    app.addCommand({"render", "render <project> [--out=signal.wav] [--previews=folder [--sheet] [--frames=N | --at=t1,t2]] [--rate=Hz]",
-        "Writes the XYRGB signal (beside the project unless --out), and preview images of frames.",
-        "With --previews and no --out, writes only the previews; --sheet puts them on one image.", render});
+    app.addCommand({"render", "render <project> [--out=signal.wav] [--previews=folder [--sheet] [--frames=N | --at=t1,t2] [--whole | --video=file.mp4] [--app=osci-motion.app]] [--rate=Hz]",
+        "Writes the XYRGB signal (beside the project unless --out), and pictures of frames as the Scope shows them.",
+        "With --previews and no --out, writes only the pictures, rendered by the app: a short stretch up to each frame, in seconds,\n"
+        "or with --whole a video of all of it, kept in that folder (--video takes them from one rendered before). --sheet puts them on one image.", render});
+    app.addCommand({"video", "video <project> [--out=file.mp4] [--app=osci-motion.app]",
+        "Renders the project to video with the app, as Export does.", {}, video});
     app.addCommand({"stats", "stats <project> [--frames=N | --at=t1,t2] [--json] [--rate=Hz]",
         "Each frame's beam in numbers: drawn and travelled length, brightness, a fingerprint of its samples.", {}, stats});
     app.addCommand({"diff", "diff <a.wav> <b.wav> [--tolerance=1e-4] | diff <a> <b> [--frames=N | --at=t1,t2]",

@@ -432,6 +432,8 @@
       <GROUP id="MotionSrcExport" name="export">
         <FILE id="MotSignalExport" name="SignalExporter.h" compile="0" resource="0"
               file="Source/motion/export/SignalExporter.h"/>
+        <FILE id="MotStretches" name="Stretches.h" compile="0" resource="0"
+              file="Source/motion/export/Stretches.h"/>
         <FILE id="MotMusicExport" name="SoundtrackExporter.h" compile="0" resource="0"
               file="Source/motion/export/SoundtrackExporter.h"/>
         <FILE id="MotWavExport" name="WavExporter.h" compile="0" resource="0"

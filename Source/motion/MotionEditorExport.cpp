@@ -157,7 +157,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                     const auto rate = state->sampleRate;
                     const motion::PreparedComposition prepared(project, rate, &state->cancelled, motion::CompositionPurpose::signal, motion::hidden::Reach::ofCanvas(config.renderSize.width, config.renderSize.height, VisualiserGeometry::signalGain));
                     picture = std::make_shared<const motion::PreparedBeam>(prepared.beam);
-                    result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress, baked.get());
+                    result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress, baked.get(), state->stretches.has_value() ? &*state->stretches : nullptr);
                     if (result.wasOk() && config.includeAudio) {
                         result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), rate, state->cancelled, &state->soundtrackProgress);
                     }
@@ -182,9 +182,12 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                     // follows the document sample by sample.
                     if (picture != nullptr) {
                         auto slots = std::make_shared<motion::ScopeBeamSlots>(beamSnapshot->params);
-                        beamSnapshot->params.applyExternalModulation = [picture, slots, rate = state->sampleRate, cursor = std::make_shared<juce::int64>(0)](int samples) {
+                        beamSnapshot->params.applyExternalModulation = [picture, slots, state, rate = state->sampleRate, cursor = std::make_shared<juce::int64>(0)](int samples) {
                             for (std::size_t index = 0; index < motion::beamPropertySpecs.size(); ++index) {
-                                slots->fill(index, samples, [&](int sample) { return picture->value(index, static_cast<double>(*cursor + sample) / rate); });
+                                slots->fill(index, samples, [&](int sample) {
+                                    const auto seconds = static_cast<double>(*cursor + sample) / rate;
+                                    return picture->value(index, state->stretches.has_value() ? state->stretches->timeAt(seconds) : seconds);
+                                });
                             }
                             *cursor += samples;
                         };
@@ -226,6 +229,10 @@ void MotionEditor::handleCommandLine(const juce::String& commandLine) {
         const auto token = tokens[index].trim().unquoted();
         if (token == "--render-video" && index + 1 < tokens.size()) {
             commandLineRender = juce::File::createFileWithoutCheckingPath(tokens[++index].trim().unquoted());
+            continue;
+        }
+        if (token.startsWith("--stills=")) {
+            for (const auto& time : juce::StringArray::fromTokens(token.fromFirstOccurrenceOf("=", false, false), ",", {})) { commandLineStills.push_back(time.getDoubleValue()); }
             continue;
         }
         if (token.startsWith("-psn_")) { continue; }
@@ -276,9 +283,10 @@ void MotionEditor::continueCommandLineRender() {
     for (const auto& source : processor.document.liveSourcesInUse()) { std::cerr << "osci-motion: leaving out " << source->name << ", a live source; capture it to render it." << std::endl; }
     const auto project = motion::Document::withoutLiveSources(processor.document.mainProject());
     config.frameRate = project.frameRate;
-    config.includeAudio = true;
+    config.includeAudio = commandLineStills.empty();
     auto state = std::make_shared<ExportState>();
     state->sampleRate = processor.exportSampleRate();
+    if (!commandLineStills.empty()) { state->stretches = motion::Stretches::upTo(commandLineStills, project.frameRate); }
     exportState = state;
     const auto destination = commandLineRender;
     std::cout << "osci-motion rendering " << project.name << " to " << destination.getFullPathName() << std::endl;

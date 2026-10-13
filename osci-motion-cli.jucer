@@ -18,6 +18,8 @@
       <FILE id="MoCliSignalDiff" name="SignalDiff.h" compile="0" resource="0"
             file="Source/motion/cli/SignalDiff.h"/>
       <FILE id="MoCliRecipe" name="Recipe.h" compile="0" resource="0" file="Source/motion/cli/Recipe.h"/>
+      <FILE id="MoCliScopeRender" name="ScopeRender.h" compile="0" resource="0"
+            file="Source/motion/cli/ScopeRender.h"/>
     </GROUP>
     <GROUP id="MoCliE" name="Engine">
       <FILE id="MotionDocC" name="Document.cpp" compile="1" resource="0"

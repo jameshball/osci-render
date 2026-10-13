@@ -84,32 +84,6 @@ struct BeamFrame {
         result.fingerprint = juce::String::toHexString(static_cast<juce::int64>(hash)).paddedLeft('0', 16);
         return result;
     }
-
-    // The frame as the Scope shows it, roughly: each step between drawn
-    // samples a line in their colour, on black, the Scope's width across.
-    // Brightened so its brightest line is at full and dim ones lifted: a dim
-    // scene still reads, its lines in the order of brightness they are drawn.
-    juce::Image preview(int size) const {
-        juce::Image image(juce::Image::RGB, size, size, true);
-        juce::Graphics g(image);
-        g.fillAll(juce::Colours::black);
-        const auto place = [size](const osci::Point& point) {
-            return juce::Point<float>((point.x * .5f + .5f) * static_cast<float>(size), (.5f - point.y * .5f) * static_cast<float>(size));
-        };
-        float brightest = lit;
-        for (const auto& point : samples) { brightest = std::max(brightest, brightness(point)); }
-        const auto gain = 1.0f / brightest;
-        for (std::size_t index = 1; index < samples.size(); ++index) {
-            const auto& from = samples[index - 1];
-            const auto& to = samples[index];
-            if (brightness(from) < lit || brightness(to) < lit) { continue; }
-            // Lifted as the Scope's intensity lifts dim lines.
-            const auto channel = [gain](float value) { return static_cast<juce::uint8>(std::pow(std::clamp(value * gain, 0.0f, 1.0f), .45f) * 255.0f); };
-            g.setColour(juce::Colour(channel(to.r), channel(to.g), channel(to.b)).withAlpha(.75f));
-            g.drawLine(juce::Line<float>(place(from), place(to)), 1.5f);
-        }
-        return image;
-    }
 };
 
 // `count` frames evenly over a composition, the first at its start.
