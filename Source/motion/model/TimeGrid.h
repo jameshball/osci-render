@@ -139,7 +139,8 @@ struct TimeGrid {
         auto mode = display;
         if (text.back() == 's' || text.back() == 'f') {
             mode = text.back() == 's' ? TimeDisplay::seconds : TimeDisplay::frames;
-            text.remove_suffix(1); trim();
+            text.remove_suffix(1);
+            trim();
         }
         const auto numeric = [](std::string_view part, bool integer, bool exponent = true) -> std::optional<long double> {
             if (part.empty()) { return std::nullopt; }
@@ -175,7 +176,8 @@ struct TimeGrid {
             std::size_t first = 0;
             for (std::size_t i = 0; i <= value.size(); ++i) {
                 if (i == value.size() || value[i] == delimiter) {
-                    parts.push_back(value.substr(first, i - first)); first = i + 1;
+                    parts.push_back(value.substr(first, i - first));
+                    first = i + 1;
                 }
             }
             return parts;

@@ -487,7 +487,8 @@ void MotionEditor::setUpTimeline() {
         if (id != 0) {
             const auto found = std::find_if(project.markers.begin(), project.markers.end(), [id](const auto& marker) { return marker.id == id; });
             if (found == project.markers.end()) { return; }
-            name = found->name; time = found->time;
+            name = found->name;
+            time = found->time;
         }
         auto panel = std::make_unique<MotionMarkerPanel>(name, time, project.timeGrid(), project.duration);
         const juce::Component::SafePointer<MotionMarkerPanel> markerPanel(panel.get());

@@ -48,7 +48,11 @@ void MotionCurveEditor::restoreView(const ViewState& state) {
     setSelection(state.target, state.property);
     if (std::isfinite(state.start) && std::isfinite(state.end) && state.end > state.start
         && std::isfinite(state.low) && std::isfinite(state.high) && state.high > state.low) {
-        viewStart = state.start; viewEnd = state.end; low = state.low; high = state.high; userView = state.user;
+        viewStart = state.start;
+        viewEnd = state.end;
+        low = state.low;
+        high = state.high;
+        userView = state.user;
     }
     selectedTime = state.selected;
     companions.clear();
@@ -1333,7 +1337,8 @@ void MotionCurveEditor::fit(bool primaryOnly) {
     for (int i = 0; i <= 256; ++i) {
         const auto local = clip->localTime(std::lerp(first, last, i / 256.0));
         const auto base = curve->evaluateBase(local);
-        low = std::min(low, base); high = std::max(high, base);
+        low = std::min(low, base);
+        high = std::max(high, base);
         const auto driven = withDrivers.evaluate(local);
         const auto value = range.has_value() ? std::clamp(driven, range->first, range->second) : driven;
         low = std::min(low, value);

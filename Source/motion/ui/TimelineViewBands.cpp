@@ -344,7 +344,10 @@ void MotionTimelineView::jumpMarker(bool forward) {
     if (target != nullptr) {
         const auto id = target->id;
         const auto time = target->time;
-        selectMarker(id); processor.seek(time); revealTime(time); repaint();
+        selectMarker(id);
+        processor.seek(time);
+        revealTime(time);
+        repaint();
     }
 }
 

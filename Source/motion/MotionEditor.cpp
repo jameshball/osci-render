@@ -616,16 +616,22 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
     if (fromLibrary) {
         for (const auto& source : project.definitions) {
             if (source->id != id) { continue; }
-            definition = id; time = motion::Document::makeCompositionClip(0, *source, 0).offset;
+            definition = id;
+            time = motion::Document::makeCompositionClip(0, *source, 0).offset;
         }
     }
     if (definition == 0 || definition == processor.document.editingComposition()) { return; }
     ScopeView previous;
-    previous.scope = processor.document.editingComposition(); previous.selection = fromLibrary ? selection : id;
-    previous.position = processor.position.load(); previous.timelineFraction = timelineFraction;
+    previous.scope = processor.document.editingComposition();
+    previous.selection = fromLibrary ? selection : id;
+    previous.position = processor.position.load();
+    previous.timelineFraction = timelineFraction;
     previous.timelineTab = timelineTabs.getCurrentTabIndex();
-    previous.curveTarget = curveTarget; previous.property = curvePropertyName; previous.cameraCurve = cameraCurve;
-    previous.timeline = timeline.viewState(); previous.preview = composition.viewState();
+    previous.curveTarget = curveTarget;
+    previous.property = curvePropertyName;
+    previous.cameraCurve = cameraCurve;
+    previous.timeline = timeline.viewState();
+    previous.preview = composition.viewState();
     previous.graph = curveEditor.viewState();
 
     composition.setNavigating(false);
@@ -651,7 +657,8 @@ void MotionEditor::leaveComposition() {
     auto entered = processor.document.enterComposition(previous.scope);
     if (entered.failed()) { previous = {}; processor.document.enterComposition(0); scopeHistory.clear(); }
     statusBar.clear();
-    processor.playing.store(false); processor.seek(previous.position);
+    processor.playing.store(false);
+    processor.seek(previous.position);
     select(previous.selection);
     timelineTabs.setSelectedIndex(previous.timelineTab);
     selectCurveTarget(previous.curveTarget, previous.property, previous.cameraCurve);

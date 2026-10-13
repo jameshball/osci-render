@@ -185,8 +185,10 @@ juce::Result prepareAnimatedText(Asset& asset, const juce::GlyphArrangement& gly
     for (const auto& shape : restShapes) {
         for (const auto t : {0.0f, 1.0f}) {
             const auto point = shape->nextVector(t);
-            minX = std::min(minX, point.x); maxX = std::max(maxX, point.x);
-            minY = std::min(minY, point.y); maxY = std::max(maxY, point.y);
+            minX = std::min(minX, point.x);
+            maxX = std::max(maxX, point.x);
+            minY = std::min(minY, point.y);
+            maxY = std::max(maxY, point.y);
         }
     }
     const auto centreX = (minX + maxX) / 2, centreY = (minY + maxY) / 2;
@@ -453,7 +455,8 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (asset.extension.equalsIgnoreCase(".blender")) {
         if (!asset.blenderSettings.valid() || asset.data.getSize() != 0) { return juce::Result::fail("Invalid Blender source settings."); }
         asset.liveIdentity = std::make_shared<const LiveSourceIdentity>();
-        asset.source.reset(); asset.audio.reset();
+        asset.source.reset();
+        asset.audio.reset();
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
     }
@@ -468,7 +471,8 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         std::vector<double> defaults;
         for (const auto& spec : definition->parameters) { defaults.push_back(spec.defaultValue); }
         asset.source = generator::clipSource(*definition, 0, 60, [&](double) { return defaults; });
-        asset.liveIdentity.reset(); asset.audio.reset();
+        asset.liveIdentity.reset();
+        asset.audio.reset();
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
     }
@@ -488,7 +492,8 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
             if (progress != nullptr) { progress->store(static_cast<double>(drawings.size()) / capture.frames.size()); }
         }
         asset.source = std::make_shared<const PreparedSource>(std::move(drawings), std::move(capture.timing));
-        asset.liveIdentity.reset(); asset.audio.reset();
+        asset.liveIdentity.reset();
+        asset.audio.reset();
         return juce::Result::ok();
     }
     if (osci::files::isVideo(extension)) {

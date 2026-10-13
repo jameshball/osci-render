@@ -1045,7 +1045,8 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
                     const auto previousEnd = track.clips.back().timing(candidate.tempo()).end();
                     const auto first = clip.timing(candidate.tempo()).start;
                     if (first < previousEnd && previousEnd - first <= timeTolerance(first, previousEnd, displacement)) {
-                        auto aligned = clip.timing(candidate.tempo()); aligned.moveTo(previousEnd);
+                        auto aligned = clip.timing(candidate.tempo());
+                        aligned.moveTo(previousEnd);
                         if (!clip.setTiming(aligned, candidate.tempo())) { return juce::Result::fail("Ripple delete produced invalid clip timing."); }
                         clip.nudgeStartPast(previousEnd, candidate.tempo());
                     }
@@ -1094,17 +1095,23 @@ bool Document::canReferenceComposition(Id definition) const {
 }
 
 Clip Document::makeCompositionClip(Id id, const CompositionDefinition& definition, double time) {
-    Clip clip; clip.id = id; clip.composition = definition.id; clip.name = definition.name.toStdString();
+    Clip clip;
+    clip.id = id;
+    clip.composition = definition.id;
+    clip.name = definition.name.toStdString();
     double first = definition.duration, last = 0;
     for (const auto& track : definition.tracks) {
         for (const auto& source : track.clips) {
             const auto timing = source.timing(definition.tempo());
             if (!timing.valid() || timing.start >= definition.duration) { continue; }
-            first = std::min(first, timing.start); last = std::max(last, std::min(timing.end(), definition.duration));
+            first = std::min(first, timing.start);
+            last = std::max(last, std::min(timing.end(), definition.duration));
         }
     }
     if (last <= first) { first = 0; last = definition.duration; }
-    clip.start = time; clip.offset = first; clip.duration = last - first;
+    clip.start = time;
+    clip.offset = first;
+    clip.duration = last - first;
     clip.properties = defaultProperties(objectPropertySpecs);
     return clip;
 }
@@ -1129,7 +1136,11 @@ juce::Result Document::insertComposition(Id definition, double time, Id trackId,
         }
     } else {
         if (groupId != 0 && findGroup(candidate, groupId) == nullptr) { return juce::Result::fail("The destination group no longer exists."); }
-        Track track; track.id = ++highest; track.name = clip.name; track.group = groupId; track.clips = {clip};
+        Track track;
+        track.id = ++highest;
+        track.name = clip.name;
+        track.group = groupId;
+        track.clips = {clip};
         candidate.tracks.push_back(std::move(track));
     }
     candidate.duration = std::max(candidate.duration, clip.end());
@@ -1196,7 +1207,8 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     }
     for (auto& cut : copy->cameraCuts) {
         if (!cameras.contains(cut.camera)) { return juce::Result::fail("Invalid composition camera reference."); }
-        cut.id = ++highest; cut.camera = cameras.at(cut.camera);
+        cut.id = ++highest;
+        cut.camera = cameras.at(cut.camera);
     }
     for (auto& marker : copy->markers) { marker.id = ++highest; }
     renumber(copy->effects, highest, owners);
@@ -1251,9 +1263,13 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     // The new instance trims this source to the selected interval.
     definition->name = name;
     definition->duration = state.duration;
-    definition->bpm = state.bpm; definition->tempoChanges = state.tempoChanges; definition->frameRate = state.frameRate;
-    definition->timeDisplay = state.timeDisplay; definition->beatsPerBar = state.beatsPerBar;
-    definition->snapBeats = state.snapBeats; definition->gridSnap = state.gridSnap;
+    definition->bpm = state.bpm;
+    definition->tempoChanges = state.tempoChanges;
+    definition->frameRate = state.frameRate;
+    definition->timeDisplay = state.timeDisplay;
+    definition->beatsPerBar = state.beatsPerBar;
+    definition->snapBeats = state.snapBeats;
+    definition->gridSnap = state.gridSnap;
     double first = std::numeric_limits<double>::infinity(), last = 0;
     std::size_t count = 0, insertion = state.tracks.size();
     std::set<Id> requiredGroups;
@@ -1267,7 +1283,9 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
         for (const auto& clip : copy.clips) {
             const auto timing = clip.timing(state.tempo());
             if (!clip.valid() || !timing.valid()) { return juce::Result::fail("A selected clip has invalid timing or properties."); }
-            first = std::min(first, timing.start); last = std::max(last, timing.end()); ++count;
+            first = std::min(first, timing.start);
+            last = std::max(last, timing.end());
+            ++count;
         }
         // Capture effective visibility across the new scope boundary. Solo is
         // scoped independently inside the definition after this operation.
@@ -1346,10 +1364,17 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     });
     pruneReferences(*definition);
     Clip instance;
-    instance.id = ++highest; instance.composition = definition->id; instance.name = name.toStdString();
-    instance.start = first; instance.duration = last - first; instance.offset = first;
+    instance.id = ++highest;
+    instance.composition = definition->id;
+    instance.name = name.toStdString();
+    instance.start = first;
+    instance.duration = last - first;
+    instance.offset = first;
     instance.properties = defaultProperties(objectPropertySpecs);
-    Track replacement; replacement.id = ++highest; replacement.name = name.toStdString(); replacement.clips = {instance};
+    Track replacement;
+    replacement.id = ++highest;
+    replacement.name = name.toStdString();
+    replacement.clips = {instance};
     replacement.solo = std::any_of(state.tracks.begin(), state.tracks.end(), [](const auto& track) { return track.solo; })
         || std::any_of(state.groups.begin(), state.groups.end(), [](const auto& group) { return group.solo; });
     const auto isSelected = [&](const Clip& clip) { return selected.contains(clip.id); };
@@ -1762,7 +1787,9 @@ juce::Result Document::setLink(Id target, const std::string& property, std::opti
 juce::Result Document::addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id) {
     if (!settings.valid() || name.trim().isEmpty()) { return juce::Result::fail("Enter a source name and a port from 51600 to 51699."); }
     auto asset = std::make_shared<Asset>();
-    asset->id = newId(); asset->name = name.trim(); asset->extension = ".blender";
+    asset->id = newId();
+    asset->name = name.trim();
+    asset->extension = ".blender";
     asset->blenderSettings = settings;
     const auto result = decodeAsset(*asset);
     if (result.failed()) { return result; }
@@ -1777,7 +1804,8 @@ juce::Result Document::setBlenderSource(Id id, juce::String name, BlenderSourceS
     if (!settings.valid() || name.trim().isEmpty()) { return juce::Result::fail("Enter a source name and a port from 51600 to 51699."); }
     if (found->name == name.trim() && found->blenderSettings == settings) { return juce::Result::ok(); }
     auto replacement = std::make_shared<Asset>(*found);
-    replacement->name = name.trim(); replacement->blenderSettings = settings;
+    replacement->name = name.trim();
+    replacement->blenderSettings = settings;
     if (found->blenderSettings.port != settings.port) { replacement->liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
     edit("Change Blender source", [id, replacement](Project& project) {
         for (auto& asset : project.assets) { if (asset->id == id) { asset = replacement; break; } }

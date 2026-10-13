@@ -317,7 +317,9 @@ bool MotionEditor::setLoop(double start, double end, bool enabled, juce::String 
     }
     const motion::Document::ViewChange view(processor.document);
     processor.document.edit(label, [start, end, enabled](motion::Project& state) {
-        state.loopStart = start; state.loopEnd = end; state.looping = enabled;
+        state.loopStart = start;
+        state.loopEnd = end;
+        state.looping = enabled;
     });
     return true;
 }

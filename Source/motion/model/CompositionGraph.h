@@ -137,7 +137,8 @@ Id highestProjectIdentity(const ProjectType& project, Id highest = 0) {
         all(composition.effects);
         for (const auto& group : composition.groups) { highest = std::max(highest, group.id); all(group.effects); }
         for (const auto& track : composition.tracks) {
-            highest = std::max(highest, track.id); all(track.effects);
+            highest = std::max(highest, track.id);
+            all(track.effects);
             for (const auto& clip : track.clips) { highest = std::max(highest, clip.id); all(clip.effects); }
         }
         all(composition.cameras);

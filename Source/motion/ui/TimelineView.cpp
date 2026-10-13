@@ -156,7 +156,10 @@ void MotionTimelineView::restoreView(const ViewState& state) {
     scrollTime = std::isfinite(state.scroll) ? std::max(0.0, state.scroll) : 0.0;
     scrollY = state.scrollY;
     selectedMarker = 0;
-    selected = state.primary; selectedClips = state.selected; collapsedGroups = state.collapsed; expandedTracks = state.expanded;
+    selected = state.primary;
+    selectedClips = state.selected;
+    collapsedGroups = state.collapsed;
+    expandedTracks = state.expanded;
     std::erase_if(collapsedGroups, [this](auto id) { return motion::findGroup(processor.document.project(), id) == nullptr; });
     if (!isClip(selected) && motion::findGroup(processor.document.project(), selected) == nullptr) { selected = 0; }
     layoutRevision.reset();
@@ -191,7 +194,9 @@ void MotionTimelineView::revealSelection() {
     motion::Id trackId = 0, parent = 0;
     for (const auto& track : project.tracks) {
         if (std::any_of(track.clips.begin(), track.clips.end(), [this](const auto& clip) { return clip.id == selected; })) {
-            trackId = track.id; parent = track.group; break;
+            trackId = track.id;
+            parent = track.group;
+            break;
         }
     }
     const auto* selectedGroup = motion::findGroup(project, selected);
@@ -396,7 +401,10 @@ void MotionTimelineView::refreshTracks() {
     for (const auto& track : project.tracks) { updateHeader(track, false); }
     for (const auto& group : project.groups) {
         motion::Track display;
-        display.id = group.id; display.name = group.name; display.muted = group.muted; display.solo = group.solo;
+        display.id = group.id;
+        display.name = group.name;
+        display.muted = group.muted;
+        display.solo = group.solo;
         updateHeader(display, true);
     }
     rebuildRows();
@@ -647,7 +655,8 @@ void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
         motion::Id inserted = 0;
         const auto result = processor.document.insertComposition(assetId, snapTime(time, juce::ModifierKeys::getCurrentModifiers()), track, groupAtY(y), inserted);
         if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } return; }
-        selectClip(inserted); refreshTracks();
+        selectClip(inserted);
+        refreshTracks();
         return;
     }
     const auto time = x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
@@ -850,7 +859,9 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         if (event.getNumberOfClicks() > 1) {
             // Double-click an edge: back to the default height.
             processor.document.setTrackHeight(id, 0);
-            layoutRows(); resized(); repaint();
+            layoutRows();
+            resized();
+            repaint();
             return;
         }
         heightDrag = HeightDrag {id, heightOf(static_cast<std::size_t>(edge)), event.y, storedHeight(id)};
@@ -870,10 +881,14 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     if (marker != nullptr && event.mods.isLeftButtonDown()) {
         const auto id = marker->id;
         const auto time = marker->time;
-        selectMarker(id); markerDragging = id; markerOriginalTime = time;
+        selectMarker(id);
+        markerDragging = id;
+        markerOriginalTime = time;
         processor.seek(time);
-        downX = event.x; before = processor.document.project();
-        expectedRevision = processor.document.revision(); changed = false;
+        downX = event.x;
+        before = processor.document.project();
+        expectedRevision = processor.document.revision();
+        changed = false;
         repaint();
         return;
     }
@@ -1255,7 +1270,9 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
     if (loopDrag.has_value()) { loopDragged(event); return; }
     if (heightDrag.has_value()) {
         processor.document.setTrackHeight(heightDrag->track, std::clamp(heightDrag->startHeight + event.y - heightDrag->downY, motion::Track::minimumHeight, motion::Track::maximumHeight));
-        layoutRows(); resized(); repaint();
+        layoutRows();
+        resized();
+        repaint();
         return;
     }
     if (resizingNames) {
@@ -1555,7 +1572,9 @@ void MotionTimelineView::mouseDoubleClick(const juce::MouseEvent& event) {
         // Double-click a row's bottom edge: back to the default height.
         heightDrag.reset();
         processor.document.setTrackHeight(rows[static_cast<std::size_t>(edge)].id, 0);
-        layoutRows(); resized(); repaint();
+        layoutRows();
+        resized();
+        repaint();
         return;
     }
     const auto* lane = event.y >= rulerHeight ? laneAtY(event.y) : nullptr;
@@ -1701,7 +1720,9 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
     if (key == juce::KeyPress::escapeKey && heightDrag.has_value()) {
         processor.document.setTrackHeight(heightDrag->track, heightDrag->original);
         heightDrag.reset();
-        layoutRows(); resized(); repaint();
+        layoutRows();
+        resized();
+        repaint();
         return true;
     }
     if (key == juce::KeyPress::escapeKey && clipMarquee.has_value()) {
@@ -1948,7 +1969,8 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
             const auto localAt = [&](int x) { return timing.localTime(scrollTime + (x - namesWidth) / pixelsPerSecond); };
             for (int x = first; x < last; x += 3) {
                 const auto value = found->second.evaluateBase(localAt(x));
-                low = std::min(low, value); high = std::max(high, value);
+                low = std::min(low, value);
+                high = std::max(high, value);
             }
             if (high > low && last > first) {
                 juce::Path shape;

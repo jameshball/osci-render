@@ -87,10 +87,16 @@ struct Clip {
                 next.rate = value.rate * (contentBpm / tempo.averageBpm(next.start, next.end()));
             }
         } else {
-            next.start = value.start; next.duration = value.duration(); next.offset = value.offset; next.rate = value.rate;
+            next.start = value.start;
+            next.duration = value.duration();
+            next.offset = value.offset;
+            next.rate = value.rate;
         }
         if (!next.valid() || !next.timing(tempo).valid()) { return false; }
-        start = next.start; duration = next.duration; offset = next.offset; rate = next.rate;
+        start = next.start;
+        duration = next.duration;
+        offset = next.offset;
+        rate = next.rate;
         return true;
     }
     bool anchorToBeats(const Tempo& tempo) {

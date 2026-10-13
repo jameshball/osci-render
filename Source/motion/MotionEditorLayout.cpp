@@ -96,7 +96,9 @@ void MotionEditor::resized() {
     cancelExport.setBounds(header.removeFromRight(62).reduced(2));
     exportBar.setBounds(header.removeFromRight(180).reduced(2));
     const bool nested = processor.document.editingComposition() != 0;
-    scopeBack.setVisible(nested); scopeLabel.setVisible(nested); scopeShared.setVisible(nested);
+    scopeBack.setVisible(nested);
+    scopeLabel.setVisible(nested);
+    scopeShared.setVisible(nested);
     if (nested) {
         // Inset like the tool row below it.
         auto breadcrumb = timeline.removeFromTop(28).reduced(motion::style::padding, 2);

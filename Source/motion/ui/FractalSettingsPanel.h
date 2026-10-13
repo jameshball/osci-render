@@ -59,8 +59,10 @@ private:
             float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
             for (const auto& segment : prepared.segments) {
                 for (const auto [x, y] : {std::pair {segment[0], segment[1]}, std::pair {segment[2], segment[3]}}) {
-                    left = std::min(left, static_cast<float>(x)); right = std::max(right, static_cast<float>(x));
-                    top = std::min(top, static_cast<float>(y)); bottom = std::max(bottom, static_cast<float>(y));
+                    left = std::min(left, static_cast<float>(x));
+                    right = std::max(right, static_cast<float>(x));
+                    top = std::min(top, static_cast<float>(y));
+                    bottom = std::max(bottom, static_cast<float>(y));
                 }
             }
             const auto size = std::max({right - left, bottom - top, 1e-6f});

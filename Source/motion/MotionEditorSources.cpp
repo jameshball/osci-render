@@ -200,7 +200,8 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
         }
         const auto result = id == 0 ? document.addBlenderSource(name, settings, sourceId) : document.setBlenderSource(id, name, settings);
         if (result.failed()) { return result; }
-        owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(sourceId);
+        owner->assetLibrary.refresh();
+        owner->assetLibrary.selectAsset(sourceId);
         id = sourceId;
         expected = motion::findAsset(document.mainProject().assets, sourceId);
         *panelIdentity = expected->liveIdentity;
@@ -270,7 +271,8 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
                 if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
                 asset->id = document.newId();
                 document.edit("Capture Blender source", [&](motion::Project& project) { project.assets.push_back(asset); });
-                owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(asset->id);
+                owner->assetLibrary.refresh();
+                owner->assetLibrary.selectAsset(asset->id);
                 owner->libraryTabs.setSelectedIndex(0);
             });
         });

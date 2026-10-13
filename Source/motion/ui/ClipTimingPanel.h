@@ -27,7 +27,8 @@ public:
             motion::style::inspector::styleCaption(captions[i], labels[i]);
             addAndMakeVisible(captions[i]);
             auto& value = values[i];
-            value.setName(names[i]); value.setTitle(names[i]);
+            value.setName(names[i]);
+            value.setTitle(names[i]);
             value.setEditable(false, true);
             value.setJustificationType(juce::Justification::centredRight);
             value.setFont(motion::style::body());

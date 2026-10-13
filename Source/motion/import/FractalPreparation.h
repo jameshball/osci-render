@@ -98,10 +98,13 @@ inline Prepared prepare(const juce::String& source, int depth, const std::atomic
             if (draws) {
                 if (result.segments.size() == maxSegments) { return fail("Fractal exceeds 32,768 drawing segments. Choose a lower depth."); }
                 result.segments.push_back({ turtle.x, turtle.y, x, y });
-                minX = std::min({minX, turtle.x, x}); maxX = std::max({maxX, turtle.x, x});
-                minY = std::min({minY, turtle.y, y}); maxY = std::max({maxY, turtle.y, y});
+                minX = std::min({minX, turtle.x, x});
+                maxX = std::max({maxX, turtle.x, x});
+                minY = std::min({minY, turtle.y, y});
+                maxY = std::max({maxY, turtle.y, y});
             }
-            turtle.x = x; turtle.y = y;
+            turtle.x = x;
+            turtle.y = y;
         } else if (symbol == '+') {
             turtle.heading = std::remainder(turtle.heading + turn, 360.0);
         } else if (symbol == '-') {
@@ -111,7 +114,8 @@ inline Prepared prepare(const juce::String& source, int depth, const std::atomic
             stack.push_back(turtle);
         } else if (symbol == ']') {
             if (stack.empty()) { return fail("Fractal has an unmatched closing bracket."); }
-            turtle = stack.back(); stack.pop_back();
+            turtle = stack.back();
+            stack.pop_back();
         }
     }
     if (!stack.empty()) { return fail("Fractal has an unmatched opening bracket."); }

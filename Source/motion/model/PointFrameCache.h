@@ -90,8 +90,12 @@ public:
                     cursor += 4;
                     return value;
                 };
-                point.x = next(); point.y = next(); point.z = next();
-                point.r = next(); point.g = next(); point.b = next();
+                point.x = next();
+                point.y = next();
+                point.z = next();
+                point.r = next();
+                point.g = next();
+                point.b = next();
             }
             return PreparedPointFrames::create(rate, frames, stride, std::move(points));
         } catch (const std::bad_alloc&) {

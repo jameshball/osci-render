@@ -21,8 +21,10 @@ inline juce::Path traceSource(const PreparedSource& source, std::size_t frame, i
         if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) { continue; }
         points.push_back(view != nullptr ? view(point) : juce::Point<float>(point.x, point.y));
         lit.push_back(point.r > 0 || point.g > 0 || point.b > 0);
-        left = std::min(left, points.back().x); right = std::max(right, points.back().x);
-        top = std::min(top, points.back().y); bottom = std::max(bottom, points.back().y);
+        left = std::min(left, points.back().x);
+        right = std::max(right, points.back().x);
+        top = std::min(top, points.back().y);
+        bottom = std::max(bottom, points.back().y);
     }
     if (points.empty()) { return path; }
     // A script that never sets a colour leaves every point unlit; draw it all.
