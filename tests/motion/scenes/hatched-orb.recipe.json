@@ -1,0 +1,72 @@
+{
+  "duration": 8,
+  "fps": 60,
+  "beam": {
+    "intensity": 20,
+    "persistence": 0.2
+  },
+  "camera": {
+    "hidesHiddenLines": true,
+    "properties": {
+      "position.z": 4.6,
+      "hatching": 100,
+      "hatchDetail": 64
+    }
+  },
+  "objects": [
+    {
+      "name": "Ball",
+      "generator": "sphere",
+      "properties": {
+        "position.x": -0.42,
+        "generator.radius": 0.5,
+        "generator.segments": 48,
+        "generator.rings": 24,
+        "edges": 0,
+        "outline": 100
+      }
+    },
+    {
+      "name": "Torus",
+      "generator": "torus",
+      "properties": {
+        "position.x": 0.62,
+        "rotation.x": 65,
+        "generator.radius": 0.36,
+        "generator.thickness": 0.14,
+        "generator.segments": 48,
+        "generator.sides": 20,
+        "edges": 0,
+        "outline": 100
+      },
+      "keys": {
+        "rotation.y": {
+          "expression": "45 * t",
+          "every": 0.5
+        }
+      }
+    },
+    {
+      "name": "Key",
+      "generator": "pointLight",
+      "properties": {
+        "light.intensity": 3,
+        "light.range": 10,
+        "light.shadows": 100,
+        "position.x": -2.2,
+        "position.y": 1.4,
+        "position.z": 1.2
+      },
+      "keys": {
+        "position.x": {
+          "expression": "2.4 * cos(2 * pi * t / 8 + 2.6)",
+          "every": 0.5
+        },
+        "position.z": {
+          "expression": "1.6 + 1.2 * sin(2 * pi * t / 8 + 2.6)",
+          "every": 0.5
+        }
+      }
+    }
+  ]
+}

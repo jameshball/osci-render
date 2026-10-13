@@ -1,0 +1,104 @@
+{
+  "duration": 1,
+  "fps": 60,
+  "beam": {
+    "intensity": 20,
+    "persistence": 0.2
+  },
+  "camera": {
+    "hidesHiddenLines": true,
+    "properties": {
+      "position.y": 0.55,
+      "position.z": 4.8,
+      "rotation.x": -12
+    }
+  },
+  "objects": [
+    {
+      "name": "Box",
+      "generator": "box",
+      "properties": {
+        "position.x": -1.05,
+        "generator.width": 0.5,
+        "generator.height": 0.5,
+        "generator.depth": 0.5,
+        "rotation.x": 20,
+        "edges": 0,
+        "outline": 100,
+        "spiral": 100
+      },
+      "keys": {
+        "rotation.y": {
+          "expression": "45 * t",
+          "every": 0.5
+        }
+      }
+    },
+    {
+      "name": "Ball",
+      "generator": "sphere",
+      "properties": {
+        "position.x": -0.35,
+        "generator.radius": 0.3,
+        "generator.segments": 24,
+        "generator.rings": 12,
+        "edges": 0,
+        "outline": 100,
+        "spiral": 100
+      }
+    },
+    {
+      "name": "Torus",
+      "generator": "torus",
+      "properties": {
+        "position.x": 0.38,
+        "rotation.x": 60,
+        "generator.radius": 0.26,
+        "generator.thickness": 0.1,
+        "generator.segments": 32,
+        "generator.sides": 14,
+        "edges": 0,
+        "outline": 100,
+        "spiral": 100
+      },
+      "keys": {
+        "rotation.y": {
+          "expression": "45 * t",
+          "every": 0.5
+        }
+      }
+    },
+    {
+      "name": "Cone",
+      "generator": "cone",
+      "properties": {
+        "position.x": 1.05,
+        "position.y": -0.05,
+        "generator.radius": 0.28,
+        "generator.height": 0.6,
+        "edges": 0,
+        "outline": 100,
+        "spiral": 100
+      }
+    },
+    {
+      "name": "Fill",
+      "generator": "ambientLight",
+      "properties": {
+        "light.intensity": 0.12
+      }
+    },
+    {
+      "name": "Key",
+      "generator": "pointLight",
+      "properties": {
+        "light.intensity": 2.4,
+        "light.range": 8,
+        "light.shadows": 100,
+        "position.x": -1.4,
+        "position.y": 1.6,
+        "position.z": 1.6
+      }
+    }
+  ]
+}
