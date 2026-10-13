@@ -1,6 +1,20 @@
 #include "EffectStack.h"
 #include "../model/KeyEdit.h"
 
+namespace {
+// The nearest key after (or before) a time, never the key at it.
+std::optional<double> neighbourKey(const motion::Curve& curve, double time, bool forward) {
+    const auto& keys = curve.keyframes();
+    const auto apart = [time](const auto& key) { return !motion::sameTime(key.time, time); };
+    if (forward) {
+        const auto found = std::find_if(keys.begin(), keys.end(), [&](const auto& key) { return key.time > time && apart(key); });
+        return found == keys.end() ? std::nullopt : std::optional<double>(found->time);
+    }
+    const auto found = std::find_if(keys.rbegin(), keys.rend(), [&](const auto& key) { return key.time < time && apart(key); });
+    return found == keys.rend() ? std::nullopt : std::optional<double>(found->time);
+}
+}
+
 void MotionEffectStack::setOwner(std::optional<motion::Id> value, motion::Id clip) {
     if (value != owner || clip != context) {
         cancelGesture();
@@ -242,8 +256,7 @@ void MotionEffectStack::Card::update() {
         const auto* curve = target->curve(row->id);
         if (curve == nullptr) { continue; }
         if (!row->field.isEditing()) { row->field.setValue(curve->evaluateBase(local)); }
-        const auto& keys = curve->keyframes();
-        const bool keyed = std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return std::abs(key.time - local) < 1.0e-6; });
+        const bool keyed = curve->hasKeyAt(local);
         row->key.setState(keyed ? osci::KeyframeButton::State::keyed : (curve->animated() ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
         const auto driven = stack.isDriven(id, row->id);
         row->field.setAccent(driven ? std::optional<juce::Colour>(motion::style::result()) : std::nullopt);
@@ -251,8 +264,8 @@ void MotionEffectStack::Card::update() {
         const auto animated = curve->animated() && !folded();
         row->previous.setVisible(animated);
         row->next.setVisible(animated);
-        row->previous.setEnabled(std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return key.time < local - 1.0e-6; }));
-        row->next.setEnabled(std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return key.time > local + 1.0e-6; }));
+        row->previous.setEnabled(neighbourKey(*curve, local, false).has_value());
+        row->next.setEnabled(neighbourKey(*curve, local, true).has_value());
     }
 }
 
@@ -260,12 +273,7 @@ void MotionEffectStack::Card::jump(const std::string& property, bool forward) {
     const auto target = motion::findPropertyTarget(stack.processor.document.project(), id);
     const auto* curve = target.has_value() ? target->curve(property) : nullptr;
     if (curve == nullptr || target->rate == 0) { return; }
-    const auto now = target->localTime(stack.frameTime());
-    std::optional<double> best;
-    for (const auto& key : curve->keyframes()) {
-        const bool candidate = forward ? key.time > now + 1.0e-6 : key.time < now - 1.0e-6;
-        if (candidate && (!best.has_value() || (forward ? key.time < *best : key.time > *best))) { best = key.time; }
-    }
+    const auto best = neighbourKey(*curve, target->localTime(stack.frameTime()), forward);
     if (best.has_value()) { stack.processor.seek(std::clamp(target->projectTime(*best), 0.0, stack.processor.document.project().duration)); }
 }
 

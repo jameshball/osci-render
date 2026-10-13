@@ -744,7 +744,7 @@ void MotionEditor::setUpTimeline() {
         const auto& project = processor.document.project();
         juce::String name = "Marker";
         if (id == 0) {
-            const auto found = std::find_if(project.markers.begin(), project.markers.end(), [time](const auto& marker) { return std::abs(marker.time - time) < 1.0e-9; });
+            const auto found = std::find_if(project.markers.begin(), project.markers.end(), [time](const auto& marker) { return motion::sameTime(marker.time, time); });
             if (found != project.markers.end()) { id = found->id; }
         }
         if (id != 0) {

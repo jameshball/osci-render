@@ -98,7 +98,7 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
         for (auto& [name, curve] : clip.properties) {
             std::vector<motion::Keyframe> moving;
             for (const auto& key : curve.keyframes()) {
-                const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.clip == clip.id && item.property == name && sameTime(item.time, key.time); });
+                const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.clip == clip.id && item.property == name && motion::sameTime(item.time, key.time); });
                 if (chosen) { moving.push_back(key); }
             }
             if (moving.empty()) { continue; }
@@ -106,7 +106,7 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
             for (auto key : moving) {
                 key.time = movedKeyTime(timing, key.time, delta);
                 const auto& remaining = curve.keyframes();
-                if (std::any_of(remaining.begin(), remaining.end(), [&](const auto& other) { return sameTime(other.time, key.time); })) {
+                if (std::any_of(remaining.begin(), remaining.end(), [&](const auto& other) { return motion::sameTime(other.time, key.time); })) {
                     collided = true;
                     continue;
                 }

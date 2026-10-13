@@ -82,7 +82,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
     g.reduceClipRegion(namesWidth, top, getWidth() - namesWidth, cameraBandHeight);
     for (const auto time : times) {
         const auto centre = juce::Point<float>(static_cast<float>(timeX(time)) + .5f, static_cast<float>(top) + cameraBandHeight * .5f);
-        const auto chosen = selectedCameraKey.has_value() && selectedCameraKey->first == camera->id && std::abs(selectedCameraKey->second - time) < 1.0e-6;
+        const auto chosen = selectedCameraKey.has_value() && selectedCameraKey->first == camera->id && motion::sameTime(selectedCameraKey->second, time);
         g.setColour(osci::Colours::veryDark());
         motion::style::drawDiamond(g, centre, chosen ? 6.0f : 5.0f, true);
         g.setColour(chosen ? motion::style::accent() : osci::Colours::text().withAlpha(.8f));
@@ -255,9 +255,8 @@ std::optional<double> MotionTimelineView::cameraKeyAt(int x) const {
 
 void MotionTimelineView::moveCameraKeys(motion::Camera& camera, double from, double to) {
     for (auto& [name, curve] : camera.properties) {
-        const auto& keys = curve.keyframes();
-        const auto found = std::find_if(keys.begin(), keys.end(), [from](const auto& key) { return std::abs(key.time - from) < 1.0e-6; });
-        if (found == keys.end()) { continue; }
+        const auto* found = curve.findKey(from);
+        if (found == nullptr) { continue; }
         auto moved = *found;
         curve.removeKey(moved.time);
         moved.time = to;
@@ -273,15 +272,15 @@ void MotionTimelineView::dragCameraKey(const juce::MouseEvent& event) {
         return;
     }
     const auto time = processor.document.project().frameTime(snapTime(drag.from + (event.x - drag.downX) / pixelsPerSecond, event.mods));
-    if (std::abs(time - drag.to) < 1.0e-9) { return; }
+    if (motion::sameTime(time, drag.to)) { return; }
     auto updated = drag.before;
     const auto camera = std::find_if(updated.cameras.begin(), updated.cameras.end(), [&drag](const auto& item) { return item.id == drag.camera; });
     if (camera == updated.cameras.end()) { return; }
     // A key never lands on another key of the same camera.
-    const auto occupied = std::abs(time - drag.from) > 1.0e-6 && std::any_of(camera->properties.begin(), camera->properties.end(), [time](const auto& entry) { return entry.second.hasKeyAt(time); });
+    const auto occupied = !motion::sameTime(time, drag.from) && std::any_of(camera->properties.begin(), camera->properties.end(), [time](const auto& entry) { return entry.second.hasKeyAt(time); });
     if (occupied) { return; }
     // Back where it started is no move at all.
-    drag.moved = std::abs(time - drag.from) > 1.0e-9;
+    drag.moved = !motion::sameTime(time, drag.from);
     if (drag.moved) { moveCameraKeys(*camera, drag.from, time); }
     processor.document.preview(std::move(updated));
     drag.revision = processor.document.revision();

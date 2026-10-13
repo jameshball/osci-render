@@ -261,9 +261,8 @@ private:
     motion::Id beamHover = 0;
     int beamPointer = 0;
     void paintLane(juce::Graphics& g, const Row& row, int y, int height) const;
-    static bool sameTime(double a, double b) { return std::abs(a - b) < 1.0e-6; }
     bool isKeySelected(motion::Id clip, const std::string& property, double time) const {
-        return std::any_of(selectedKeys.begin(), selectedKeys.end(), [&](const auto& key) { return key.clip == clip && key.property == property && sameTime(key.time, time); });
+        return std::any_of(selectedKeys.begin(), selectedKeys.end(), [&](const auto& key) { return key.clip == clip && key.property == property && motion::sameTime(key.time, time); });
     }
     // Keys whose diamond lies under a point in a lane row.
     std::optional<KeyRef> keyAt(juce::Point<int> point) const;

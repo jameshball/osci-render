@@ -226,7 +226,7 @@ std::vector<motion::Document::CopiedKey> MotionTimelineView::copiedKeys() const 
         if (found == clip->properties.end()) { continue; }
         const auto timing = clip->timing(project.tempo());
         for (const auto& keyframe : found->second.keyframes()) {
-            if (!sameTime(keyframe.time, key.time) || timing.rate == 0) { continue; }
+            if (!motion::sameTime(keyframe.time, key.time) || timing.rate == 0) { continue; }
             const auto time = timing.projectTime(keyframe.time);
             earliest = std::min(earliest, time);
             timed.push_back({time, {key.property, 0, keyframe}});
@@ -901,7 +901,7 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
             const bool chosen = isKeySelected(key->clip, key->property, key->time);
             if (event.mods.isShiftDown()) {
                 if (chosen) {
-                    std::erase_if(selectedKeys, [&](const auto& item) { return item.clip == key->clip && item.property == key->property && sameTime(item.time, key->time); });
+                    std::erase_if(selectedKeys, [&](const auto& item) { return item.clip == key->clip && item.property == key->property && motion::sameTime(item.time, key->time); });
                 } else {
                     selectedKeys.push_back(*key);
                 }
@@ -1321,7 +1321,7 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         auto updated = *before;
         const auto delta = (event.x - downX) / pixelsPerSecond;
         const auto time = delta == 0 ? markerOriginalTime : std::clamp(snapEdge(markerOriginalTime + delta, event.mods, *before, {}, nullptr, markerDragging), 0.0, updated.duration);
-        if (std::any_of(updated.markers.begin(), updated.markers.end(), [this, time](const auto& marker) { return marker.id != markerDragging && std::abs(marker.time - time) < 1.0e-9; })) { return; }
+        if (std::any_of(updated.markers.begin(), updated.markers.end(), [this, time](const auto& marker) { return marker.id != markerDragging && motion::sameTime(marker.time, time); })) { return; }
         for (auto& marker : updated.markers) { if (marker.id == markerDragging) { marker.time = time; } }
         std::sort(updated.markers.begin(), updated.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
         changed = time != markerOriginalTime;
@@ -2381,7 +2381,7 @@ std::optional<double> MotionTimelineView::magnet(double time, const motion::Proj
             for (const auto& [name, curve] : clip.properties) {
                 for (const auto& key : curve.keyframes()) {
                     const bool moving = movingKeys != nullptr && std::any_of(movingKeys->begin(), movingKeys->end(), [&](const auto& item) {
-                        return item.clip == clip.id && item.property == name && sameTime(item.time, key.time);
+                        return item.clip == clip.id && item.property == name && motion::sameTime(item.time, key.time);
                     });
                     if (!moving) { consider(timing.projectTime(key.time)); }
                 }
