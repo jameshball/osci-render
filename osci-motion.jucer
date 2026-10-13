@@ -415,6 +415,10 @@
             compile="1" resource="0" file="Source/motion/MotionEditorCommands.cpp"/>
       <FILE id="MotMotionEditorExportcpp" name="MotionEditorExport.cpp" compile="1"
             resource="0" file="Source/motion/MotionEditorExport.cpp"/>
+      <FILE id="MotMotionEditorLayoutcpp" name="MotionEditorLayout.cpp" compile="1"
+            resource="0" file="Source/motion/MotionEditorLayout.cpp"/>
+      <FILE id="MotMotionEditorPanelscpp" name="MotionEditorPanels.cpp" compile="1"
+            resource="0" file="Source/motion/MotionEditorPanels.cpp"/>
       <FILE id="MotMotionEditorSourcescpp" name="MotionEditorSources.cpp"
             compile="1" resource="0" file="Source/motion/MotionEditorSources.cpp"/>
       <FILE id="MotionMotionProcessorcpp" name="MotionProcessor.cpp" compile="1"
