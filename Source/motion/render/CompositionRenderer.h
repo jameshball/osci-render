@@ -453,7 +453,14 @@ struct PreparedCamera {
     Id id;
     std::array<Curve, cameraPropertySpecs.size()> curves;
     PreparedChain target, parent;
-    bool hidesHiddenLines = false;
+
+    // How far lines behind faces fade from view (0..1).
+    double hidesLines(double time) const {
+        const auto value = curves[cameraHideLinesIndex].evaluate(time) / 100;
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
+    }
+    // Whether it may hide any.
+    bool mayHide() const { return TransformPose::mayDifferCurve(curves[cameraHideLinesIndex], cameraPropertySpecs[cameraHideLinesIndex].defaultValue); }
 
     // How much it shades by hatching (0..1), and how many cells across.
     double hatching(double time) const {
@@ -626,7 +633,6 @@ struct PreparedComposition {
         };
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
-            item.hidesHiddenLines = camera.hideHiddenLines;
             if (camera.target != 0) { item.target = chainFor(camera.target, false); }
             if (camera.parent != 0) { item.parent = chainFor(camera.parent, true); }
             for (std::size_t index = 0; index < cameraPropertySpecs.size(); ++index) {
@@ -744,7 +750,7 @@ struct PreparedComposition {
         // Frames whose hidden lines a camera removes, that lights light, in
         // which something reflects, a surface draws itself other than by its
         // edges, or a camera hatches, are baked off the render thread.
-        const auto hides = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.hidesHiddenLines; });
+        const auto hides = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.mayHide(); });
         const auto reflective = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayReflect(); });
         const auto restyled = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayRestyle(); });
         const auto hatches = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.mayHatch(); });

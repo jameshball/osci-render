@@ -77,7 +77,7 @@ private:
         }
         motion::Camera camera;
         camera.id = next++;
-        camera.hideHiddenLines = true;
+        camera.properties["hideLines"] = motion::Curve(100.0);
         project.cameras.push_back(camera);
         return project;
     }

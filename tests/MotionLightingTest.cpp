@@ -232,13 +232,13 @@ public:
         beginTest("Lit with a camera hiding lines, what is hidden stays hidden");
         {
             auto project = scene();
-            project.cameras.front().hideHiddenLines = true;
+            project.cameras.front().properties["hideLines"] = motion::Curve(100.0);
             addLight(project, "ambientLight", 30, {});
             const motion::PreparedComposition prepared(project);
             motion::hidden::Workspace workspace;
             const auto lit = cull(prepared, 1, workspace);
             auto unlit = scene();
-            unlit.cameras.front().hideHiddenLines = true;
+            unlit.cameras.front().properties["hideLines"] = motion::Curve(100.0);
             const motion::PreparedComposition plain(unlit);
             const auto hidden = cull(plain, 1, workspace);
             const auto* litBox = lit->drawing(0);
@@ -310,7 +310,7 @@ public:
                 motion::Camera camera;
                 camera.id = 40;
                 camera.target = 10;
-                camera.hideHiddenLines = true;
+                camera.properties["hideLines"] = motion::Curve(100.0);
                 camera.properties["position.x"] = motion::Curve(2.2);
                 camera.properties["position.y"] = motion::Curve(1.3);
                 camera.properties["position.z"] = motion::Curve(1.6);

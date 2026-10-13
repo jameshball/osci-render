@@ -24,7 +24,7 @@ public:
         colours = composition.reflects(time) || hatching > 0;
         add(camera != nullptr ? static_cast<double>(camera - composition.cameras.data()) : -1.0);
         if (camera != nullptr) {
-            add(camera->hidesHiddenLines ? 1.0 : 0.0, hatching, hatching > 0 ? static_cast<double>(camera->hatchDetail(time)) : 0.0);
+            add(camera->hidesLines(time), hatching, hatching > 0 ? static_cast<double>(camera->hatchDetail(time)) : 0.0);
             const auto view = camera->frame(time);
             if (view.has_value()) {
                 for (const auto& axis : {view->position, view->right, view->up, view->forward}) { add(axis.x, axis.y, axis.z); }

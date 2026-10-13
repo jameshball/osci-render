@@ -14,8 +14,8 @@ namespace motion::cli {
 //
 //   {
 //     "duration": 8, "fps": 60, "bpm": 120, "rateRatio": 4, "beam": {"intensity": 20},
-//     "camera": {"hidesHiddenLines": true, "lookAt": "Ball",
-//                "properties": {"position.z": 4}, "keys": {"position.x": [[0, -1], [8, 1, "linear"]]}},
+//     "camera": {"lookAt": "Ball",
+//                "properties": {"position.z": 4, "hideLines": 100}, "keys": {"position.x": [[0, -1], [8, 1, "linear"]]}},
 //     "objects": [
 //       {"name": "Ball", "generator": "sphere", "properties": {"generator.radius": 0.3}},
 //       {"name": "Teapot", "file": "teapot.obj", "start": 2, "duration": 4},
@@ -144,7 +144,6 @@ private:
     juce::Result addCamera(const juce::var& settings) {
         Camera camera;
         camera.id = next++;
-        camera.hideHiddenLines = settings["hidesHiddenLines"];
         const auto target = settings["lookAt"].toString();
         if (target.isNotEmpty()) {
             const auto found = named.find(target);

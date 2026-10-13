@@ -13,7 +13,6 @@
     "aim": "smoothstep(min(1, 1.3 * u))"
   },
   "camera": {
-    "hidesHiddenLines": true,
     "path": {
       "every": 0.05,
       "position": [
@@ -26,6 +25,9 @@
         "-0.5 + (ball + 0.5) * aim",
         "1.3 * aim"
       ]
+    },
+    "properties": {
+      "hideLines": 100
     }
   },
   "objects": [

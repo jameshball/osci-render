@@ -206,7 +206,7 @@ struct Workspace {
     std::vector<std::array<osci::Point, 3>> sources;
     std::vector<std::optional<Vec3>> eyes;
     std::vector<std::vector<std::optional<Vec3>>> world;
-    std::vector<std::pair<double, double>> runs;
+    std::vector<std::pair<double, double>> runs, hiddenRuns;
     Dicer dicer;
     ShadowBuffers shadows;
     // What stands between mirrors and what they show.
@@ -262,7 +262,7 @@ struct OtherEye {
 class Culler {
 public:
     Culler(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel, const OtherEye* other)
-        : composition(composition), time(time), workspace(workspace), cancel(cancel), other(other), depth(workspace.depth), world(workspace.world), lights(workspace.lights), runs(workspace.runs), reach(composition.hiddenLineReach) {}
+        : composition(composition), time(time), workspace(workspace), cancel(cancel), other(other), depth(workspace.depth), world(workspace.world), lights(workspace.lights), runs(workspace.runs), hiddenRuns(workspace.hiddenRuns), reach(composition.hiddenLineReach) {}
 
     // The frame, or none when `cancel` is set partway.
     std::unique_ptr<Frame> run() {
@@ -312,7 +312,9 @@ private:
     void look() {
         camera = composition.activeCamera(time);
         view = camera != nullptr ? camera->frame(time) : std::nullopt;
-        hides = other == nullptr && camera != nullptr && camera->hidesHiddenLines && view.has_value();
+        const auto hiding = other == nullptr && camera != nullptr && view.has_value() ? camera->hidesLines(time) : 0.0;
+        hides = hiding > 0;
+        hiddenBrightness = 1 - hiding;
         lit = composition.lit(time);
         // A display with no brightness input shows how bright a line is only by
         // how long the beam takes over it (see litWeight).
@@ -491,7 +493,7 @@ private:
         eyeAt = viewpoint.has_value() ? std::optional(viewpoint->position) : std::nullopt;
         // Another eye hides nothing; when the camera would, it is shown only the
         // near side of what surfaces lay on themselves.
-        const auto nearSideOnly = other != nullptr && camera != nullptr && camera->hidesHiddenLines;
+        const auto nearSideOnly = other != nullptr && camera != nullptr && camera->hidesLines(time) > 0;
         for (std::size_t surface = 0; restyling && surface < items.size(); ++surface) {
             auto& item = items[surface];
             if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
@@ -638,9 +640,10 @@ private:
     // along its true path. A point shows where nothing is in front of it and
     // no other clip's line already drawn runs along it. `at(t)` is a point
     // of a run at progress t; the parts that show come back in `runs` as
-    // intervals of t, and are kept as drawn until `commitDrawn`. Not hiding
-    // lines, all of every line shows. `seen(t, point)` says whether nothing
-    // hides the point at t.
+    // intervals of t, and are kept as drawn until `commitDrawn`; with the
+    // camera hiding lines part-way, the parts something hides come back in
+    // `hiddenRuns`, to draw dimmed. Not hiding lines, all of every line shows.
+    // `seen(t, point)` says whether nothing hides the point at t.
     template <typename At, typename Seen>
     void runsSeen(At&& at, double length, Seen&& seen) {
         auto& coverage = workspace.coverage;
@@ -648,6 +651,7 @@ private:
         auto& drawn = workspace.drawn;
         auto& drawnStarts = workspace.drawnStarts;
         runs.clear();
+        hiddenRuns.clear();
         if (!hiding) {
             runs.emplace_back(0.0, 1.0);
             return;
@@ -656,29 +660,36 @@ private:
         samples.clear();
         for (int step = 0; step <= steps; ++step) { samples.push_back(at(static_cast<double>(step) / steps)); }
         // What the Scope doesn't show is dropped too: drawn, it would only
-        // take the beam's time from what it does.
-        const auto showing = [&](int step) {
+        // take the beam's time from what it does. Each point shows, is hidden
+        // (drawn dimmed while the camera hides lines part-way), or neither.
+        enum class Sight { none, shows, hidden };
+        const auto fading = hiddenBrightness > 0;
+        const auto seenAt = [&](int step) {
             const auto& point = samples[static_cast<std::size_t>(step)];
-            if (!point.has_value() || std::abs(point->x) > reach.x * DepthBuffer::overscan || std::abs(point->y) > reach.y * DepthBuffer::overscan || !seen(static_cast<double>(step) / steps, *point)) { return false; }
+            if (!point.has_value() || std::abs(point->x) > reach.x * DepthBuffer::overscan || std::abs(point->y) > reach.y * DepthBuffer::overscan) { return Sight::none; }
             const auto& before = samples[static_cast<std::size_t>(std::max(0, step - 1))];
             const auto& after = samples[static_cast<std::size_t>(std::min(steps, step + 1))];
-            return !before.has_value() || !after.has_value() || !coverage.covers(*point, after->x - before->x, after->y - before->y);
+            if (before.has_value() && after.has_value() && coverage.covers(*point, after->x - before->x, after->y - before->y)) { return Sight::none; }
+            if (seen(static_cast<double>(step) / steps, *point)) { return Sight::shows; }
+            return fading ? Sight::hidden : Sight::none;
         };
-        bool open = false;
+        auto open = Sight::none;
         double from = 0, previous = 0;
+        const auto close = [&](double to) {
+            if (open != Sight::none) { (open == Sight::shows ? runs : hiddenRuns).emplace_back(from, to); }
+        };
         for (int step = 0; step <= steps; ++step) {
             const auto t = static_cast<double>(step) / steps;
-            const auto shows = showing(step);
-            if (shows && !open) {
-                from = step == 0 ? 0.0 : (previous + t) * .5;
-                open = true;
-            } else if (!shows && open) {
-                runs.emplace_back(from, (previous + t) * .5);
-                open = false;
+            const auto here = seenAt(step);
+            if (here != open) {
+                const auto boundary = step == 0 ? 0.0 : (previous + t) * .5;
+                close(boundary);
+                from = boundary;
+                open = here;
             }
             previous = t;
         }
-        if (open) { runs.emplace_back(from, 1.0); }
+        close(1.0);
         if (!recording) { return; }
         for (const auto& [a, b] : runs) {
             drawnStarts.push_back(drawn.size());
@@ -687,6 +698,17 @@ private:
                 const auto& point = samples[static_cast<std::size_t>(step)];
                 if (t >= a && t <= b && point.has_value()) { drawn.push_back(*point); }
             }
+        }
+    }
+    // Each run that shows, and each hidden one to draw dimmed, in order along
+    // the line: `keep(from, to, hidden)`.
+    template <typename Keep>
+    void eachRun(Keep&& keep) const {
+        std::size_t shown = 0, hidden = 0;
+        while (shown < runs.size() || hidden < hiddenRuns.size()) {
+            const auto nextHidden = hidden < hiddenRuns.size() && (shown == runs.size() || hiddenRuns[hidden].first < runs[shown].first);
+            const auto& [from, to] = nextHidden ? hiddenRuns[hidden++] : runs[shown++];
+            keep(from, to, nextHidden);
         }
     }
     // The runs of a line that the depth buffer shows.
@@ -803,7 +825,7 @@ private:
                 continue;
             }
             lost = true;
-            for (const auto& [from, to] : runs) { kept.push_back({std::make_unique<ColouredLine>(mixed(a, b, from), mixed(a, b, to)), true, {}}); }
+            eachRun([&](double from, double to, bool hidden) { kept.push_back({std::make_unique<ColouredLine>(mixed(a, b, from), mixed(a, b, to)), true, {}, hidden ? hiddenBrightness : 1.0}); });
         }
         commitDrawn();
         // Its whole length, to give it the share of the beam its runs that
@@ -865,13 +887,14 @@ private:
                 continue;
             }
             lost = true;
-            for (const auto& [a, b] : runs) {
+            const auto keep = [&](double a, double b, double brightness) {
                 if (line) {
-                    kept.push_back({std::make_unique<osci::Line>(shape->nextVector(static_cast<float>(a)), shape->nextVector(static_cast<float>(b))), true, normalsOf(surface, index).part(a, b), brightnessOf(shape)});
+                    kept.push_back({std::make_unique<osci::Line>(shape->nextVector(static_cast<float>(a)), shape->nextVector(static_cast<float>(b))), true, normalsOf(surface, index).part(a, b), brightness});
                 } else {
-                    kept.push_back({std::make_unique<ShapePart>(*shape, item.styled != nullptr ? std::shared_ptr<const void>(item.styled->drawing) : std::shared_ptr<const void>(item.source), static_cast<float>(a), static_cast<float>(b)), true, normalsOf(surface, index).part(a, b), brightnessOf(shape)});
+                    kept.push_back({std::make_unique<ShapePart>(*shape, item.styled != nullptr ? std::shared_ptr<const void>(item.styled->drawing) : std::shared_ptr<const void>(item.source), static_cast<float>(a), static_cast<float>(b)), true, normalsOf(surface, index).part(a, b), brightness});
                 }
-            }
+            };
+            eachRun([&](double a, double b, bool hidden) { keep(a, b, brightnessOf(shape) * (hidden ? hiddenBrightness : 1.0)); });
         }
         // A clip's path goes back over its own lines on purpose (the beam
         // retraces an edge rather than jump), so only other clips' lines can
@@ -1141,14 +1164,19 @@ private:
     DepthBuffer& depth;
     std::vector<std::vector<std::optional<Vec3>>>& world;
     std::vector<LightView>& lights;
-    // The parts of a line that show, from `runsSeen`.
+    // The parts of a line that show, and (while the camera hides lines only
+    // part-way) those that would be hidden, from `runsSeen`.
     std::vector<std::pair<double, double>>& runs;
+    std::vector<std::pair<double, double>>& hiddenRuns;
     const Reach reach;
 
     // What is seen, and what the frame needs done.
     const PreparedCamera* camera = nullptr;
     std::optional<PreparedCamera::Frame> view;
     bool hides = false, lit = false, xyOnly = false, reflecting = false, restyling = false;
+    // How bright what is hidden is drawn: 0 when the camera hides it all,
+    // dimmer as it hides more.
+    double hiddenBrightness = 0;
     double frameHatching = 0;
     // The clips seen, and the eyes that see them.
     std::vector<SceneItem> items;
@@ -1201,7 +1229,8 @@ private:
 // other, the line they cross along is an edge of what is seen that neither
 // drawing has: it is added, and tested too. The drawing keeps its own shapes,
 // cut where they hide; hidden runs are dropped, not darkened, so the beam
-// skips straight to the next visible part.
+// skips straight to the next visible part (a camera hiding lines only
+// part-way draws them dimmed, as much as it shows them).
 //
 // Lights see the same surfaces, each from where it is, so whatever something
 // blocks from a light is in its shadow. What is kept is then lit, a couple of

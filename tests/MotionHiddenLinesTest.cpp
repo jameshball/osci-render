@@ -30,6 +30,25 @@ public:
         const auto shown = culled->length() / whole->length();
         expect(shown > .55 && shown < .9, "about three quarters of its length shows: " + juce::String(shown));
 
+        beginTest("Hiding lines part-way keeps the far edges, dimmed, and the amount can be keyed");
+        {
+            auto halfway = cubeProject(true);
+            halfway.cameras.front().properties["hideLines"] = motion::Curve(50.0);
+            const motion::PreparedComposition faded(halfway);
+            motion::hidden::Workspace fadeSolver;
+            const auto fadedFrame = motion::hidden::cull(faded, 1, fadeSolver);
+            const auto* kept = fadedFrame != nullptr ? fadedFrame->drawing(0) : nullptr;
+            expect(kept != nullptr && whole != nullptr && kept->length() > whole->length() * .95, "every edge is still drawn");
+            auto keyed = cubeProject(true);
+            auto& hide = keyed.cameras.front().properties["hideLines"];
+            hide = motion::Curve(0.0);
+            hide.setKey({0, 0, motion::Interpolation::linear});
+            hide.setKey({2, 100, motion::Interpolation::linear});
+            const motion::PreparedComposition rising(keyed);
+            expect(rising.hiddenLines != nullptr, "a camera keyed to hide lines bakes them");
+            expectWithinAbsoluteError(rising.cameras.front().hidesLines(1), .5, 1.0e-9);
+        }
+
         beginTest("A mesh known only by its lines gets the faces they enclose");
         {
             std::vector<std::unique_ptr<osci::Shape>> lines;
@@ -546,7 +565,7 @@ private:
         project.tracks.push_back(track);
         motion::Camera camera;
         camera.id = 30;
-        camera.hideHiddenLines = hide;
+        camera.properties["hideLines"] = motion::Curve(hide ? 100.0 : 0.0);
         project.cameras.push_back(camera);
         return project;
     }

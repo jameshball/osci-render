@@ -122,7 +122,7 @@ public:
             project.tracks.push_back(track);
             motion::Camera camera;
             camera.id = 8;
-            camera.hideHiddenLines = true;
+            camera.properties["hideLines"] = motion::Curve(100.0);
             project.cameras.push_back(camera);
             const motion::PreparedComposition prepared(project);
             motion::hidden::Workspace workspace;
@@ -148,7 +148,7 @@ public:
             project.tracks.push_back(track);
             motion::Camera camera;
             camera.id = 8;
-            camera.hideHiddenLines = true;
+            camera.properties["hideLines"] = motion::Curve(100.0);
             project.cameras.push_back(camera);
             const motion::PreparedComposition prepared(project);
             motion::hidden::Workspace workspace;

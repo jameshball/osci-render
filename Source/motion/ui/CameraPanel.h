@@ -24,16 +24,9 @@ public:
         parent.setTooltip("Carry this camera with a group's transform");
         lookAt.onChange = [this] { applyRig(); };
         parent.onChange = [this] { applyRig(); };
-        hiddenLines.addItem("Drawn", 1);
-        hiddenLines.addItem("Removed", 2);
-        hiddenLines.setName("Camera hidden lines");
-        hiddenLines.setTitle("Camera hidden lines");
-        hiddenLines.setTooltip("Hide the lines this camera can't see, behind the faces of 3D meshes, as a solid object would. Baked in the background as you edit.");
-        hiddenLines.onChange = [this] { applyHiddenLines(); };
-        addAndMakeVisible(hiddenLines);
         motion::style::inspector::styleHeading(title, "Rig");
         addAndMakeVisible(title);
-        for (auto [label, text] : {std::pair {&lookAtLabel, "Look at"}, std::pair {&parentLabel, "Parent"}, std::pair {&hiddenLabel, "Hidden lines"}, std::pair {&shotLabel, "Shot"}, std::pair {&keysLabel, "Keys"}}) {
+        for (auto [label, text] : {std::pair {&lookAtLabel, "Look at"}, std::pair {&parentLabel, "Parent"}, std::pair {&shotLabel, "Shot"}, std::pair {&keysLabel, "Keys"}}) {
             motion::style::inspector::styleCaption(*label, text);
             addAndMakeVisible(label);
         }
@@ -62,13 +55,12 @@ public:
         refresh();
     }
     // Rows, then the same room under them as a section of properties leaves.
-    int preferredHeight() const { return camera == 0 ? 0 : motion::style::inspector::headingHeight + 5 * motion::style::controlHeight + 5 * motion::style::gap + motion::style::padding; }
+    int preferredHeight() const { return camera == 0 ? 0 : motion::style::inspector::headingHeight + 4 * motion::style::controlHeight + 4 * motion::style::gap + motion::style::padding; }
 
     void refresh() {
         const auto& project = processor.document.project();
         const auto* found = findCamera(project, camera);
         refreshRig(project, found);
-        hiddenLines.setSelectedId(found != nullptr && found->hideHiddenLines ? 2 : 1, juce::dontSendNotification);
         // On screen already, or a cut away to it.
         const auto onScreen = activeCamera() == camera;
         showing.setVisible(onScreen);
@@ -88,7 +80,7 @@ public:
         // Choices span the Y and Z columns, like the Scope's overlay.
         const motion::style::PropertyGrid grid(area.getWidth());
         const auto right = grid.value + grid.column, left = grid.column + motion::style::gap;
-        for (auto [label, box] : {std::pair<juce::Label*, juce::Component*> {&lookAtLabel, &lookAt}, {&parentLabel, &parent}, {&hiddenLabel, &hiddenLines}}) {
+        for (auto [label, box] : {std::pair<juce::Label*, juce::Component*> {&lookAtLabel, &lookAt}, {&parentLabel, &parent}}) {
             auto row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
             area.removeFromTop(motion::style::gap);
             label->setBounds(row.removeFromLeft(left));
@@ -183,21 +175,10 @@ private:
         refresh();
     }
 
-    void applyHiddenLines() {
-        const auto hide = hiddenLines.getSelectedId() == 2;
-        const auto id = camera;
-        processor.document.edit(hide ? "Remove hidden lines" : "Draw hidden lines", [id, hide](motion::Project& project) {
-            for (auto& item : project.cameras) {
-                if (item.id == id) { item.hideHiddenLines = hide; }
-            }
-        });
-        refresh();
-    }
-
     MotionProcessor& processor;
     motion::Id camera = 0;
-    juce::ComboBox lookAt, parent, hiddenLines;
-    juce::Label title, lookAtLabel, parentLabel, hiddenLabel, shotLabel, keysLabel, showing;
+    juce::ComboBox lookAt, parent;
+    juce::Label title, lookAtLabel, parentLabel, shotLabel, keysLabel, showing;
     std::vector<std::pair<motion::Id, juce::String>> listedTargets, listedParents;
     juce::TextButton cutButton, keyButton;
 };

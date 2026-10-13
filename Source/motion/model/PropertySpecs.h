@@ -142,6 +142,8 @@ inline constexpr auto luaSliderSpecs = std::to_array<PropertySpec>({
     {"slider.y", "Slider Y", "Slider Y", "", 0, 1, 0, .01, 3, ""}, {"slider.z", "Slider Z", "Slider Z", "", 0, 1, 0, .01, 3, ""},
 });
 
+// Hide lines: how far lines behind the faces of 3D meshes fade from view,
+// from all of them drawn (0) to none (100); part-way they are dimmed.
 // Hatching: the scene shaded by a Hilbert curve over the frame, denser where
 // more light falls, rather than by brightness. Hatch detail is how many of
 // its cells span the frame where the light is full.
@@ -153,9 +155,11 @@ inline constexpr auto cameraPropertySpecs = std::to_array<PropertySpec>({
     {"rotation.y", "Rotation Y", "Rotation", "Y", -unbounded, unbounded, 0, 1, 1, "°"},
     {"rotation.z", "Rotation Z", "Rotation", "Z", -unbounded, unbounded, 0, 1, 1, "°"},
     {"fov", "Field of view", "Field of view", "", 1, 179, defaultCameraFieldOfView, .5, 1, "°"},
+    {"hideLines", "Hide lines", "Hide lines", "", 0, 100, 0, 1, 0, "%"},
     {"hatching", "Hatching", "Hatching", "", 0, 100, 0, 1, 0, "%"},
     {"hatchDetail", "Hatch detail", "Hatch detail", "", 8, 256, 64, 1, 0, ""},
 });
+inline constexpr auto cameraHideLinesIndex = specIndex(cameraPropertySpecs, "hideLines");
 inline constexpr auto cameraHatchingIndex = specIndex(cameraPropertySpecs, "hatching"), cameraHatchDetailIndex = specIndex(cameraPropertySpecs, "hatchDetail");
 
 // The Scope's picture: one row each, in the visualiser's own ranges.

@@ -275,7 +275,6 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
         item->setAttribute("name", juce::String(camera.name));
         if (camera.target != 0) { item->setAttribute("target", juce::String(camera.target)); }
         if (camera.parent != 0) { item->setAttribute("parent", juce::String(camera.parent)); }
-        if (camera.hideHiddenLines) { item->setAttribute("hideHiddenLines", true); }
         saveProperties(*item, camera.properties);
     }
     for (const auto& marker : state.markers) {
@@ -595,7 +594,6 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         camera.id = *identity;
         camera.target = readId(*item, "target").value_or(0);
         camera.parent = readId(*item, "parent").value_or(0);
-        camera.hideHiddenLines = item->getBoolAttribute("hideHiddenLines", false);
         if (camera.parent != 0 && findGroup(project, camera.parent) == nullptr) {
             notes.note("Camera carried by a group that's missing", juce::String(camera.name));
             camera.parent = 0;

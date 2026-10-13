@@ -22,12 +22,12 @@ constexpr std::array<SurfaceStyle, 6> surfaceStyles {{
 
 // The heading each property group sits under (a generator's own numbers sit
 // under its name, a script's sliders under theirs; anything else is Beam).
-constexpr std::array<std::pair<std::string_view, std::string_view>, 22> sectionOfGroup {{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 23> sectionOfGroup {{
     {"Position", "Transform"}, {"Rotation", "Transform"}, {"Scale", "Transform"}, {"Anchor", "Transform"},
     {"Colour", "Appearance"}, {"Opacity", "Appearance"}, {"Lit by lights", "Appearance"}, {"Beam", "Appearance"},
     {"Edges", "Surface"}, {"Outline", "Surface"}, {"Spiral", "Surface"}, {"Noise", "Surface"}, {"Slices", "Surface"}, {"Rings", "Surface"},
     {"Fill detail", "Surface"}, {"Noise phase", "Surface"}, {"Noise flow", "Surface"}, {"Mirror", "Surface"},
-    {"Hatching", "Shading"}, {"Hatch detail", "Shading"},
+    {"Hide lines", "Hidden lines"}, {"Hatching", "Shading"}, {"Hatch detail", "Shading"},
     {"Gain", "Audio"}, {"Pan", "Audio"},
 }};
 }
@@ -506,6 +506,9 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         editor.setTitle(juce::String(spec.label.data(), spec.label.size()));
         editor.setComponentID("motion." + juce::String(spec.id.data(), spec.id.size()));
         editor.setTooltip(juce::String(spec.label.data(), spec.label.size()) + ": drag to scrub (Shift fine, Cmd coarse), double-click to type.");
+        if (spec.id == "hideLines") {
+            editor.setTooltip("Hide lines: how far the lines this camera can't see, behind the faces of 3D meshes, fade from view. At 100% they're removed, as a solid object hides them; part-way they're dimmed. Baked in the background as you edit.");
+        }
         if (spec.id == "beam") {
             editor.setTooltip("Beam: this object's share of the beam's time, as a multiple of its even share. More draws it slower and brighter on a scope, taking the time from the others; 0 leaves it out. Its level in the timeline can be dragged too.");
         }

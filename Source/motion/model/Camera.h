@@ -16,8 +16,6 @@ struct Camera {
     // Z rotation as roll. Parent: a group whose transform carries the camera.
     Id target = 0;
     Id parent = 0;
-    // Lines this camera can't see, behind the faces of 3D meshes, are not drawn.
-    bool hideHiddenLines = false;
 
     bool valid() const { return id != 0 && validProperties(properties, cameraPropertySpecs); }
 };

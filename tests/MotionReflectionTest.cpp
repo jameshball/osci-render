@@ -205,7 +205,7 @@ private:
         addClip(project, generatorAsset(2, "grid"), 20, {{"rotation.x", -90}, {"position.y", floorHeight}, {"generator.width", 3}, {"generator.height", 3}, {"reflects", reflects}});
         motion::Camera camera;
         camera.id = 40;
-        camera.hideHiddenLines = true;
+        camera.properties["hideLines"] = motion::Curve(100.0);
         camera.properties["position.y"] = motion::Curve(1.5);
         camera.properties["position.z"] = motion::Curve(4);
         camera.properties["rotation.x"] = motion::Curve(-25);

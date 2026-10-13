@@ -6,10 +6,10 @@
     "persistence": 0.2
   },
   "camera": {
-    "hidesHiddenLines": true,
     "lookAt": "Floor",
     "properties": {
-      "position.y": 2.7
+      "position.y": 2.7,
+      "hideLines": 100
     },
     "keys": {
       "position.x": {
