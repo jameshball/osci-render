@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../model/ProjectFile.h"
+#include "Recipe.h"
 #include "../render/BeamRenderer.h"
 #include "../render/HiddenLineBaker.h"
 #include <atomic>
@@ -15,9 +15,10 @@ struct Composition {
     // How long preparing and removing hidden lines took.
     double prepareMilliseconds = 0, bakeMilliseconds = 0;
 
+    // A project file, or a recipe (see Recipe) made into one.
     static juce::Result open(const juce::File& file, double sampleRate, Composition& opened) {
         ProjectFile project;
-        const auto read = ProjectFile::read(file, project);
+        const auto read = Recipe::isRecipe(file) ? Recipe::read(file, project.project) : ProjectFile::read(file, project);
         if (read.failed()) { return read; }
         return prepare(project.project, sampleRate, opened);
     }

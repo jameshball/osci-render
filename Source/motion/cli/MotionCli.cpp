@@ -12,6 +12,12 @@ using namespace motion::cli;
 
 juce::File fileArgument(const juce::String& text) { return juce::File::getCurrentWorkingDirectory().getChildFile(text); }
 
+// A project's or recipe's name, for what is written from it.
+juce::String sceneName(const juce::File& file) {
+    const auto name = file.getFileName();
+    return Recipe::isRecipe(file) ? name.dropLastCharacters(juce::String(".recipe.json").length()) : file.getFileNameWithoutExtension();
+}
+
 // The arguments after the command that are not options.
 juce::StringArray positional(const juce::ArgumentList& args) {
     juce::StringArray found;
@@ -71,18 +77,41 @@ void writePreviews(const Composition& composition, const std::vector<double>& ti
     }
 }
 
+// A recipe made into a project file, to open in the app.
+void make(const juce::ArgumentList& args) {
+    const auto files = positional(args);
+    if (files.size() != 1) { juce::ConsoleApplication::fail("make takes one recipe."); }
+    const auto recipe = fileArgument(files[0]);
+    if (!Recipe::isRecipe(recipe) || !recipe.existsAsFile()) { juce::ConsoleApplication::fail("There is no recipe (<scene>.recipe.json) at " + recipe.getFullPathName() + "."); }
+    motion::Project project;
+    const auto read = Recipe::read(recipe, project);
+    if (read.failed()) { juce::ConsoleApplication::fail(recipe.getFileName() + ": " + read.getErrorMessage()); }
+    const auto out = args.getValueForOption("--out");
+    const auto destination = out.isNotEmpty() ? fileArgument(out) : recipe.getSiblingFile(sceneName(recipe) + ".osci-motion");
+    const auto written = motion::ProjectFile::write(project, destination);
+    if (written.failed()) { juce::ConsoleApplication::fail(written.getErrorMessage()); }
+    say("Project " + destination.getFullPathName());
+}
+
 void render(const juce::ArgumentList& args) {
     const auto files = positional(args);
     if (files.size() != 1) { juce::ConsoleApplication::fail("render takes one project."); }
     const auto project = fileArgument(files[0]);
     auto composition = open(project, sampleRateOf(args));
-    composition.bakeAll();
-    say("Prepared in " + juce::String(composition.prepareMilliseconds, 1) + " ms, hidden lines in " + juce::String(composition.bakeMilliseconds, 1) + " ms");
     const auto previews = args.getValueForOption("--previews");
-    if (previews.isNotEmpty()) { writePreviews(composition, timesOf(args, composition.duration()), fileArgument(previews), project.getFileNameWithoutExtension()); }
     const auto out = args.getValueForOption("--out");
-    if (out.isEmpty() && previews.isNotEmpty()) { return; }
-    const auto destination = out.isNotEmpty() ? fileArgument(out) : project.withFileExtension("wav");
+    // Previews alone need only their frames.
+    const auto signal = out.isNotEmpty() || previews.isEmpty();
+    const auto times = timesOf(args, composition.duration());
+    if (signal) {
+        composition.bakeAll();
+    } else {
+        composition.bakeAt(times);
+    }
+    say("Prepared in " + juce::String(composition.prepareMilliseconds, 1) + " ms, hidden lines in " + juce::String(composition.bakeMilliseconds, 1) + " ms");
+    if (previews.isNotEmpty()) { writePreviews(composition, times, fileArgument(previews), sceneName(project)); }
+    if (!signal) { return; }
+    const auto destination = out.isNotEmpty() ? fileArgument(out) : project.getSiblingFile(sceneName(project) + ".wav");
     const std::atomic<bool> cancel {false};
     const auto start = juce::Time::getMillisecondCounterHiRes();
     const auto written = motion::SignalExporter::write(*composition.prepared, destination, composition.sampleRate, cancel);
@@ -147,9 +176,9 @@ void diff(const juce::ArgumentList& args) {
     if (differing > 0) { juce::ConsoleApplication::fail(juce::String(differing) + (differing == 1 ? " frame differs." : " frames differ.")); }
 }
 
-// Every project under a folder against the stats kept beside it
-// (<project>.stats.json): what changed, frame by frame. --update keeps the
-// new stats instead.
+// Every project and recipe under a folder against the stats kept beside it
+// (<name>.stats.json): what changed, frame by frame. --update keeps the new
+// stats instead.
 void check(const juce::ArgumentList& args) {
     const auto folders = positional(args);
     if (folders.size() != 1) { juce::ConsoleApplication::fail("check takes one folder of projects."); }
@@ -158,7 +187,7 @@ void check(const juce::ArgumentList& args) {
     const auto rate = sampleRateOf(args);
     const auto update = args.containsOption("--update");
     int changed = 0, added = 0, failed = 0, same = 0;
-    for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*.osci-motion")) {
+    for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*.osci-motion;*.recipe.json")) {
         const auto project = entry.getFile();
         const auto kept = project.withFileExtension("stats.json");
         const auto name = project.getRelativePathFrom(folder);
@@ -216,6 +245,9 @@ int main(int argc, char* argv[]) {
     juce::ConsoleApplication app;
     app.addHelpCommand("--help|-h", "osci-motion-cli: draws osci-motion projects offline, as Export draws them.\n"
         "Times are in seconds; --rate=Hz sets the sample rate (48000).", true);
+    app.addCommand({"make", "make <scene.recipe.json> [--out=scene.osci-motion]",
+        "Makes a project from a recipe: objects from generators or files, their properties and keys, a camera.",
+        "Every command takes a recipe wherever it takes a project. See Source/motion/cli/Recipe.h for the format.", make});
     app.addCommand({"render", "render <project> [--out=signal.wav] [--previews=folder [--frames=N | --at=t1,t2]] [--rate=Hz]",
         "Writes the XYRGB signal (beside the project unless --out), and preview images of frames.",
         "With --previews and no --out, writes only the previews.", render});
@@ -224,6 +256,6 @@ int main(int argc, char* argv[]) {
     app.addCommand({"diff", "diff <a.wav> <b.wav> [--tolerance=1e-4] | diff <a> <b> [--frames=N | --at=t1,t2]",
         "Compares two signals sample by sample, or two projects frame by frame.", {}, diff});
     app.addCommand({"check", "check <folder> [--update] [--frames=N] [--rate=Hz]",
-        "Draws every project under a folder and compares each with the stats kept beside it.", {}, check});
+        "Draws every project and recipe under a folder and compares each with the stats kept beside it.", {}, check});
     return app.findAndRunCommand(argc, argv);
 }

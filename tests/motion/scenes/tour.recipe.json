@@ -1,0 +1,256 @@
+{
+  "duration": 24,
+  "fps": 60,
+  "beam": {
+    "intensity": 20,
+    "persistence": 0.2
+  },
+  "define": {
+    "u": "clamp((t - 16) / 6, 0, 1)",
+    "turn": "-7 * pi / 8 + 2 * pi / 16 * (min(t, 16) + 6 * (u - u * u / 2))",
+    "reach": "6.395991869913532 + (0.3 - 6.395991869913532) * smoothstep(u)",
+    "ball": "-0.2 + 0.2 * (1 - cos(2 * pi * t / 4)) / 2",
+    "aim": "smoothstep(min(1, 1.3 * u))"
+  },
+  "camera": {
+    "hidesHiddenLines": true,
+    "path": {
+      "every": 0.05,
+      "position": [
+        "reach * cos(turn)",
+        "2.7 + (0.22 - 2.7) * smoothstep(u)",
+        "reach * sin(turn)"
+      ],
+      "look": [
+        "0",
+        "-0.5 + (ball + 0.5) * aim",
+        "1.3 * aim"
+      ]
+    }
+  },
+  "objects": [
+    {
+      "name": "Floor",
+      "generator": "grid",
+      "properties": {
+        "rotation.x": -90,
+        "position.y": -0.5,
+        "generator.columns": 18,
+        "generator.rows": 18,
+        "generator.width": 3.2,
+        "generator.height": 3.2,
+        "reflects": 40
+      }
+    },
+    {
+      "name": "Mirror ball",
+      "generator": "sphere",
+      "properties": {
+        "position.z": 1.3,
+        "generator.radius": 0.3,
+        "generator.segments": 24,
+        "generator.rings": 12,
+        "reflects": 100
+      },
+      "keys": {
+        "position.y": {
+          "expression": "ball",
+          "every": 0.25
+        }
+      }
+    },
+    {
+      "name": "Pillar 1",
+      "generator": "box",
+      "properties": {
+        "position.x": 0.438406204336,
+        "position.z": 0.438406204336,
+        "position.y": -0.05,
+        "generator.width": 0.22,
+        "generator.depth": 0.22,
+        "generator.height": 0.9
+      }
+    },
+    {
+      "name": "Pillar 2",
+      "generator": "box",
+      "properties": {
+        "position.x": -0.438406204336,
+        "position.z": 0.438406204336,
+        "position.y": -0.05,
+        "generator.width": 0.22,
+        "generator.depth": 0.22,
+        "generator.height": 0.9
+      }
+    },
+    {
+      "name": "Pillar 3",
+      "generator": "box",
+      "properties": {
+        "position.x": -0.438406204336,
+        "position.z": -0.438406204336,
+        "position.y": -0.05,
+        "generator.width": 0.22,
+        "generator.depth": 0.22,
+        "generator.height": 0.9
+      }
+    },
+    {
+      "name": "Pillar 4",
+      "generator": "box",
+      "properties": {
+        "position.x": 0.438406204336,
+        "position.z": -0.438406204336,
+        "position.y": -0.05,
+        "generator.width": 0.22,
+        "generator.depth": 0.22,
+        "generator.height": 0.9
+      }
+    },
+    {
+      "name": "Torus",
+      "generator": "torus",
+      "properties": {
+        "position.x": 1,
+        "position.y": 0.72,
+        "rotation.x": 90,
+        "generator.radius": 0.3,
+        "generator.thickness": 0.07,
+        "generator.segments": 24,
+        "generator.sides": 10
+      }
+    },
+    {
+      "name": "Cone",
+      "generator": "cone",
+      "properties": {
+        "position.x": -1,
+        "position.y": -0.2,
+        "position.z": 0,
+        "generator.radius": 0.26,
+        "generator.height": 0.6
+      },
+      "keys": {
+        "rotation.y": {
+          "expression": "360 * t / 24",
+          "every": 3
+        },
+        "rotation.z": {
+          "expression": "25 * sin(2 * pi * t / 24)",
+          "every": 1.5
+        }
+      }
+    },
+    {
+      "name": "Fill",
+      "generator": "ambientLight",
+      "properties": {
+        "light.intensity": 0.04,
+        "red": 0.7,
+        "green": 0.8,
+        "blue": 1
+      }
+    },
+    {
+      "name": "Light",
+      "generator": "pointLight",
+      "properties": {
+        "light.intensity": 2.2,
+        "light.range": 4.5,
+        "light.shadows": 100,
+        "red": 1,
+        "green": 0.78,
+        "blue": 0.5,
+        "position.y": 0.72
+      },
+      "keys": {
+        "position.x": {
+          "expression": "cos(2 * pi * t / 8)",
+          "every": 0.5
+        },
+        "position.z": {
+          "expression": "sin(2 * pi * t / 8)",
+          "every": 0.5
+        }
+      }
+    },
+    {
+      "name": "Light glow",
+      "generator": "arc",
+      "properties": {
+        "generator.radius": 0.055,
+        "generator.start": 0,
+        "generator.sweep": 360,
+        "lit": 0,
+        "red": 1,
+        "green": 0.82,
+        "blue": 0.55,
+        "position.y": 0.72,
+        "rotation.x": 0,
+        "rotation.y": 0
+      },
+      "keys": {
+        "position.x": {
+          "expression": "cos(2 * pi * t / 8)",
+          "every": 0.5
+        },
+        "position.z": {
+          "expression": "sin(2 * pi * t / 8)",
+          "every": 0.5
+        }
+      }
+    },
+    {
+      "name": "Light glow",
+      "generator": "arc",
+      "properties": {
+        "generator.radius": 0.055,
+        "generator.start": 0,
+        "generator.sweep": 360,
+        "lit": 0,
+        "red": 1,
+        "green": 0.82,
+        "blue": 0.55,
+        "position.y": 0.72,
+        "rotation.x": 90,
+        "rotation.y": 0
+      },
+      "keys": {
+        "position.x": {
+          "expression": "cos(2 * pi * t / 8)",
+          "every": 0.5
+        },
+        "position.z": {
+          "expression": "sin(2 * pi * t / 8)",
+          "every": 0.5
+        }
+      }
+    },
+    {
+      "name": "Light glow",
+      "generator": "arc",
+      "properties": {
+        "generator.radius": 0.055,
+        "generator.start": 0,
+        "generator.sweep": 360,
+        "lit": 0,
+        "red": 1,
+        "green": 0.82,
+        "blue": 0.55,
+        "position.y": 0.72,
+        "rotation.x": 0,
+        "rotation.y": 90
+      },
+      "keys": {
+        "position.x": {
+          "expression": "cos(2 * pi * t / 8)",
+          "every": 0.5
+        },
+        "position.z": {
+          "expression": "sin(2 * pi * t / 8)",
+          "every": 0.5
+        }
+      }
+    }
+  ]
+}
