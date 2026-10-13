@@ -762,6 +762,12 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
     }
     // Pasting while the originals exist copies their routes too.
     cloneDrivers(candidate, owners, [&highest] { return ++highest; });
+    // Instances pasted may take the project past what compositions may hold.
+    const auto graph = validateCompositionGraph(mergeScope(candidate));
+    if (!graph) {
+        pastedIds.clear();
+        return juce::Result::fail(graph.error);
+    }
     lastId = highest;
     edit(clips.size() > 1 ? "Paste clips" : "Paste clip", [&candidate](Project& project) { project = candidate; });
     return juce::Result::ok();
@@ -838,6 +844,9 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     }
     // A duplicate keeps its routed modulators, like its own keys.
     cloneDrivers(candidate, owners, [&highest] { return ++highest; });
+    // Instances duplicated may take the project past what compositions may hold.
+    const auto graph = validateCompositionGraph(mergeScope(candidate));
+    if (!graph) { return juce::Result::fail(graph.error); }
     lastId = highest;
     edit(copies.size() == 1 ? "Duplicate clip" : "Duplicate clips", [candidate = std::move(candidate)](Project& project) { project = candidate; });
     duplicateIds = std::move(ids);
@@ -1165,7 +1174,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     if (selected.empty() || selected.size() != clipIds.size() || name.isEmpty() || name.length() > 200) {
         return juce::Result::fail("Select distinct clips and name the composition (up to 200 characters).");
     }
-    const auto graph = validateCompositionGraph(state);
+    const auto graph = validateCompositionGraph(mergeScope(state));
     if (!graph || !validGroupHierarchy(state)) { return juce::Result::fail("The existing composition structure is invalid."); }
     auto definition = std::make_shared<CompositionDefinition>();
     // Keep the owning time coordinate: track/group curves and modulation phase
@@ -1298,7 +1307,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     definition->duration = std::max(definition->duration, last);
     candidate.duration = std::max(candidate.duration, last);
     candidate.definitions.push_back(definition);
-    const auto expanded = validateCompositionGraph(candidate);
+    const auto expanded = validateCompositionGraph(mergeScope(candidate));
     if (!expanded) { return juce::Result::fail(expanded.error); }
     // Publish identities and one undo snapshot only after every check succeeds.
     lastId = highest;

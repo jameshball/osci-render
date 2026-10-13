@@ -131,6 +131,43 @@ public:
         expect(document.enterComposition(0).wasOk());
         expectEquals(document.project().markers.front().name, juce::String("Main cue"));
         {
+            // Duplicating or pasting an instance can't take the project past
+            // what compositions may expand to: it would save but not load.
+            auto generator = std::make_shared<motion::Asset>();
+            generator->id = 1; generator->name = "Rectangle"; generator->extension = ".generator";
+            generator->data.append("rectangle", 9);
+            expect(motion::decodeAsset(*generator).wasOk());
+            motion::Project big;
+            big.assets.push_back(generator);
+            motion::Id next = 10;
+            std::shared_ptr<motion::CompositionDefinition> inner;
+            // Six clips, then four levels of ten instances each: 60000 clips.
+            for (int level = 0; level < 5; ++level) {
+                auto definition = std::make_shared<motion::CompositionDefinition>();
+                definition->id = next++; definition->name = "Level " + juce::String(level); definition->duration = 10;
+                motion::Track holder; holder.id = next++;
+                for (int index = 0; index < (level == 0 ? 6 : 10); ++index) {
+                    auto clip = level == 0 ? motion::Document::makeClip(next++, *generator, index) : motion::Document::makeCompositionClip(next++, *inner, index);
+                    clip.duration = 1;
+                    expect(holder.insert(clip, big.tempo()));
+                }
+                definition->tracks.push_back(holder);
+                big.definitions.push_back(definition);
+                inner = definition;
+            }
+            motion::Track top; top.id = next++;
+            auto instance = motion::Document::makeCompositionClip(next++, *inner, 0);
+            instance.duration = 1;
+            expect(top.insert(instance, big.tempo()));
+            big.tracks.push_back(top);
+            juce::UndoManager bigUndo;
+            motion::Document bigDocument(bigUndo);
+            bigDocument.reset(big);
+            std::vector<motion::Id> made;
+            expect(bigDocument.duplicateClips({instance.id}, made).failed(), "a duplicate past the limit is refused");
+            expect(made.empty() && bigDocument.project().tracks[0].clips.size() == 1, "and nothing changes");
+        }
+        {
             // A composition's tempo is its own: the main Scope's keys stay put.
             auto keyed = document.mainProject();
             keyed.beam.properties["intensity"].setKey({2.0, 3.0});
