@@ -498,6 +498,8 @@ private:
             auto& into = styled[surface];
             into.place(*item.drawing, item.source, world[surface], workspace.laid);
             restyle(into, item.source, workspace.facesAlongOf(*item.drawing, item.source), style, eyeAt, workspace.laid, nearSideOnly);
+            // Its corners were placed from the drawing it replaces: the faces must be the same.
+            jassert(into.drawing->faces().vertices.size() == item.drawing->faces().vertices.size() && into.drawing->faces().triangles == item.drawing->faces().triangles);
             item.drawing = into.drawing.get();
             item.styled = &into;
             outlining = outlining || into.eyeOnlyFrom < into.drawing->shapeCount();
