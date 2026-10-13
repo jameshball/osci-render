@@ -16,7 +16,9 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
     // The editor's own commands, so the menu and shortcuts agree.
     const std::array<std::pair<const char*, const char*>, 4> edits {{{"Cut", "Cmd+X"}, {"Copy", "Cmd+C"}, {"Paste", "Cmd+V"}, {"Split at playhead", "Cmd+K"}}};
     for (int index = 0; index < static_cast<int>(edits.size()); ++index) {
-        menu.addItem(motion::style::menuItem(edits[static_cast<std::size_t>(index)].first, 20 + index, edits[static_cast<std::size_t>(index)].second).setEnabled(index != 1 ? !locked : true));
+        const auto pasting = index == 2;
+        const auto enabled = (index == 1 || !locked) && (!pasting || (canPaste && canPaste()));
+        menu.addItem(motion::style::menuItem(edits[static_cast<std::size_t>(index)].first, 20 + index, edits[static_cast<std::size_t>(index)].second).setEnabled(enabled));
     }
     menu.addItem(motion::style::menuItem(many ? "Duplicate clips" : "Duplicate clip", 1, "Cmd+D").setEnabled(!locked));
     menu.addSeparator();
@@ -484,7 +486,7 @@ void MotionTimelineView::insertEffect(const std::string& type, juce::Point<int> 
 
 void MotionTimelineView::showSpaceMenu() {
     juce::PopupMenu menu;
-    menu.addItem(motion::style::menuItem("Paste", 1, "Cmd+V"));
+    menu.addItem(motion::style::menuItem("Paste", 1, "Cmd+V").setEnabled(canPaste && canPaste()));
     menu.addItem(2, "Add track");
     menu.addItem(3, "Add camera here");
     const auto time = std::clamp(scrollTime + (getMouseXYRelative().x - namesWidth) / pixelsPerSecond, 0.0, processor.document.project().duration);

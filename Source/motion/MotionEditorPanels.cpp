@@ -512,6 +512,7 @@ void MotionEditor::setUpTimeline() {
     };
     timeline.onTimingRequested = [this](motion::Id id) { select(id); };
     timeline.onLoopSelection = [this] { loopSelection(); };
+    timeline.canPaste = [this] { return !std::holds_alternative<std::monostate>(clipboard); };
     timeline.onCommand = [this](const juce::String& name) {
         for (const auto& command : commands) {
             if (command.name == name) { command.action(); return; }

@@ -30,6 +30,8 @@ public:
     explicit MotionTimelineView(MotionProcessor& ownerProcessor);
     // Runs one of the editor's commands by name (Cut, Copy, Paste...).
     std::function<void(const juce::String&)> onCommand;
+    // Whether there is anything to paste, for the menus' Paste.
+    std::function<bool()> canPaste;
     // Add a camera that takes over the output at the playhead.
     std::function<void(double)> onAddCamera;
     std::function<void(motion::Id)> onSelection, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
