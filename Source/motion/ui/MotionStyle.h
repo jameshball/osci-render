@@ -53,6 +53,9 @@ inline juce::Font caption() { return juce::Font(juce::FontOptions(11.0f)); }
 // A text button set with this property true is lettered in caption() rather
 // than body(): one sitting in a line of caption text.
 inline const juce::Identifier captionButton {"motionCaptionButton"};
+// How wide a caption laid over a field is, set on the field, so its value
+// keeps clear of it.
+inline const juce::Identifier captionWidth {"motionCaptionWidth"};
 inline juce::Font buttonFont(const juce::Button& button) { return button.getProperties()[captionButton] ? caption() : body(); }
 inline juce::Font heading() { return juce::Font(juce::FontOptions(11.0f, juce::Font::bold)); }
 inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)); }
@@ -521,7 +524,11 @@ inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>&
             fields[index]->setBounds(cell);
             auto& caption = captions[index];
             caption.setInterceptsMouseClicks(false, false);
-            caption.setBounds(cell.withTrimmedLeft(6).withWidth(juce::roundToInt(juce::TextLayout::getStringWidth(caption.getFont(), caption.getText())) + 2));
+            const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(caption.getFont(), caption.getText())) + 2;
+            caption.setBounds(cell.withTrimmedLeft(6).withWidth(width));
+            fields[index]->getProperties().set(captionWidth, width + 4);
+            auto* label = dynamic_cast<juce::Label*>(fields[index]);
+            if (label != nullptr) { label->setBorderSize({0, 6 + width + 4, 0, 6}); }
             caption.toFront(false);
         }
     }

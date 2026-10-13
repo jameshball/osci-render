@@ -31,6 +31,7 @@ public:
     void setSpec(const motion::PropertySpec& value) { spec = value; repaint(); }
     void setAxisColour(std::optional<juce::Colour> colour) { axisColour = colour; repaint(); }
     void setPrefix(juce::String text) { prefix = std::move(text); repaint(); }
+
     // How the value reads and is typed when it isn't a plain number, such as a
     // time in the ruler's format. Without it, the spec's decimals and unit apply.
     struct Notation {
@@ -63,7 +64,9 @@ public:
             g.setColour((hasKeyboardFocus(false) ? osci::Colours::accentColor() : osci::Colours::outlineSubtle()).withAlpha(.8f));
             g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
         }
-        auto text = getLocalBounds().reduced(5, 0);
+        // Clear of a caption laid over it (see style::captionWidth): a value
+        // too long for the rest is shortened rather than run into it.
+        auto text = getLocalBounds().reduced(5, 0).withTrimmedLeft(static_cast<int>(getProperties()[motion::style::captionWidth]));
         if (axisColour.has_value() || prefix.isNotEmpty()) {
             g.setFont(motion::style::caption());
             g.setColour(axisColour.value_or(osci::Colours::textMuted()).withAlpha(isEnabled() ? 1.0f : .4f));
