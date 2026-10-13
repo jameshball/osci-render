@@ -255,7 +255,9 @@ public:
             if (confirm) { confirm(); }
         };
         const auto width = 380;
-        const auto lines = juce::jmax(1, juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(style::body(), message) / (width - 8.0f))) + message.retainCharacters("\n").length());
+        // Each line of the message as many lines as it wraps to.
+        int lines = 0;
+        for (const auto& line : juce::StringArray::fromLines(message)) { lines += juce::jmax(1, juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(style::body(), line) / (width - 8.0f)))); }
         setSize(width, headerHeight + headerGap + lines * lineHeight + footerGap + footerHeight);
     }
     // `about` names what the message is about (a file), muted beside the
