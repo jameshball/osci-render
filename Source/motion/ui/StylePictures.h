@@ -99,9 +99,7 @@ inline juce::Path laid(const std::vector<hidden::surface::Piece>& pieces) {
     juce::Path path;
     for (const auto& piece : pieces) {
         traceFacing(path, [&](double share) {
-            hidden::surface::Weights weights;
-            for (std::size_t corner = 0; corner < 3; ++corner) { weights[corner] = piece.from[corner] + (piece.to[corner] - piece.from[corner]) * share; }
-            return hidden::surface::smoothAt(made.corners, made.faces, made.normals, piece.face, weights);
+            return hidden::surface::smoothAt(made.corners, made.faces, made.normals, piece.face, hidden::mixed(piece.from, piece.to, share));
         }, 3);
     }
     return path;

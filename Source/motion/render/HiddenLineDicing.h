@@ -2,6 +2,7 @@
 
 #include "HiddenLineDepth.h"
 #include "HiddenLineMidpoints.h"
+#include "TrianglePoints.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -256,11 +257,10 @@ private:
         const auto needed = std::ceil(std::sqrt(curving(p, q, r, bend)));
         const auto n = static_cast<int>(needed < finest ? std::max(1.0, needed) : finest);
         const auto stretch = std::max(cell, 1.5 * longest / n);
-        const auto rowStart = [n](int j) { return j * (n + 1) - j * (j - 1) / 2; };
-        points.resize(static_cast<std::size_t>(rowStart(n + 1)));
+        points.resize(static_cast<std::size_t>(gridIndex(n, n + 1, 0)));
         for (int j = 0; j <= n; ++j) {
             for (int i = 0; i + j <= n; ++i) {
-                auto& point = points[static_cast<std::size_t>(rowStart(j) + i)];
+                auto& point = points[static_cast<std::size_t>(gridIndex(n, j, i))];
                 if (i == 0 && j == 0) {
                     point = p;
                 } else if (i == n) {
@@ -273,7 +273,7 @@ private:
                 }
             }
         }
-        const auto at = [&](int i, int j) -> const DiceCorner& { return points[static_cast<std::size_t>(rowStart(j) + i)]; };
+        const auto at = [&](int i, int j) -> const DiceCorner& { return points[static_cast<std::size_t>(gridIndex(n, j, i))]; };
         const auto piece = [&](const DiceCorner& u, const DiceCorner& v, const DiceCorner& w) { halve(u, v, w, depthLeft - 1, false, stretch * stretch, bend, emit); };
         for (int j = 0; j < n; ++j) {
             for (int i = 0; i + j < n; ++i) {

@@ -44,6 +44,14 @@ public:
             }
             return found->second;
         }
+
+        // Its corners where `world` puts them (at the origin where it puts
+        // none), into `placed`, and its normals there, as smooth as it is.
+        surface::Normals placedAt(const std::vector<std::optional<Vec3>>& world, std::vector<Vec3>& placed) const {
+            placed.clear();
+            for (const auto& corner : world) { placed.push_back(corner.value_or(Vec3 {})); }
+            return smoothing.normals(placed, faces);
+        }
     };
 
     // A new frame: surfaces laid before it may be let go of to make room.
@@ -75,18 +83,8 @@ public:
             made.faces.assign(mesh.triangles.begin(), mesh.triangles.end());
             made.smoothing = surface::Smoothing::of(made.corners, made.faces);
             made.normals = made.smoothing.normals(made.corners, made.faces);
-            std::map<std::pair<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::tuple<std::int64_t, std::int64_t, std::int64_t>>, int> sides;
-            for (const auto& face : made.faces) {
-                // A face with no area (two corners at one place) has no sides.
-                const std::array places {surface::detail::placeOf(made.corners[face[0]]), surface::detail::placeOf(made.corners[face[1]]), surface::detail::placeOf(made.corners[face[2]])};
-                if (places[0] == places[1] || places[1] == places[2] || places[2] == places[0]) { continue; }
-                for (std::size_t side = 0; side < 3; ++side) {
-                    auto a = places[side], b = places[(side + 1) % 3];
-                    if (b < a) { std::swap(a, b); }
-                    ++sides[{a, b}];
-                }
-            }
-            made.closed = !sides.empty() && std::all_of(sides.begin(), sides.end(), [](const auto& side) { return side.second == 2; });
+            const auto sides = surface::detail::sidesOf(made.corners, made.faces);
+            made.closed = !sides.empty() && std::all_of(sides.begin(), sides.end(), [](const auto& side) { return side.second.size() == 2; });
             found = laid.emplace(&drawing, Entry {std::move(made), frame}).first;
         }
         return found->second.surface;
@@ -120,11 +118,7 @@ void smoothLines(const LaidSurfaces::Surface& surface, const std::vector<surface
     std::optional<std::pair<Vec3, osci::Point>> ended;
     for (const auto& piece : pieces) {
         const auto stretches = surface::stretchesOf(surface.normals, piece, turn);
-        const auto weightsAt = [&](double share) {
-            surface::Weights weights;
-            for (std::size_t corner = 0; corner < 3; ++corner) { weights[corner] = piece.from[corner] + (piece.to[corner] - piece.from[corner]) * share; }
-            return weights;
-        };
+        const auto weightsAt = [&](double share) { return mixed(piece.from, piece.to, share); };
         const auto point = [&](int stretch) {
             const auto p = surface::smoothAt(surface.corners, surface.faces, surface.normals, piece.face, weightsAt(static_cast<double>(stretch) / stretches));
             return osci::Point(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
@@ -155,7 +149,7 @@ struct Styled {
     // Where the lines laid on it begin, and where its outline's begin.
     std::size_t laidFrom = 0, eyeOnlyFrom = 0;
     // For each line laid on it, where on its face the line's ends are.
-    std::vector<std::array<surface::Weights, 2>> ends;
+    std::vector<std::array<Weights, 2>> ends;
     // Its corners and normals in the scene, this frame, and which way its
     // faces wind: the sign of what they enclose (outward when positive).
     std::vector<Vec3> corners;
@@ -167,14 +161,12 @@ struct Styled {
     void place(const PreparedDrawing& drawing, const std::shared_ptr<const PreparedSource>& owner, const std::vector<std::optional<Vec3>>& world, LaidSurfaces& laid) {
         unstyled = &drawing;
         auto& surface = laid.of(drawing, owner);
-        corners.clear();
-        for (const auto& corner : world) { corners.push_back(corner.value_or(Vec3 {})); }
-        normals = surface.smoothing.normals(corners, surface.faces);
+        normals = surface.placedAt(world, corners);
         enclosed = 0;
         for (const auto& f : surface.faces) { enclosed += corners[f[0]].dot(corners[f[1]].cross(corners[f[2]])); }
     }
     // Whether a point of a closed surface is on its far side from `eye`.
-    bool farFrom(Vec3 eye, std::uint32_t face, const surface::Weights& at, const std::vector<surface::Face>& faces) const {
+    bool farFrom(Vec3 eye, std::uint32_t face, const Weights& at, const std::vector<surface::Face>& faces) const {
         const auto facing = normals.at(face, at).dot(eye - surface::at(corners, faces[face], at));
         return enclosed < 0 ? facing > 0 : facing < 0;
     }
@@ -223,7 +215,7 @@ inline void restyle(Styled& styled, const std::shared_ptr<const PreparedSource>&
     styled.ends.clear();
     const auto add = [&](const std::vector<surface::Piece>& pieces, double amount, double turn, bool laidOn) {
         const auto culling = laidOn && nearSideOnly && surface.closed && eye.has_value();
-        smoothLines(surface, pieces, turn, [&](osci::Point from, osci::Point to, std::uint32_t face, const surface::Weights& starts, const surface::Weights& ends) {
+        smoothLines(surface, pieces, turn, [&](osci::Point from, osci::Point to, std::uint32_t face, const Weights& starts, const Weights& ends) {
             if (culling && styled.farFrom(*eye, face, starts, surface.faces) && styled.farFrom(*eye, face, ends, surface.faces)) { return; }
             shapes.push_back(dimmed(std::make_unique<osci::Line>(from, to), amount));
             faces.push_back({static_cast<std::int32_t>(face), -1});

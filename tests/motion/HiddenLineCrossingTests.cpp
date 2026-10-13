@@ -53,7 +53,7 @@ void twoTriangles() {
     check(near(piece->eyeFrom.x, 0) && near(piece->eyeTo.x, 0) && near(piece->eyeFrom.z, 5) && near(piece->eyeTo.z, 5), "it lies where the two planes meet");
     check(near(std::abs(piece->eyeTo.y - piece->eyeFrom.y), .5), "it spans only where both triangles reach");
     const auto again = Vec3 {piece->eyeFrom.x, piece->eyeFrom.y, piece->eyeFrom.z};
-    check(near((at(triangles[0].eye, piece->from) - again).length(), 0), "its weights find it on its own triangle");
+    check(near((motion::hidden::weighted(triangles[0].eye, piece->from) - again).length(), 0), "its weights find it on its own triangle");
 
     std::vector<Triangle> resting {
         {{Vec3 {-1, -1, 5}, Vec3 {1, -1, 5}, Vec3 {0, 1, 5}}, 0},

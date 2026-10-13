@@ -1,5 +1,6 @@
 #pragma once
 
+#include "TrianglePoints.h"
 #include "../model/Vec3.h"
 #include <algorithm>
 #include <array>
@@ -7,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <numbers>
 #include <optional>
 #include <tuple>
 #include <vector>
@@ -20,7 +22,6 @@
 // line, end to end. Pure geometry, so it can be tested alone.
 namespace motion::hidden::surface {
 using Face = std::array<std::uint32_t, 3>;
-using Weights = std::array<double, 3>;
 
 // A stretch of line across one face.
 struct Piece {
@@ -28,9 +29,8 @@ struct Piece {
     Weights from, to;
 };
 
-inline Vec3 at(const std::vector<Vec3>& corners, const Face& face, const Weights& weights) {
-    return corners[face[0]] * weights[0] + corners[face[1]] * weights[1] + corners[face[2]] * weights[2];
-}
+// The point at `weights` on a face.
+inline Vec3 at(const std::vector<Vec3>& corners, const Face& face, const Weights& weights) { return weighted(corners[face[0]], corners[face[1]], corners[face[2]], weights); }
 
 enum class Pattern { spiral, noise, slices, rings };
 
@@ -79,12 +79,13 @@ inline std::optional<Meeting> meetingOf(const Face& face, const Weights& weights
 }
 
 // A corner's place, to the nearest ten millionth.
-inline std::tuple<std::int64_t, std::int64_t, std::int64_t> placeOf(Vec3 p) { return {std::llround(p.x * 1.0e7), std::llround(p.y * 1.0e7), std::llround(p.z * 1.0e7)}; }
+using Place = std::tuple<std::int64_t, std::int64_t, std::int64_t>;
+inline Place placeOf(Vec3 p) { return {std::llround(p.x * 1.0e7), std::llround(p.y * 1.0e7), std::llround(p.z * 1.0e7)}; }
 
 // The faces with each corner as the first corner at its place: a mesh may
 // repeat a place (a ball's poles, a seam), and lines meet there all the same.
 inline std::vector<Face> byPlace(const std::vector<Vec3>& corners, const std::vector<Face>& faces) {
-    std::map<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::uint32_t> first;
+    std::map<Place, std::uint32_t> first;
     std::vector<Face> placed(faces.size());
     for (std::size_t index = 0; index < faces.size(); ++index) {
         for (std::size_t corner = 0; corner < 3; ++corner) {
@@ -92,6 +93,23 @@ inline std::vector<Face> byPlace(const std::vector<Vec3>& corners, const std::ve
         }
     }
     return placed;
+}
+
+// Each side of the faces with area, by its ends' places (the lower first),
+// with the faces it is a side of and which side of each it is.
+inline std::map<std::pair<Place, Place>, std::vector<std::pair<std::uint32_t, std::size_t>>> sidesOf(const std::vector<Vec3>& corners, const std::vector<Face>& faces) {
+    std::map<std::pair<Place, Place>, std::vector<std::pair<std::uint32_t, std::size_t>>> sides;
+    for (std::uint32_t index = 0; index < faces.size(); ++index) {
+        // A face with no area (two corners at one place) has no sides.
+        const std::array places {placeOf(corners[faces[index][0]]), placeOf(corners[faces[index][1]]), placeOf(corners[faces[index][2]])};
+        if (places[0] == places[1] || places[1] == places[2] || places[2] == places[0]) { continue; }
+        for (std::size_t side = 0; side < 3; ++side) {
+            auto a = places[side], b = places[(side + 1) % 3];
+            if (b < a) { std::swap(a, b); }
+            sides[{a, b}].push_back({index, side});
+        }
+    }
+    return sides;
 }
 
 // Pieces put in order along their lines: each one's neighbour is the one
@@ -220,15 +238,6 @@ inline double noise(Vec3 point) {
         lerp(v, lerp(u, g(AA + 1, x, y, z - 1), g(BA + 1, x - 1, y, z - 1)), lerp(u, g(AB + 1, x, y - 1, z - 1), g(BB + 1, x - 1, y - 1, z - 1))));
 }
 
-}
-
-// A pattern over the faces, `across` lines across the surface's largest
-// side, or for slices and the spiral, up its height. A spiral winds about
-// the surface's own up (y) through its middle, slices are level across it,
-// and rings centre on its front (its nearest along z).
-// `turn`: how far round its loop noise has morphed (a whole turn brings it
-// back as it was).
-namespace detail {
 // How far up a surface each point of it is, from its lowest part, over it
 // (see pattern's spiral): found over its faces each cut evenly into a grid,
 // `cuts` across, the same along every side so neighbours' grids meet, and
@@ -255,7 +264,6 @@ struct Climb {
         Climb climb;
         climb.cuts = cuts;
         // Edges of one face only, by their ends' places.
-        using Place = std::tuple<std::int64_t, std::int64_t, std::int64_t>;
         std::map<std::pair<Place, Place>, int> edgeUses;
         const auto edgeOf = [](Place a, Place b) { return a < b ? std::pair {a, b} : std::pair {b, a}; };
         if (flat) {
@@ -265,9 +273,9 @@ struct Climb {
         }
         std::vector<char> rim;
         std::vector<Vec3> points;
-        std::map<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::uint32_t> at;
+        std::map<Place, std::uint32_t> at;
         std::vector<std::vector<std::pair<std::uint32_t, double>>> next;
-        const auto pointAt = [&](int row, int column) { return static_cast<std::size_t>(row * (cuts + 1) - row * (row - 1) / 2 + column); };
+        const auto pointAt = [&](int row, int column) { return static_cast<std::size_t>(gridIndex(cuts, row, column)); };
         const auto join = [&](std::uint32_t a, std::uint32_t b) {
             if (a == b) { return; }
             const auto length = (points[b] - points[a]).length();
@@ -419,7 +427,7 @@ struct Climb {
         const auto row = std::clamp(static_cast<int>(std::floor(y)), 0, cuts - 1);
         const auto column = std::clamp(static_cast<int>(std::floor(x)), 0, cuts - 1 - row);
         const auto fx = x - column, fy = y - row;
-        const auto pointAt = [&](int r, int c) { return up[grid[static_cast<std::size_t>(r * (cuts + 1) - r * (r - 1) / 2 + c)]]; };
+        const auto pointAt = [&](int r, int c) { return up[grid[static_cast<std::size_t>(gridIndex(cuts, r, c))]]; };
         std::array<double, 3> ups, shares;
         if (fx + fy <= 1 || row + column + 2 > cuts) {
             ups = {pointAt(row, column), pointAt(row, column + 1), pointAt(row + 1, column)};
@@ -434,19 +442,6 @@ struct Climb {
         return ups[0] * shares[0] + ups[1] * shares[1] + ups[2] * shares[2];
     }
 };
-}
-
-namespace detail {
-// A point's weights on a face's corners, as it lies on the face's plane.
-inline Weights weightsOn(const std::vector<Vec3>& corners, const Face& face, Vec3 point) {
-    const auto a = corners[face[0]];
-    const auto u = corners[face[1]] - a, v = corners[face[2]] - a, w = point - a;
-    const auto uu = u.dot(u), uv = u.dot(v), vv = v.dot(v), wu = w.dot(u), wv = w.dot(v);
-    const auto area = uu * vv - uv * uv;
-    if (!(std::abs(area) > 0)) { return {1, 0, 0}; }
-    const auto second = (vv * wu - uv * wv) / area, third = (uu * wv - uv * wu) / area;
-    return {1 - second - third, second, third};
-}
 
 // Lines whose ends lie within `reach` of each other joined end to end (each
 // end to its nearest), the joining piece's end moved onto where the line
@@ -456,6 +451,11 @@ inline Weights weightsOn(const std::vector<Vec3>& corners, const Face& face, Vec
 inline std::vector<Piece> mended(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const std::vector<Piece>& pieces, double reach, double same) {
     const auto start = [&](const Piece& piece) { return at(corners, faces[piece.face], piece.from); };
     const auto end = [&](const Piece& piece) { return at(corners, faces[piece.face], piece.to); };
+    // A point's weights on a piece's face, as it lies on the face's plane.
+    const auto weightsOnFace = [&](const Piece& piece, Vec3 point) {
+        const auto& face = faces[piece.face];
+        return weightsOn(corners[face[0]], corners[face[1]], corners[face[2]], point);
+    };
     // The lines, as runs of the pieces, and where each starts and ends.
     struct Line { std::size_t first, last; };
     std::vector<Line> lines;
@@ -511,7 +511,7 @@ inline std::vector<Piece> mended(const std::vector<Vec3>& corners, const std::ve
             }
             if (joining > first) {
                 auto& piece = result[joining];
-                piece.from = weightsOn(corners, faces[piece.face], end(result[joining - 1]));
+                piece.from = weightsOnFace(piece, end(result[joining - 1]));
             }
             const auto next = joined[line][static_cast<std::size_t>(1 - side)];
             line = next.first;
@@ -520,7 +520,7 @@ inline std::vector<Piece> mended(const std::vector<Vec3>& corners, const std::ve
         // Back round to where it began: a loop, closed exactly.
         if (line != none && result.size() > first) {
             auto& piece = result.back();
-            piece.to = weightsOn(corners, faces[piece.face], start(result[first]));
+            piece.to = weightsOnFace(piece, start(result[first]));
         }
     };
     for (std::size_t line = 0; line < lines.size(); ++line) {
@@ -538,6 +538,12 @@ inline std::vector<Piece> mended(const std::vector<Vec3>& corners, const std::ve
 }
 }
 
+// A pattern over the faces, `across` lines across the surface's largest
+// side, or for slices and the spiral, up its height. A spiral winds about
+// the surface's own up (y) through its middle, slices are level across it,
+// and rings centre on its front (its nearest along z).
+// `turn`: how far round its loop noise has morphed (a whole turn brings it
+// back as it was).
 inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Pattern kind, double across, double turn = 0) {
     if (faces.empty() || !(across > 0)) { return {}; }
     // Faces with a corner that isn't finite (a mesh an effect broke) are
@@ -601,7 +607,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     // Each part winds about its own middle.
     const auto startsRound = [&](const detail::Bounds& part) {
         const auto around = std::max(part.high.x - part.low.x, part.high.z - part.low.z) / 2;
-        return level ? 1.0 : std::max(1.0, std::round(2 * 3.14159265358979323846 * around * std::tan(18 * 3.14159265358979323846 / 180) / climbing));
+        return level ? 1.0 : std::max(1.0, std::round(2 * std::numbers::pi * around * std::tan(18 * std::numbers::pi / 180) / climbing));
     };
     std::vector<double> partStarts;
     if (climb.has_value()) {
@@ -611,7 +617,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     // The part of the face being found, as the spiral winds round it.
     auto axis = middle;
     auto starts = startsRound(bounds);
-    constexpr double whole = 2 * 3.14159265358979323846;
+    constexpr double whole = 2 * std::numbers::pi;
     // Noise morphs as three fields mixed by a point going round a circle of
     // the sphere of their mixes, tipped off its middle: as strong all the way
     // round, and never at its opposite (which would draw the same lines), so
@@ -671,7 +677,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
                 fine.push_back(a * weights[0] + b * weights[1] + c * weights[2]);
             }
         }
-        const auto pointAt = [&](int row, int column) { return static_cast<std::uint32_t>(row * (cuts + 1) - row * (row - 1) / 2 + column); };
+        const auto pointAt = [&](int row, int column) { return static_cast<std::uint32_t>(gridIndex(cuts, row, column)); };
         const auto add = [&](std::uint32_t p, std::uint32_t q, std::uint32_t r) {
             fineFaces.push_back({first + p, first + q, first + r});
             parents.push_back(index);
@@ -697,7 +703,10 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     // How far apart its lines are: those ending nearer each other than an
     // eighth of that are one line, broken where faces met.
     const auto lineSpacing = kind == Pattern::spiral ? std::min(spacing, climbing) : kind == Pattern::slices ? std::min(spacing, along) : spacing;
-    pieces = detail::mended(corners, faces, pieces, lineSpacing / 8, 1.0e-9 * bounds.size() + 1.0e-12);
+    // Within this, a piece starts where the last ends: it follows on.
+    const auto same = 1.0e-9 * bounds.size() + 1.0e-12;
+    const auto followsOn = [same](Vec3 end, Vec3 start) { return (start - end).length() < same; };
+    pieces = detail::mended(corners, faces, pieces, lineSpacing / 8, same);
     // Then pieces that follow on over one face joined while they stay near
     // straight (within a 250th of the spacing: looser visibly flattens
     // curves), so a line is as few pieces as draw it well: the beam has only
@@ -712,7 +721,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
         const auto from = flat(pieces[start], pieces[start].from);
         // Each next piece on the same face, starting where the last ended,
         // taken while every point passed stays near the line to its end.
-        while (end + 1 < pieces.size() && pieces[end + 1].face == pieces[start].face && (flat(pieces[end + 1], pieces[end + 1].from) - flat(pieces[end], pieces[end].to)).length() < 1.0e-9 * bounds.size() + 1.0e-12) {
+        while (end + 1 < pieces.size() && pieces[end + 1].face == pieces[start].face && followsOn(flat(pieces[end], pieces[end].to), flat(pieces[end + 1], pieces[end + 1].from))) {
             const auto to = flat(pieces[end + 1], pieces[end + 1].to);
             const auto line = to - from;
             const auto length = line.length();
@@ -738,11 +747,11 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     while (first < joined.size()) {
         auto last = first;
         double length = (flat(joined[first], joined[first].to) - flat(joined[first], joined[first].from)).length();
-        while (last + 1 < joined.size() && (flat(joined[last + 1], joined[last + 1].from) - flat(joined[last], joined[last].to)).length() < 1.0e-9 * bounds.size() + 1.0e-12) {
+        while (last + 1 < joined.size() && followsOn(flat(joined[last], joined[last].to), flat(joined[last + 1], joined[last + 1].from))) {
             ++last;
             length += (flat(joined[last], joined[last].to) - flat(joined[last], joined[last].from)).length();
         }
-        const auto closed = (flat(joined[last], joined[last].to) - flat(joined[first], joined[first].from)).length() < 1.0e-9 * bounds.size() + 1.0e-12;
+        const auto closed = followsOn(flat(joined[last], joined[last].to), flat(joined[first], joined[first].from));
         if (!closed || length >= spacing / 2) { kept.insert(kept.end(), joined.begin() + static_cast<std::ptrdiff_t>(first), joined.begin() + static_cast<std::ptrdiff_t>(last) + 1); }
         first = last + 1;
     }
@@ -777,7 +786,7 @@ struct Smoothing {
 
     static Smoothing of(const std::vector<Vec3>& corners, const std::vector<Face>& faces, double crease = .7) {
         const auto own = faceNormals(corners, faces);
-        std::map<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::vector<std::pair<std::uint32_t, std::uint8_t>>> around;
+        std::map<detail::Place, std::vector<std::pair<std::uint32_t, std::uint8_t>>> around;
         for (std::uint32_t index = 0; index < faces.size(); ++index) {
             const auto a = detail::placeOf(corners[faces[index][0]]), b = detail::placeOf(corners[faces[index][1]]), c = detail::placeOf(corners[faces[index][2]]);
             if (a == b || b == c || c == a) { continue; }
@@ -875,7 +884,6 @@ inline int stretchesOf(const Normals& normals, const Piece& piece, double turn =
 // only one face has (a flat drawing's outline).
 inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Normals& smooth, Vec3 eye, double crease = .7) {
     const auto& normals = smooth.faces;
-    const auto keyOf = detail::placeOf;
     const auto cosCrease = std::cos(crease);
     std::vector<std::array<double, 3>> facing(faces.size());
     for (std::uint32_t index = 0; index < faces.size(); ++index) {
@@ -924,17 +932,7 @@ inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::v
     }
     // Sharp edges between a face toward the eye and one away, and edges
     // just one face has.
-    std::map<std::pair<std::tuple<std::int64_t, std::int64_t, std::int64_t>, std::tuple<std::int64_t, std::int64_t, std::int64_t>>, std::vector<std::pair<std::uint32_t, std::size_t>>> edges;
-    for (std::uint32_t index = 0; index < faces.size(); ++index) {
-        const auto& p = placed[index];
-        if (p[0] == p[1] || p[1] == p[2] || p[2] == p[0]) { continue; }
-        for (std::size_t side = 0; side < 3; ++side) {
-            auto a = keyOf(corners[faces[index][side]]), b = keyOf(corners[faces[index][(side + 1) % 3]]);
-            if (b < a) { std::swap(a, b); }
-            edges[{a, b}].push_back({index, side});
-        }
-    }
-    for (const auto& [key, sharing] : edges) {
+    for (const auto& [key, sharing] : detail::sidesOf(corners, faces)) {
         if (std::get<0>(key) == std::get<1>(key)) { continue; }
         const auto [index, side] = sharing.front();
         const auto toward = [&](std::uint32_t face) { return normals[face].dot(eye - corners[faces[face][0]]) > 0; };
@@ -966,8 +964,7 @@ inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::v
         auto previous = piece.from;
         for (int stretch = 1; stretch <= stretches; ++stretch) {
             const auto share = static_cast<double>(stretch) / stretches;
-            Weights next;
-            for (std::size_t corner = 0; corner < 3; ++corner) { next[corner] = piece.from[corner] + (piece.to[corner] - piece.from[corner]) * share; }
+            auto next = mixed(piece.from, piece.to, share);
             if (stretch < stretches) {
                 // How far it may move either way and stay on the face.
                 double least = -1.0e300, most = 1.0e300;

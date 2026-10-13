@@ -3,6 +3,7 @@
 #include <atomic>
 
 #include "HiddenLineDepth.h"
+#include "TrianglePoints.h"
 #include "../model/Vec3.h"
 #include <algorithm>
 #include <array>
@@ -25,9 +26,6 @@ struct Triangle {
     // shows its own lines more, as a mirror's give way to what it shows.
     float mirrors = 0;
 };
-
-// A point on a triangle, as the weights of its corners.
-using Weights = std::array<double, 3>;
 
 // One piece of a crossing, on the triangle it belongs to: the one of the
 // surface that mirrors less, or of the earlier surface.
@@ -75,8 +73,6 @@ inline std::optional<std::array<Weights, 2>> through(const std::array<double, 3>
     return std::nullopt;
 }
 
-inline Vec3 at(const std::array<Vec3, 3>& corners, const Weights& weights) { return corners[0] * weights[0] + corners[1] * weights[1] + corners[2] * weights[2]; }
-
 // Where triangles `a` and `b` (indices into `triangles`) cut through each
 // other, if they do.
 inline std::optional<Piece> between(const std::vector<Triangle>& triangles, std::uint32_t a, std::uint32_t b) {
@@ -100,7 +96,7 @@ inline std::optional<Piece> between(const std::vector<Triangle>& triangles, std:
     // Both cuts lie on the line where the planes meet: where they overlap
     // along it, the triangles cross.
     const auto direction = unitA->cross(*unitB);
-    const auto along = [&](const Triangle& triangle, const std::array<Weights, 2>& cut) { return std::array<double, 2> {direction.dot(at(triangle.eye, cut[0])), direction.dot(at(triangle.eye, cut[1]))}; };
+    const auto along = [&](const Triangle& triangle, const std::array<Weights, 2>& cut) { return std::array<double, 2> {direction.dot(weighted(triangle.eye, cut[0])), direction.dot(weighted(triangle.eye, cut[1]))}; };
     const auto alongA = along(first, *cutA), alongB = along(second, *cutB);
     const auto low = std::max(std::min(alongA[0], alongA[1]), std::min(alongB[0], alongB[1]));
     const auto high = std::min(std::max(alongA[0], alongA[1]), std::max(alongB[0], alongB[1]));
@@ -112,12 +108,10 @@ inline std::optional<Piece> between(const std::vector<Triangle>& triangles, std:
     const auto& range = ownedByA ? alongA : alongB;
     const auto weightsAt = [&](double position) {
         const auto t = range[1] != range[0] ? (position - range[0]) / (range[1] - range[0]) : 0.0;
-        Weights weights {};
-        for (std::size_t corner = 0; corner < 3; ++corner) { weights[corner] = cut[0][corner] + (cut[1][corner] - cut[0][corner]) * t; }
-        return weights;
+        return mixed(cut[0], cut[1], t);
     };
     const auto from = weightsAt(low), to = weightsAt(high);
-    return Piece {ownedByA ? a : b, from, to, at(owner.eye, from), at(owner.eye, to)};
+    return Piece {ownedByA ? a : b, from, to, weighted(owner.eye, from), weighted(owner.eye, to)};
 }
 
 namespace detail {

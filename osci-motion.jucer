@@ -587,6 +587,8 @@
               file="Source/motion/render/SampleClock.h"/>
         <FILE id="MotrenderTimeCacheh" name="TimeCache.h" compile="0" resource="0"
               file="Source/motion/render/TimeCache.h"/>
+        <FILE id="MotrenderTrianglePointsh" name="TrianglePoints.h" compile="0"
+              resource="0" file="Source/motion/render/TrianglePoints.h"/>
       </GROUP>
       <GROUP id="MotionSrcUi" name="ui">
         <FILE id="MotuiAssetLibrarycpp" name="AssetLibrary.cpp" compile="1"

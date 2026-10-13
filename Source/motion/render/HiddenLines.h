@@ -577,12 +577,10 @@ private:
             if (std::abs(across) > 1.0e-12 * plane.length() * toward.length()) { at = cameraEye.position + toward * (plane.dot(a - cameraEye.position) / across); }
             if (!lit) { return hatching::Seen {surface, at, 1}; }
             // Where on its face it is, for the normal there.
-            const auto ab = b - a, ac = c - a, ap = at - a;
-            const auto d00 = ab.dot(ab), d01 = ab.dot(ac), d11 = ac.dot(ac), d20 = ap.dot(ab), d21 = ap.dot(ac);
-            const auto denominator = d00 * d11 - d01 * d01;
-            surface::Weights weights {1.0 / 3, 1.0 / 3, 1.0 / 3};
-            if (std::abs(denominator) > 1.0e-300) {
-                const auto v = std::clamp((d11 * d20 - d01 * d21) / denominator, 0.0, 1.0), w = std::clamp((d00 * d21 - d01 * d20) / denominator, 0.0, 1.0 - v);
+            Weights weights {1.0 / 3, 1.0 / 3, 1.0 / 3};
+            const auto shares = sharesOn(a, b, c, at, 1.0e-300);
+            if (shares.has_value()) {
+                const auto v = std::clamp((*shares)[0], 0.0, 1.0), w = std::clamp((*shares)[1], 0.0, 1.0 - v);
                 weights = {1 - v - w, v, w};
             }
             LineNormals facing;
@@ -909,7 +907,7 @@ private:
                 const auto sa = screen(piece.eyeFrom), sb = screen(piece.eyeTo);
                 if (!sa.has_value() || !sb.has_value()) { continue; }
                 const auto& corners = surfaceSources[piece.triangle];
-                const auto source = [&](const crossing::Weights& weights) {
+                const auto source = [&](const Weights& weights) {
                     const auto mixed = [&](float osci::Point::* axis) { return static_cast<float>(corners[0].*axis * weights[0] + corners[1].*axis * weights[1] + corners[2].*axis * weights[2]); };
                     return osci::Point(mixed(&osci::Point::x), mixed(&osci::Point::y), mixed(&osci::Point::z));
                 };

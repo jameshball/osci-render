@@ -457,7 +457,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
             if (placed == 0) { return; }
             middle = middle / placed;
             const auto draw = [&](Vec3 seenFrom, const FlatMirror* only) {
-                smoothLines(surface, surface::outline(styled.corners, surface.faces, styled.normals, seenFrom), outlineTurn, [&](osci::Point from, osci::Point to, std::uint32_t face, const surface::Weights& starts, const surface::Weights& ends) {
+                smoothLines(surface, surface::outline(styled.corners, surface.faces, styled.normals, seenFrom), outlineTurn, [&](osci::Point from, osci::Point to, std::uint32_t face, const Weights& starts, const Weights& ends) {
                     const auto a = place(item, from), b = place(item, to);
                     if (!a.has_value() || !b.has_value()) { return; }
                     DimmedShape line(std::make_unique<osci::Line>(from, to), static_cast<float>(amount));
@@ -546,7 +546,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 if (!(itself > 0)) { continue; }
                 const auto& corners = item.drawing->faces().triangles[face];
                 const auto& vertices = item.drawing->faces().vertices;
-                const auto source = [&](const crossing::Weights& weights) {
+                const auto source = [&](const Weights& weights) {
                     const auto mixed = [&](float osci::Point::* axis) { return static_cast<float>(vertices[corners[0]].*axis * weights[0] + vertices[corners[1]].*axis * weights[1] + vertices[corners[2]].*axis * weights[2]); };
                     return osci::Point(mixed(&osci::Point::x), mixed(&osci::Point::y), mixed(&osci::Point::z));
                 };

@@ -218,7 +218,7 @@ int main() {
         const auto pieces = pattern(square, halves, Pattern::rings, 8);
         check(pieces.size() > 100, "rings across two faces, in many pieces: " + std::to_string(pieces.size()));
         for (const auto& piece : pieces) {
-            const auto half = Weights {(piece.from[0] + piece.to[0]) / 2, (piece.from[1] + piece.to[1]) / 2, (piece.from[2] + piece.to[2]) / 2};
+            const auto half = hidden::Weights {(piece.from[0] + piece.to[0]) / 2, (piece.from[1] + piece.to[1]) / 2, (piece.from[2] + piece.to[2]) / 2};
             for (const auto& weights : {piece.from, piece.to, half}) {
                 const auto radius = at(square, halves[piece.face], weights).length() / .25 + .5;
                 check(std::abs(radius - std::round(radius)) < .03, "each ring round its middle, a spacing from the next: " + std::to_string(radius));
