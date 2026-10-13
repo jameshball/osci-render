@@ -80,7 +80,7 @@ private:
             if (!job.has_value() || job->project == nullptr || threadShouldExit()) { continue; }
             try {
                 if (composition == nullptr || preparedRevision != job->revision) {
-                    composition = std::make_unique<PreparedComposition>(*job->project, 48000, &cancel, CompositionPurpose::signal, job->eye.reach);
+                    composition = std::make_unique<PreparedComposition>(*job->project, 48000, &cancel, CompositionPurpose::culling, job->eye.reach);
                     // A preparation cancelled part way is not kept for the revision.
                     if (cancel.load()) {
                         composition.reset();

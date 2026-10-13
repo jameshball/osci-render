@@ -520,7 +520,11 @@ struct PreparedCamera {
     }
 };
 
-enum class CompositionPurpose { signal, editorGeometry };
+// signal: drawn to the Scope or exported, baking its hidden lines alongside.
+// culling: prepared just as the signal is, by what bakes those hidden lines
+// (a bake's workers, the Scene's preview), so it starts no bake of its own.
+// editorGeometry: the editor's shapes, rebuilt during drags.
+enum class CompositionPurpose { signal, culling, editorGeometry };
 
 // Whole beam cycles per video frame, at least 45 Hz so scopes do not flicker.
 inline double beamCycleRate(double frameRate) {
@@ -555,7 +559,7 @@ struct PreparedComposition {
         // Editor geometry is rebuilt during drags; loudness modulation only
         // matters to the signal, so the envelope is built there alone.
         PreparedDrivers drivers([this, cancel, purpose]() -> std::shared_ptr<const SoundtrackEnvelope> {
-            return purpose == CompositionPurpose::signal ? loudnessEnvelope(cancel) : nullptr;
+            return purpose != CompositionPurpose::editorGeometry ? loudnessEnvelope(cancel) : nullptr;
         });
         const ClipTiming mainClock(0, project.duration);
         drivers.driveEffects(effects, project.effects, project, mainClock);
@@ -692,7 +696,7 @@ struct PreparedComposition {
             }
             // A light lights what the Scope draws and is never drawn there
             // itself; the Scene shows its picture.
-            if (generator != nullptr && generator->category == GeneratorCategory::light && purpose == CompositionPurpose::signal) {
+            if (generator != nullptr && generator->category == GeneratorCategory::light && purpose != CompositionPurpose::editorGeometry) {
                 PreparedLight light;
                 light.kind = generator->kind;
                 light.specs = generator->parameters;
