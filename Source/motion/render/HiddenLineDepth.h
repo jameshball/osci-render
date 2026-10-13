@@ -33,10 +33,9 @@ struct Reach {
 };
 
 // What hides what, point by point: a depth buffer over what the Scope shows
-// (a little past it, for the beam's width), at the same pixel size however wide
-// that is, holding the
-// nearest surface at every pixel. Surfaces are drawn into it as triangles small
-// enough to follow whatever bends them; a point shows when nothing in its pixel
+// (a little past it, for the beam's width), at the same pixel size however
+// wide that is, holding the nearest surface at every pixel. Surfaces are
+// drawn into it as triangles small enough to follow whatever bends them; a point shows when nothing in its pixel
 // is in front of it. Each pixel keeps which triangle is nearest at its centre,
 // and a point is tested against that triangle's plane where the point is, not
 // where the centre is: a surface seen edge on changes depth steeply across a
