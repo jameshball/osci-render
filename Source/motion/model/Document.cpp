@@ -4,6 +4,7 @@
 #include "ModulationGraph.h"
 #include "PropertySchema.h"
 #include "../import/SourceDecoding.h"
+#include <numbers>
 #include <set>
 
 // Every edit that adds things checks it has identities for them: a project
@@ -1881,7 +1882,7 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
                 // Unturned, a light shines down -Z: turned about X, then Y, to the middle.
                 const auto length = std::sqrt(x * x + y * y + z * z);
                 if (length > 0) {
-                    constexpr auto degrees = 180 / 3.14159265358979323846;
+                    constexpr auto degrees = 180 / std::numbers::pi;
                     clip.properties["rotation.x"] = Curve(std::asin(-y / length) * degrees);
                     clip.properties["rotation.y"] = Curve(std::atan2(x, z) * degrees);
                 }

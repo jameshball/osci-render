@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <deque>
+#include <numbers>
 #include <optional>
 #include <vector>
 
@@ -171,7 +172,7 @@ inline std::array<double, 3> illumination(const std::vector<LightView>& lights, 
                 const auto falloff = std::max(0.0, 1 - reach * reach);
                 strength *= falloff * falloff;
                 if (state.spot()) {
-                    constexpr double radians = 3.14159265358979323846 / 360;
+                    constexpr double radians = std::numbers::pi / 360;
                     const auto along = -toward.dot(state.direction);
                     const auto outer = std::cos(state.cone * radians), inner = std::cos(state.cone * (1 - state.softness) * radians);
                     if (inner - outer > 1.0e-9) {

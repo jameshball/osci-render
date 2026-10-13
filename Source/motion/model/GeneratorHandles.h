@@ -224,9 +224,8 @@ inline std::vector<Handle> handles(const GeneratorDefinition& definition, std::s
             break;
         case GeneratorKind::spotLight: {
             constexpr auto length = light_glyph::spotLength;
-            const auto rimAt = [&](double degrees) { return length * std::tan(degrees * pi / 360); };
-            result.push_back(point({0, rimAt(value(2)), -length}, {2}, name(2), std::nullopt, Vec3 {0, 1, 0}));
-            result.push_back(point({0, -rimAt(value(2) * (1 - value(3) / 100)), -length}, {3}, name(3), std::nullopt, Vec3 {0, 1, 0}));
+            result.push_back(point({0, light_glyph::spotRim(value(2)), -length}, {2}, name(2), std::nullopt, Vec3 {0, 1, 0}));
+            result.push_back(point({0, -light_glyph::spotRim(value(2) * (1 - value(3) / 100)), -length}, {3}, name(3), std::nullopt, Vec3 {0, 1, 0}));
             result.push_back(point({0, 0, -light_glyph::spotReach(value(0))}, {0}, name(0), std::nullopt, Vec3 {0, 0, 1}));
             break;
         }

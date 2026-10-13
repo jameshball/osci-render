@@ -1,6 +1,8 @@
 #pragma once
 
 #include "PropertySpecs.h"
+#include <cmath>
+#include <numbers>
 #include <span>
 #include <string_view>
 
@@ -165,6 +167,8 @@ inline double rayReach(double intensity) { return .16 + .06 * intensity; }
 inline double arrowReach(double intensity) { return .2 + .08 * intensity; }
 // Spot lights: a cone this long, its intensity's handle beyond it.
 inline constexpr double spotLength = .3;
+// How far from its axis a spot light's cone of `degrees` reaches at its end.
+inline double spotRim(double degrees) { return spotLength * std::tan(degrees * std::numbers::pi / 360); }
 inline double spotReach(double intensity) { return spotLength + .06 + .06 * intensity; }
 }
 

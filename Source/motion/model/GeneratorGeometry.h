@@ -484,11 +484,10 @@ inline Geometry build(const GeneratorDefinition& definition, std::span<const dou
             // and its axis out to its intensity's handle.
             constexpr auto length = light_glyph::spotLength;
             const auto cone = value(2), softness = value(3) / 100;
-            const auto rimAt = [&](double degrees) { return length * std::tan(degrees * pi / 360); };
             const auto ring = [&](double radius) {
                 return polyline(sampled(48, [&](double t) { return Vec3 {radius * std::cos(2 * pi * t), radius * std::sin(2 * pi * t), -length}; }), false);
             };
-            const auto outer = rimAt(cone), inner = rimAt(cone * (1 - softness));
+            const auto outer = light_glyph::spotRim(cone), inner = light_glyph::spotRim(cone * (1 - softness));
             geometry.paths.push_back(ring(outer));
             if (softness > 0 && inner > 1.0e-3) { geometry.paths.push_back(ring(inner)); }
             for (int side = 0; side < 4; ++side) {
