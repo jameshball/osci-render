@@ -113,7 +113,7 @@ void findChanges(int steps, Find&& find, Fill&& fill) {
 // The light reaching a point of a clip, in each colour: what the lights give
 // it, as far as the clip is lit by lights (at 0 its own colour, 1 in every
 // channel). `shade` is told what shadows take from it.
-inline std::array<float, 3> lightAt(const std::vector<LightView>& lights, Vec3 point, const Normals& normals, float response, double* shade = nullptr) {
+inline std::array<float, 3> lightAt(const std::vector<LightView>& lights, Vec3 point, const LineNormals& normals, float response, double* shade = nullptr) {
     const auto total = illumination(lights, point, normals, shade);
     std::array<float, 3> light {};
     for (std::size_t channel = 0; channel < 3; ++channel) { light[channel] = 1 + response * (static_cast<float>(total[channel]) - 1); }

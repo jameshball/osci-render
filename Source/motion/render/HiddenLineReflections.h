@@ -414,7 +414,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
         // scene (its shape's progress from `start` to `end`), as the mirror
         // shows it: lit as it is lit, then coloured by its clip. Only in
         // `only`, of a flat mirror's pieces, when given.
-        const auto reflectStretch = [&](const SceneItem& item, osci::Shape& shape, const Normals& normals, Vec3 from, Vec3 to, double start, double end, float itself, const FlatMirror* only = nullptr, GrazedSurface grazed = {}) {
+        const auto reflectStretch = [&](const SceneItem& item, osci::Shape& shape, const LineNormals& normals, Vec3 from, Vec3 to, double start, double end, float itself, const FlatMirror* only = nullptr, GrazedSurface grazed = {}) {
             const auto response = static_cast<float>(item.clip->lit(time));
             // As bright as it is drawn: by its style, as little as its own
             // surface mirrors, and its light.
@@ -461,7 +461,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                     const auto a = place(item, from), b = place(item, to);
                     if (!a.has_value() || !b.has_value()) { return; }
                     DimmedShape line(std::make_unique<osci::Line>(from, to), static_cast<float>(amount));
-                    const auto normals = Normals::turning(styled.normals.at(face, starts), styled.normals.at(face, ends));
+                    const auto normals = LineNormals::turning(styled.normals.at(face, starts), styled.normals.at(face, ends));
                     reflectStretch(item, line, normals, *a, *b, 0.0, 1.0, itself, only, {source, styled.grazing(face)});
                 });
             };
@@ -508,7 +508,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                 if (cancelled()) { return std::nullopt; }
                 auto* shape = item.drawing->shape(index);
                 if (shape == nullptr || !(shape->length() > 0)) { continue; }
-                const auto normals = lit ? normalsOf(source, index) : Normals {};
+                const auto normals = lit ? normalsOf(source, index) : LineNormals {};
                 // In the scene as straight stretches: one for a straight line
                 // nothing bends, else as many as keep close to its path.
                 std::vector<std::pair<double, std::optional<Vec3>>> path;
@@ -551,7 +551,7 @@ std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& comp
                     return osci::Point(mixed(&osci::Point::x), mixed(&osci::Point::y), mixed(&osci::Point::z));
                 };
                 osci::Line line(source(piece.from), source(piece.to));
-                Normals normals;
+                LineNormals normals;
                 if (lit) { normals.add(normalOf(crossingTriangles[piece.triangle].eye[0], crossingTriangles[piece.triangle].eye[1], crossingTriangles[piece.triangle].eye[2])); }
                 reflectStretch(item, line, normals, piece.eyeFrom, piece.eyeTo, 0.0, 1.0, itself);
             }

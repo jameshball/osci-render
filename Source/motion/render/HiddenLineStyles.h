@@ -181,11 +181,11 @@ struct Styled {
 
     // The normals to light a line by, turning along it as the surface does;
     // none for one of its own (lit by the faces it runs along, as ever).
-    std::optional<Normals> normalsOf(std::size_t shape) const {
+    std::optional<LineNormals> normalsOf(std::size_t shape) const {
         if (shape < laidFrom || shape - laidFrom >= ends.size()) { return std::nullopt; }
         const auto face = static_cast<std::uint32_t>(drawing->shapeFaces()[shape][0]);
         const auto& [starts, finishes] = ends[shape - laidFrom];
-        return Normals::turning(normals.at(face, starts), normals.at(face, finishes));
+        return LineNormals::turning(normals.at(face, starts), normals.at(face, finishes));
     }
     // How near a line of its outline its own faces may come, along the line
     // from it to the eye that sees it, without hiding it: it is where the

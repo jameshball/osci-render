@@ -403,7 +403,7 @@ inline std::vector<Frame::Entry> hatch(const PreparedComposition& composition, d
             const auto v = std::clamp((d11 * d20 - d01 * d21) / denominator, 0.0, 1.0), w = std::clamp((d00 * d21 - d01 * d20) / denominator, 0.0, 1.0 - v);
             weights = {1 - v - w, v, w};
         }
-        Normals facing;
+        LineNormals facing;
         facing.add(normals[surface]->at(face, weights));
         const auto light = lightAt(lights, at, facing, static_cast<float>(items[surface].clip->lit(time)));
         const auto brightest = std::max({light[0], light[1], light[2]});
@@ -732,7 +732,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     struct Kept {
         std::unique_ptr<osci::Shape> shape;
         bool cut;
-        Normals normals;
+        LineNormals normals;
         double brightness = 1;
     };
     // A run culling cut too short to see would only draw a dot: it is
@@ -824,7 +824,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         }
     }
     const auto normalsOf = [&](std::size_t surface, std::size_t shape) {
-        Normals normals;
+        LineNormals normals;
         if (!lit || items[surface].drawing == nullptr || faceNormals[surface].empty()) { return normals; }
         if (items[surface].styled != nullptr) {
             const auto smooth = items[surface].styled->normalsOf(shape);
@@ -990,7 +990,7 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             visibleRuns([&](double t) { return screen(piece.eyeFrom + (piece.eyeTo - piece.eyeFrom) * t); }, std::hypot(sb->x - sa->x, sb->y - sa->y));
             commitDrawn();
             // It lies on the face it was found on.
-            Normals normals;
+            LineNormals normals;
             if (lit) {
                 const auto a = place(items[surface], corners[0]), b = place(items[surface], corners[1]), c = place(items[surface], corners[2]);
                 if (a.has_value() && b.has_value() && c.has_value()) { normals.add(normalOf(*a, *b, *c)); }

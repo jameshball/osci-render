@@ -24,7 +24,7 @@ LightView lightOf(GeneratorKind kind, Vec3 position, Vec3 direction = {0, 0, -1}
     return light;
 }
 
-double red(const std::vector<LightView>& lights, Vec3 at, Normals normals = {}) { return illumination(lights, at, normals)[0]; }
+double red(const std::vector<LightView>& lights, Vec3 at, LineNormals normals = {}) { return illumination(lights, at, normals)[0]; }
 
 // A square of surface drawn into a light's view, as two triangles.
 void square(ShadowView& view, std::array<Vec3, 4> corners) {
@@ -76,17 +76,17 @@ void cone() {
 
 void facing() {
     const std::vector<LightView> lights {lightOf(GeneratorKind::directionalLight, {}, {0, -1, 0})};
-    Normals up;
+    LineNormals up;
     up.add(Vec3 {0, 1, 0});
-    Normals side;
+    LineNormals side;
     side.add(Vec3 {1, 0, 0});
-    Normals edge;
+    LineNormals edge;
     edge.add(Vec3 {0, 1, 0});
     edge.add(Vec3 {1, 0, 0});
     check(near(red(lights, {}, up), 1), "a face square on to a light takes all of it");
     check(near(red(lights, {}, side), 0), "one edge on to it, none");
     check(near(red(lights, {}, edge), .5), "an edge between them half");
-    Normals down;
+    LineNormals down;
     down.add(Vec3 {0, -1, 0});
     check(near(red(lights, {}, down), 1), "either side of a face takes it");
     check(near(red(lights, {}), 1), "a line on no face takes it whichever way it comes");
