@@ -538,7 +538,8 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
                 if (handle.has_value() && plot().expanded(5).contains(*handle)
                     && keyPoint(*clip, *selected).getDistanceFrom(event.position) > 7.0f
                     && handle->getDistanceFrom(event.position) <= 8.0f) {
-                    beginDrag(*clip, mode, event.position);
+                    // A locked target's curve shows but doesn't drag.
+                    if (!beginDrag(*clip, mode, event.position)) { return; }
                     drag->original = *selected;
                     drag->handle = *handle;
                     repaint();
@@ -556,7 +557,7 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
             }
             const auto handle = scaleHandle(*box, right);
             if (plot().expanded(5).contains(handle.getCentre()) && handle.expanded(3.0f, 2.0f).contains(event.position)) {
-                beginDrag(*clip, right ? DragMode::scaleRight : DragMode::scaleLeft, event.position);
+                if (!beginDrag(*clip, right ? DragMode::scaleRight : DragMode::scaleLeft, event.position)) { return; }
                 drag->pivot = right ? box->first : box->last;
                 drag->edge = right ? box->last : box->first;
                 repaint();
@@ -613,8 +614,7 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
         const auto* primary = findCurve(current, propertyName);
         const auto* key = primary != nullptr ? primary->findKey(*selectedTime) : nullptr;
         if (key != nullptr) {
-            beginDrag(*current, DragMode::key, event.position);
-            drag->original = *key;
+            if (beginDrag(*current, DragMode::key, event.position)) { drag->original = *key; }
         }
     }
     setHover(hoverAt(event.position));
@@ -650,7 +650,7 @@ void MotionCurveEditor::mouseDoubleClick(const juce::MouseEvent& event) {
     if (!std::isfinite(key.time) || !std::isfinite(key.value)) { return; }
     const auto id = targetId;
     const auto property = propertyName;
-    processor.document.tryEdit("Add animation key", [id, property, key](motion::Project& project) {
+    processor.document.tryEdit("Add key", [id, property, key](motion::Project& project) {
         auto* target = mutableCurve(project, id, property);
         if (target == nullptr) { return false; }
         target->setKeyValue(key.time, key.value);
@@ -800,8 +800,8 @@ void MotionCurveEditor::mouseUp(const juce::MouseEvent&) {
     if (valid && !changed.empty()) {
         const auto id = targetId;
         const auto plural = selection().size() > 1;
-        const auto* label = mode == DragMode::key ? (plural ? "Move animation keys" : "Move animation key")
-            : mode == DragMode::scaleLeft || mode == DragMode::scaleRight ? "Scale animation keys" : "Edit cubic tangent";
+        const auto* label = mode == DragMode::key ? (plural ? "Move keys" : "Move key")
+            : mode == DragMode::scaleLeft || mode == DragMode::scaleRight ? "Scale keys" : "Move key handle";
         // One undo step for every curve the drag changed.
         processor.document.edit(label, [id, changed = std::move(changed)](motion::Project& project) {
             for (const auto& [name, curve] : changed) {
@@ -913,9 +913,9 @@ void MotionCurveEditor::zoomTime(float x, double factor) {
     setView(start, start + span);
 }
 
-void MotionCurveEditor::beginDrag(const motion::PropertyTarget& clip, DragMode mode, juce::Point<float> down) {
+bool MotionCurveEditor::beginDrag(const motion::PropertyTarget& clip, DragMode mode, juce::Point<float> down) {
     // A locked track's keys can be selected but not moved.
-    if (clip.locked) { return; }
+    if (clip.locked) { return false; }
     drag = Drag {};
     drag->originals = groupCurves(clip);
     drag->previews = drag->originals;
@@ -927,6 +927,7 @@ void MotionCurveEditor::beginDrag(const motion::PropertyTarget& clip, DragMode m
     drag->mode = mode;
     drag->primary = selectedTime;
     drag->companions = companions;
+    return true;
 }
 
 void MotionCurveEditor::cancelDrag() {
@@ -1419,7 +1420,7 @@ bool MotionCurveEditor::deleteSelected() {
         return false;
     }
     const auto id = targetId;
-    processor.document.edit(keys.size() > 1 ? "Delete animation keys" : "Delete animation key", [id, keys](motion::Project& project) {
+    processor.document.edit(keys.size() > 1 ? "Delete keys" : "Delete key", [id, keys](motion::Project& project) {
         for (const auto& key : keys) {
             auto* target = mutableCurve(project, id, key.property);
             if (target != nullptr) { target->removeKey(key.time); }
@@ -1487,7 +1488,7 @@ void MotionCurveEditor::setSelectedInterpolation(motion::Interpolation next) {
     if (!needed) {
         return;
     }
-    processor.document.edit(keys.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, keys, next](motion::Project& project) {
+    processor.document.edit("Change key interpolation", [id, keys, next](motion::Project& project) {
         for (const auto& ref : keys) {
             auto* target = mutableCurve(project, id, ref.property);
             if (target != nullptr) { motion::keyedit::setInterpolation(*target, ref.time, next); }
@@ -1522,7 +1523,10 @@ void MotionCurveEditor::setActiveKeyTime(double projectTime) {
     adoptSelection(std::move(result->selection), selectedTime.has_value());
     if (changed.empty()) { return; }
     const auto id = targetId;
-    processor.document.editCoalesced("Move animation key", "graph.key.time", [id, changed = std::move(changed)](motion::Project& project) {
+    // Steps join while they are to this target's same curves.
+    juce::String control = "graph.key.time:" + juce::String(id);
+    for (const auto& [name, curve] : changed) { control << ":" << juce::String(name); }
+    processor.document.editCoalesced("Move key", control, [id, changed = std::move(changed)](motion::Project& project) {
         for (const auto& [name, curve] : changed) {
             auto* target = mutableCurve(project, id, name);
             if (target != nullptr) { *target = curve; }
@@ -1542,7 +1546,9 @@ void MotionCurveEditor::setActiveKeyValue(double value) {
     const auto* current = curve != nullptr ? curve->findKey(ref.time) : nullptr;
     if (current == nullptr || current->value == constrained) { return; }
     const auto id = targetId;
-    processor.document.editCoalesced("Change animation key", "graph.key.value", [id, ref, constrained](motion::Project& project) {
+    // Joins only edits of the same key.
+    const auto control = "graph.key.value:" + juce::String(id) + ":" + juce::String(ref.property) + ":" + juce::String(ref.time, 9);
+    processor.document.editCoalesced("Change key", control, [id, ref, constrained](motion::Project& project) {
         auto* curve = mutableCurve(project, id, ref.property);
         const auto* key = curve != nullptr ? curve->findKey(ref.time) : nullptr;
         if (key == nullptr) { return; }
@@ -1571,7 +1577,10 @@ bool MotionCurveEditor::nudgeSelected(int frames, double values) {
     adoptSelection(std::move(result->selection), selectedTime.has_value());
     if (!changed.empty()) {
         const auto id = targetId;
-        processor.document.editCoalesced(keys.size() > 1 ? "Nudge animation keys" : "Nudge animation key", frames != 0 ? "graph.nudge.time" : "graph.nudge.value", [id, changed = std::move(changed)](motion::Project& updated) {
+        // Nudges join while they are to this target's same curves.
+        juce::String control = (frames != 0 ? "graph.nudge.time:" : "graph.nudge.value:") + juce::String(id);
+        for (const auto& [name, curve] : changed) { control << ":" << juce::String(name); }
+        processor.document.editCoalesced(keys.size() > 1 ? "Nudge keys" : "Nudge key", control, [id, changed = std::move(changed)](motion::Project& updated) {
             for (const auto& [name, curve] : changed) {
                 auto* target = mutableCurve(updated, id, name);
                 if (target != nullptr) { *target = curve; }

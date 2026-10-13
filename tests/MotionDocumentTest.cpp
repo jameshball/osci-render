@@ -228,12 +228,16 @@ public:
             motion::ui::PreviewGesture gesture(viewDocument);
             gesture.begin();
             gesture.preview([](motion::Project& project) { project.markers.push_back({1, 5, "Dragged"}); });
+            const auto looping = !viewDocument.project().looping;
             viewDocument.changeView([](motion::Composition& state) { state.looping = !state.looping; });
             expect(!gesture.stale(), "the drag carries on");
+            gesture.preview([](motion::Project& project) { project.markers.push_back({1, 6, "Dragged"}); });
+            expect(viewDocument.project().looping == looping, "its next preview keeps the option as changed");
             expect(gesture.commit("Drag"), "and ends as an undo step");
             expect(viewDocument.project().markers.size() == 1);
             expect(viewUndo.undo());
             expect(viewDocument.project().markers.empty(), "which undoes the drag");
+            expect(viewDocument.project().looping == looping, "but not the option");
         }
         {
             // A modulator's field dragged: one undo step, and Escape takes it back.

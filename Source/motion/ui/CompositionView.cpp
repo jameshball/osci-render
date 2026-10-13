@@ -566,6 +566,9 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     panDrag = event.mods.isShiftDown();
     cameraAtDown = camera;
     down = event.position;
+    // Looking through a camera, the drag moves it: one undo step, which
+    // Escape takes back.
+    if (navigationDrag && lockedCamera != 0) { processor.document.beginHeld("camera-view:" + juce::String(static_cast<juce::int64>(lockedCamera))); }
     if (navigationDrag) { return; }
     if (event.mods.isPopupMenu()) {
         // Like a left click, the menu acts on what is under the pointer.
@@ -890,6 +893,7 @@ juce::String MotionCompositionView::centreAnchor(motion::Id id) {
 }
 
 void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
+    if (navigationDrag && lockedCamera != 0) { processor.document.endHeld(); }
     navigationDrag = false;
     if (marqueeArmed) {
         marqueeArmed = false;
@@ -1390,7 +1394,17 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
     if (key == juce::KeyPress::escapeKey) {
         if (navigating) { setNavigating(false); return true; }
         if (validGesture()) { cancelGesture(); return true; }
-        if (navigationDrag) { camera = cameraAtDown; navigationDrag = false; repaint(); return true; }
+        if (navigationDrag) {
+            // The camera's pose goes back with the view, unwritten.
+            if (lockedCamera != 0) {
+                processor.document.cancelHeld();
+                lastPose.reset();
+            }
+            camera = cameraAtDown;
+            navigationDrag = false;
+            repaint();
+            return true;
+        }
         if (marqueeArmed) { resetMarquee(); repaint(); return true; }
         // Escape clears the picked parts, then leaves part mode.
         if (partMode && !picked.empty()) { picked.clear(); refreshPartBar(); return true; }
@@ -1412,9 +1426,11 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
     if (!navigating && (code == juce::KeyPress::numberPad3 || (plain && code == '3'))) { setViewPreset(opposite ? ViewPreset::left : ViewPreset::right); return true; }
     if (!navigating && (code == juce::KeyPress::numberPad7 || (plain && code == '7'))) { setViewPreset(opposite ? ViewPreset::bottom : ViewPreset::top); return true; }
     if (key.getModifiers().isCommandDown() || key.getModifiers().isCtrlDown()) {
+        // Undo mid-drag takes back the drag alone, as the Graph's does.
+        const auto undoing = key.getKeyCode() == 'Z' && !key.getModifiers().isShiftDown() && validGesture();
         cancelGesture();
         setNavigating(false);
-        return false;
+        return undoing;
     }
     if (navigating) { return true; }
     if (key.getModifiers().isAltDown()) { return false; }
@@ -1449,7 +1465,7 @@ juce::String MotionCompositionView::emptyMessage() const {
             if (!silenced && timing.start > now && (!next.has_value() || timing.start < *next)) { next = timing.start; }
         }
     }
-    if (!any) { return "Drop files here to start, or Add source (" + motion::style::shortcutText("Cmd+I") + ")"; }
+    if (!any) { return "Drop files here to start, or choose Import source (" + motion::style::shortcutText("Cmd+I") + ")"; }
     if (hidden) { return "Clips here are on muted or un-soloed tracks"; }
     const auto grid = project.timeGrid();
     const auto at = "Nothing on screen at " + juce::String(grid.positionLabel(now));
@@ -1627,6 +1643,7 @@ void MotionCompositionView::cancelGesture() {
         edit.cancel();
         if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
     }
+    if (navigationDrag && lockedCamera != 0) { processor.document.endHeld(); }
     navigationDrag = false;
 }
 

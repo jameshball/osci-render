@@ -377,6 +377,9 @@ private:
     // The project before a gesture's first preview, until a step is recorded:
     // where an edit made meanwhile undoes to.
     std::optional<Project> previewBase;
+    // The project at that first preview, as it was: what view options a
+    // gesture's previews started from.
+    std::optional<Project> previewOrigin;
     bool carryView = true;
     // During undo and redo: the step's opposite snapshot, for carrying view options.
     const Project* carryOptionsFrom = nullptr;

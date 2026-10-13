@@ -99,7 +99,8 @@ private:
         double pivot = 0, edge = 0;    // Scaling: content times of the fixed and dragged edges.
     };
 
-    void beginDrag(const motion::PropertyTarget& clip, DragMode mode, juce::Point<float> down);
+    // Whether a drag began (not on a locked target's curve).
+    bool beginDrag(const motion::PropertyTarget& clip, DragMode mode, juce::Point<float> down);
 
     void cancelDrag();
 

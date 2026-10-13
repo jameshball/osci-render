@@ -6,6 +6,10 @@
 #include "../import/SourceDecoding.h"
 #include <set>
 
+// Every edit that adds things checks it has identities for them: a project
+// would need trillions of edits to run out (loading leaves that many free).
+static juce::Result noIdentitiesLeft() { return juce::Result::fail("This project can't take any more items."); }
+
 namespace motion {
 
 // Approximate bytes a snapshot holds by value (curves, keys, clips, tracks).
@@ -57,6 +61,7 @@ struct Document::Change : juce::UndoableAction {
     bool perform() override {
         const juce::ScopedValueSetter<const Project*> carry(owner.carryOptionsFrom, performed ? &before : nullptr);
         owner.previewBase.reset();
+        owner.previewOrigin.reset();
         owner.apply(after);
         performed = true;
         return true;
@@ -64,6 +69,7 @@ struct Document::Change : juce::UndoableAction {
     bool undo() override {
         const juce::ScopedValueSetter<const Project*> carry(owner.carryOptionsFrom, &after);
         owner.previewBase.reset();
+        owner.previewOrigin.reset();
         owner.apply(before);
         return true;
     }
@@ -133,7 +139,7 @@ juce::Result Document::setMarker(Id id, double time, juce::String name) {
     if (!adding && found->time == time && found->name == name) { return juce::Result::ok(); }
     if (adding) {
         const auto highest = highestId();
-        if (highest >= maximumId) { return juce::Result::fail("No marker identities remain."); }
+        if (highest >= maximumId) { return noIdentitiesLeft(); }
         id = highest + 1;
         lastId = id;
     }
@@ -312,8 +318,15 @@ void Document::record(const juce::String& label, Project view, bool joinPrevious
 }
 
 void Document::preview(Project project) {
-    if (!previewBase.has_value()) { previewBase = state; }
-    apply(finished(std::move(project)));
+    if (!previewBase.has_value()) {
+        previewBase = state;
+        previewOrigin = state;
+    }
+    // A gesture builds its previews from where it started: a view option
+    // changed since (L for loop mid-drag) stays as it now is.
+    auto shown = finished(std::move(project));
+    carryViewOptions(shown, state, *previewOrigin);
+    apply(std::move(shown));
 }
 
 void Document::edit(juce::String label, std::function<void(Project&)> operation) {
@@ -407,11 +420,15 @@ void Document::changeView(std::function<void(Composition&)> change) {
 void Document::commit(juce::String label, Project before) {
     undo.beginNewTransaction(label);
     if (onUndoStep) { onUndoStep(); }
-    undo.perform(new Change(*this, mergeScope(std::move(before)), state));
+    // Undo puts back the gesture, not a view option changed during it.
+    auto from = mergeScope(std::move(before));
+    if (previewOrigin.has_value()) { carryViewOptions(from, state, *previewOrigin); }
+    undo.perform(new Change(*this, std::move(from), state));
 }
 
 void Document::reset(Project project) {
     previewBase.reset();
+    previewOrigin.reset();
     scopeId = 0;
     ++projectGeneration;
     ++scopeChanges;
@@ -486,7 +503,7 @@ juce::Result Document::setTempoChange(double beat, double bpm, std::optional<dou
     std::sort(changes.begin(), changes.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
     auto shared = std::make_shared<const std::vector<TempoChange>>(std::move(changes));
     if (!Tempo(current.bpm, shared).valid()) { return juce::Result::fail("A tempo change needs a position after the start and 1-1000 BPM."); }
-    return retempo(std::move(shared), replacing.has_value() ? "Change tempo change" : "Add tempo change");
+    return retempo(std::move(shared), replacing.has_value() ? "Edit tempo change" : "Add tempo change");
 }
 
 juce::Result Document::removeTempoChange(double beat) {
@@ -496,7 +513,7 @@ juce::Result Document::removeTempoChange(double beat) {
     const auto before = changes.size();
     std::erase_if(changes, [beat](const auto& change) { return change.beat == beat; });
     if (changes.size() == before) { return juce::Result::fail("There is no tempo change there."); }
-    return retempo(changes.empty() ? nullptr : std::make_shared<const std::vector<TempoChange>>(std::move(changes)), "Remove tempo change");
+    return retempo(changes.empty() ? nullptr : std::make_shared<const std::vector<TempoChange>>(std::move(changes)), "Delete tempo change");
 }
 
 // Musical clips follow the new map; overlapping results are refused.
@@ -594,7 +611,7 @@ juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const A
             if (clip.id != clipId) { continue; }
             if (track.locked || clip.asset != expected->id) { return juce::Result::fail("The selected clip is locked or its source has changed."); }
             const auto highest = highestId();
-            if (highest >= maximumId) { return juce::Result::fail("There are no remaining source identities."); }
+            if (highest >= maximumId) { return noIdentitiesLeft(); }
             if (copy.liveIdentity != nullptr) { copy.liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
             copy.id = highest + 1;
             copy.name = copy.liveIdentity != nullptr ? expected->name + " copy" : expected->name.upToLastOccurrenceOf(".", false, false) + " copy " + juce::String(static_cast<juce::uint64>(copy.id)) + expected->extension;
@@ -784,7 +801,7 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
     std::map<Id, Id> overflowTracks, owners;
     for (const auto& copied : clips) {
         auto clip = copied.clip;
-        if (static_cast<Id>(clip.effects.size() + state.routes.size()) + 2 > maximumId - highest) { return juce::Result::fail("There are no remaining identities for pasted clips."); }
+        if (static_cast<Id>(clip.effects.size() + state.routes.size()) + 2 > maximumId - highest) { return noIdentitiesLeft(); }
         auto timing = clip.timing(state.tempo());
         timing.moveTo(timing.start - first + time);
         if (!clip.setTiming(timing, state.tempo())) { return juce::Result::fail("The pasted selection has invalid timing."); }
@@ -826,11 +843,11 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
 }
 
 juce::Result Document::pasteKeys(Id clipId, const std::vector<CopiedKey>& keys, double time) {
-    if (keys.empty()) { return juce::Result::fail("The clipboard has no keyframes."); }
+    if (keys.empty()) { return juce::Result::fail("The clipboard has no keys."); }
     const auto target = findPropertyTarget(project(), clipId);
-    if (!target.has_value() || target->isEffect) { return juce::Result::fail("Select a clip, group or camera to paste keyframes onto."); }
-    if (target->locked) { return juce::Result::fail("Unlock the track before pasting keyframes."); }
-    const auto changed = tryEdit(keys.size() > 1 ? "Paste keyframes" : "Paste keyframe", [&](Project& updated) {
+    if (!target.has_value() || target->isEffect) { return juce::Result::fail("Select a clip, group or camera to paste keys onto."); }
+    if (target->locked) { return juce::Result::fail("Unlock the track before pasting keys."); }
+    const auto changed = tryEdit(keys.size() > 1 ? "Paste keys" : "Paste key", [&](Project& updated) {
         const auto found = findPropertyTarget(updated, clipId);
         if (!found.has_value()) { return false; }
         bool any = false;
@@ -878,7 +895,7 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     std::map<Id, Id> owners;
     for (auto& [index, copy] : copies) {
         const auto required = static_cast<Id>(copy.effects.size() + state.routes.size()) + 1;
-        if (required > maximumId - highest) { return juce::Result::fail("There are no remaining identities for duplicated clips."); }
+        if (required > maximumId - highest) { return noIdentitiesLeft(); }
         auto timing = copy.timing(state.tempo());
         timing.moveTo(timing.start + (last - first));
         if (copies.size() == 1) {
@@ -938,7 +955,7 @@ juce::Result Document::extractParts(const std::vector<PartSplit>& splits, std::v
         const auto original = originals[clip.asset];
         if (original == nullptr) { return juce::Result::fail("The clip's source no longer exists."); }
         const auto required = static_cast<Id>(clip.effects.size() + trackAt->effects.size() + state.routes.size()) + 4;
-        if (required > maximumId - highest) { return juce::Result::fail("There are no remaining identities for the parts."); }
+        if (required > maximumId - highest) { return noIdentitiesLeft(); }
         const auto stem = original->name.containsChar('.') ? original->name.upToLastOccurrenceOf(".", false, false) : original->name;
         const auto partStem = partName.endsWithIgnoreCase(part->extension) ? partName.dropLastCharacters(part->extension.length()) : partName;
         // The document keeps its own copies of the halves, named and numbered here.
@@ -999,7 +1016,7 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
         if (removed.empty()) { continue; }
         auto& track = candidate.tracks.change(index);
         if (ripple && !track.sortClips(candidate.tempo()).has_value()) {
-            return juce::Result::fail("Ripple delete requires non-overlapping clip intervals.");
+            return juce::Result::fail("Ripple delete can't close up clips that overlap.");
         }
         std::erase_if(track.clips, [&](const auto& clip) { return requested.contains(clip.id); });
         if (!ripple) { continue; }
@@ -1095,14 +1112,14 @@ Clip Document::makeCompositionClip(Id id, const CompositionDefinition& definitio
 juce::Result Document::insertComposition(Id definition, double time, Id trackId, Id groupId, Id& clipId) {
     clipId = 0;
     if (!std::isfinite(time) || time < 0 || !canReferenceComposition(definition)) {
-        return juce::Result::fail("Choose a valid composition that does not contain the current editing scope.");
+        return juce::Result::fail("That composition contains the one you're editing, so it can't go inside it.");
     }
     auto candidate = project();
     const auto source = findDefinition(candidate, definition);
     if (source == nullptr) { return juce::Result::fail("The composition no longer exists."); }
     auto highest = highestId();
     const auto required = trackId == 0 ? 2u : 1u;
-    if (required > maximumId - highest) { return juce::Result::fail("There are no remaining clip identities."); }
+    if (required > maximumId - highest) { return noIdentitiesLeft(); }
     auto clip = makeCompositionClip(++highest, *source, time);
     if (!clip.valid() || !clip.timing(candidate.tempo()).valid()) { return juce::Result::fail("The composition has invalid timing."); }
     if (trackId != 0) {
@@ -1142,7 +1159,7 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
         for (const auto& clip : track.clips) { required += clip.effects.size(); }
     }
     auto highest = highestId();
-    if (required > maximumId - highest) { return juce::Result::fail("There are no remaining composition identities."); }
+    if (required > maximumId - highest) { return noIdentitiesLeft(); }
     // Every renumbered property owner, so routes and links can follow.
     std::map<Id, Id> owners;
     copy->id = ++highest;
@@ -1270,7 +1287,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     for (const auto& track : definition->tracks) { required += track.effects.size(); }
     for (const auto& group : state.groups) { if (requiredGroups.contains(group.id)) { required += group.effects.size(); } }
     required += 2 * state.routes.size() + state.modulators.size();
-    if (required > maximumId - highest) { return juce::Result::fail("There are no remaining composition identities."); }
+    if (required > maximumId - highest) { return noIdentitiesLeft(); }
     definition->id = ++highest;
     // copies: every root owner copied (not moved) into the definition.
     std::map<Id, Id> groupIds, copies;
@@ -1376,7 +1393,7 @@ juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming
     bool changed = false;
     std::set<std::size_t> touched;
     for (const auto& [clipId, timing] : timings) {
-        if (!timing.valid()) { return juce::Result::fail("Clip timing needs a finite non-negative start, positive duration and speed, and finite source offset."); }
+        if (!timing.valid()) { return juce::Result::fail("Enter a start of 0 or more, and a duration and speed above 0."); }
         const auto track = std::find_if(tracks.begin(), tracks.end(), [clipId](const Track& item) { return holdsClip(item, clipId); });
         if (track == tracks.end()) { return juce::Result::fail("A selected clip no longer exists."); }
         if (track->locked) { return juce::Result::fail("Unlock the track before changing clip timing."); }
@@ -1408,7 +1425,7 @@ juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming
 
 juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
     const auto& state = project();
-    if (!resolvedSeconds.valid()) { return juce::Result::fail("Clip timing needs a finite non-negative start, positive duration and speed, and finite source offset."); }
+    if (!resolvedSeconds.valid()) { return juce::Result::fail("Enter a start of 0 or more, and a duration and speed above 0."); }
     for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
         const auto& track = state.tracks[trackIndex];
         for (std::size_t clipIndex = 0; clipIndex < track.clips.size(); ++clipIndex) {
@@ -1463,7 +1480,7 @@ static void insertCut(Project& updated, Id id, Id camera, double time) {
 juce::Result Document::cutToCamera(Id camera, double time, Id& cutId) {
     const auto& current = project();
     if (!hasCamera(current, camera)) { return juce::Result::fail("Choose a camera to cut to."); }
-    if (!std::isfinite(time) || time < 0 || time >= current.duration) { return juce::Result::fail("Cuts must start inside the project."); }
+    if (!std::isfinite(time) || time < 0 || time >= current.duration) { return juce::Result::fail("Cuts must start inside the composition."); }
     cutId = newId();
     const auto id = cutId;
     tryEdit("Cut to camera", [time, camera, id](Project& updated) {
@@ -1492,7 +1509,7 @@ juce::Result Document::applyCutRange(Project& project, Id cut, double start, dou
     const auto found = std::find_if(project.cameraCuts.begin(), project.cameraCuts.end(), [cut](const auto& item) { return item.id == cut; });
     if (found == project.cameraCuts.end()) { return juce::Result::fail("The cut no longer exists."); }
     if (!std::isfinite(start) || !std::isfinite(end) || start < 0 || end > project.duration + 1.0e-9 || end - start < frame - 1.0e-9) {
-        return juce::Result::fail("A cut must stay inside the project and last at least one frame.");
+        return juce::Result::fail("A cut must stay inside the composition and last at least one frame.");
     }
     for (const auto& other : project.cameraCuts) {
         if (other.id != cut && start < other.end() && other.start < end) { return juce::Result::fail("Cuts cannot overlap; trim the neighbouring cut first."); }
@@ -1514,7 +1531,7 @@ juce::Result Document::setCutRange(Id cut, double start, double end, juce::Strin
 }
 
 juce::Result Document::removeCut(Id cut) {
-    const auto removed = tryEdit("Remove camera cut", [cut](Project& updated) {
+    const auto removed = tryEdit("Delete cut", [cut](Project& updated) {
         const auto before = updated.cameraCuts.size();
         std::erase_if(updated.cameraCuts, [cut](const auto& item) { return item.id == cut; });
         return updated.cameraCuts.size() != before;
@@ -1524,7 +1541,7 @@ juce::Result Document::removeCut(Id cut) {
 
 juce::Result Document::addCamera(double time, Id& cameraId) {
     const auto& current = project();
-    if (!std::isfinite(time) || time < 0 || time > current.duration) { return juce::Result::fail("Cameras are added inside the project."); }
+    if (!std::isfinite(time) || time < 0 || time > current.duration) { return juce::Result::fail("Add cameras inside the composition."); }
     Camera camera;
     camera.id = cameraId = newId();
     // The camera on the output at `time` is the first camera unless a cut shows another.
@@ -1619,7 +1636,7 @@ juce::Result Document::addRoute(ModulationRoute route, Id& id) {
     const auto& current = project();
     const auto hasModulator = std::any_of(current.modulators.begin(), current.modulators.end(), [&](const auto& item) { return item.id == route.modulator; });
     if (!route.valid() || !hasModulator || !drivableProperty(current, route.target, route.property)) { return juce::Result::fail("A route needs an existing modulator and a visual property."); }
-    if (beamOutsideMain(route.target)) { return juce::Result::fail("The Scope is modulated from the main composition."); }
+    if (beamOutsideMain(route.target)) { return juce::Result::fail("Go back to the main composition to drive the Scope."); }
     id = route.id;
     edit("Route modulator", [route](Project& project) { project.routes.push_back(route); });
     return juce::Result::ok();
@@ -1645,14 +1662,14 @@ juce::Result Document::routeModulator(Id modulator, Id target, const std::vector
     const auto& current = project();
     const auto hasModulator = std::any_of(current.modulators.begin(), current.modulators.end(), [&](const auto& item) { return item.id == modulator; });
     if (!hasModulator) { return juce::Result::fail("The modulator no longer exists."); }
-    if (beamOutsideMain(target)) { return juce::Result::fail("The Scope is modulated from the main composition."); }
+    if (beamOutsideMain(target)) { return juce::Result::fail("Go back to the main composition to drive the Scope."); }
     std::vector<ModulationRoute> added;
     for (const auto& property : properties) {
         const auto routed = std::any_of(current.routes.begin(), current.routes.end(), [&](const auto& route) { return route.modulator == modulator && route.target == target && route.property == property; });
         if (routed || !drivableProperty(current, target, property)) { continue; }
         added.push_back({newId(), modulator, target, property, routeAmount(current, target, property), ModulationMode::add});
     }
-    if (added.empty()) { return juce::Result::fail("It already drives that, or that cannot be modulated."); }
+    if (added.empty()) { return juce::Result::fail("That modulator already drives it, or it can't be modulated."); }
     edit("Route modulator", [added](Project& project) { project.routes.insert(project.routes.end(), added.begin(), added.end()); });
     return juce::Result::ok();
 }
@@ -1661,7 +1678,7 @@ juce::Result Document::moveEffect(Id effect, Id owner, bool copy) {
     if (findEffect(project(), effect) == nullptr) { return juce::Result::fail("The effect no longer exists."); }
     const auto copyId = copy ? newId() : Id(0);
     const auto moved = tryEdit(copy ? "Copy effect" : "Move effect", [&](Project& updated) { return motion::moveEffect(updated, effect, owner, copy, copyId); });
-    return moved ? juce::Result::ok() : juce::Result::fail("The effect is already there, or that has no room for more effects.");
+    return moved ? juce::Result::ok() : juce::Result::fail("The effect is already there, or that list has no room for more.");
 }
 
 std::optional<Project> Document::previewRoute(Id modulator, Id target, const std::vector<std::string>& properties) const {
@@ -1687,7 +1704,7 @@ juce::Result Document::addRoutedModulator(Modulator modulator, ModulationRoute r
     if (!modulator.valid() || !route.valid() || !drivableProperty(project(), route.target, route.property)) {
         return juce::Result::fail("A route needs an existing visual property.");
     }
-    if (beamOutsideMain(route.target)) { return juce::Result::fail("The Scope is modulated from the main composition."); }
+    if (beamOutsideMain(route.target)) { return juce::Result::fail("Go back to the main composition to drive the Scope."); }
     modulatorId = modulator.id;
     edit("Route new modulator", [modulator, route](Project& project) {
         project.modulators.push_back(modulator);
@@ -1713,7 +1730,7 @@ juce::Result Document::setRoute(const ModulationRoute& route) {
 }
 
 juce::Result Document::removeRoute(Id id) {
-    const auto removed = tryEdit("Delete route", [id](Project& project) {
+    const auto removed = tryEdit("Remove route", [id](Project& project) {
         const auto before = project.routes.size();
         std::erase_if(project.routes, [id](const auto& route) { return route.id == id; });
         return project.routes.size() != before;
