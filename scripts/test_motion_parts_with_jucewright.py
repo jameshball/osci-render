@@ -47,7 +47,7 @@ def names():
 
 def part_count():
     for name in names():
-        found = re.fullmatch(r"(\d+) (parts?|pieces?)", name)
+        found = re.fullmatch(r"(\d+) (lines?|pieces?)", name)
         if found:
             return int(found.group(1))
     return 0

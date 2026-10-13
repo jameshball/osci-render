@@ -1233,10 +1233,11 @@ void MotionCompositionView::resetMarquee() {
 void MotionCompositionView::refreshPartBar() {
     const auto count = pickedPartCount();
     const auto shown = partMode && count > 0;
-    // Picking pieces counts pieces, as they were clicked.
+    // Picking pieces counts pieces, as they were clicked; a box or lasso
+    // picks lines (which may be part of a piece).
     const auto pieces = partPick == PartPick::pieces;
     const auto shownCount = pieces ? pickedPieceCount() : count;
-    partCount.setText(juce::String(static_cast<juce::uint64>(shownCount)) + (pieces ? (shownCount == 1 ? " piece" : " pieces") : (shownCount == 1 ? " part" : " parts")), juce::dontSendNotification);
+    partCount.setText(juce::String(static_cast<juce::uint64>(shownCount)) + (pieces ? (shownCount == 1 ? " piece" : " pieces") : (shownCount == 1 ? " line" : " lines")), juce::dontSendNotification);
     partCount.setVisible(shown);
     extractButton.setVisible(shown);
     resized();
