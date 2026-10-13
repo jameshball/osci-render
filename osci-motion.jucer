@@ -681,6 +681,10 @@
               resource="0" file="Source/motion/ui/TextSourceEditor.h"/>
         <FILE id="MotuiTimelineViewcpp" name="TimelineView.cpp" compile="1"
               resource="0" file="Source/motion/ui/TimelineView.cpp"/>
+        <FILE id="MotuiTimeRulerh" name="TimeRuler.h" compile="0" resource="0"
+              file="Source/motion/ui/TimeRuler.h"/>
+        <FILE id="MotuiSourceKindh" name="SourceKind.h" compile="0" resource="0"
+              file="Source/motion/ui/SourceKind.h"/>
         <FILE id="MotTimelineView" name="TimelineView.h" compile="0" resource="0"
               file="Source/motion/ui/TimelineView.h"/>
         <FILE id="MotuiTimelineViewBandscpp" name="TimelineViewBands.cpp" compile="1"

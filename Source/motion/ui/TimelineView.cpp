@@ -1,4 +1,5 @@
 #include "TimelineView.h"
+#include "TimeRuler.h"
 
 MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : processor(ownerProcessor) {
     setName("Composition timeline");
@@ -686,25 +687,17 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(area.removeFromTop(toolsHeight));
     if (showsMarkerBand()) { fillCard(g, markerBandTop(), markerBandHeight, osci::Colours::surfaceRaised(), osci::Colours::surfaceRaised().darker(.15f)); }
-    g.setFont(motion::style::body());
     const auto viewEnd = scrollTime + std::max(0, getWidth() - namesWidth) / pixelsPerSecond;
     const auto grid = processor.document.project().timeGrid();
     const auto step = grid.tickStep(pixelsPerSecond);
-    const auto minorStep = grid.display == motion::TimeDisplay::beats ? grid.snapBeats * 60.0 / grid.bpm : 1.0 / grid.frameRate;
-    if (grid.snapping && minorStep * pixelsPerSecond >= 9 && minorStep < step) {
+    const auto minorStep = grid.snapStep(pixelsPerSecond, step);
+    if (minorStep.has_value()) {
         g.setColour(juce::Colours::white.withAlpha(0.035f));
-        grid.forEachTick(scrollTime, viewEnd, minorStep, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
+        grid.forEachTick(scrollTime, viewEnd, *minorStep, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
     }
-    grid.forEachTick(scrollTime, viewEnd, step, [&](double time) {
-        const auto x = timeX(time);
-        g.setColour(juce::Colours::white.withAlpha(0.06f));
-        g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight()));
-        // A label that would be cut at the right edge is left out.
-        const auto text = juce::String(grid.label(time, step));
-        if (x + 5 + juce::TextLayout::getStringWidth(motion::style::body(), text) > static_cast<float>(getWidth() - 4)) { return; }
-        g.setColour(osci::Colours::text().withAlpha(0.7f));
-        g.drawText(text, x + 5, 0, 70, 26, juce::Justification::centredLeft);
-    });
+    g.setColour(juce::Colours::white.withAlpha(0.06f));
+    grid.forEachTick(scrollTime, viewEnd, step, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
+    motion::ui::paintRulerLabels(g, grid, scrollTime, viewEnd, step, {0, 0, getWidth(), 26}, [this](double time) { return timeX(time); });
     paintLoop(g);
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(0, 0, namesWidth, toolsHeight);

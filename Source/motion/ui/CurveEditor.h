@@ -170,8 +170,9 @@ private:
     juce::Rectangle<float> plot() const {
         return { static_cast<float>(gutter), bandHeight + 6.0f, std::max(1.0f, getWidth() - gutter - 10.0f), std::max(1.0f, getHeight() - bandHeight - 14.0f) };
     }
-    void paintRuler(juce::Graphics& g, double step, double minorStep);
-    void paintGrid(juce::Graphics& g, double step, double minorStep);
+    // `minorStep`: the snap grid, when it is drawn (see TimeGrid::snapStep).
+    void paintRuler(juce::Graphics& g, double step, std::optional<double> minorStep);
+    void paintGrid(juce::Graphics& g, double step, std::optional<double> minorStep);
     void paintReadout(juce::Graphics& g, juce::Point<float> anchor, const juce::String& text);
     // The curve between project times `from` and `to`, sampled `perPixel` times
     // a pixel and exactly at each of `keys` (and just before), so holds jump

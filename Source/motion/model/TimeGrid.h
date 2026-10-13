@@ -41,6 +41,17 @@ struct TimeGrid {
         return std::isfinite(result) ? (result == 0 ? 0.0 : result) : seconds;
     }
 
+    // The grid times snap to, drawn as fine lines between the ticks `tickStep`
+    // apart: none when nothing snaps, or its lines would stand closer than
+    // `closest` pixels.
+    std::optional<double> snapStep(double pixelsPerSecond, double tickStep, double closest = 9) const {
+        if (!snapping) { return std::nullopt; }
+        const auto subdivision = std::isfinite(snapBeats) && snapBeats > 0 ? snapBeats : 0.25;
+        const auto step = display == TimeDisplay::beats ? positiveProduct(beatSeconds(), subdivision) : frameSeconds();
+        if (!(step * pixelsPerSecond >= closest) || !(step < tickStep)) { return std::nullopt; }
+        return step;
+    }
+
     double tickStep(double pixelsPerSecond) const {
         const auto scale = std::isfinite(pixelsPerSecond) && pixelsPerSecond > 0 ? pixelsPerSecond : 75.0;
         const auto target = positiveQuotient(75.0, scale);

@@ -1,5 +1,6 @@
 #include <limits>
 #include "CurveEditor.h"
+#include "TimeRuler.h"
 #include "MenuIcons.h"
 
 MotionCurveEditor::MotionCurveEditor(MotionProcessor& processor) : processor(processor) {
@@ -131,7 +132,7 @@ juce::Path MotionCurveEditor::curvePath(double from, double to, float perPixel, 
     return path;
 }
 
-void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, double minorStep) {
+void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, std::optional<double> minorStep) {
     const auto area = plot();
     const auto grid = processor.document.project().timeGrid();
     // Whole-pixel hairlines stay crisp; minor lines sit at half strength.
@@ -139,7 +140,7 @@ void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, double minorSt
         g.setColour(juce::Colours::white.withAlpha(alpha));
         g.fillRect(std::round(timeX(time)), area.getY(), 1.0f, area.getHeight());
     };
-    grid.forEachTick(viewStart, viewEnd, minorStep, [&](double time) { vertical(time, .022f); });
+    if (minorStep.has_value()) { grid.forEachTick(viewStart, viewEnd, *minorStep, [&](double time) { vertical(time, .022f); }); }
     grid.forEachTick(viewStart, viewEnd, step, [&](double time) { vertical(time, .05f); });
     const auto valueTick = valueStep(high - low, std::max(3, juce::roundToInt(area.getHeight() / 30)));
     const auto decimals = std::clamp(static_cast<int>(-std::floor(std::log10(valueTick))), 0, 6);
@@ -159,24 +160,19 @@ void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, double minorSt
     }
 }
 
-// The Timeline's ruler: labels left-aligned on major ticks, short marks
-// between them, scrubbed by dragging.
-void MotionCurveEditor::paintRuler(juce::Graphics& g, double step, double minorStep) {
+// The Timeline's ruler: labels left-aligned on major ticks, short marks on
+// the snap grid between them, scrubbed by dragging.
+void MotionCurveEditor::paintRuler(juce::Graphics& g, double step, std::optional<double> minorStep) {
     const auto grid = processor.document.project().timeGrid();
     juce::Graphics::ScopedSaveState state(g);
     g.reduceClipRegion(juce::Rectangle<int>(gutter, 0, getWidth() - gutter, bandHeight));
-    grid.forEachTick(viewStart, viewEnd, minorStep, [&](double time) {
+    if (minorStep.has_value()) {
         g.setColour(juce::Colours::white.withAlpha(.16f));
-        g.fillRect(std::round(timeX(time)), bandHeight - 4.0f, 1.0f, 4.0f);
-    });
-    g.setFont(motion::style::body());
-    grid.forEachTick(viewStart, viewEnd, step, [&](double time) {
-        const auto x = std::round(timeX(time));
-        g.setColour(juce::Colours::white.withAlpha(.3f));
-        g.fillRect(x, bandHeight - 8.0f, 1.0f, 8.0f);
-        g.setColour(osci::Colours::text().withAlpha(.7f));
-        g.drawText(juce::String(grid.label(time, step)), juce::roundToInt(x) + 5, 0, 70, bandHeight - 4, juce::Justification::centredLeft);
-    });
+        grid.forEachTick(viewStart, viewEnd, *minorStep, [&](double time) { g.fillRect(std::round(timeX(time)), bandHeight - 4.0f, 1.0f, 4.0f); });
+    }
+    g.setColour(juce::Colours::white.withAlpha(.3f));
+    grid.forEachTick(viewStart, viewEnd, step, [&](double time) { g.fillRect(std::round(timeX(time)), bandHeight - 8.0f, 1.0f, 8.0f); });
+    motion::ui::paintRulerLabels(g, grid, viewStart, viewEnd, step, {gutter, 0, getWidth() - gutter, bandHeight - 4}, [this](double time) { return std::round(timeX(time)); });
 }
 
 // A readout beside a key, above it or below when there is no room: the
@@ -225,7 +221,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     const auto area = plot();
     const auto grid = processor.document.project().timeGrid();
     const auto step = grid.tickStep(area.getWidth() / (viewEnd - viewStart));
-    const auto minorStep = step / 2;
+    const auto minorStep = grid.snapStep(area.getWidth() / (viewEnd - viewStart), step);
     // The clip's playing span is the stage, lit; time it never plays is shaded.
     const auto clipStart = clip->start, clipEnd = clip->end();
     const auto stageLeft = std::clamp(timeX(clipStart), area.getX(), area.getRight());
