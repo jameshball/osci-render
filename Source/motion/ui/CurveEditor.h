@@ -277,6 +277,8 @@ private:
     std::vector<KeyRef> companions;      // Additional selected keys on any curve of the group.
     std::optional<juce::Rectangle<float>> marquee;
     juce::Point<float> marqueeStart;
+    // What a Shift-dragged marquee adds its keys to.
+    std::vector<KeyRef> marqueeBase;
     std::optional<Drag> drag;
     std::optional<double> snapGuide;     // Project time of the magnet a drag is snapped to.
     osci::PlayheadStrip playheadStrip;

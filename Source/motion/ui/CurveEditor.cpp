@@ -574,6 +574,12 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     const auto previousPrimary = primaryKey();
+    // Shift on empty space keeps what is selected, for a box to add to.
+    marqueeBase.clear();
+    if (!hit.has_value() && event.mods.isShiftDown()) {
+        marqueeBase = companions;
+        if (previousPrimary.has_value()) { marqueeBase.push_back(*previousPrimary); }
+    }
     if (hit.has_value() && isSelected(hit->property, hit->time)) {
         // Grabbing a selected key keeps the group and makes it primary.
         std::erase(companions, *hit);
@@ -684,21 +690,25 @@ void MotionCurveEditor::scrubTo(float x, juce::ModifierKeys modifiers) {
 void MotionCurveEditor::mouseDrag(const juce::MouseEvent& event) {
     if (scrubbing) { scrubTo(event.position.x, event.mods); return; }
     if (marquee.has_value()) {
-        // The box selects across every curve of the group; the first key on
-        // the primary curve becomes primary.
+        // The box selects across every curve of the group (added to what was
+        // selected, with Shift); the first key on the primary curve becomes
+        // primary.
         marquee = juce::Rectangle<float>(marqueeStart, event.position);
         const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
         selectedTime.reset();
         companions.clear();
+        const auto select = [this](const KeyRef& key) {
+            if (key.property == propertyName && !selectedTime.has_value()) {
+                selectedTime = key.time;
+            } else if (std::find(companions.begin(), companions.end(), key) == companions.end() && !(key.property == propertyName && selectedTime == key.time)) {
+                companions.push_back(key);
+            }
+        };
+        for (const auto& key : marqueeBase) { select(key); }
         if (clip.has_value()) {
             for (const auto& name : groupNames(*clip)) {
                 for (const auto& key : clip->curve(name)->keyframes()) {
-                    if (!marquee->contains(keyPoint(*clip, key))) { continue; }
-                    if (name == propertyName && !selectedTime.has_value()) {
-                        selectedTime = key.time;
-                    } else {
-                        companions.push_back({ name, key.time });
-                    }
+                    if (marquee->contains(keyPoint(*clip, key))) { select({name, key.time}); }
                 }
             }
         }
