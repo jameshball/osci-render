@@ -181,7 +181,11 @@ try:
     step("change intensity without saving", "set-value", intensity()["ref"], "9")
     step("disable upsampling without saving", "click", "--name", "Upsample Audio", "--exact")
     step("change settle without saving", "set-value", scope_field("settle")["ref"], "0")
-    open_project()
+    # Reopening asks before the unsaved changes go.
+    session.open_project(project)
+    command("wait-for-locator", "--name", "Discard", "--exact")
+    step("discard unsaved changes", "click", "--name", "Discard", "--exact")
+    command("wait-for-locator", "--name", "Hero diamond.obj", "--class", "juce::Label", "--exact")
     open_scope()
     seek(10)
     assert abs(float(intensity()["value"]) - 2) < .001, intensity()["value"]

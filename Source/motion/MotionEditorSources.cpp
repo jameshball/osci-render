@@ -458,7 +458,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             if (request.replacement != nullptr) {
                 const auto& assets = document.project().assets;
                 if (std::find(assets.begin(), assets.end(), request.replacement) == assets.end()) {
-                    owner->statusBar.show("The source changed while baking. Its previous result has been kept.");
+                    owner->statusBar.show("The source changed while baking. Its previous result has been kept.", MotionStatusBar::Kind::warning);
                     return;
                 }
                 asset->id = request.replacement->id;
@@ -633,7 +633,7 @@ void MotionEditor::showTextEditor(SourceRequest request) {
             const auto& assets = owner->processor.document.project().assets;
             const auto id = next.replacement->id;
             const auto found = motion::findAsset(assets, id);
-            if (found == nullptr) { owner->statusBar.show("The text source was removed while it was being edited."); return; }
+            if (found == nullptr) { owner->statusBar.show("The text source was removed while it was being edited.", MotionStatusBar::Kind::warning); return; }
             auto settings = found->textSettings;
             settings.family = chosen.family;
             settings.style = chosen.style;
@@ -760,12 +760,12 @@ void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView
         // The picks index the shapes the Scene showed; a source prepared
         // since then may hold others.
         if (drawing == nullptr || asset->source != chosen.source) {
-            statusBar.show("The object changed. Pick its parts again.");
+            statusBar.show("The object changed. Pick its parts again.", MotionStatusBar::Kind::notice);
             return;
         }
         const auto split = motion::parts::split(*drawing, chosen.shapes);
         if (!split.has_value()) {
-            statusBar.show("Pick some of the object's parts, not all of them.");
+            statusBar.show("Pick some of the object's parts, not all of them.", MotionStatusBar::Kind::notice);
             return;
         }
         // Both halves are small vector sources, prepared here so the split

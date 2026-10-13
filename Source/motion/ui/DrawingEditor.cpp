@@ -258,6 +258,11 @@ bool MotionDrawingEditor::keyPressed(const juce::KeyPress& key) {
         if (key.getModifiers().isShiftDown()) { redo(); } else { undo(); }
         return true;
     }
+    // Cmd+Return applies, as in the other editors in the Scene.
+    if (command && key.getKeyCode() == juce::KeyPress::returnKey) {
+        finish();
+        return true;
+    }
     // Other shortcuts would act on the timeline behind the drawing.
     if (command) { return key.getKeyCode() != 'S'; }
     if (key == juce::KeyPress::returnKey) { finishStroke(); changed(); return true; }

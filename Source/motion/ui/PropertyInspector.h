@@ -30,8 +30,6 @@ public:
     // Double-clicking a camera's name renames it.
     std::function<void(motion::Id, const juce::String&)> onRename;
 
-    // Embedded inspectors (e.g. in the camera panel) supply their own title.
-    // Distinguishes controls of several inspectors for automation and access.
     // A section above the property rows (the clip's timing), sized by
     // `height`; 0 hides it.
     void setLead(juce::Component* component, std::function<int()> height);

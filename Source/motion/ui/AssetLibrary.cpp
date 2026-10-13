@@ -131,7 +131,10 @@ void MotionAssetLibrary::paint(juce::Graphics& graphics) {
     if (assets.empty() && definitions.empty()) {
         graphics.setColour(osci::Colours::text().withAlpha(0.6f));
         graphics.setFont(motion::style::body());
-        graphics.drawFittedText("Drop files here", list.getBounds().reduced(12), juce::Justification::centred, 3);
+        // Empty, or nothing found: which says what to do.
+        const auto filter = search.getText().trim();
+        const auto message = filter.isEmpty() ? juce::String("Drop files here") : "No sources match " + juce::String::fromUTF8("\xe2\x80\x9c") + filter + juce::String::fromUTF8("\xe2\x80\x9d");
+        graphics.drawFittedText(message, list.getBounds().reduced(12), juce::Justification::centred, 3);
     }
 }
 

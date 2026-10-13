@@ -1186,6 +1186,8 @@ std::function<void(MotionEditor::PopoverEdit)> MotionEditor::popoverEdit(juce::C
                     return;
                 }
                 if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); }
+            } else {
+                owner->statusBar.show("The project changed while this was open, so nothing was changed. Try again.", MotionStatusBar::Kind::warning);
             }
             dismissPopover(popover.getComponent());
         });
@@ -1658,13 +1660,16 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     curveProperties.clear();
     const auto* effect = motion::findEffect(processor.document.project(), id);
     const auto parameterless = effect != nullptr && motion::effectDefinition(effect->type) != nullptr && motion::effectDefinition(effect->type)->parameters.empty();
-    if (parameterless || !motion::findPropertyTarget(processor.document.project(), id).has_value()) {
-        // Nothing selected, or an effect without parameters: nothing to graph.
+    // Nothing selected, or nothing of it to graph (an effect without parameters).
+    const auto nothingToGraph = [this] {
         curveTarget = 0;
         curveEditor.setSelection(0, {});
         routingPanel.setTarget(0, {});
         refreshCurveList();
         layoutGraphSide();
+    };
+    if (parameterless || !motion::findPropertyTarget(processor.document.project(), id).has_value()) {
+        nothingToGraph();
         return;
     }
     const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
@@ -1689,6 +1694,10 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
         for (const auto& spec : motion::luaSliderSpecs) {
             if (target->properties != nullptr && target->properties->contains(spec.id)) { add(spec.id); }
         }
+    }
+    if (curveProperties.empty()) {
+        nothingToGraph();
+        return;
     }
     const auto previousTarget = curveEditor.viewState().target;
     // Opening a new target shows its first animated channel unless one was asked for.

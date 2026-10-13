@@ -90,20 +90,6 @@ int main() {
     frame = clipTransformFrame(project, 2, 2);
     check(frame.has_value() && near(frame->worldOrigin, {5, 4, 3}), "clip keys use offset/rate local time and ancestors use project time");
 
-    auto effect = makeEffect(5, effectCatalog().front());
-    effect.range = EffectRange {1, 2};
-    project.tracks[0].clips[0].effects.push_back(effect);
-    check(!clipTransformFrame(project, 2, 2)->hasPostTransformEffects, "pre-transform clip effects do not invalidate affine position mapping");
-    project.tracks[0].effects.push_back(effect);
-    check(clipTransformFrame(project, 2, 2)->hasPostTransformEffects, "active track effect is detected at project time");
-    check(!clipTransformFrame(project, 2, 3)->hasPostTransformEffects, "effect range end is exclusive");
-    project.tracks[0].effects[0].properties["strength"] = Curve(0);
-    check(!clipTransformFrame(project, 2, 2)->hasPostTransformEffects, "zero strength is inactive");
-    project.groups[0].effects.push_back(effect);
-    check(clipTransformFrame(project, 2, 2)->hasPostTransformEffects, "ancestor effects are detected");
-    project.groups[0].effects[0].enabled = false;
-    project.effects.push_back(effect);
-    check(clipTransformFrame(project, 2, 2)->hasPostTransformEffects, "composition effects are detected");
 
     check(!clipTransformFrame(project, 999, 0), "missing clip is unavailable");
     check(!clipTransformFrame(project, 2, std::numeric_limits<double>::infinity()), "nonfinite time is unavailable");

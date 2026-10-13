@@ -46,19 +46,6 @@ std::optional<Affine> evaluate(const PropertyMap& properties, double time) {
         { values[6], values[7], values[8] },
         { values[anchorIndex], values[anchorIndex + 1], values[anchorIndex + 2] } };
 }
-inline bool hasEffects(const std::vector<EffectInstance>& effects, double time) {
-    for (const auto& effect : effects) {
-        if (!effect.enabled || (effect.range.has_value() && (time < effect.range->start || time >= effect.range->end()))) {
-            continue;
-        }
-        const auto strength = effect.properties.find("strength");
-        // Unknown/malformed effects are conservatively treated as active.
-        if (strength == effect.properties.end()) { return true; }
-        const auto value = strength->second.evaluate(time);
-        if (!std::isfinite(value) || value > 0) { return true; }
-    }
-    return false;
-}
 }
 
 struct TransformFrame {
@@ -66,7 +53,6 @@ struct TransformFrame {
     // Columns of the parent's linear transform, including scale/shear from
     // nested rotated non-uniform scales. These are deliberately not normalized.
     std::array<Vec3, 3> parentBasis { Vec3 { 1, 0, 0 }, Vec3 { 0, 1, 0 }, Vec3 { 0, 0, 1 } };
-    bool hasPostTransformEffects = false;
 
     std::optional<Vec3> positionDelta(Vec3 worldDelta) const {
         if (!worldDelta.finite()) { return std::nullopt; }
@@ -100,7 +86,6 @@ struct TransformFrame {
                 basis = parent->direction(basis);
                 if (!basis.finite()) { return false; }
             }
-            hasPostTransformEffects = hasPostTransformEffects || transform_detail::hasEffects(group->effects, projectTime);
             groupId = group->parent;
         }
         for (const auto axis : { Vec3 { 1, 0, 0 }, Vec3 { 0, 1, 0 }, Vec3 { 0, 0, 1 } }) {
@@ -132,8 +117,6 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
             if (!own.has_value()) { return std::nullopt; }
             TransformFrame frame;
             frame.worldOrigin = own->position;
-            frame.hasPostTransformEffects = transform_detail::hasEffects(track.effects, projectTime)
-                || transform_detail::hasEffects(project.effects, projectTime);
             if (!frame.addGroups(project, track.group, projectTime)) { return std::nullopt; }
             return frame;
         }
@@ -152,7 +135,6 @@ std::optional<TransformFrame> groupTransformFrame(const ProjectType& project, Id
     if (!own.has_value()) { return std::nullopt; }
     TransformFrame frame;
     frame.worldOrigin = own->position;
-    frame.hasPostTransformEffects = transform_detail::hasEffects(group->effects, projectTime) || transform_detail::hasEffects(project.effects, projectTime);
     if (!frame.addGroups(project, group->parent, projectTime)) { return std::nullopt; }
     return frame;
 }

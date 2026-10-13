@@ -229,7 +229,7 @@ private:
     static std::optional<juce::Colour> labelColour(const motion::Track& track);
     juce::Colour clipColour(const motion::Clip& clip, const motion::Track& track) const;
     // Project times of every key on a clip, restricted to its visible interval.
-    std::vector<double> clipKeyTimes(const motion::Clip& clip, const std::string& property = {}) const;
+    std::vector<double> clipKeyTimes(const motion::Clip& clip) const;
     void paintClip(juce::Graphics& g, const motion::Clip& clip, const motion::Track& track, int index, float opacity) const;
     // The beam's shares across the visible time, one value per column.
     static constexpr int beamStep = 4;
@@ -299,10 +299,9 @@ private:
     // One row: a track's or group's card and clips, or a keyframe lane.
     void paintRow(juce::Graphics& g, int visible);
     void fillCard(juce::Graphics& g, int y, int height, juce::Colour header, std::optional<juce::Colour> lane) const;
-    bool showsCameraBand() const { return true; }
     // Matches the add-track button above it.
     juce::Rectangle<int> addCameraBounds() const { return {namesWidth - 26, cameraBandTop(), 22, cameraBandHeight}; }
-    bool inCameraBand(int y) const { return showsCameraBand() && y >= cameraBandTop() && y < cameraBandTop() + cameraBandHeight; }
+    bool inCameraBand(int y) const { return y >= cameraBandTop() && y < cameraBandTop() + cameraBandHeight; }
     juce::Rectangle<int> cutBounds(const motion::CameraCut& cut) const;
     static juce::Colour cameraColour(const motion::Project& project, motion::Id camera);
     juce::String cameraName(motion::Id camera) const;

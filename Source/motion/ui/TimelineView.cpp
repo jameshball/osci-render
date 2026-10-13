@@ -131,7 +131,7 @@ void MotionTimelineView::groupSelectedTracks() { groupTracks(tracksToGroup()); }
 
 void MotionTimelineView::groupTracks(const std::vector<motion::Id>& ids) {
     if (ids.empty()) {
-        if (onError) { onError("Select tracks to group: Cmd-click their names."); }
+        if (onError) { onError("Select tracks to group: " + motion::style::shortcutText("Cmd-click") + " their names."); }
         return;
     }
     const auto& project = processor.document.project();
@@ -829,7 +829,7 @@ void MotionTimelineView::paint(juce::Graphics& g) {
             g.drawText(marker.name, tag.reduced(6, 0).toNearestInt(), juce::Justification::centredLeft, true);
         }
     }
-    if (showsCameraBand()) { paintCameraBand(g); }
+    paintCameraBand(g);
     if (snapGuide.has_value()) {
         const auto x = timeX(*snapGuide);
         if (x >= namesWidth && x <= getWidth()) {
@@ -1306,7 +1306,7 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
     }
     if (beamTarget.has_value()) {
         setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
-        setTooltip("Beam: drag up to give this object more of the beam's time, down to give it less. Cmd-click adds a key.");
+        setTooltip("Beam: drag up to give this object more of the beam's time, down to give it less. " + motion::style::shortcutText("Cmd-click") + " adds a key.");
         return;
     }
     int row = 0;
@@ -1320,13 +1320,23 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
     if (getTooltip() != tip) { setTooltip(tip); }
     const auto hovered = clip != nullptr ? clip->id : 0;
     if (hovered != hoveredClip) { hoveredClip = hovered; repaint(); }
+    const auto inBand = inCameraBand(event.y) && event.x >= namesWidth;
+    const auto* hoveredCut = inBand ? cutAt(event.getPosition()) : nullptr;
+    const auto* hoveredMarker = markerAt(event.getPosition());
     if (event.y < rulerHeight && event.x < namesWidth) {
         setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    } else if (inCameraBand(event.y) && event.x >= namesWidth && cameraKeyAt(event.x).has_value()) {
+    } else if (inBand && cameraKeyAt(event.x).has_value()) {
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
         setTooltip("Camera key: drag to move, Delete to remove");
-    } else if (markerAt(event.getPosition()) != nullptr) {
+    } else if (hoveredCut != nullptr) {
+        // As cameraBandDown takes it: an end resizes the shot, the middle moves it.
+        const auto bounds = cutBounds(*hoveredCut);
+        const auto edge = std::abs(event.x - bounds.getX()) <= 5 || std::abs(event.x - bounds.getRight()) <= 5;
+        setMouseCursor(edge ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor);
+        setTooltip(cameraName(hoveredCut->camera) + ": drag to move this shot, drag an end to change when it cuts; right-click for more");
+    } else if (hoveredMarker != nullptr) {
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+        setTooltip(hoveredMarker->name + ": drag to move, double-click to edit, right-click for more");
     } else if (clip != nullptr) {
         const auto bounds = clipBounds(*clip, row);
         const bool edge = event.x < bounds.getX() + 8 || event.x > bounds.getRight() - 8;
@@ -2030,12 +2040,11 @@ juce::Colour MotionTimelineView::clipColour(const motion::Clip& clip, const moti
     return motion::style::visualClip();
 }
 
-std::vector<double> MotionTimelineView::clipKeyTimes(const motion::Clip& clip, const std::string& property) const {
+std::vector<double> MotionTimelineView::clipKeyTimes(const motion::Clip& clip) const {
     std::vector<double> times;
     const auto timing = clip.timing(processor.document.project().tempo());
     if (!(timing.rate != 0)) { return times; }
     for (const auto& [name, curve] : clip.properties) {
-        if (!property.empty() && name != property) { continue; }
         for (const auto& key : curve.keyframes()) {
             const auto time = timing.projectTime(key.time);
             if (time >= timing.start - 1.0e-9 && time <= timing.end() + 1.0e-9) { times.push_back(time); }
@@ -3569,7 +3578,7 @@ void MotionTimelineView::ensureTrackRows() const {
     // Any change (an undo among them): what is selected and gone is let go.
     if (!layoutRevision.has_value() || *layoutRevision != revision) {
         const auto& project = processor.document.project();
-        rulerHeight = cameraBandTop() + (showsCameraBand() ? cameraBandHeight + bandGap : 0);
+        rulerHeight = cameraBandTop() + cameraBandHeight + bandGap;
         if (std::none_of(project.markers.begin(), project.markers.end(), [this](const auto& marker) { return marker.id == selectedMarker; })) { selectedMarker = 0; }
         if (std::none_of(project.cameraCuts.begin(), project.cameraCuts.end(), [this](const auto& cut) { return cut.id == selectedCut; })) { selectedCut = 0; }
         if (selectedCameraKey.has_value() && std::none_of(project.cameras.begin(), project.cameras.end(), [this](const auto& camera) { return camera.id == selectedCameraKey->first; })) { selectedCameraKey.reset(); }

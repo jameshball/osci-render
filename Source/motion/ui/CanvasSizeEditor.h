@@ -48,7 +48,7 @@ public:
     }
     std::optional<VisualiserRenderSize> value() const {
         const auto w = juce::roundToInt(width.getValue()), h = juce::roundToInt(height.getValue());
-        if (w < 128 || w > 4096 || h < 128 || h > 4096 || w % 2 != 0 || h % 2 != 0) { return std::nullopt; }
+        if (w < smallest || w > largest || h < smallest || h > largest || w % 2 != 0 || h % 2 != 0) { return std::nullopt; }
         return VisualiserRenderSize { w, h };
     }
     void resized() override {
@@ -77,7 +77,9 @@ private:
     }
     int caption, row, gap;
     juce::ComboBox preset;
-    static constexpr motion::PropertySpec sizeSpec {"size", "Size", "", "", 2, 8192, 1024, 2, 0, " px"};
+    // Sizes the renderer takes: even, from 128 to 4096 pixels.
+    static constexpr int smallest = 128, largest = 4096;
+    static constexpr motion::PropertySpec sizeSpec {"size", "Size", "", "", smallest, largest, 1024, 2, 0, " px"};
     juce::Label presetLabel { "Canvas preset caption", "Preset" }, widthLabel { "Video width caption", "Width" }, heightLabel { "Video height caption", "Height" };
     motion::ui::ScrubField width, height;
 };
