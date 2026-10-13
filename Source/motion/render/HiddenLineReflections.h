@@ -349,10 +349,8 @@ private:
                 const auto& sb = *onScreen[first + b];
                 const auto& sm = *onScreen[first + middle];
                 auto stray = std::hypot(sm.x - (sa.x + (sb.x - sa.x) * share), sm.y - (sa.y + (sb.y - sa.y) * share)) / (.25 * DepthBuffer::pixel);
-                for (std::size_t channel = 0; channel < 3; ++channel) {
-                    const auto straight = colours[a][channel] + (colours[b][channel] - colours[a][channel]) * share;
-                    stray = std::max(stray, static_cast<double>(std::abs(colours[middle][channel] - straight)) * 128);
-                }
+                const auto straight = mixed(colours[a], colours[b], share);
+                for (std::size_t channel = 0; channel < 3; ++channel) { stray = std::max(stray, static_cast<double>(std::abs(colours[middle][channel] - straight[channel])) * 128); }
                 return stray;
             }, kept, pending);
             const auto endAt = [&](std::size_t inside, std::size_t outside) {
