@@ -460,10 +460,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     const auto reflecting = composition.reflects(time);
     const auto restyling = composition.restyles(time);
     // How much the camera shades by hatching over its frame rather than by
-    // brightness.
-    const auto hatching = camera != nullptr && view.has_value() ? camera->hatching(time) : 0.0;
-    const auto frameHatching = from == nullptr ? hatching : 0.0;
-    if (!hides && !lit && !reflecting && !restyling && !(hatching > 0)) { return frame; }
+    // brightness: none seen from another eye.
+    const auto frameHatching = from == nullptr && camera != nullptr && view.has_value() ? camera->hatching(time) : 0.0;
+    if (!hides && !lit && !reflecting && !restyling && !(frameHatching > 0)) { return frame; }
     std::vector<SceneItem> items;
     for (std::size_t index = 0; index < composition.clips.size(); ++index) {
         const auto& clip = composition.clips[index];
@@ -854,6 +853,9 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
             lostBy[surface] = 1;
             continue;
         }
+        // Drawn just as it is: nothing hides its lines, lights them or draws
+        // them again.
+        if (!hiding && !lit && item.styled == nullptr && !(item.mirrors > 0)) { continue; }
         auto& kept = keptBy[surface];
         bool lost = false;
         recording = surface + 1 < items.size() || !crossings.empty();
