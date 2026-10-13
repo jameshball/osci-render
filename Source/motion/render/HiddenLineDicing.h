@@ -37,11 +37,24 @@ public:
     void setReach(Reach value) { reach = value; }
 
     // `bend` places a source point on screen; `emit` takes each piece, and
-    // whether it is whole (rather than cut where it comes into view).
+    // whether it is whole (rather than cut where it comes into view). A face
+    // can take many pieces, so `cancelled` is asked every so often; false
+    // once it stops the dicing.
+    template <typename Bend, typename Emit, typename Cancelled>
+    bool dice(const DiceCorner& a, const DiceCorner& b, const DiceCorner& c, Bend&& bend, Emit&& emit, Cancelled&& cancelled) {
+        midpoints.clear();
+        stopped = false;
+        std::size_t emitted = 0;
+        auto asked = [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, bool whole) {
+            if ((++emitted & 1023) == 0 && cancelled()) { stopped = true; }
+            if (!stopped) { emit(p, q, r, whole); }
+        };
+        halve(a, b, c, deepest, true, cell * cell, bend, asked);
+        return !stopped;
+    }
     template <typename Bend, typename Emit>
     void dice(const DiceCorner& a, const DiceCorner& b, const DiceCorner& c, Bend&& bend, Emit&& emit) {
-        midpoints.clear();
-        halve(a, b, c, deepest, true, cell * cell, bend, emit);
+        dice(a, b, c, bend, emit, [] { return false; });
     }
 
 private:
@@ -92,7 +105,7 @@ private:
     // grids again, so the grid's points are never overwritten while in use).
     template <typename Bend, typename Emit>
     void halve(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, int depthLeft, bool mayGrid, double limit, Bend& bend, Emit& emit) {
-        if (offFrame(p, q, r)) { return; }
+        if (stopped || offFrame(p, q, r)) { return; }
         const auto pq = lengthSquared(p, q), qr = lengthSquared(q, r), rp = lengthSquared(r, p);
         const auto longest = std::max({pq, qr, rp});
         // Partly behind the eye, a piece is halved only so far, then cut
@@ -271,6 +284,7 @@ private:
     }
 
     MidpointCache<DiceCorner> midpoints;
+    bool stopped = false;
     std::vector<DiceCorner> points;
     Reach reach;
 };

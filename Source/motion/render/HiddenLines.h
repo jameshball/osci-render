@@ -260,14 +260,15 @@ bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::ve
                 continue;
             }
             // Diced point by point into pieces flat enough, once bent, to draw.
-            dicer.dice({mesh.vertices[triangle[0]], projection(a)}, {mesh.vertices[triangle[1]], projection(b)}, {mesh.vertices[triangle[2]], projection(c)},
+            const auto diced = dicer.dice({mesh.vertices[triangle[0]], projection(a)}, {mesh.vertices[triangle[1]], projection(b)}, {mesh.vertices[triangle[2]], projection(c)},
                 [&](const osci::Point& point) { return projection(seen(place(item, point))); },
                 [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, bool flat) {
                     depth.triangle(*p.at, *q.at, *r.at);
                     // A piece cut at the near plane reaches far off the
                     // screen: only whole pieces are told of.
                     if (flat) { whole(surface, std::array<Vec3, 3> {projection.unproject(*p.at), projection.unproject(*q.at), projection.unproject(*r.at)}, std::array<osci::Point, 3> {p.source, q.source, r.source}); }
-                });
+                }, cancelled);
+            if (!diced) { return false; }
         }
     }
     return true;

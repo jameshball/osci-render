@@ -320,6 +320,13 @@ public:
             // as long however often it is halved, so halving it stops there.
             const auto crushed = dice([&](const osci::Point& point) { return through(osci::Point(std::round(point.x * 8) / 8, std::round(point.y * 8) / 8, point.z)); });
             expect(crushed > 0 && crushed < 100000, "a stepped face is cut into a bounded number of pieces (" + juce::String(static_cast<int>(crushed)) + ")");
+            // A bake that stops partway through a face stops its dicing too.
+            const auto bulge = [&](const osci::Point& point) { return through(osci::Point(point.x, point.y, point.z - .3f * (1 - point.x * point.x) * (1 - point.y * point.y))); };
+            const auto corner = [&](float x, float y) { const osci::Point point(x, y, 2); return motion::hidden::DiceCorner {point, bulge(point)}; };
+            motion::hidden::Dicer dicer;
+            std::size_t pieces = 0;
+            const auto finished = dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), bulge, [&](const auto&, const auto&, const auto&, bool) { ++pieces; }, [] { return true; });
+            expect(!finished && pieces < 1024, "a cancelled face stops being diced (" + juce::String(static_cast<int>(pieces)) + " pieces)");
         }
 
         beginTest("A bake reuses a frame for a time that depends on just the same");
