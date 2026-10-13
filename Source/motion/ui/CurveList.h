@@ -74,10 +74,14 @@ public:
         header.removeFromLeft(10);
         header.removeFromRight(animatedOnly.getWidth() + 10);
         if (ownerName.isNotEmpty()) {
-            g.setColour(osci::Colours::textMuted());
-            g.setFont(motion::style::caption());
+            // Its kind first, when the name still fits beside it.
             const auto kindWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), ownerKind) + 6;
-            g.drawText(ownerKind, header.removeFromLeft(kindWidth), juce::Justification::centredLeft, false);
+            const auto nameWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::title(), ownerName);
+            if (kindWidth + nameWidth <= header.getWidth()) {
+                g.setColour(osci::Colours::textMuted());
+                g.setFont(motion::style::caption());
+                g.drawText(ownerKind, header.removeFromLeft(kindWidth), juce::Justification::centredLeft, false);
+            }
             g.setColour(osci::Colours::text());
             g.setFont(motion::style::title());
             g.drawText(ownerName, header, juce::Justification::centredLeft, true);
