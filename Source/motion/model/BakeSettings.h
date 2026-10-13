@@ -8,6 +8,8 @@ struct BakeSettings {
     std::size_t pointsPerFrame = 1024;
     std::uint32_t seed = 0;
 
+    bool operator==(const BakeSettings&) const = default;
+
     std::uint64_t frameCount() const {
         const auto count = std::ceil(duration * frameRate);
         return std::isfinite(count) && count > 0 && count <= PreparedPointFrames::maximumFrames

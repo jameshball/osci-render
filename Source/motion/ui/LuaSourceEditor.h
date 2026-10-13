@@ -114,10 +114,7 @@ public:
         }
         // Escape leaves untouched code; edits need Cancel, so work is never lost.
         if (key == juce::KeyPress::escapeKey) {
-            const auto& now = baking.currentSettings();
-            const auto sameSettings = now.duration == originalSettings.duration && now.frameRate == originalSettings.frameRate && now.bpm == originalSettings.bpm
-                && now.pointsPerFrame == originalSettings.pointsPerFrame && now.seed == originalSettings.seed;
-            if (model.getCode() == original && sameSettings && onCancel) { onCancel(); }
+            if (model.getCode() == original && baking.currentSettings() == originalSettings && onCancel) { onCancel(); }
             return true;
         }
         // Other shortcuts would act on the timeline behind the editor.
