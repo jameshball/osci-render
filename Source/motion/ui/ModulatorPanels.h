@@ -73,10 +73,18 @@ inline void paintModulatorShape(juce::Graphics& g, const Modulator& modulator, j
     } else {
         auto shape = modulator.shape;
         shape.phase = 0;
+        // Random ones over more cycles, so they read as random, and spread
+        // to the height like the rest (a few values seldom reach it).
+        const auto random = shape.waveform == ModulationWaveform::noiseSmooth || shape.waveform == ModulationWaveform::noiseHold;
+        const auto cycles = random ? 6.0 : 2.0;
         const auto steps = static_cast<int>(area.getWidth());
+        std::vector<double> values;
+        for (int step = 0; step <= steps; ++step) { values.push_back(shape.atCycles(static_cast<double>(step) / steps * cycles)); }
+        const auto [low, high] = std::minmax_element(values.begin(), values.end());
+        const auto fit = [&](double value) { return random && *high - *low > 1.0e-6 ? (value - *low) / (*high - *low) * 2 - 1 : value; };
         for (int step = 0; step <= steps; ++step) {
             const auto x = static_cast<double>(step) / steps;
-            const auto y = shape.atCycles(x * 2) * .9;
+            const auto y = fit(values[static_cast<std::size_t>(step)]) * .9;
             if (step == 0) { path.startNewSubPath(point(x, y)); } else { path.lineTo(point(x, y)); }
         }
     }

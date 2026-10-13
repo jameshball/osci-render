@@ -281,7 +281,7 @@ void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
     area.removeFromLeft(motion::style::padding);
     g.setFont(motion::style::caption());
     g.setColour(routes == 0 ? osci::Colours::textMuted().withAlpha(.7f) : motion::style::result());
-    g.drawText(routes == 0 ? juce::String("Not routed") : routes == 1 ? juce::String("Drives 1") : "Drives " + juce::String(routes), area.removeFromBottom(area.getHeight() / 2), juce::Justification::topLeft, true);
+    g.drawText(routes == 0 ? juce::String("Drives nothing yet") : routes == 1 ? juce::String("Drives 1 property") : "Drives " + juce::String(routes) + " properties", area.removeFromBottom(area.getHeight() / 2), juce::Justification::topLeft, true);
     g.setFont(motion::style::body());
     g.setColour(osci::Colours::text());
     g.drawText(juce::String(modulator.name), area, juce::Justification::bottomLeft, true);
