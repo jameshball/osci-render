@@ -498,6 +498,15 @@ inline Geometry build(const GeneratorDefinition& definition, std::span<const dou
             break;
         }
     }
+    // Faces with no area (at a sphere's poles, where a ring of corners
+    // meets in one point) hide nothing and face no way: left out.
+    std::erase_if(geometry.triangles, [&](const auto& face) {
+        const auto& a = geometry.vertices[face[0]];
+        const auto& b = geometry.vertices[face[1]];
+        const auto& c = geometry.vertices[face[2]];
+        const auto longest = std::max({(b - a).dot(b - a), (c - b).dot(c - b), (a - c).dot(a - c)});
+        return !((b - a).cross(c - a).length() > 1.0e-9 * longest);
+    });
     return geometry;
 }
 }
