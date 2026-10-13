@@ -134,10 +134,7 @@ void MotionEditor::loadProject(const juce::File& file) {
             if (overlay != nullptr) { owner->dismissOverlay(overlay); }
             if (result.failed()) {
                 owner->projectNotLoaded(file);
-                // A check of the file's structure failing says what, then why it might.
-                auto message = result.getErrorMessage();
-                if (message.startsWith("Invalid") || message.containsIgnoreCase("identity")) { message << " The file may be damaged, or saved by a newer osci-motion."; }
-                motion::ui::MessageSheet::show(*owner, "Couldn't open the project", message, "OK", {}, file.getFileName());
+                motion::ui::MessageSheet::show(*owner, "Couldn't open the project", result.getErrorMessage(), "OK", {}, file.getFileName());
                 return;
             }
             if (owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) {

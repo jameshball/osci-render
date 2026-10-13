@@ -3,6 +3,7 @@
 #include <thread>
 #include "../Source/motion/import/FractalPreparation.h"
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/model/ProjectFile.h"
 #include "../Source/motion/model/LightPresets.h"
 #include "../Source/motion/ui/PreviewGesture.h"
 #include "../Source/motion/import/SourceDecoding.h"
@@ -620,6 +621,40 @@ public:
         const auto lines = notes.lines().joinIntoString("\n");
         expect(lines.contains(juce::String(juce::CharPointer_UTF8("Clip property this version doesn't have (\xc3\x97" "2): hilbert, sierpinski"))), lines);
         expect(lines.contains("Effect this version doesn't have: warp-drive"), lines);
+
+        beginTest("A file that can't open at all says why, and what to do");
+        {
+            using Problem = motion::ProjectFile::Problem;
+            const auto problemOf = [](const juce::MemoryBlock& bytes) {
+                motion::ProjectFile file;
+                const auto result = motion::ProjectFile::read(bytes.getData(), bytes.getSize(), file);
+                return std::pair(file.problem, result.getErrorMessage());
+            };
+            const auto saved = [](const juce::XmlElement& project) {
+                juce::MemoryBlock bytes;
+                juce::AudioProcessor::copyXmlToBinary(project, bytes);
+                return bytes;
+            };
+            juce::XmlElement whole("motion-project");
+            whole.setAttribute("schema", 1);
+            whole.addChildElement(new juce::XmlElement(xml));
+            motion::ProjectFile opened;
+            const auto bytes = saved(whole);
+            expect(motion::ProjectFile::read(bytes.getData(), bytes.getSize(), opened).wasOk() && opened.problem == Problem::none);
+            const juce::String text("v 0 0 0\n");
+            const auto [notProject, notProjectWhy] = problemOf(juce::MemoryBlock(text.toRawUTF8(), text.getNumBytesAsUTF8()));
+            expect(notProject == Problem::notProject && notProjectWhy.contains("Add source"), notProjectWhy);
+            auto later = whole;
+            later.setAttribute("schema", 2);
+            const auto [newer, newerWhy] = problemOf(saved(later));
+            expect(newer == Problem::newer && newerWhy.contains("Update osci-motion"), newerWhy);
+            auto truncated = bytes;
+            truncated.setSize(bytes.getSize() / 2);
+            const auto [cut, cutWhy] = problemOf(truncated);
+            expect(cut == Problem::damaged && cutWhy.contains("backup"), cutWhy);
+            motion::ProjectFile missing;
+            expect(motion::ProjectFile::read(juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("no such project.osci-motion"), missing).failed() && missing.problem == Problem::unreadable);
+        }
         testCameras(document);
         testAnimatedSources();
         testEffects(document.project());

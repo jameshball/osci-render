@@ -254,17 +254,16 @@ void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
 }
 
 void MotionProcessor::setStateInformation(const void* data, int size) {
-    const auto failed = [&](const juce::String& reason) {
+    motion::ProjectFile file;
+    const auto result = motion::ProjectFile::read(data, static_cast<std::size_t>(std::max(0, size)), file);
+    if (result.failed()) {
+        // Kept as it was, so a newer or mended osci-motion can still reopen it.
         const juce::MessageManagerLock messageLock;
         unrestoredState = juce::MemoryBlock(data, static_cast<std::size_t>(std::max(0, size)));
         unrestoredGeneration = document.generation();
         unrestoredRevision = document.revision();
-        restoreError = "Your last session couldn't be reopened: " + reason + " It is kept as it was until you change this project.";
-    };
-    motion::ProjectFile file;
-    const auto result = motion::ProjectFile::read(data, static_cast<std::size_t>(std::max(0, size)), file);
-    if (result.failed()) {
-        failed(result.getErrorMessage());
+        const auto why = file.problem == motion::ProjectFile::Problem::newer ? juce::String("a newer osci-motion saved it; update osci-motion to reopen it") : juce::String("what was saved of it is damaged");
+        restoreError = "Your last session couldn't be reopened: " + why + ". It is kept as it was until you change this project; open a saved project to carry on meanwhile.";
         return;
     }
     {
