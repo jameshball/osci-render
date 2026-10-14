@@ -125,8 +125,11 @@ private:
         // by their surface areas times how many triangles each holds,
         // trying a few cuts along the longest side of the centres' box.
         constexpr int bins = 12;
+        // Its bounds start inverted, so any corner widens them. (MSVC
+        // refuses initialisers naming a local constant in a local struct.)
         struct Bin {
-            Vec3 low {largest, largest, largest}, high {-largest, -largest, -largest};
+            Vec3 low {std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
+            Vec3 high {-std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max()};
             std::uint32_t count = 0;
         };
         std::array<Bin, bins> binned {};

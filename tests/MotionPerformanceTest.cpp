@@ -42,7 +42,7 @@ private:
 
     // A mesh from the repository's models, turning once over two seconds.
     static std::shared_ptr<motion::Asset> modelAsset(motion::Id id, const char* model) {
-        const auto file = juce::File(__FILE__).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);
+        const auto file = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);
         auto asset = std::make_shared<motion::Asset>();
         asset->id = id;
         asset->name = model;

@@ -86,7 +86,7 @@ struct ProjectSummary {
             return {};
         }
         juce::MemoryBlock start;
-        stream.readIntoMemoryBlock(start, static_cast<ssize_t>(reach));
+        stream.readIntoMemoryBlock(start, static_cast<int>(reach));
         return peek(start.getData(), start.getSize());
     }
 

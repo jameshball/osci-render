@@ -453,7 +453,7 @@ public:
 
         beginTest("Profile: a frame of real meshes, and baking them");
         for (const auto& [model, bulge] : {std::pair {"teapot.obj", false}, std::pair {"lamp.obj", false}, std::pair {"teapot.obj", true}}) {
-            const auto file = juce::File(__FILE__).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);
+            const auto file = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("Resources/models").getChildFile(model);
             if (!file.existsAsFile()) { continue; }
             auto meshProject = cubeProject(true);
             auto mesh = std::make_shared<motion::Asset>();

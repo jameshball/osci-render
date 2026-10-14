@@ -8,7 +8,7 @@ public:
 
     void runTest() override {
         beginTest("Motion UI text uses only the MotionStyle type styles");
-        const auto root = juce::File(__FILE__).getParentDirectory().getSiblingFile("Source").getChildFile("motion");
+        const auto root = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(__FILE__)).getParentDirectory().getSiblingFile("Source").getChildFile("motion");
         expect(root.isDirectory(), root.getFullPathName());
         // Fonts are defined by MotionStyle; text sources render the user's own font.
         const juce::StringArray allowed {"MotionStyle.h", "TextSettings.h"};
