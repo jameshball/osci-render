@@ -3,6 +3,7 @@
 #include "Recipe.h"
 #include "../render/BeamRenderer.h"
 #include "../render/HiddenLineBaker.h"
+#include "../import/LuaSliderBakes.h"
 #include <atomic>
 #include <memory>
 
@@ -21,6 +22,9 @@ struct Composition {
         const auto read = Recipe::isRecipe(file) ? Recipe::read(file, project.project) : ProjectFile::read(file, project);
         if (read.failed()) { return read; }
         for (const auto& line : project.notes.lines()) { std::cerr << file.getFileName() << ": left out " << line << std::endl; }
+        // Lua sliders bake as the app bakes them.
+        const auto baked = LuaSliderBakes::bakeAll(project.project, &never());
+        if (baked.failed()) { return baked; }
         return prepare(project.project, sampleRate, opened);
     }
     // `sampleRate` 0: the project's own.

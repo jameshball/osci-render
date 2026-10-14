@@ -75,6 +75,15 @@ public:
         expect(result.wasOk(), result.getErrorMessage());
         expect(loaded.tracks[0].clips[0].luaBake != nullptr && loaded.tracks[0].clips[0].luaBake->key == plan->key);
 
+        beginTest("Drawn offline, every Lua clip's sliders bake at once");
+        {
+            auto offline = document.project();
+            offline.tracks.change(0).clips[0].luaBake.reset();
+            const auto baked = motion::LuaSliderBakes::bakeAll(offline, nullptr);
+            expect(baked.wasOk(), baked.getErrorMessage());
+            expect(offline.tracks[0].clips[0].luaBake != nullptr && offline.tracks[0].clips[0].luaBake->key == plan->key, "the same bake the app makes");
+        }
+
         beginTest("A stale saved bake is dropped at load");
         {
             auto xml = document.save();
