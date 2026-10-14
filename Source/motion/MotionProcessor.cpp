@@ -305,14 +305,6 @@ void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlEl
     // with the editor and the live-source owner, after worker preparation.
     const juce::MessageManagerLock messageLock;
     VisualiserState::load(state, visualiserParameters, recordingParameters);
-    // A project from before export settings were its own takes them from
-    // the Scope's recording settings it saved.
-    const auto* composition = state.getChildByName("composition");
-    if (composition != nullptr && composition->getChildByName("export") == nullptr && state.getChildByName("recording") != nullptr) {
-        const auto canvas = recordingParameters.getCanvasSize();
-        prepared.exportSettings = {canvas.width, canvas.height, static_cast<int>(recordingParameters.videoCodec), recordingParameters.getCRF(), recordingParameters.recordAudio.getBoolValue()};
-        if (!prepared.exportSettings.valid()) { prepared.exportSettings = {}; }
-    }
     document.reset(std::move(prepared));
     restoreStandaloneProjectFilePathFromXml(state);
     loadProperties(state);
