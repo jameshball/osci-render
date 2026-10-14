@@ -40,6 +40,18 @@ namespace motion::cli {
 // each by its own amount (added, or multiplied with "mode": "multiply"):
 //   "modulators": [{"name": "Spin", "waveform": "saw", "rate": 0.125, "phase": 0.5,
 //                   "routes": [{"to": "Box", "property": "rotation.y", "amount": 180}]}]
+// A modulator with "waveform": "soundtrack" follows the soundtrack's loudness
+// (0 to 1), and "scope" drives the Scope's beam (intensity, glow...).
+// More, object by object:
+//   {"name": "Title", "text": "Title", "typography": {"family": "", "bold": true, "align": "centre",
+//    "tracking": 0.05, "animation": "rise", "characterDelay": 0.05, "characterDuration": 0.4, "hold": 30}}
+//   {"name": "Song", "file": "song.wav"}                      (an audio file: a soundtrack track)
+//   {"name": "Sketch", "file": "sketch.lua", "bake": {"duration": 4, "pointsPerFrame": 2048}}
+//   "effects": [{"type": "vortex", "properties": {"strength": 1}, "keys": {"strength": [[0, 1], [2, 0]]}}]
+// "effects" on the recipe itself apply to everything. Several cameras, cut
+// between in time (each cut {"camera", "start", "duration"}):
+//   "cameras": [{"name": "Wide", ...as "camera"...}, {"name": "Close", ...}],
+//   "cuts": [{"camera": "Wide", "start": 0, "duration": 2}, {"camera": "Close", "start": 2, "duration": 2}]
 // Files are found beside the recipe.
 class Recipe {
 public:
@@ -74,6 +86,12 @@ private:
         project.duration = number(recipe, "duration", 8);
         project.frameRate = number(recipe, "fps", 60);
         project.bpm = number(recipe, "bpm", 120);
+        project.beatsPerBar = static_cast<int>(number(recipe, "beatsPerBar", 4));
+        // "beats": the timeline in bars and beats, where a new tempo moves
+        // cuts, markers and clips with the music.
+        const auto display = recipe["timeDisplay"].toString();
+        if (display.isNotEmpty() && display != "seconds" && display != "frames" && display != "beats") { return juce::Result::fail("Time shows as seconds, frames or beats."); }
+        project.timeDisplay = display == "beats" ? TimeDisplay::beats : display == "frames" ? TimeDisplay::frames : TimeDisplay::seconds;
         // The rate the beam is drawn at (192 kHz unless said).
         project.sampleRate = number(recipe, "sampleRate", Project::defaultSampleRate);
         if (!Project::validSampleRate(project.sampleRate)) { return juce::Result::fail("A sample rate is 22050 to 768000 Hz."); }
@@ -113,6 +131,33 @@ private:
             const auto added = addCamera(recipe["camera"]);
             if (added.failed()) { return juce::Result::fail("camera: " + added.getErrorMessage()); }
         }
+        const auto* cameras = recipe["cameras"].getArray();
+        if (cameras != nullptr) {
+            for (const auto& camera : *cameras) {
+                const auto added = addCamera(camera);
+                if (added.failed()) { return juce::Result::fail(camera["name"].toString() + ": " + added.getErrorMessage()); }
+            }
+        }
+        const auto* cuts = recipe["cuts"].getArray();
+        if (cuts != nullptr) {
+            for (const auto& item : *cuts) {
+                const auto camera = named.find(item["camera"].toString());
+                if (camera == named.end() || std::none_of(project.cameras.begin(), project.cameras.end(), [&](const Camera& candidate) { return candidate.id == camera->second; })) {
+                    return juce::Result::fail("A cut is to a camera by its name, not \"" + item["camera"].toString() + "\".");
+                }
+                CameraCut cut;
+                cut.id = next++;
+                cut.camera = camera->second;
+                cut.start = number(item, "start", 0);
+                cut.duration = number(item, "duration", 1);
+                if (!(cut.duration > 0) || cut.start < 0) { return juce::Result::fail("A cut starts at 0 or later and lasts a while."); }
+                project.cameraCuts.push_back(cut);
+            }
+        }
+        if (recipe.hasProperty("effects")) {
+            const auto added = addEffects(project.effects, recipe["effects"], project.duration);
+            if (added.failed()) { return juce::Result::fail("effects: " + added.getErrorMessage()); }
+        }
         const auto* modulators = recipe["modulators"].getArray();
         if (modulators != nullptr) {
             for (const auto& modulator : *modulators) {
@@ -132,7 +177,14 @@ private:
         asset->id = next++;
         const auto generator = object["generator"].toString();
         const auto file = object["file"].toString();
-        if (generator.isNotEmpty()) {
+        if (object.hasProperty("text")) {
+            const auto text = object["text"].toString();
+            asset->data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
+            asset->name = (object["name"].toString().isNotEmpty() ? object["name"].toString() : juce::String("Text")) + ".txt";
+            asset->extension = ".txt";
+            const auto typed = typography(object["typography"], asset->textSettings);
+            if (typed.failed()) { return typed; }
+        } else if (generator.isNotEmpty()) {
             const auto* definition = findGenerator(generator.toStdString());
             if (definition == nullptr) { return juce::Result::fail("There is no generator \"" + generator + "\"."); }
             asset->name = juce::String(definition->name.data(), definition->name.size());
@@ -144,19 +196,35 @@ private:
             asset->name = source.getFileName();
             asset->extension = source.getFileExtension().toLowerCase();
         } else {
-            return juce::Result::fail("An object needs a \"generator\" or a \"file\".");
+            return juce::Result::fail("An object needs a \"generator\", a \"file\" or \"text\".");
+        }
+        // How a script is run to draw it.
+        const auto& bake = object["bake"];
+        if (bake.isObject()) {
+            asset->bakeSettings.duration = number(bake, "duration", asset->bakeSettings.duration);
+            asset->bakeSettings.frameRate = number(bake, "frameRate", asset->bakeSettings.frameRate);
+            asset->bakeSettings.pointsPerFrame = static_cast<int>(number(bake, "pointsPerFrame", asset->bakeSettings.pointsPerFrame));
+            const auto invalid = asset->bakeSettings.validate();
+            if (!invalid.empty()) { return juce::Result::fail(juce::String(invalid)); }
         }
         const auto decoded = decodeAsset(*asset);
         if (decoded.failed()) { return decoded; }
         auto clip = Document::makeClip(next++, *asset, number(object, "start", 0));
         const auto name = object["name"].toString();
         if (name.isNotEmpty()) { clip.name = name.toStdString(); }
-        clip.duration = number(object, "duration", project.duration - clip.start);
+        // A sound plays as long as it is unless told otherwise.
+        clip.duration = number(object, "duration", asset->audio != nullptr ? std::min(clip.duration, project.duration - clip.start) : project.duration - clip.start);
         const auto set = setProperties(clip.properties, object, clip.duration);
         if (set.failed()) { return set; }
+        if (object.hasProperty("effects")) {
+            if (asset->audio != nullptr) { return juce::Result::fail("A sound has no effects."); }
+            const auto added = addEffects(clip.effects, object["effects"], clip.duration);
+            if (added.failed()) { return juce::Result::fail("effects: " + added.getErrorMessage()); }
+        }
         Track track;
         track.id = next++;
         track.name = clip.name;
+        track.kind = asset->audio != nullptr ? TrackKind::audio : TrackKind::visual;
         track.insert(clip, project.tempo());
         project.assets.push_back(asset);
         project.tracks.push_back(track);
@@ -187,8 +255,10 @@ private:
             const auto followed = cameraPath(camera, settings["path"]);
             if (followed.failed()) { return juce::Result::fail("path: " + followed.getErrorMessage()); }
         }
+        const auto name = settings["name"].toString();
+        if (name.isNotEmpty()) { camera.name = name.toStdString(); }
         project.cameras.push_back(camera);
-        named["camera"] = camera.id;
+        named[name.isNotEmpty() ? name : juce::String("camera")] = camera.id;
         return juce::Result::ok();
     }
 
@@ -198,10 +268,11 @@ private:
         modulator.name = settings["name"].toString().toStdString();
         if (modulator.name.empty()) { return juce::Result::fail("A modulator needs a \"name\"."); }
         const auto waveform = settings["waveform"].toString();
-        const std::array<std::pair<const char*, ModulationWaveform>, 6> waveforms {{{"sine", ModulationWaveform::sine}, {"triangle", ModulationWaveform::triangle},
-            {"saw", ModulationWaveform::saw}, {"square", ModulationWaveform::square}, {"smooth noise", ModulationWaveform::noiseSmooth}, {"held noise", ModulationWaveform::noiseHold}}};
+        const std::array<std::pair<const char*, ModulationWaveform>, 7> waveforms {{{"sine", ModulationWaveform::sine}, {"triangle", ModulationWaveform::triangle},
+            {"saw", ModulationWaveform::saw}, {"square", ModulationWaveform::square}, {"smooth noise", ModulationWaveform::noiseSmooth}, {"held noise", ModulationWaveform::noiseHold},
+            {"soundtrack", ModulationWaveform::soundtrack}}};
         const auto found = std::find_if(waveforms.begin(), waveforms.end(), [&](const auto& entry) { return waveform.isEmpty() ? entry.second == ModulationWaveform::sine : waveform.equalsIgnoreCase(entry.first); });
-        if (found == waveforms.end()) { return juce::Result::fail("A waveform is sine, triangle, saw, square, smooth noise or held noise, not \"" + waveform + "\"."); }
+        if (found == waveforms.end()) { return juce::Result::fail("A waveform is sine, triangle, saw, square, smooth noise, held noise or soundtrack, not \"" + waveform + "\"."); }
         modulator.shape.waveform = found->second;
         modulator.shape.rateHz = number(settings, "rate", 1);
         modulator.shape.phase = number(settings, "phase", 0);
@@ -211,7 +282,7 @@ private:
         for (const auto& item : *routes) {
             const auto to = item["to"].toString();
             const auto target = named.find(to);
-            if (target == named.end()) { return juce::Result::fail("There is no object \"" + to + "\" to drive (or \"camera\")."); }
+            if (target == named.end()) { return juce::Result::fail("There is no object \"" + to + "\" to drive (or a camera, or \"scope\")."); }
             ModulationRoute route;
             route.id = next++;
             route.modulator = modulator.id;
@@ -224,6 +295,55 @@ private:
         }
         project.modulators.push_back(modulator);
         return juce::Result::ok();
+    }
+
+    // Effects in order, each of a type with its parameters set and keyed.
+    juce::Result addEffects(std::vector<EffectInstance>& effects, const juce::var& list, double duration) {
+        const auto* items = list.getArray();
+        if (items == nullptr) { return juce::Result::fail("Effects are a list of {\"type\", \"properties\", \"keys\"}."); }
+        for (const auto& item : *items) {
+            const auto type = item["type"].toString();
+            const auto* definition = effectDefinition(type.toStdString());
+            if (definition == nullptr) { return juce::Result::fail("There is no effect \"" + type + "\"."); }
+            auto effect = makeEffect(next++, *definition);
+            if (item.hasProperty("name")) { effect.name = item["name"].toString().toStdString(); }
+            for (const auto* key : {"properties", "keys"}) {
+                const auto* given = item[key].getDynamicObject();
+                if (given != nullptr) {
+                    for (const auto& [property, value] : given->getProperties()) {
+                        if (!effect.properties.contains(property.toString().toStdString())) { return juce::Result::fail(type + " has no \"" + property.toString() + "\"."); }
+                    }
+                }
+            }
+            const auto set = setProperties(effect.properties, item, duration);
+            if (set.failed()) { return juce::Result::fail(type + ": " + set.getErrorMessage()); }
+            effects.push_back(std::move(effect));
+        }
+        return juce::Result::ok();
+    }
+    // A text's type: its font, style, alignment and how it animates in.
+    static juce::Result typography(const juce::var& given, TextSettings& settings) {
+        if (!given.isObject()) {
+            return juce::Result::ok();
+        }
+        settings.family = given["family"].toString();
+        settings.style = (static_cast<bool>(given["bold"]) ? TextSettings::bold : 0) | (static_cast<bool>(given["italic"]) ? TextSettings::italic : 0);
+        const auto align = given["align"].toString();
+        settings.alignment = align == "centre" || align == "center" ? 1 : align == "right" ? 2 : 0;
+        settings.lineSpacing = number(given, "lineSpacing", settings.lineSpacing);
+        settings.tracking = number(given, "tracking", settings.tracking);
+        const std::array<std::pair<const char*, TextSettings::Animation>, 6> animations {{{"none", TextSettings::Animation::none}, {"typewriter", TextSettings::Animation::typeOn},
+            {"rise", TextSettings::Animation::rise}, {"pop", TextSettings::Animation::pop}, {"wave", TextSettings::Animation::wave}, {"scatter", TextSettings::Animation::scatter}}};
+        const auto animation = given["animation"].toString();
+        const auto found = std::find_if(animations.begin(), animations.end(), [&](const auto& entry) { return animation.isEmpty() ? entry.second == TextSettings::Animation::none : animation.equalsIgnoreCase(entry.first); });
+        if (found == animations.end()) { return juce::Result::fail("Text animates by none, typewriter, rise, pop, wave or scatter, not \"" + animation + "\"."); }
+        settings.animation = found->second;
+        settings.characterDelay = number(given, "characterDelay", settings.characterDelay);
+        settings.characterDuration = number(given, "characterDuration", settings.characterDuration);
+        settings.hold = number(given, "hold", settings.hold);
+        settings.amount = number(given, "amount", settings.amount);
+        const auto invalid = settings.validate();
+        return invalid.isEmpty() ? juce::Result::ok() : juce::Result::fail(invalid);
     }
 
     // "properties" as steady values, then "keys" as keyframes.
@@ -379,8 +499,9 @@ private:
     const juce::File folder;
     Project& project;
     Id next = 100;
-    // Objects by name, for the camera to look at.
-    std::map<juce::String, Id> named;
+    // Objects and cameras by name, for cameras to look at, cuts to show and
+    // modulators to drive; "scope" is the Scope's beam.
+    std::map<juce::String, Id> named {{"scope", beamIdentity}};
     std::map<juce::String, juce::Expression> definitions;
 };
 }
