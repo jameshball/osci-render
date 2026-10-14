@@ -64,6 +64,7 @@ public:
             about.giveAwayKeyboardFocus();
         };
         about.onFocusLost = [this] { applyDescription(); };
+        about.onTextChange = [this] { fitAbout(); };
         about.onEscapeKey = [this] {
             about.setText(processor.document.mainProject().description, false);
             about.giveAwayKeyboardFocus();
@@ -101,7 +102,10 @@ public:
             resized();
             if (onHeightChanged) { onHeightChanged(); }
         }
-        if (!about.hasKeyboardFocus(true)) { about.setText(processor.document.mainProject().description, false); }
+        if (!about.hasKeyboardFocus(true)) {
+            about.setText(processor.document.mainProject().description, false);
+            fitAbout();
+        }
         const auto& project = processor.document.project();
         updating = true;
         if (!length.isBeingEdited()) { length.setText(juce::String(project.duration, 3) + "s", juce::dontSendNotification); }
@@ -122,10 +126,25 @@ public:
         area.removeFromTop(4);
         const motion::style::PropertyGrid grid(area.getWidth());
         about.setBounds(area.removeFromTop(aboutHeight).withWidth(grid.value + grid.column));
+        fitAbout();
     }
 
 private:
-    static constexpr int aboutGap = 14, aboutHeight = 56;
+    static constexpr int aboutGap = 14;
+    // The field grows with what is written, two lines to seven.
+    int aboutHeight = 46;
+    void fitAbout() {
+        if (about.getWidth() <= 0) {
+            return;
+        }
+        const auto wanted = juce::jlimit(46, 120, about.getTextHeight() + 8);
+        if (wanted == aboutHeight) {
+            return;
+        }
+        aboutHeight = wanted;
+        about.setSize(about.getWidth(), aboutHeight);
+        if (onHeightChanged) { onHeightChanged(); }
+    }
     void applyDescription() {
         const auto text = about.getText().replaceCharacters("\r\n", "  ").trim();
         if (text != processor.document.mainProject().description) {
