@@ -629,9 +629,12 @@ jobs:
           fi
 
       # Standalone C++20 Motion model/render/editor tests; needs clang++ or g++ on PATH.
+      # Ubuntu's clang++ 18 crashes compiling these tests; its g++ builds them.
       - name: Run Motion portable tests
         if: steps.ci_flags.outputs.skip_validation != 'true'
         shell: bash
+        env:
+          CXX: ${{ runner.os == 'Linux' && 'g++' || '' }}
         run: python3 scripts/test_motion_portable.py
 
       # The visualiser's bundled resampler under ASan/UBSan; needs clang++.
