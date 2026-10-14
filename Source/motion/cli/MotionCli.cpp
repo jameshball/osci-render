@@ -207,6 +207,58 @@ void stats(const juce::ArgumentList& args) {
     }
 }
 
+// What a frame is made of once its hidden lines are removed: each clip's
+// drawing and what each mirror shows, with how long and in how many pieces.
+void frame(const juce::ArgumentList& args) {
+    const auto files = positional(args);
+    if (files.size() != 1) { juce::ConsoleApplication::fail("frame takes one project."); }
+    auto composition = open(fileArgument(files[0]), sampleRateOf(args));
+    const auto times = timesOf(args, composition.duration());
+    composition.bakeAt(times);
+    const auto* bake = composition.prepared->hiddenLines.get();
+    for (const auto time : times) {
+        say("At " + timeText(time) + ":");
+        const auto* baked = bake != nullptr ? bake->at(time) : nullptr;
+        if (baked == nullptr) { say("  nothing baked"); continue; }
+        const auto list = [](const juce::String& kind, const std::vector<motion::hidden::Frame::Entry>& entries) {
+            for (const auto& entry : entries) {
+                if (entry.drawing == nullptr) { say("  " + kind + " " + juce::String(static_cast<int>(entry.clip)) + ": hidden"); continue; }
+                // Pieces: runs of shapes each starting where the last ended.
+                int pieces = 0;
+                osci::Point end;
+                for (std::size_t index = 0; index < entry.drawing->shapeCount(); ++index) {
+                    auto* shape = entry.drawing->shape(index);
+                    const auto start = shape->nextVector(0);
+                    if (index == 0 || std::abs(start.x - end.x) > 1.0e-5f || std::abs(start.y - end.y) > 1.0e-5f || std::abs(start.z - end.z) > 1.0e-5f) { ++pieces; }
+                    end = shape->nextVector(1);
+                }
+                say("  " + kind + " " + juce::String(static_cast<int>(entry.clip)) + ": " + juce::String(static_cast<int>(entry.drawing->shapeCount())) + " shapes in " + juce::String(pieces)
+                    + " pieces, length " + juce::String(entry.drawing->length(), 3) + ", weighted " + juce::String(entry.drawing->beamLength(), 3) + ", shown " + juce::String(entry.shown, 3));
+            }
+        };
+        list("drawing", baked->drawings);
+        list("reflection", baked->reflections);
+        list("hatching", baked->hatching);
+        // How the beam shares the cycle: each drawing's samples, beside the
+        // samples its strokes need whole and the fewest it can make do with.
+        motion::BeamRenderer beam;
+        beam.planCycle(*composition.prepared, time, composition.sampleRate);
+        const auto cycle = composition.sampleRate / composition.prepared->beamRate;
+        std::int64_t drawn = 0, moving = 0;
+        say("  beam (" + juce::String(cycle, 0) + " samples a cycle" + (beam.plannedSimplified() ? ", simplified to fit" : "") + "):");
+        for (const auto& segment : beam.plannedSegments()) {
+            if (segment.kind != motion::BeamRenderer::Kind::draw) { moving += segment.count; continue; }
+            drawn += segment.count;
+            const auto* drawing = segment.drawing;
+            const auto clip = segment.clip != nullptr ? static_cast<int>(segment.clip - composition.prepared->clips.data()) : -1;
+            const auto kind = drawing != nullptr && std::any_of(baked->reflections.begin(), baked->reflections.end(), [&](const auto& entry) { return entry.drawing.get() == drawing; }) ? "reflection" : "drawing";
+            say("    " + juce::String(kind) + " " + juce::String(clip) + ": " + juce::String(segment.count) + " samples (whole " + juce::String(drawing != nullptr ? drawing->minimumTraversalSamples() : 0)
+                + ", coarse " + juce::String(drawing != nullptr ? drawing->coarseTraversalSamples() : 0) + ")");
+        }
+        say("    drawing " + juce::String(drawn) + ", moving " + juce::String(moving));
+    }
+}
+
 void diff(const juce::ArgumentList& args) {
     const auto files = positional(args);
     if (files.size() != 2) { juce::ConsoleApplication::fail("diff takes two signals (.wav) or two projects."); }
@@ -324,6 +376,8 @@ int main(int argc, char* argv[]) {
         "Each frame's beam in numbers: drawn and travelled length, brightness, a fingerprint of its samples.", {}, stats});
     app.addCommand({"diff", "diff <a.wav> <b.wav> [--tolerance=1e-4] | diff <a> <b> [--frames=N | --at=t1,t2]",
         "Compares two signals sample by sample, or two projects frame by frame.", {}, diff});
+    app.addCommand({"frame", "frame <project> [--frames=N | --at=t1,t2] [--rate=Hz]",
+        "What a baked frame is made of: each clip's drawing and what each mirror shows, with length and pieces.", {}, frame});
     app.addCommand({"check", "check <folder> [--update] [--frames=N] [--rate=Hz]",
         "Draws every project and recipe under a folder and compares each with the stats kept beside it.", {}, check});
     return app.findAndRunCommand(argc, argv);
