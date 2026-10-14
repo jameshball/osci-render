@@ -8,7 +8,8 @@
 
 // With nothing selected, Properties shows the composition's own settings:
 // how long it runs, its frame rate, tempo and meter, in the same two-column
-// rows as a clip's timing.
+// rows as a clip's timing; and for the project itself, what it is about, as
+// the start screen shows it under its name.
 class MotionCompositionPanel final : public juce::Component {
 public:
     explicit MotionCompositionPanel(MotionProcessor& owner) : processor(owner) {
@@ -45,6 +46,29 @@ public:
             combo->onChange = [this, combo] { if (!updating && onTiming) { onTiming(combo->getSelectedId()); } };
             addAndMakeVisible(*combo);
         }
+        motion::style::inspector::styleHeading(aboutTitle, "About");
+        addChildComponent(aboutTitle);
+        about.setName("Project description");
+        about.setTitle("Project description");
+        about.setTooltip("What this project is: shown under its name on the start screen");
+        about.setMultiLine(true, true);
+        about.setReturnKeyStartsNewLine(false);
+        about.setScrollbarsShown(false);
+        about.setInputRestrictions(motion::Project::longestDescription);
+        about.setFont(motion::style::body());
+        about.setTextToShowWhenEmpty("Describe this project for the start screen", osci::Colours::textMuted().withAlpha(.6f));
+        motion::style::styleField(about);
+        about.setIndents(8, 6);
+        about.onReturnKey = [this] {
+            applyDescription();
+            about.giveAwayKeyboardFocus();
+        };
+        about.onFocusLost = [this] { applyDescription(); };
+        about.onEscapeKey = [this] {
+            about.setText(processor.document.mainProject().description, false);
+            about.giveAwayKeyboardFocus();
+        };
+        addChildComponent(about);
     }
 
     // The Timing menu's own command ids, so both change things the same way.
@@ -59,9 +83,25 @@ public:
         refresh();
         if (onHeightChanged) { onHeightChanged(); }
     }
-    int preferredHeight() const { return shown ? motion::style::inspector::headingHeight + 2 * motion::style::inspector::row + 10 : 0; }
+    int preferredHeight() const {
+        if (!shown) {
+            return 0;
+        }
+        const auto timing = motion::style::inspector::headingHeight + 2 * motion::style::inspector::row + 10;
+        return timing + (aboutShown ? aboutGap + motion::style::inspector::headingHeight + aboutHeight + 10 : 0);
+    }
     void refresh() {
         if (!shown) { return; }
+        // Only the project has a description, not a composition entered.
+        const auto mainShown = processor.document.editingComposition() == 0;
+        if (mainShown != aboutShown) {
+            aboutShown = mainShown;
+            aboutTitle.setVisible(aboutShown);
+            about.setVisible(aboutShown);
+            resized();
+            if (onHeightChanged) { onHeightChanged(); }
+        }
+        if (!about.hasKeyboardFocus(true)) { about.setText(processor.document.mainProject().description, false); }
         const auto& project = processor.document.project();
         updating = true;
         if (!length.isBeingEdited()) { length.setText(juce::String(project.duration, 3) + "s", juce::dontSendNotification); }
@@ -77,9 +117,21 @@ public:
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
         motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter});
+        area.removeFromTop(aboutGap);
+        aboutTitle.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
+        area.removeFromTop(4);
+        const motion::style::PropertyGrid grid(area.getWidth());
+        about.setBounds(area.removeFromTop(aboutHeight).withWidth(grid.value + grid.column));
     }
 
 private:
+    static constexpr int aboutGap = 14, aboutHeight = 56;
+    void applyDescription() {
+        const auto text = about.getText().replaceCharacters("\r\n", "  ").trim();
+        if (text != processor.document.mainProject().description) {
+            processor.document.edit("Change the description", [text](motion::Project& project) { project.description = text; });
+        }
+    }
     void applyLength() {
         const auto value = motion::ui::parseNumber(length.getText(), "s");
         auto& document = processor.document;
@@ -109,7 +161,9 @@ private:
 
     MotionProcessor& processor;
     bool shown = false, updating = false;
-    juce::Label title, length, tempo;
+    bool aboutShown = false;
+    juce::Label title, length, tempo, aboutTitle;
+    juce::TextEditor about;
     std::array<juce::Label, 4> captions;
     juce::ComboBox frameRate, meter;
 };

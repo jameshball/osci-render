@@ -712,6 +712,7 @@ juce::XmlElement Document::save(const Project& project) {
     xml.setAttribute("scopeSettle", exactNumber(project.scope.settleMicros));
     if (project.scope.xyOnly) { xml.setAttribute("scopeXYOnly", true); }
     xml.setAttribute("sampleRate", exactNumber(project.sampleRate));
+    if (project.description.isNotEmpty()) { xml.setAttribute("description", project.description); }
     auto* exporting = xml.createNewChildElement("export");
     exporting->setAttribute("width", project.exportSettings.width);
     exporting->setAttribute("height", project.exportSettings.height);
@@ -819,6 +820,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         notes.note("Sample rate this version can't draw at, set to 192 kHz", juce::String(project.sampleRate) + " Hz");
         project.sampleRate = Project::defaultSampleRate;
     }
+    project.description = xml.getStringAttribute("description").trim().substring(0, Project::longestDescription);
     const auto* exporting = xml.getChildByName("export");
     if (exporting != nullptr) {
         ExportSettings settings;

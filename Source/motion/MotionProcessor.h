@@ -121,7 +121,7 @@ public:
         keepsLaunchSession = true;
         remembersFiles = false;
     }
-    // The project's picture (see ProjectPicture), saved with it: the Scope's
+    // The project's picture (see ProjectSummary), saved with it: the Scope's
     // frame when it was last saved; message thread.
     juce::MemoryBlock picture;
     // True while the project is written to its own file: what is written is

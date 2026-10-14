@@ -1,5 +1,6 @@
 {
   "name": "Mirror ball tour",
+  "description": "Lights, shadows and a mirror ball reflecting the room around it.",
   "picture": 21,
   "duration": 24,
   "fps": 60,

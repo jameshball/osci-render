@@ -1,5 +1,6 @@
 {
   "name": "Orbit",
+  "description": "Shadows sweep a lit studio as the camera circles it.",
   "picture": 4,
   "duration": 16,
   "fps": 60,

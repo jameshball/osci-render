@@ -690,11 +690,11 @@ public:
             expect(motion::ProjectFile::read(juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("no such project.osci-motion"), missing).failed() && missing.problem == Problem::unreadable);
         }
 
-        beginTest("A project's picture is the first thing in its file, read from its start alone");
+        beginTest("A project's picture and description come first in its file, read from its start alone");
         {
             juce::Image frame(juce::Image::RGB, 300, 200, true);
             juce::Graphics(frame).fillAll(juce::Colours::green);
-            const auto jpeg = motion::ProjectPicture::encode(frame);
+            const auto jpeg = motion::ProjectSummary::encode(frame);
             expect(!jpeg.isEmpty());
             const juce::TemporaryFile pictured(".osci-motion"), plain(".osci-motion");
             expect(motion::ProjectFile::write(document.project(), pictured.getFile(), jpeg).wasOk());
@@ -702,14 +702,25 @@ public:
             juce::MemoryBlock bytes;
             pictured.getFile().loadFileAsData(bytes);
             const auto start = juce::String::createStringFromData(static_cast<const char*>(bytes.getData()) + 8, 504);
-            expect(start.contains("<picture "), "the picture comes before the composition");
-            const auto picture = motion::ProjectPicture::peek(pictured.getFile());
-            expect(picture.getWidth() == motion::ProjectPicture::width && picture.getHeight() == motion::ProjectPicture::height);
+            expect(start.contains("<summary "), "the summary comes before the composition");
+            const auto picture = motion::ProjectSummary::peek(pictured.getFile()).picture;
+            expect(picture.getWidth() == motion::ProjectSummary::width && picture.getHeight() == motion::ProjectSummary::height);
             expect(picture.getPixelAt(256, 192).getGreen() > 100 && picture.getPixelAt(256, 192).getRed() < 40, "the frame's middle, as it was");
             motion::ProjectFile opened;
             expect(motion::ProjectFile::read(pictured.getFile(), opened).wasOk() && opened.notes.empty());
-            expect(motion::ProjectPicture::read(*opened.xml) == jpeg);
-            expect(!motion::ProjectPicture::peek(plain.getFile()).isValid(), "a project saved without one has none");
+            expect(motion::ProjectSummary::pictureIn(*opened.xml) == jpeg);
+            expect(!motion::ProjectSummary::peek(plain.getFile()).picture.isValid(), "a project saved without one has none");
+
+            // The description is the project's, copied beside the picture.
+            auto described = document.project();
+            described.description = juce::String::fromUTF8("Neon <signs> & \"quotes\" /> caf\xc3\xa9");
+            const juce::TemporaryFile withText(".osci-motion");
+            expect(motion::ProjectFile::write(described, withText.getFile(), jpeg).wasOk());
+            const auto summary = motion::ProjectSummary::peek(withText.getFile());
+            expect(summary.description == described.description, summary.description);
+            expect(summary.picture.isValid(), "a description doesn't hide the picture");
+            motion::ProjectFile reread;
+            expect(motion::ProjectFile::read(withText.getFile(), reread).wasOk() && reread.project.description == described.description);
         }
         testCameras(document);
         testAnimatedSources();

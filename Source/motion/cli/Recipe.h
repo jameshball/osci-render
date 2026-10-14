@@ -10,8 +10,9 @@ namespace motion::cli {
 // A project described in JSON, built as it would be built by hand in the app:
 // each object a clip on its own track, from a generator (a box, a sphere, a
 // light) or a file, with its properties set and keyed. Kept as text, a scene
-// is made again exactly whatever the project format comes to be. "picture":
-// a time whose frame `make` has the app draw as the project's picture.
+// is made again exactly whatever the project format comes to be.
+// "description": what it is, shown under its name on the start screen;
+// "picture": a time whose frame `make` has the app draw as its picture.
 //
 //   {
 //     "name": "Ball", "duration": 8, "fps": 60, "bpm": 120, "sampleRate": 192000, "beam": {"intensity": 20},
@@ -67,6 +68,9 @@ private:
     juce::Result make(const juce::var& recipe) {
         if (!recipe.isObject()) { return juce::Result::fail("A recipe is a JSON object."); }
         if (recipe.hasProperty("name")) { project.name = recipe["name"].toString(); }
+        // What it is, under its name on the start screen.
+        project.description = recipe["description"].toString().trim();
+        if (project.description.length() > Project::longestDescription) { return juce::Result::fail("A description is up to " + juce::String(Project::longestDescription) + " characters."); }
         project.duration = number(recipe, "duration", 8);
         project.frameRate = number(recipe, "fps", 60);
         project.bpm = number(recipe, "bpm", 120);

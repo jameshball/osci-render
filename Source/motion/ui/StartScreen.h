@@ -8,7 +8,9 @@
 namespace motion::ui {
 // A project on the start screen: one opened lately, or an example.
 struct StartCard {
-    juce::String name, detail;
+    // `detail`: a line about it, under its name; `when`: when it was last
+    // saved, beside the name.
+    juce::String name, detail, when;
     juce::Image picture;
     juce::File file;
     juce::String resource;
@@ -654,9 +656,17 @@ private:
                 g.drawRoundedRectangle(picture.reduced(.5f), corner, 1.0f);
             }
             auto text = area.withTrimmedTop(10).withTrimmedLeft(2);
+            auto nameLine = text.removeFromTop(17);
+            if (card.when.isNotEmpty()) {
+                g.setFont(style::caption());
+                g.setColour(osci::Colours::textMuted().withAlpha(.75f));
+                const auto whenWidth = juce::TextLayout::getStringWidth(style::caption(), card.when) + 2;
+                g.drawText(card.when, nameLine.removeFromRight(whenWidth), juce::Justification::centredRight, false);
+                nameLine.removeFromRight(8);
+            }
             g.setFont(style::body());
             g.setColour(osci::Colours::text().withAlpha(.9f + .1f * lit));
-            g.drawText(card.name, text.removeFromTop(17), juce::Justification::centredLeft, true);
+            g.drawText(card.name, nameLine, juce::Justification::centredLeft, true);
             g.setFont(style::caption());
             g.setColour(osci::Colours::textMuted());
             g.drawText(card.detail, text.removeFromTop(16), juce::Justification::centredLeft, true);

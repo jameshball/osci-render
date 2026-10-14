@@ -515,8 +515,8 @@
         <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
         <FILE id="MotLoadNotes" name="LoadNotes.h" compile="0" resource="0"
               file="Source/motion/model/LoadNotes.h"/>
-        <FILE id="MotProjectPicture" name="ProjectPicture.h" compile="0" resource="0"
-              file="Source/motion/model/ProjectPicture.h"/>
+        <FILE id="MotProjectSummary" name="ProjectSummary.h" compile="0" resource="0"
+              file="Source/motion/model/ProjectSummary.h"/>
         <FILE id="MotProjectFile" name="ProjectFile.h" compile="0" resource="0"
               file="Source/motion/model/ProjectFile.h"/>
         <FILE id="MotmodelDocumentSerialisationcpp" name="DocumentSerialisation.cpp"

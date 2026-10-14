@@ -167,6 +167,10 @@ struct Project : Composition {
     // the beam each frame, for a dense scene drawn cleanly.
     double sampleRate = defaultSampleRate;
     ExportSettings exportSettings;
+    // What the project is, in a sentence or two: shown under its name on
+    // the start screen.
+    juce::String description;
+    static constexpr int longestDescription = 200;
     static constexpr double defaultSampleRate = 192000, lowestSampleRate = 22050, highestSampleRate = 768000;
     static bool validSampleRate(double rate) { return std::isfinite(rate) && rate >= lowestSampleRate && rate <= highestSampleRate; }
     // The Scope's picture: animatable beam and display properties.

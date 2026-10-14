@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Document.h"
-#include "ProjectPicture.h"
+#include "ProjectSummary.h"
 #include <atomic>
 #include <limits>
 #include <memory>
@@ -63,12 +63,12 @@ struct ProjectFile {
     }
     // A project on its own (no editor or Scope settings with it), as the app
     // writes one, to open in the app or read back; with its picture (a JPEG,
-    // see ProjectPicture) when given one.
+    // see ProjectSummary) when given one.
     static juce::Result write(const Project& project, const juce::File& destination, const juce::MemoryBlock& picture = {}) {
         juce::XmlElement xml("motion-project");
         xml.setAttribute("schema", 1);
         xml.addChildElement(new juce::XmlElement(Document::save(project)));
-        ProjectPicture::write(xml, picture);
+        ProjectSummary::write(xml, picture, project.description);
         juce::MemoryBlock bytes;
         juce::AudioProcessor::copyXmlToBinary(xml, bytes);
         if (!destination.replaceWithData(bytes.getData(), bytes.getSize())) { return juce::Result::fail("Couldn't write " + destination.getFullPathName() + "."); }

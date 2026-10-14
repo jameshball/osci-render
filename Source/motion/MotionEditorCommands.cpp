@@ -522,27 +522,13 @@ namespace {
 juce::String edited(juce::Time time) {
     const auto seconds = (juce::Time::getCurrentTime() - time).inSeconds();
     const auto count = [](juce::int64 amount, const char* unit) { return juce::String(amount) + " " + unit + (amount == 1 ? "" : "s") + " ago"; };
-    if (seconds < 60) { return "Edited just now"; }
-    if (seconds < 3600) { return "Edited " + count(static_cast<juce::int64>(seconds / 60), "minute"); }
-    if (seconds < 86400) { return "Edited " + count(static_cast<juce::int64>(seconds / 3600), "hour"); }
+    if (seconds < 60) { return "Just now"; }
+    if (seconds < 3600) { return count(static_cast<juce::int64>(seconds / 60), "minute"); }
+    if (seconds < 86400) { return count(static_cast<juce::int64>(seconds / 3600), "hour"); }
     const auto days = static_cast<juce::int64>(seconds / 86400);
-    if (days == 1) { return "Edited yesterday"; }
-    if (days < 7) { return "Edited " + count(days, "day"); }
-    return "Edited " + time.formatted("%e %b %Y").trim();
-}
-// What each example shows, under its name.
-const std::map<juce::String, juce::String>& exampleAbouts() {
-    static const std::map<juce::String, juce::String> abouts {
-        {"Orbit", "Shadows as the camera circles"},
-        {"Mirror ball tour", "Lights, shadows and a mirror ball"},
-        {"Surface shapes", "Every surface style, one by one"}};
-    return abouts;
-}
-// The picture an example was saved with.
-juce::Image examplePicture(const juce::String& resource) {
-    int size = 0;
-    const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);
-    return data != nullptr ? motion::ProjectPicture::peek(data, static_cast<std::size_t>(size)) : juce::Image();
+    if (days == 1) { return "Yesterday"; }
+    if (days < 7) { return count(days, "day"); }
+    return time.formatted("%e %b %Y").trim();
 }
 }
 
@@ -557,11 +543,14 @@ void MotionEditor::showStartScreen() {
         if (!file.existsAsFile()) {
             continue;
         }
+        const auto summary = motion::ProjectSummary::peek(file);
         motion::ui::StartCard card;
         card.name = file.getFileNameWithoutExtension();
-        card.detail = edited(file.getLastModificationTime());
+        // What it is, or else where it is.
+        card.detail = summary.description.isNotEmpty() ? summary.description : "In " + file.getParentDirectory().getFileName();
+        card.when = edited(file.getLastModificationTime());
         card.file = file;
-        card.picture = motion::ProjectPicture::peek(file);
+        card.picture = summary.picture;
         card.open = file == current;
         recents.push_back(std::move(card));
     }
@@ -570,10 +559,12 @@ void MotionEditor::showStartScreen() {
     for (const auto& resource : exampleProjects()) {
         motion::ui::StartCard card;
         card.name = juce::String(BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8())).upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' ');
-        const auto about = exampleAbouts().find(card.name);
-        card.detail = about != exampleAbouts().end() ? about->second : juce::String("Example project");
+        int size = 0;
+        const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);
+        const auto summary = data != nullptr ? motion::ProjectSummary::peek(data, static_cast<std::size_t>(size)) : motion::ProjectSummary();
+        card.detail = summary.description;
         card.resource = resource;
-        card.picture = examplePicture(resource);
+        card.picture = summary.picture;
         examples.push_back(std::move(card));
     }
     // Carrying on is offered when there is something to carry on with.
@@ -669,7 +660,7 @@ void MotionEditor::beforeSaving(std::function<void()> write) {
         if (owner == nullptr) {
             return;
         }
-        if (frame.isValid()) { owner->processor.picture = motion::ProjectPicture::encode(frame); }
+        if (frame.isValid()) { owner->processor.picture = motion::ProjectSummary::encode(frame); }
         owner->processor.savingProjectFile = true;
         saving->write();
         if (owner != nullptr) { owner->processor.savingProjectFile = false; }

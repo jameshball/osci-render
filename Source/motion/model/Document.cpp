@@ -109,6 +109,7 @@ Project Document::mergeScope(Project view) const {
     whole.scope = view.scope;
     whole.sampleRate = view.sampleRate;
     whole.exportSettings = view.exportSettings;
+    whole.description = view.description;
     whole.beam = view.beam;
     whole.assets = std::move(view.assets);
     whole.definitions = std::move(view.definitions);

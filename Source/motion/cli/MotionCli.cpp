@@ -149,7 +149,7 @@ void make(const juce::ArgumentList& args) {
     const auto written = motion::ProjectFile::write(project, destination);
     if (written.failed()) { juce::ConsoleApplication::fail(written.getErrorMessage()); }
     // "picture": a time, in seconds, whose frame the app draws as the
-    // project's picture (see ProjectPicture).
+    // project's picture (see ProjectSummary).
     const auto picture = juce::JSON::parse(recipe.loadFileAsString()).getProperty("picture", {});
     if (!picture.isVoid()) {
         const std::vector<double> times {static_cast<double>(picture)};
@@ -158,7 +158,7 @@ void make(const juce::ArgumentList& args) {
         const auto at = motion::Stretches::upTo(times, project.frameRate).exportTime(0, times[0]) + .5 / (project.frameRate > 0 ? project.frameRate : 60.0);
         const auto taken = ScopeRender::still(video.getFile(), at, still.getFile());
         if (taken.failed()) { juce::ConsoleApplication::fail(taken.getErrorMessage()); }
-        const auto jpeg = motion::ProjectPicture::encode(juce::ImageFileFormat::loadFrom(still.getFile()));
+        const auto jpeg = motion::ProjectSummary::encode(juce::ImageFileFormat::loadFrom(still.getFile()));
         if (jpeg.isEmpty()) { juce::ConsoleApplication::fail("Couldn't make the picture from " + still.getFile().getFullPathName() + "."); }
         const auto pictured = motion::ProjectFile::write(project, destination, jpeg);
         if (pictured.failed()) { juce::ConsoleApplication::fail(pictured.getErrorMessage()); }

@@ -1,5 +1,6 @@
 {
   "name": "Surface shapes",
+  "description": "Four solids through every surface style, from wireframe to noise.",
   "picture": 22.5,
   "duration": 30,
   "fps": 60,
