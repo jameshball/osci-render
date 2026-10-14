@@ -23,8 +23,8 @@
         "position.z": -9,
         "generator.width": 4,
         "generator.height": 4,
-        "generator.columns": 16,
-        "generator.rows": 32,
+        "generator.columns": 8,
+        "generator.rows": 16,
         "red": 1,
         "green": 0.25,
         "blue": 0.85,
@@ -142,12 +142,12 @@
     {
       "name": "Drive",
       "waveform": "saw",
-      "rate": 1.5,
+      "rate": 0.75,
       "routes": [
         {
           "to": "Road",
           "property": "position.z",
-          "amount": 0.375
+          "amount": 0.75
         }
       ]
     },
