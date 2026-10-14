@@ -1,0 +1,52 @@
+{
+  "name": "Dragon curve",
+  "description": "An L-system folds into a dragon curve: its depth is keyed from 1 to 10, and each generation grows out of the last. Edit the rules in the source to grow another fractal.",
+  "picture": 12,
+  "duration": 16,
+  "fps": 60,
+  "bpm": 120,
+  "beam": {
+    "intensity": 6,
+    "persistence": 0.5,
+    "glow": 0.35
+  },
+  "objects": [
+    {
+      "name": "Dragon",
+      "file": "Dragon_curve.lsystem",
+      "fractalDepth": 1,
+      "properties": {
+        "scale.x": 0.72,
+        "scale.y": 0.72
+      },
+      "keys": {
+        "fractal.depth": [
+          [
+            0,
+            1,
+            "linear"
+          ],
+          [
+            9,
+            10,
+            "linear"
+          ]
+        ]
+      }
+    }
+  ],
+  "modulators": [
+    {
+      "name": "Turn",
+      "waveform": "saw",
+      "rate": 0.0625,
+      "routes": [
+        {
+          "to": "Dragon",
+          "property": "rotation.z",
+          "amount": 180
+        }
+      ]
+    }
+  ]
+}

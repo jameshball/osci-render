@@ -28,6 +28,8 @@
               resource="1" file="Resources/motion/examples/Title_card.osci-motion"/>
         <FILE id="ExPrLogoSting" name="Logo_sting.osci-motion" compile="0"
               resource="1" file="Resources/motion/examples/Logo_sting.osci-motion"/>
+        <FILE id="ExPrDragonCurve" name="Dragon_curve.osci-motion" compile="0"
+              resource="1" file="Resources/motion/examples/Dragon_curve.osci-motion"/>
         <FILE id="ExPrHarmonograph" name="Harmonograph.osci-motion" compile="0"
               resource="1" file="Resources/motion/examples/Harmonograph.osci-motion"/>
         <FILE id="ExPrBeatCuts" name="Beat_cuts.osci-motion" compile="0" resource="1"
@@ -466,6 +468,8 @@
               compile="0" resource="0" file="Source/motion/import/BakedSourceArchive.h"/>
         <FILE id="MotimportFractalPreparationh" name="FractalPreparation.h"
               compile="0" resource="0" file="Source/motion/import/FractalPreparation.h"/>
+        <FILE id="MotFractalDrawing" name="FractalDrawing.h" compile="0" resource="0"
+              file="Source/motion/import/FractalDrawing.h"/>
         <FILE id="MotimportLuaBakerh" name="LuaBaker.h" compile="0" resource="0"
               file="Source/motion/import/LuaBaker.h"/>
         <FILE id="MotimportLuaSliderBakesh" name="LuaSliderBakes.h" compile="0"

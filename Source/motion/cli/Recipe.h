@@ -47,6 +47,8 @@ namespace motion::cli {
 //    "tracking": 0.05, "animation": "rise", "characterDelay": 0.05, "characterDuration": 0.4, "hold": 30}}
 //   {"name": "Song", "file": "song.wav"}                      (an audio file: a soundtrack track)
 //   {"name": "Sketch", "file": "sketch.lua", "bake": {"duration": 4, "pointsPerFrame": 2048}}
+//   {"name": "Dragon 5", "file": "dragon.lsystem", "fractalDepth": 5, "track": "Dragon", "start": 4, "duration": 1}
+//   (objects naming the same "track" share it, one after another)
 //   "effects": [{"type": "vortex", "properties": {"strength": 1}, "keys": {"strength": [[0, 1], [2, 0]]}}]
 // "effects" on the recipe itself apply to everything. Several cameras, cut
 // between in time (each cut {"camera", "start", "duration"}):
@@ -198,6 +200,11 @@ private:
         } else {
             return juce::Result::fail("An object needs a \"generator\", a \"file\" or \"text\".");
         }
+        // How deep an L-system grows.
+        if (object.hasProperty("fractalDepth")) {
+            asset->fractalDepth = static_cast<int>(object["fractalDepth"]);
+            if (asset->fractalDepth < 0 || asset->fractalDepth > 15) { return juce::Result::fail("A fractal's depth is 0 to 15."); }
+        }
         // How a script is run to draw it.
         const auto& bake = object["bake"];
         if (bake.isObject()) {
@@ -221,14 +228,22 @@ private:
             const auto added = addEffects(clip.effects, object["effects"], clip.duration);
             if (added.failed()) { return juce::Result::fail("effects: " + added.getErrorMessage()); }
         }
-        Track track;
-        track.id = next++;
-        track.name = clip.name;
-        track.kind = asset->audio != nullptr ? TrackKind::audio : TrackKind::visual;
-        track.insert(clip, project.tempo());
         project.assets.push_back(asset);
-        project.tracks.push_back(track);
         named[name] = clip.id;
+        // Objects naming the same "track" share it, one after another.
+        const auto trackName = object["track"].toString();
+        const auto shared = trackName.isEmpty() ? project.tracks.end() : std::find_if(project.tracks.begin(), project.tracks.end(), [&](const Track& candidate) { return candidate.name == trackName.toStdString(); });
+        if (shared != project.tracks.end()) {
+            auto& track = itemAt(project.tracks, static_cast<std::size_t>(std::distance(project.tracks.begin(), shared)));
+            if (track.kind != (asset->audio != nullptr ? TrackKind::audio : TrackKind::visual) || !track.insert(clip, project.tempo())) { return juce::Result::fail("It doesn't fit on the track \"" + trackName + "\" (another clip is there, or it's another kind)."); }
+        } else {
+            Track track;
+            track.id = next++;
+            track.name = trackName.isNotEmpty() ? trackName.toStdString() : clip.name;
+            track.kind = asset->audio != nullptr ? TrackKind::audio : TrackKind::visual;
+            track.insert(clip, project.tempo());
+            project.tracks.push_back(track);
+        }
         const auto preset = object["preset"].toString();
         if (preset.isEmpty()) { return juce::Result::ok(); }
         for (const auto candidate : lightPresets) {
