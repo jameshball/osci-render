@@ -872,6 +872,8 @@ void MotionEditor::refreshInspector() {
 }
 
 bool MotionEditor::keyPressed(const juce::KeyPress& key) {
+    // While the start screen is up, keys are its alone.
+    if (startScreen != nullptr) { return startScreen->handleKey(key); }
     if (scopeFullScreen && key == juce::KeyPress::escapeKey) {
         setScopeFullScreen(false);
         return true;

@@ -614,6 +614,7 @@ void MotionEditor::showStartScreen() {
     };
     const auto atStartup = processor.globalSettings.getBool("showStartScreen", true);
     auto screen = std::make_unique<motion::ui::StartScreen>(std::move(recents), std::move(examples), continuing, atStartup, juce::String("Version ") + JucePlugin_VersionString, std::move(actions));
+    startScreen = screen.get();
     startScreenOverlay = motion::ui::StartScreen::show(*this, std::move(screen));
 }
 

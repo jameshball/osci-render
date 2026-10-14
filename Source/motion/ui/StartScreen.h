@@ -141,6 +141,9 @@ public:
         search.removeKeyListener(this);
     }
 
+    // Keys heard elsewhere while the screen is up: the editor can hold the
+    // focus as the window opens.
+    bool handleKey(const juce::KeyPress& key) { return keyPressed(key); }
     static osci::ComponentOverlay* show(juce::Component& owner, std::unique_ptr<StartScreen> screen) {
         auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(screen), juce::String(), juce::Point<int>(width, height), false);
         auto* raw = overlay.get();
@@ -400,6 +403,10 @@ private:
             if (appearedAt == 0) {
                 appearedAt = juce::Time::getMillisecondCounterHiRes() + 140;
                 startTimerHz(60);
+                // The keys come here, wherever the window's focus was.
+                juce::MessageManager::callAsync([safe = juce::Component::SafePointer<Grid>(this)] {
+                    if (safe != nullptr && !safe->owner.search.hasKeyboardFocus(false)) { safe->grabKeyboardFocus(); }
+                });
             }
         }
         void layOut(int width) {
@@ -415,6 +422,9 @@ private:
                 for (const auto& card : cards) {
                     if (query.isEmpty() || card.name.containsIgnoreCase(query) || card.detail.containsIgnoreCase(query)) { shown.push_back(&card); }
                 }
+                // Two rows of recent projects keep the examples in view; a
+                // search looks through them all.
+                if (&cards == &recents && query.isEmpty() && shown.size() > maxRecents) { shown.resize(maxRecents); }
                 if (shown.empty() && (query.isNotEmpty() || &cards != &recents)) {
                     return;
                 }
@@ -577,6 +587,7 @@ private:
         }
 
     private:
+        static constexpr std::size_t maxRecents = 6;
         static constexpr int columns = 3, gutter = 18, rowGap = 22, textHeight = 44, headingHeight = 30, sectionGap = 18;
         struct Placed {
             const StartCard* card;
@@ -606,9 +617,10 @@ private:
             layOut(getWidth());
         }
 
-        static void paintPlaceholder(juce::Graphics& g, juce::Rectangle<float> area) {
-            // A scope's graticule with a faint trace: a project not yet pictured.
-            g.setColour(juce::Colours::white.withAlpha(.035f));
+        // A scope's graticule with a faint figure of the project's own (its
+        // name chooses the ratio and phase): a project not yet pictured.
+        static void paintPlaceholder(juce::Graphics& g, juce::Rectangle<float> area, const juce::String& name) {
+            g.setColour(juce::Colours::white.withAlpha(.03f));
             for (int line = 1; line < 8; ++line) {
                 const auto x = area.getX() + area.getWidth() * static_cast<float>(line) / 8;
                 g.fillRect(x, area.getY(), 1.0f, area.getHeight());
@@ -617,18 +629,22 @@ private:
                 const auto y = area.getY() + area.getHeight() * static_cast<float>(line) / 6;
                 g.fillRect(area.getX(), y, area.getWidth(), 1.0f);
             }
+            static constexpr std::array<std::pair<float, float>, 8> ratios {{{1, 2}, {2, 3}, {3, 4}, {3, 5}, {4, 5}, {1, 3}, {5, 6}, {2, 5}}};
+            const auto hash = static_cast<std::uint32_t>(name.hashCode());
+            const auto [a, b] = ratios[hash % ratios.size()];
+            const auto phase = static_cast<float>((hash >> 8) % 628) / 100.0f;
             juce::Path trace;
-            const auto box = area.withSizeKeepingCentre(area.getHeight() * .62f, area.getHeight() * .46f);
-            for (int step = 0; step <= 160; ++step) {
-                const auto t = juce::MathConstants<float>::twoPi * static_cast<float>(step) / 160;
-                const auto x = box.getCentreX() + box.getWidth() * .5f * std::sin(3.0f * t + .6f), y = box.getCentreY() + box.getHeight() * .5f * std::sin(2.0f * t);
+            const auto box = area.withSizeKeepingCentre(area.getHeight() * .56f, area.getHeight() * .56f);
+            constexpr int steps = 360;
+            for (int step = 0; step <= steps; ++step) {
+                const auto t = juce::MathConstants<float>::twoPi * static_cast<float>(step) / steps;
+                const auto x = box.getCentreX() + box.getWidth() * .5f * std::sin(a * t + phase), y = box.getCentreY() + box.getHeight() * .5f * std::sin(b * t);
                 if (step == 0) { trace.startNewSubPath(x, y); } else { trace.lineTo(x, y); }
             }
-            trace.closeSubPath();
-            g.setColour(style::key().withAlpha(.06f));
+            g.setColour(style::key().withAlpha(.05f));
             g.strokePath(trace, juce::PathStrokeType(5.0f));
-            g.setColour(style::key().withAlpha(.28f));
-            g.strokePath(trace, juce::PathStrokeType(1.2f));
+            g.setColour(style::key().withAlpha(.2f));
+            g.strokePath(trace, juce::PathStrokeType(1.1f));
         }
         void paintCard(juce::Graphics& g, const Placed& place, float lit, bool chosen, float appear) {
             const auto& card = *place.card;
@@ -659,7 +675,7 @@ private:
                     g.drawImage(card.picture, grown, juce::RectanglePlacement::fillDestination);
                     g.setOpacity(1.0f);
                 } else {
-                    paintPlaceholder(g, picture);
+                    paintPlaceholder(g, picture, card.name);
                 }
                 // A faint sheen along the top edge, as on glass.
                 g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(.05f), picture.getX(), picture.getY(), juce::Colours::transparentWhite, picture.getX(), picture.getY() + picture.getHeight() * .45f, false));

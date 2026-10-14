@@ -276,6 +276,7 @@ private:
     void showStartScreen();
     void showStartScreenAtLaunch();
     juce::Component::SafePointer<osci::OverlayComponent> startScreenOverlay;
+    juce::Component::SafePointer<motion::ui::StartScreen> startScreen;
     // Keeps the Scope's next frame as the picture of `file` (see ProjectPictures).
     void keepProjectPicture(const juce::File& file);
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
