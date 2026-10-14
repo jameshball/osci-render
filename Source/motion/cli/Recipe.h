@@ -72,6 +72,17 @@ private:
         // The rate the beam is drawn at (192 kHz unless said).
         project.sampleRate = number(recipe, "sampleRate", Project::defaultSampleRate);
         if (!Project::validSampleRate(project.sampleRate)) { return juce::Result::fail("A sample rate is 22050 to 768000 Hz."); }
+        // How it exports: {"width", "height", "codec", "crf", "soundtrack"}.
+        const auto& exporting = recipe["export"];
+        if (exporting.isObject()) {
+            auto& settings = project.exportSettings;
+            settings.width = static_cast<int>(number(exporting, "width", settings.width));
+            settings.height = static_cast<int>(number(exporting, "height", settings.height));
+            settings.codec = static_cast<int>(number(exporting, "codec", settings.codec));
+            settings.crf = static_cast<int>(number(exporting, "crf", settings.crf));
+            settings.soundtrack = exporting.hasProperty("soundtrack") ? static_cast<bool>(exporting["soundtrack"]) : settings.soundtrack;
+            if (!settings.valid()) { return juce::Result::fail("Export settings are a frame of 64 to 8192 px, a codec 0-4 and a CRF of 0-51."); }
+        }
         // Names for parts of expressions, used by any expression after.
         const auto* defined = recipe["define"].getDynamicObject();
         if (defined != nullptr) {

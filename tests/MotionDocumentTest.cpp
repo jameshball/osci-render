@@ -639,6 +639,23 @@ public:
             expectEquals(rated.project().sampleRate, 192000.0);
         }
 
+        beginTest("A project keeps how it exports, and settings it can't use open as the defaults");
+        {
+            juce::UndoManager exportUndo;
+            motion::Document exported(exportUndo);
+            expect(exported.load(xml).wasOk());
+            expect(exported.project().exportSettings == motion::ExportSettings {});
+            const motion::ExportSettings wide {1920, 1080, 3, 0, false};
+            exported.edit("Export", [wide](motion::Project& project) { project.exportSettings = wide; });
+            motion::Project reopened;
+            expect(motion::Document::prepareLoad(exported.save(), reopened).wasOk());
+            expect(reopened.exportSettings == wide, "the frame, codec, quality and soundtrack come back");
+            auto broken = std::make_unique<juce::XmlElement>(exported.save());
+            broken->getChildByName("export")->setAttribute("width", 3);
+            expect(opensLeavingOut(exported, *broken));
+            expect(exported.project().exportSettings == motion::ExportSettings {});
+        }
+
         beginTest("A file that can't open at all says why, and what to do");
         {
             using Problem = motion::ProjectFile::Problem;

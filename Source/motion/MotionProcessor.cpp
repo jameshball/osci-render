@@ -34,8 +34,12 @@ MotionProcessor::MotionProcessor()
         loopEnd.store(project.loopEnd);
         looping.store(project.looping && project.hasLoop());
         if (document.viewOnlyChange()) { return; }
-        // The project's rate, resampled to the device as it plays.
+        // The project's rate, resampled to the device as it plays, and its
+        // export frame as the Scope's canvas.
         setProcessingSampleRate(document.mainProject().sampleRate);
+        const auto& exporting = document.mainProject().exportSettings;
+        const VisualiserRenderSize frame {exporting.width, exporting.height};
+        if (!(recordingParameters.getCanvasSize() == frame)) { recordingParameters.setCanvasSize(frame); }
         prepareComposition(project);
     };
     document.onChanged();
@@ -62,6 +66,16 @@ void MotionProcessor::prepareComposition(const motion::Project& project) {
 }
 
 void MotionProcessor::handleAsyncUpdate() {
+    // The canvas changed elsewhere (the Scope's settings): the project's frame
+    // follows, as an edit of its own.
+    const auto canvas = recordingParameters.getCanvasSize();
+    const auto& exporting = document.mainProject().exportSettings;
+    if (canvas.width != exporting.width || canvas.height != exporting.height) {
+        document.edit("Change the canvas", [canvas](motion::Project& project) {
+            project.exportSettings.width = canvas.width;
+            project.exportSettings.height = canvas.height;
+        });
+    }
     if (preparationSampleRate != requestedSampleRate.load() || preparationReach != canvasReach()) {
         prepareComposition(document.project());
         return;
@@ -290,8 +304,16 @@ void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlEl
     // Restoring a session is not a realtime operation. Serialize its commit
     // with the editor and the live-source owner, after worker preparation.
     const juce::MessageManagerLock messageLock;
-    document.reset(std::move(prepared));
     VisualiserState::load(state, visualiserParameters, recordingParameters);
+    // A project from before export settings were its own takes them from
+    // the Scope's recording settings it saved.
+    const auto* composition = state.getChildByName("composition");
+    if (composition != nullptr && composition->getChildByName("export") == nullptr && state.getChildByName("recording") != nullptr) {
+        const auto canvas = recordingParameters.getCanvasSize();
+        prepared.exportSettings = {canvas.width, canvas.height, static_cast<int>(recordingParameters.videoCodec), recordingParameters.getCRF(), recordingParameters.recordAudio.getBoolValue()};
+        if (!prepared.exportSettings.valid()) { prepared.exportSettings = {}; }
+    }
+    document.reset(std::move(prepared));
     restoreStandaloneProjectFilePathFromXml(state);
     loadProperties(state);
     getUndoManager().clearUndoHistory();

@@ -57,6 +57,20 @@ bool MotionEditor::waitsForCapture(bool video, std::function<void()> exportWitho
     return true;
 }
 
+VideoEncodingConfiguration MotionEditor::exportConfiguration(const motion::Project& project) {
+    auto config = recordingSettings.createVideoEncodingConfiguration();
+    const auto& settings = project.exportSettings;
+    config.renderSize = {settings.width, settings.height};
+    config.codec = config.preserveAlpha ? VideoCodec::ProRes4444 : static_cast<VideoCodec>(settings.codec);
+    config.crf = settings.crf;
+    config.includeAudio = settings.soundtrack;
+    config.frameRate = project.frameRate;
+    const auto& info = VideoEncodingConstants::getVideoCodecInfo(config.codec);
+    config.fileExtension = config.preserveAlpha ? "mov" : info.defaultFileExtension;
+    config.audioCodecArgs = info.proRes ? juce::StringArray {"-c:a", "pcm_s16le"} : juce::StringArray {"-c:a", "aac", "-b:a", "384k"};
+    return config;
+}
+
 void MotionEditor::exportVideo(bool leaveOutLive) {
 #if OSCI_PREMIUM
     if (exportState != nullptr) { return; }
@@ -70,9 +84,8 @@ void MotionEditor::exportVideo(bool leaveOutLive) {
         statusBar.show("Couldn't capture the beam settings: " + juce::String(error.what()));
         return;
     }
-    auto config = recordingSettings.createVideoEncodingConfiguration();
     const auto project = leaveOutLive ? motion::Document::withoutLiveSources(processor.document.mainProject()) : processor.document.mainProject();
-    config.frameRate = project.frameRate;
+    auto config = exportConfiguration(project);
     const auto renderMode = visualiser.getRenderMode();
     auto state = std::make_shared<ExportState>();
     state->sampleRate = processor.exportSampleRate();
@@ -94,6 +107,16 @@ void MotionEditor::exportVideo(bool leaveOutLive) {
             // Dismiss only after the settings button callback has returned: the
             // overlay owns that callback and its captured project snapshot.
             if (settingsOverlay != nullptr) { settingsOverlay->requestDismiss(); }
+            // What was chosen is the project's, for next time and to save.
+            if (owner != nullptr) {
+                auto chosen = owner->processor.document.mainProject().exportSettings;
+                if (!config.preserveAlpha) { chosen.codec = static_cast<int>(config.codec); }
+                chosen.crf = config.crf;
+                chosen.soundtrack = config.includeAudio;
+                if (!(chosen == owner->processor.document.mainProject().exportSettings)) {
+                    owner->processor.document.edit("Change export settings", [chosen](motion::Project& updated) { updated.exportSettings = chosen; });
+                }
+            }
             if (owner == nullptr) { return; }
             // Automation names the file itself: a native save panel can't be driven.
             const auto automated = osci::isJucewrightAutomationLaunch() ? juce::SystemStats::getEnvironmentVariable("OSCI_MOTION_EXPORT_FILE", {}) : juce::String();
@@ -279,12 +302,11 @@ void MotionEditor::continueCommandLineRender() {
         failCommandLineRender(error.what());
         return;
     }
-    auto config = recordingSettings.createVideoEncodingConfiguration();
     // Nothing waits for Blender here: live sources are left out, and said so.
     for (const auto& source : processor.document.liveSourcesInUse()) { std::cerr << "osci-motion: leaving out " << source->name << ", a live source; capture it to render it." << std::endl; }
     const auto project = motion::Document::withoutLiveSources(processor.document.mainProject());
-    config.frameRate = project.frameRate;
-    config.includeAudio = commandLineStills.empty();
+    auto config = exportConfiguration(project);
+    config.includeAudio = config.includeAudio && commandLineStills.empty();
     auto state = std::make_shared<ExportState>();
     state->sampleRate = processor.exportSampleRate();
     if (!commandLineStills.empty()) { state->stretches = motion::Stretches::upTo(commandLineStills, project.frameRate); }

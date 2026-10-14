@@ -144,6 +144,20 @@ inline const GeneratorDefinition* generatorOf(const Asset& asset) {
     return findGenerator(asset.data.toString().trim().toStdString());
 }
 
+// How a project is exported: its frame (the Scope's canvas too, so what is
+// framed is what is exported), the video codec (as VideoCodec numbers it),
+// the encoder's quality (its CRF: 1 best to 51, 0 lossless) and whether the
+// soundtrack goes with it.
+struct ExportSettings {
+    int width = 1024, height = 1024;
+    int codec = 0;
+    int crf = 16;
+    bool soundtrack = true;
+    static constexpr int smallest = 64, largest = 8192, codecs = 5;
+    bool operator==(const ExportSettings&) const = default;
+    bool valid() const { return width >= smallest && width <= largest && height >= smallest && height <= largest && codec >= 0 && codec < codecs && crf >= 0 && crf <= 51; }
+};
+
 struct Project : Composition {
     // The output display belongs to the whole project, not to one composition.
     ScopeProfile scope;
@@ -151,6 +165,7 @@ struct Project : Composition {
     // are, resampled to the audio device as it plays. Higher draws more of
     // the beam each frame, for a dense scene drawn cleanly.
     double sampleRate = defaultSampleRate;
+    ExportSettings exportSettings;
     static constexpr double defaultSampleRate = 192000, lowestSampleRate = 22050, highestSampleRate = 768000;
     static bool validSampleRate(double rate) { return std::isfinite(rate) && rate >= lowestSampleRate && rate <= highestSampleRate; }
     // The Scope's picture: animatable beam and display properties.

@@ -712,6 +712,12 @@ juce::XmlElement Document::save(const Project& project) {
     xml.setAttribute("scopeSettle", exactNumber(project.scope.settleMicros));
     if (project.scope.xyOnly) { xml.setAttribute("scopeXYOnly", true); }
     xml.setAttribute("sampleRate", exactNumber(project.sampleRate));
+    auto* exporting = xml.createNewChildElement("export");
+    exporting->setAttribute("width", project.exportSettings.width);
+    exporting->setAttribute("height", project.exportSettings.height);
+    exporting->setAttribute("codec", project.exportSettings.codec);
+    exporting->setAttribute("crf", project.exportSettings.crf);
+    exporting->setAttribute("soundtrack", project.exportSettings.soundtrack);
     auto* beam = xml.createNewChildElement("scopeBeam");
     saveProperties(*beam, project.beam.properties);
     for (const auto& asset : project.assets) {
@@ -812,6 +818,20 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     if (!Project::validSampleRate(project.sampleRate)) {
         notes.note("Sample rate this version can't draw at, set to 192 kHz", juce::String(project.sampleRate) + " Hz");
         project.sampleRate = Project::defaultSampleRate;
+    }
+    const auto* exporting = xml.getChildByName("export");
+    if (exporting != nullptr) {
+        ExportSettings settings;
+        settings.width = exporting->getIntAttribute("width", settings.width);
+        settings.height = exporting->getIntAttribute("height", settings.height);
+        settings.codec = exporting->getIntAttribute("codec", settings.codec);
+        settings.crf = exporting->getIntAttribute("crf", settings.crf);
+        settings.soundtrack = exporting->getBoolAttribute("soundtrack", settings.soundtrack);
+        if (settings.valid()) {
+            project.exportSettings = settings;
+        } else {
+            notes.note("Export settings this version can't use, set to the defaults");
+        }
     }
     // The Scope's identity is reserved before anything else claims one.
     std::set<Id> identities {beamIdentity}, compositionIds;

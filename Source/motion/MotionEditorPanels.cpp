@@ -178,7 +178,13 @@ void MotionEditor::setUpScope() {
         controls->onApply = [owner, popover](VisualiserRenderSize size) {
             juce::MessageManager::callAsync([owner, popover, size] {
                 if (owner == nullptr || popover == nullptr) { return; }
-                owner->processor.recordingParameters.setCanvasSize(size);
+                // The frame is the project's: an edit, saved and undone with it.
+                if (size.width != owner->processor.document.mainProject().exportSettings.width || size.height != owner->processor.document.mainProject().exportSettings.height) {
+                    owner->processor.document.edit("Change the canvas", [size](motion::Project& project) {
+                        project.exportSettings.width = size.width;
+                        project.exportSettings.height = size.height;
+                    });
+                }
                 dismissPopover(popover.getComponent());
             });
         };
