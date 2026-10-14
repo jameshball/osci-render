@@ -15,6 +15,8 @@ namespace osci {
     inline juce::MemoryBlock linuxProductIconPng() {
 #if defined (SOSCI)
         return { BinaryData::sosci_mac_saturated_png, static_cast<size_t> (BinaryData::sosci_mac_saturated_pngSize) };
+#elif defined (OSCI_MOTION)
+        return { BinaryData::motion_mac_png, static_cast<size_t> (BinaryData::motion_mac_pngSize) };
 #else
         return { BinaryData::osci_mac_png, static_cast<size_t> (BinaryData::osci_mac_pngSize) };
 #endif

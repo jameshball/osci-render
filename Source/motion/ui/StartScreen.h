@@ -151,7 +151,7 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         auto header = area.removeFromTop(headerHeight);
-        mark.setBounds(header.removeFromLeft(34).withSizeKeepingCentre(34, 26));
+        mark.setBounds(header.removeFromLeft(34).withSizeKeepingCentre(34, 30));
         // Clear of the overlay's close button.
         header.removeFromRight(40);
         search.setBounds(header.removeFromRight(232).withSizeKeepingCentre(232, 28));
@@ -304,37 +304,43 @@ private:
         style::Fade fade {*this};
     };
 
-    // A small Lissajous figure drifting as a scope at rest does: the app's
-    // mark beside its name.
+    // osci-motion's mark beside its name: the torus of its icon, drawn by
+    // the beam, with its glow.
     class Mark final : public juce::Component {
     public:
-        Mark() { setInterceptsMouseClicks(false, false); }
-        void paint(juce::Graphics& g) override {
-            const auto area = getLocalBounds().toFloat().reduced(4, 3);
-            juce::Path figure;
-            constexpr int steps = 180;
-            for (int step = 0; step <= steps; ++step) {
-                const auto t = juce::MathConstants<float>::twoPi * static_cast<float>(step) / steps;
-                const auto x = area.getCentreX() + area.getWidth() * .5f * std::sin(3.0f * t + phase);
-                const auto y = area.getCentreY() + area.getHeight() * .5f * std::sin(2.0f * t);
-                if (step == 0) { figure.startNewSubPath(x, y); } else { figure.lineTo(x, y); }
-            }
-            figure.closeSubPath();
-            const auto green = style::key();
-            for (const auto& [thickness, alpha] : std::initializer_list<std::pair<float, float>> {{6.0f, .06f}, {3.2f, .16f}, {1.3f, .95f}}) {
-                g.setColour(green.withAlpha(alpha));
-                g.strokePath(figure, juce::PathStrokeType(thickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        Mark() {
+            setInterceptsMouseClicks(false, false);
+            const auto svg = juce::String::createStringFromData(BinaryData::motion_mark_svg, BinaryData::motion_mark_svgSize);
+            const auto xml = juce::parseXML(svg);
+            if (xml != nullptr) {
+                for (auto* path : xml->getChildWithTagNameIterator("path")) {
+                    figure = juce::Drawable::parseSVGPath(path->getStringAttribute("d"));
+                    break;
+                }
             }
         }
+        void paint(juce::Graphics& g) override {
+            if (figure.isEmpty()) {
+                return;
+            }
+            const auto area = getLocalBounds().toFloat().reduced(1);
+            const auto placed = figure.getTransformToScaleToFit(area, true);
+            auto path = figure;
+            path.applyTransform(placed);
+            // As the icon draws it: a ribbon, bright edges either side of a
+            // solid green body, over a faint haze.
+            const auto green = style::brand();
+            const auto width = std::max(1.6f, area.getWidth() * 34.0f / 1024.0f * 1.3f);
+            const auto stroke = [&](float thickness, juce::Colour colour) {
+                g.setColour(colour);
+                g.strokePath(path, juce::PathStrokeType(thickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            };
+            stroke(width * 2.4f, green.withAlpha(.12f));
+            stroke(width, juce::Colour(0xffaaf58c));
+            stroke(width * .74f, green);
+        }
     private:
-        float phase = .6f;
-        double last = juce::Time::getMillisecondCounterHiRes();
-        juce::VBlankAttachment drift {this, [this] {
-            const auto now = juce::Time::getMillisecondCounterHiRes();
-            phase += static_cast<float>((now - last) * .00035);
-            last = now;
-            repaint();
-        }};
+        juce::Path figure;
     };
 
     // The cards: projects opened lately, then the examples, each a picture

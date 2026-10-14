@@ -1,5 +1,6 @@
 #include "MotionEditor.h"
 #include "ui/MenuIcons.h"
+#include "../components/AboutComponent.h"
 #include <cstdlib>
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
@@ -181,7 +182,30 @@ void MotionEditor::setUpMenus() {
     menus.addStandaloneAudioSettingsMenuItem(audioMenu, processor, *this);
     menus.addTopLevelMenu("View");
     menus.addTopLevelMenu("Timing");
+    menus.addTopLevelMenu("Help");
     registerCommands();
+    menus.addMenuItem(helpMenu, "Start screen...", [this] { showStartScreen(); });
+    menus.addMenuItem(helpMenu, "Keyboard shortcuts...", [this] { showShortcuts(); }, motion::style::shortcutText("Cmd+/"));
+    menus.addMenuSeparator(helpMenu);
+    menus.addMenuItem(helpMenu, "About osci-motion", [this] {
+        AboutComponent::Info about;
+        about.imageData = BinaryData::motion_logo_png;
+        about.imageSize = BinaryData::motion_logo_pngSize;
+        about.productName = ProjectInfo::projectName;
+        about.companyName = ProjectInfo::companyName;
+        about.versionString = ProjectInfo::versionString;
+        about.isPremium = true;
+        about.betaUpdatesEnabled = osci::UpdateSettings(processor.getProductSlug()).betaUpdatesEnabled();
+        about.onBetaUpdatesChanged = [this](bool enabled) {
+            osci::UpdateSettings(processor.getProductSlug()).setReleaseTrack(enabled ? osci::ReleaseTrack::Beta : osci::ReleaseTrack::Stable);
+            refreshBetaUpdatesButton();
+            resized();
+        };
+        about.websiteUrl = "https://osci-render.com";
+        about.onPrivacyAndTerms = [this] { openPrivacyAndTerms(); };
+        showOverlay(AboutComponent::createOverlay(about));
+    });
+    menus.addSupportMenuItems(helpMenu, processor, *this);
     initialiseMenuBar(menus);
     menuBar.setLookAndFeel(&motionLookAndFeel);
 }

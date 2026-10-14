@@ -754,8 +754,14 @@
         <FILE id="MotuiViewNavigationh" name="ViewNavigation.h" compile="0"
               resource="0" file="Source/motion/ui/ViewNavigation.h"/>
       </GROUP>
-      <FILE id="MotionIcon" name="osci_mac.png" compile="0" resource="1"
-            file="Resources/images/osci_mac.png"/>
+      <FILE id="MotionIcon" name="motion_mac.png" compile="0" resource="1"
+            file="Resources/images/motion_mac.png"/>
+      <FILE id="MotionSmallIcon" name="motion_small.png" compile="0" resource="1"
+            file="Resources/images/motion_small.png"/>
+      <FILE id="MotionLogo" name="motion_logo.png" compile="0" resource="1"
+            file="Resources/images/motion_logo.png"/>
+      <FILE id="MotionMark" name="motion_mark.svg" compile="0" resource="1"
+            file="Resources/images/motion_mark.svg"/>
       <FILE id="OfflineBeamSnap" name="OfflineVisualiserParameters.h" compile="0"
             resource="0" file="Source/visualiser/OfflineVisualiserParameters.h"/>
     </GROUP>
@@ -763,7 +769,7 @@
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1"
                JUCE_ASIO="1" JUCE_USE_XRENDER="1"/>
   <EXPORTFORMATS>
-    <LINUX_MAKE targetFolder="Builds/osci-motion/LinuxMakefile" smallIcon="MotionIcon"
+    <LINUX_MAKE targetFolder="Builds/osci-motion/LinuxMakefile" smallIcon="MotionSmallIcon"
                 bigIcon="MotionIcon" externalLibraries="luajit&#10;X11&#10;Xext&#10;Xrender"
                 extraLinkerFlags="-Wl,--wrap=eglChooseConfig,--wrap=eglInitialize,--wrap=eglTerminate">
       <CONFIGURATIONS>
@@ -810,7 +816,7 @@
         <MODULEPATH id="osci_scripting" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2022 targetFolder="Builds/osci-motion/VisualStudio2022" smallIcon="MotionIcon"
+    <VS2022 targetFolder="Builds/osci-motion/VisualStudio2022" smallIcon="MotionSmallIcon"
             bigIcon="MotionIcon" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX /bigobj"
             externalLibraries="luajit51.lib" extraLinkerFlags="/IGNORE:4006">
       <CONFIGURATIONS>
@@ -861,7 +867,7 @@
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-motion/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak -framework IOSurface"
-               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="MotionIcon"
+               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="MotionSmallIcon"
                bigIcon="MotionIcon" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
                iosDevelopmentTeamID="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-motion needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-motion needs Bluetooth access to connect to Bluetooth MIDI devices.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;"

@@ -367,7 +367,7 @@ private:
     void refreshUndo();
     // The menu bar's menus, in order, and ids clear of the menu model's own
     // (1-based per item) for the items added to them here.
-    enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, audioMenu, viewMenu, timingMenuIndex };
+    enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, audioMenu, viewMenu, timingMenuIndex, helpMenu };
     static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100, outputMenuId = 2000;
     // The rates a project can be drawn at, from what audio runs at to four
     // times 192 kHz.

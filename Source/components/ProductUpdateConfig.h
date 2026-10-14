@@ -16,8 +16,8 @@ inline ProductUpdateConfig makeProductUpdateConfig (std::function<void()> onUpda
     config.productSlug = currentProduct().slug;
     config.productName = currentProduct().name;
 #if defined(OSCI_MOTION)
-    config.productIcon = juce::ImageFileFormat::loadFrom(BinaryData::osci_mac_png, static_cast<size_t>(BinaryData::osci_mac_pngSize));
-    config.linuxIconPng = { BinaryData::osci_mac_png, static_cast<size_t>(BinaryData::osci_mac_pngSize) };
+    config.productIcon = juce::ImageFileFormat::loadFrom(BinaryData::motion_mac_png, static_cast<size_t>(BinaryData::motion_mac_pngSize));
+    config.linuxIconPng = { BinaryData::motion_mac_png, static_cast<size_t>(BinaryData::motion_mac_pngSize) };
     config.linuxInstallManifest = { "osci-motion", "osci-motion", "osci-motion", {}, {}, "AudioVideo;Audio;Graphics;" };
 #elif defined(SOSCI)
     config.productIcon = juce::ImageFileFormat::loadFrom (BinaryData::sosci_mac_saturated_png,

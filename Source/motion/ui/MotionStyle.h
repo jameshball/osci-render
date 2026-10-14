@@ -96,6 +96,9 @@ inline juce::PopupMenu::Item menuItem(const juce::String& text, int id, const ju
 }
 
 
+// osci-motion's own green, as in its icon and logo (osci-render's and
+// sosci's too): the mark on the start screen, and nothing in the editing UI.
+inline juce::Colour brand() { return juce::Colour(0xff56d836); }
 // The beam's phosphor green: traces, previews and the playhead. Keys are
 // neutral (or their axis' colour) so they never read as selected.
 inline juce::Colour key() { return juce::Colour(0xff72de98); }
