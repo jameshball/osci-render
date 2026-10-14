@@ -1,0 +1,125 @@
+{
+  "rate": 192000.0,
+  "frames": [
+    {
+      "time": 0.0,
+      "samples": 3200,
+      "drawn": 5.02640188112855,
+      "travelled": 0.0,
+      "brightness": 0.9975,
+      "lit": 0.9975,
+      "bounds": [
+        -0.800000011920929,
+        0.0,
+        -0.800000011920929,
+        0.0
+      ],
+      "fingerprint": "fe56f130fccc980b"
+    },
+    {
+      "time": 2.0,
+      "samples": 3200,
+      "drawn": 4.525483539910056,
+      "travelled": 0.0,
+      "brightness": 0.9975,
+      "lit": 0.9975,
+      "bounds": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fingerprint": "3a6fc4cbdd5e1515"
+    },
+    {
+      "time": 4.0,
+      "samples": 3200,
+      "drawn": 7.543150873854756,
+      "travelled": 0.0,
+      "brightness": 0.9975,
+      "lit": 0.9975,
+      "bounds": [
+        0.800000011920929,
+        0.0,
+        0.800000011920929,
+        0.0
+      ],
+      "fingerprint": "0d5417de1b08dcaf"
+    },
+    {
+      "time": 6.0,
+      "samples": 3200,
+      "drawn": 7.543159055523574,
+      "travelled": 9.797174158936853e-17,
+      "brightness": 0.9975,
+      "lit": 0.9975,
+      "bounds": [
+        9.797174158936853e-17,
+        0.0,
+        9.797174158936853e-17,
+        0.0
+      ],
+      "fingerprint": "8bac2c225adcc1db"
+    },
+    {
+      "time": 8.0,
+      "samples": 3200,
+      "drawn": 12.167023318819702,
+      "travelled": 0.0,
+      "brightness": 0.9975,
+      "lit": 0.9975,
+      "bounds": [
+        -0.800000011920929,
+        0.0,
+        -0.800000011920929,
+        0.0
+      ],
+      "fingerprint": "ece2fe3f26cbff45"
+    },
+    {
+      "time": 10.0,
+      "samples": 3200,
+      "drawn": 12.230880626942962,
+      "travelled": 0.0,
+      "brightness": 0.9975,
+      "lit": 0.9975,
+      "bounds": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fingerprint": "20677a7c5ef1df53"
+    },
+    {
+      "time": 12.0,
+      "samples": 3200,
+      "drawn": 16.98882132396102,
+      "travelled": 0.0,
+      "brightness": 0.9975,
+      "lit": 0.9975,
+      "bounds": [
+        0.800000011920929,
+        0.0,
+        0.800000011920929,
+        0.0
+      ],
+      "fingerprint": "7220d7bdc4457376"
+    },
+    {
+      "time": 14.0,
+      "samples": 3200,
+      "drawn": 16.988811223767698,
+      "travelled": 9.797174158936853e-17,
+      "brightness": 0.9975,
+      "lit": 0.9975,
+      "bounds": [
+        9.797174158936853e-17,
+        0.0,
+        9.797174158936853e-17,
+        0.0
+      ],
+      "fingerprint": "454c1021c497604d"
+    }
+  ]
+}

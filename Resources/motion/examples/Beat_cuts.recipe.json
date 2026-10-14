@@ -1,0 +1,77 @@
+{
+  "name": "Beat cuts",
+  "description": "A music video starter: four cameras cut on every bar and the shapes pulse with the soundtrack. Drop in your own song and set its tempo; the cuts follow.",
+  "picture": 1.02,
+  "duration": 16,
+  "fps": 60,
+  "bpm": 120,
+  "timeDisplay": "beats",
+  "beam": {
+    "intensity": 5,
+    "persistence": 0.3,
+    "glow": 0.3
+  },
+  "objects": [
+    {"name": "Soundtrack", "file": "Beat_cuts_loop.ogg"},
+    {
+      "name": "Floor",
+      "generator": "grid",
+      "properties": {"rotation.x": -90, "position.y": -0.7, "generator.width": 4, "generator.height": 4, "generator.columns": 12, "generator.rows": 12, "scale.x": 1.5, "scale.y": 1.5, "opacity": 45}
+    },
+    {
+      "name": "Torus",
+      "generator": "torus",
+      "properties": {"generator.radius": 0.55, "generator.thickness": 0.18, "rotation.x": 60}
+    },
+    {
+      "name": "Cube",
+      "generator": "box",
+      "properties": {"position.x": -1.5, "generator.width": 0.6, "generator.height": 0.6, "generator.depth": 0.6, "rotation.x": 20}
+    },
+    {
+      "name": "Cone",
+      "generator": "cone",
+      "properties": {"position.x": 1.5, "generator.radius": 0.35, "generator.height": 0.8}
+    }
+  ],
+  "cameras": [
+    {"name": "Wide", "lookAt": "Torus", "properties": {"position.x": 0, "position.y": 1.4, "position.z": 5, "hideLines": 100}},
+    {"name": "Close", "lookAt": "Torus", "properties": {"position.x": 1.5, "position.y": 0.6, "position.z": 2.5, "hideLines": 100}},
+    {"name": "Low", "lookAt": "Torus", "properties": {"position.x": -1.8, "position.y": -0.5, "position.z": 3.2, "hideLines": 100}},
+    {"name": "Top", "lookAt": "Torus", "properties": {"position.x": 0, "position.y": 5, "position.z": 0.5, "hideLines": 100}}
+  ],
+  "cuts": [
+    {"camera": "Wide", "start": 0, "duration": 2},
+    {"camera": "Close", "start": 2, "duration": 2},
+    {"camera": "Low", "start": 4, "duration": 2},
+    {"camera": "Top", "start": 6, "duration": 2},
+    {"camera": "Close", "start": 8, "duration": 2},
+    {"camera": "Low", "start": 10, "duration": 2},
+    {"camera": "Top", "start": 12, "duration": 2},
+    {"camera": "Wide", "start": 14, "duration": 2}
+  ],
+  "modulators": [
+    {
+      "name": "Spin",
+      "waveform": "saw",
+      "rate": 0.0625,
+      "routes": [
+        {"to": "Torus", "property": "rotation.y", "amount": 180},
+        {"to": "Cube", "property": "rotation.y", "amount": -180},
+        {"to": "Cone", "property": "rotation.y", "amount": 180}
+      ]
+    },
+    {
+      "name": "Kick",
+      "waveform": "soundtrack",
+      "routes": [
+        {"to": "Torus", "property": "scale.x", "amount": 0.35, "mode": "multiply"},
+        {"to": "Torus", "property": "scale.y", "amount": 0.35, "mode": "multiply"},
+        {"to": "Torus", "property": "scale.z", "amount": 0.35, "mode": "multiply"},
+        {"to": "Cube", "property": "scale.y", "amount": 0.5, "mode": "multiply"},
+        {"to": "Cone", "property": "scale.y", "amount": 0.5, "mode": "multiply"},
+        {"to": "scope", "property": "glow", "amount": 0.4}
+      ]
+    }
+  ]
+}

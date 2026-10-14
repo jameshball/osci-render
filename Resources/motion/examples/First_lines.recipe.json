@@ -1,0 +1,34 @@
+{
+  "name": "First lines",
+  "description": "A Lissajous figure steps through 1:1, 1:2, 2:3 and 3:4 on the bar while an LFO drifts its phase. Change the ratios to draw your own.",
+  "picture": 10,
+  "duration": 16,
+  "fps": 60,
+  "bpm": 120,
+  "beam": {
+    "intensity": 6,
+    "persistence": 1.2,
+    "glow": 0.4
+  },
+  "objects": [
+    {
+      "name": "Figure",
+      "generator": "lissajous",
+      "properties": {
+        "generator.radius": 0.8
+      },
+      "keys": {
+        "generator.frequencyX": [[0, 1, "hold"], [4, 1, "hold"], [8, 2, "hold"], [12, 3, "hold"]],
+        "generator.frequencyY": [[0, 1, "hold"], [4, 2, "hold"], [8, 3, "hold"], [12, 4, "hold"]]
+      }
+    }
+  ],
+  "modulators": [
+    {
+      "name": "Drift",
+      "waveform": "saw",
+      "rate": 0.125,
+      "routes": [{"to": "Figure", "property": "generator.phase", "amount": 180}]
+    }
+  ]
+}

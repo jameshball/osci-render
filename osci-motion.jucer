@@ -28,6 +28,18 @@
               resource="1" file="Resources/motion/examples/Mirror_ball_tour.osci-motion"/>
         <FILE id="ExPrSurfaces" name="Surface_shapes.osci-motion" compile="0"
               resource="1" file="Resources/motion/examples/Surface_shapes.osci-motion"/>
+        <FILE id="ExPrFirstLines" name="First_lines.osci-motion" compile="0"
+              resource="1" file="Resources/motion/examples/First_lines.osci-motion"/>
+        <FILE id="ExPrTitleCard" name="Title_card.osci-motion" compile="0"
+              resource="1" file="Resources/motion/examples/Title_card.osci-motion"/>
+        <FILE id="ExPrLogoSting" name="Logo_sting.osci-motion" compile="0"
+              resource="1" file="Resources/motion/examples/Logo_sting.osci-motion"/>
+        <FILE id="ExPrHarmonograph" name="Harmonograph.osci-motion" compile="0"
+              resource="1" file="Resources/motion/examples/Harmonograph.osci-motion"/>
+        <FILE id="ExPrBeatCuts" name="Beat_cuts.osci-motion" compile="0" resource="1"
+              file="Resources/motion/examples/Beat_cuts.osci-motion"/>
+        <FILE id="ExPrSynthwave" name="Synthwave_drive.osci-motion" compile="0"
+              resource="1" file="Resources/motion/examples/Synthwave_drive.osci-motion"/>
       </GROUP>
       <GROUP id="{6E1A0C2B-4D11-4B7A-9E0D-5A7C3E2F9B10}" name="examples">
         <FILE id="Ex3793e4" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
