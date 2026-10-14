@@ -108,7 +108,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // After the command line is read: a file or render opened with it goes
     // straight there.
     juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] {
-        if (owner != nullptr) { owner->showStartScreenAtLaunch(); }
+        if (owner != nullptr) { owner->atLaunch(); }
     });
 }
 
@@ -317,6 +317,8 @@ void MotionEditor::setUpTransport() {
 
 MotionEditor::~MotionEditor() {
     juce::Desktop::getInstance().removeFocusChangeListener(this);
+    // Closed as it should be: the session is kept by the app on quitting.
+    if (recovery != nullptr) { recovery->finish(); }
     // A popover is parented here and deletes itself only when dismissed.
     if (popover != nullptr) {
         popover->exitModalState(0);
@@ -441,6 +443,7 @@ void MotionEditor::refreshUndo() {
 
 void MotionEditor::timerCallback() {
     continueCommandLineRender();
+    keepRecovery();
     refreshUndo();
     if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) { previewText(); }
     processor.showIdleSeek(processor.document.mainProject().duration);

@@ -433,6 +433,8 @@
             resource="0" file="Source/motion/MotionProcessor.cpp"/>
       <FILE id="MotionMotionProcessorh" name="MotionProcessor.h" compile="0"
             resource="0" file="Source/motion/MotionProcessor.h"/>
+      <FILE id="MotSessionRecovery" name="SessionRecovery.h" compile="0"
+            resource="0" file="Source/motion/SessionRecovery.h"/>
       <FILE id="MotScopeBeamh" name="ScopeBeam.h" compile="0" resource="0"
             file="Source/motion/ScopeBeam.h"/>
       <FILE id="MotVisualiserStateh" name="VisualiserState.h" compile="0"

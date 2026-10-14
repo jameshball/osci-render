@@ -10,6 +10,7 @@
 #include "PreparedSource.h"
 #include "LiveSourceIdentity.h"
 #include "BlenderSourceSettings.h"
+#include <limits>
 #include "LoadNotes.h"
 #include "BakeSettings.h"
 #include "RasterSettings.h"
@@ -202,6 +203,8 @@ public:
     // saved (an undo back to that point still counts as a change).
     bool unsaved() const { return contentRevision != savedRevision; }
     void markSaved() { savedRevision = contentRevision; }
+    // Reopened with changes its file doesn't have (a session that had them).
+    void markUnsaved() { savedRevision = std::numeric_limits<std::uint64_t>::max(); }
     // Identities stay below the Scope's reserved one, so it never collides.
     static constexpr Id maximumId = beamIdentity - 1;
     // Loaded projects leave this many identities free above their highest,

@@ -269,6 +269,8 @@ void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
     }
     juce::XmlElement project("motion-project");
     project.setAttribute("schema", 1);
+    // A session with changes its file lacks reopens with them still unsaved.
+    if (document.unsaved() && !savingProjectFile) { project.setAttribute("edited", true); }
     saveStandaloneProjectFilePathToXml(project);
     saveProperties(project);
     VisualiserState::save(project, visualiserParameters, recordingParameters);
@@ -298,7 +300,12 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
         unrestoredState.reset();
         restoreError = file.notes.empty() ? juce::String() : "Reopened your last session without " + juce::String(file.notes.count()) + (file.notes.count() == 1 ? " thing" : " things") + " this version can't use: " + file.notes.lines().joinIntoString("; ") + ".";
     }
+    const auto edited = file.xml->getBoolAttribute("edited");
     applyPreparedProject(std::move(file.project), *file.xml);
+    if (edited) {
+        const juce::MessageManagerLock messageLock;
+        document.markUnsaved();
+    }
 }
 
 void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlElement& state) {

@@ -607,16 +607,48 @@ void MotionEditor::showStartScreen() {
     startScreenOverlay = motion::ui::StartScreen::show(*this, std::move(screen));
 }
 
-// Unless it was turned off, or osci-motion was opened to render, to open a
-// file, or by automation.
-void MotionEditor::showStartScreenAtLaunch() {
-    if (!juce::JUCEApplicationBase::isStandaloneApp() || osci::isJucewrightAutomationLaunch() || !processor.globalSettings.getBool("showStartScreen", true)) {
+// After the command line is read: a launch that only renders keeps no
+// recovery, and one that opens a file or render skips the start screen, as
+// one by automation does, or once it is turned off.
+void MotionEditor::atLaunch() {
+    if (!juce::JUCEApplicationBase::isStandaloneApp() || commandLineRender != juce::File() || !processor.remembersFiles) {
         return;
     }
-    if (commandLineRender != juce::File() || commandLineProject != CommandLineProject::none || projectLoad != nullptr) {
+    recovery = std::make_unique<motion::SessionRecovery>(processor.applicationFolder);
+    // A new project makes a new editor: what follows is for the app opening.
+    static bool opened = false;
+    if (std::exchange(opened, true)) {
+        recoveredState = {processor.document.generation(), processor.document.revision(), processor.document.unsaved()};
+        return;
+    }
+    const auto left = recovery->file();
+    juce::MemoryBlock session;
+    if (left.existsAsFile() && left.loadFileAsData(session) && session.getSize() > 0) {
+        processor.setStateInformation(session.getData(), static_cast<int>(session.getSize()));
+        statusBar.show("Reopened your work from " + left.getLastModificationTime().formatted("%H:%M") + ", after osci-motion closed unexpectedly. Save it to keep it.", MotionStatusBar::Kind::notice);
+    }
+    recoveredState = {processor.document.generation(), processor.document.revision(), processor.document.unsaved()};
+    if (osci::isJucewrightAutomationLaunch() || !processor.globalSettings.getBool("showStartScreen", true) || commandLineProject != CommandLineProject::none || projectLoad != nullptr) {
         return;
     }
     showStartScreen();
+}
+
+// Every few seconds the session has changed, it is written for recovery.
+void MotionEditor::keepRecovery() {
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (recovery == nullptr || now < recoveryDue) {
+        return;
+    }
+    recoveryDue = now + 10000;
+    const auto& document = processor.document;
+    const std::tuple<std::uint64_t, std::uint64_t, bool> current {document.generation(), document.revision(), document.unsaved()};
+    if (current == recoveredState) {
+        return;
+    }
+    juce::MemoryBlock session;
+    processor.getStateInformation(session);
+    if (recovery->write(std::move(session))) { recoveredState = current; }
 }
 
 // If no frame comes soon (the Scope hidden behind a dialog), the project
@@ -634,8 +666,13 @@ void MotionEditor::beforeSaving(std::function<void()> write) {
             return;
         }
         saving->done = true;
-        if (owner != nullptr && frame.isValid()) { owner->processor.picture = motion::ProjectPicture::encode(frame); }
+        if (owner == nullptr) {
+            return;
+        }
+        if (frame.isValid()) { owner->processor.picture = motion::ProjectPicture::encode(frame); }
+        owner->processor.savingProjectFile = true;
         saving->write();
+        if (owner != nullptr) { owner->processor.savingProjectFile = false; }
     };
     visualiser.captureFrame(finish);
     juce::Timer::callAfterDelay(250, [finish] { finish({}); });

@@ -5,6 +5,7 @@
 #include "model/LightPresets.h"
 #include "model/MirrorPresets.h"
 #include "MotionProcessor.h"
+#include "SessionRecovery.h"
 #include "ui/BeamOverload.h"
 #include "ui/TimelineView.h"
 #include "ui/BeamShares.h"
@@ -276,7 +277,15 @@ private:
     // The start screen: recent projects and the examples, as pictures, and
     // the ways to begin. Shown as osci-motion opens unless turned off.
     void showStartScreen();
-    void showStartScreenAtLaunch();
+    // As osci-motion opens: the work a crash cut short reopened, then the
+    // start screen.
+    void atLaunch();
+    // The session written every little while for a crash to leave behind;
+    // none for a launch that only renders.
+    std::unique_ptr<motion::SessionRecovery> recovery;
+    std::tuple<std::uint64_t, std::uint64_t, bool> recoveredState {};
+    double recoveryDue = 0;
+    void keepRecovery();
     juce::Component::SafePointer<osci::OverlayComponent> startScreenOverlay;
     juce::Component::SafePointer<motion::ui::StartScreen> startScreen;
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;

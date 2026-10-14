@@ -124,6 +124,9 @@ public:
     // The project's picture (see ProjectPicture), saved with it: the Scope's
     // frame when it was last saved; message thread.
     juce::MemoryBlock picture;
+    // True while the project is written to its own file: what is written is
+    // then what the file holds, not a session with changes the file lacks.
+    bool savingProjectFile = false;
     // The current composition's bake of its hidden lines, when it has one,
     // and how many of its frames are still to bake; message thread.
     std::shared_ptr<const motion::hidden::Bake> hiddenLineBake() const { return publishedBake; }
