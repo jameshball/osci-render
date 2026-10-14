@@ -700,6 +700,8 @@
         <FILE id="MotuiSheeth" name="Sheet.h" compile="0" resource="0" file="Source/motion/ui/Sheet.h"/>
         <FILE id="MotuiShortcutsOverlayh" name="ShortcutsOverlay.h" compile="0"
               resource="0" file="Source/motion/ui/ShortcutsOverlay.h"/>
+        <FILE id="MotuiStartScreenh" name="StartScreen.h" compile="0" resource="0"
+              file="Source/motion/ui/StartScreen.h"/>
         <FILE id="MotuiSourcePreviewh" name="SourcePreview.h" compile="0" resource="0"
               file="Source/motion/ui/SourcePreview.h"/>
         <FILE id="MotuiStatusBarh" name="StatusBar.h" compile="0" resource="0"
