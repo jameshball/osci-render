@@ -1,6 +1,5 @@
 #include "MotionEditor.h"
 #include "ui/MenuIcons.h"
-#include "../components/menu/InternalSampleRateMenu.h"
 #include <cstdlib>
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
@@ -98,7 +97,14 @@ void MotionEditor::setUpMenus() {
             for (int id = 1; id <= monitorOutput.getNumItems(); ++id) { output.addItem(outputMenuId + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
             // Named as the chooser beside the transport is.
             menu.addSubMenu("Output", output);
-            InternalSampleRateMenu::addSubmenu(menu, processor, processor.document.mainProject().sampleRateRatio, sampleRateMenuId, true);
+            // The project's own rate: what it is drawn and exported at.
+            juce::PopupMenu rates;
+            const auto current = processor.document.mainProject().sampleRate;
+            for (std::size_t index = 0; index < projectSampleRates.size(); ++index) {
+                const auto rate = projectSampleRates[index];
+                rates.addItem(sampleRateMenuId + static_cast<int>(index), juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + (rate == motion::Project::defaultSampleRate ? juce::String(" (default)") : juce::String()), true, std::abs(rate - current) < .5);
+            }
+            menu.addSubMenu("Sample rate", rates);
             menu.addSeparator();
         }
         if (index == timingMenuIndex) {
@@ -128,11 +134,13 @@ void MotionEditor::setUpMenus() {
             return true;
         }
         // The rate is the project's: an edit, undone as one.
-        const auto chooseRatio = [this](double ratio) {
-            if (processor.document.mainProject().sampleRateRatio == ratio) { return; }
-            processor.document.edit("Change the internal sample rate", [ratio](motion::Project& project) { project.sampleRateRatio = ratio; });
-        };
-        if (index == audioMenu && InternalSampleRateMenu::handleMenuId(id, sampleRateMenuId, processor, [this] { showPremiumSplashScreen(); }, chooseRatio)) { return true; }
+        if (index == audioMenu && id >= sampleRateMenuId && id < sampleRateMenuId + static_cast<int>(projectSampleRates.size())) {
+            const auto rate = projectSampleRates[static_cast<std::size_t>(id - sampleRateMenuId)];
+            if (processor.document.mainProject().sampleRate != rate) {
+                processor.document.edit("Change the sample rate", [rate](motion::Project& project) { project.sampleRate = rate; });
+            }
+            return true;
+        }
         if (index == editMenu && (id == undoMenuId || id == redoMenuId)) {
             if (id == undoMenuId) { undoRedoControls.undo(); } else { undoRedoControls.redo(); }
             refreshUndo();

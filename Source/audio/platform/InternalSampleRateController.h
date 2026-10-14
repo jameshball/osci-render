@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <osci_render_core/osci_render_core.h>
+#include "ProjectRateAdapter.h"
 
 #include <cmath>
 
@@ -22,6 +23,15 @@ public:
     }
 
     [[nodiscard]] double getRatio() const noexcept { return ratio.load(); }
+    // A rate chosen outright (an osci-motion project's) in place of a ratio
+    // of the device's, resampled to the device as it plays; 0 for none.
+    [[nodiscard]] double getChosenRate() const noexcept { return chosenRate.load(); }
+    bool setChosenRate(double rate) noexcept {
+        rate = rate > 0 ? juce::jlimit(ProjectRateAdapter::lowestRate, ProjectRateAdapter::highestRate, rate) : 0.0;
+        if (std::abs(rate - chosenRate.load()) < 1.0e-6) { return false; }
+        chosenRate.store(rate);
+        return true;
+    }
     [[nodiscard]] double getLastDeviceSampleRate() const noexcept { return lastDeviceSampleRate; }
     [[nodiscard]] int getLastDeviceBlockSize() const noexcept { return lastDeviceBlockSize; }
     [[nodiscard]] bool hasPreparedDevice() const noexcept { return lastDeviceSampleRate > 0.0 && lastDeviceBlockSize > 0; }
@@ -38,6 +48,11 @@ public:
     PreparedSpec prepare(double deviceSampleRate, int maxDeviceBlockSize, int numChannels, bool enabled) {
         lastDeviceSampleRate = deviceSampleRate;
         lastDeviceBlockSize = maxDeviceBlockSize;
+        chosen = enabled && chosenRate.load() > 0 && deviceSampleRate > 0;
+        if (chosen) {
+            projectRate.prepare(deviceSampleRate, chosenRate.load(), maxDeviceBlockSize, numChannels);
+            return {projectRate.getProcessingSampleRate(), projectRate.getMaxProcessingBlockSize(), projectRate.getLatencySamples()};
+        }
 
         const auto requestedRatio = enabled ? ratio.load() : 1.0;
         const auto effectiveRatio = enabled && osci::IntegerRatioSampleRateAdapter::isRatioAllowed(deviceSampleRate, requestedRatio)
@@ -70,6 +85,12 @@ public:
 
     template <typename ProcessInternal>
     osci::IntegerRatioSampleRateAdapter::ProcessResult process(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi, ProcessInternal&& processInternal) noexcept {
+        if (chosen) {
+            osci::IntegerRatioSampleRateAdapter::ProcessResult result;
+            result.active = true;
+            result.internalSamplesProcessed = projectRate.process(buffer, midi, std::forward<ProcessInternal>(processInternal));
+            return result;
+        }
         if (adapter.isActive()) {
             return adapter.process(buffer, midi, std::forward<ProcessInternal>(processInternal));
         }
@@ -81,7 +102,11 @@ public:
     }
 
 private:
-    std::atomic<double> ratio{1.0};
+    std::atomic<double> ratio{1.0}, chosenRate{0.0};
+    // Whether the chosen rate is what was prepared (read on the audio thread
+    // only after a prepare, which suspends processing).
+    bool chosen = false;
+    ProjectRateAdapter projectRate;
     double lastDeviceSampleRate = 0.0;
     int lastDeviceBlockSize = 0;
     osci::IntegerRatioSampleRateAdapter adapter;

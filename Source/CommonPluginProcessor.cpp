@@ -467,9 +467,9 @@ bool CommonAudioProcessor::canSetInternalSampleRateRatio(double ratio) const {
 #endif
 }
 
-void CommonAudioProcessor::setInternalSampleRateRatio(double ratio, bool remember) {
+void CommonAudioProcessor::setInternalSampleRateRatio(double ratio) {
 #if !OSCI_PREMIUM
-    juce::ignoreUnused(ratio, remember);
+    juce::ignoreUnused(ratio);
     return;
 #else
     if (!supportsInternalSampleRateOverride()) {
@@ -480,10 +480,8 @@ void CommonAudioProcessor::setInternalSampleRateRatio(double ratio, bool remembe
         return;
     }
 
-    if (remember) {
-        globalSettings.set(InternalSampleRateController::settingKey, internalSampleRate.getRatio());
-        globalSettings.save();
-    }
+    globalSettings.set(InternalSampleRateController::settingKey, internalSampleRate.getRatio());
+    globalSettings.save();
 
     if (internalSampleRate.hasPreparedDevice()) {
         suspendProcessing(true);
@@ -491,6 +489,15 @@ void CommonAudioProcessor::setInternalSampleRateRatio(double ratio, bool remembe
         suspendProcessing(false);
     }
 #endif
+}
+
+void CommonAudioProcessor::setProcessingSampleRate(double rate) {
+    if (!supportsInternalSampleRateOverride() || !internalSampleRate.setChosenRate(rate)) { return; }
+    if (internalSampleRate.hasPreparedDevice()) {
+        suspendProcessing(true);
+        prepareToPlay(internalSampleRate.getLastDeviceSampleRate(), internalSampleRate.getLastDeviceBlockSize());
+        suspendProcessing(false);
+    }
 }
 
 void CommonAudioProcessor::releaseResources() {

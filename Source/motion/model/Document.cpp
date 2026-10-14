@@ -107,7 +107,7 @@ Project Document::mergeScope(Project view) const {
     if (scopeId == 0) { return view; }
     auto whole = state;
     whole.scope = view.scope;
-    whole.sampleRateRatio = view.sampleRateRatio;
+    whole.sampleRate = view.sampleRate;
     whole.beam = view.beam;
     whole.assets = std::move(view.assets);
     whole.definitions = std::move(view.definitions);

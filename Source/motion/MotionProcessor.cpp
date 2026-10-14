@@ -34,9 +34,8 @@ MotionProcessor::MotionProcessor()
         loopEnd.store(project.loopEnd);
         looping.store(project.looping && project.hasLoop());
         if (document.viewOnlyChange()) { return; }
-        // The project's rate, never remembered for the next one.
-        const auto ratio = document.mainProject().sampleRateRatio;
-        if (std::abs(ratio - getInternalSampleRateRatio()) > 1.0e-6 && canSetInternalSampleRateRatio(ratio)) { setInternalSampleRateRatio(ratio, false); }
+        // The project's rate, resampled to the device as it plays.
+        setProcessingSampleRate(document.mainProject().sampleRate);
         prepareComposition(project);
     };
     document.onChanged();

@@ -362,7 +362,7 @@ int main(int argc, char* argv[]) {
     const juce::ScopedJuceInitialiser_GUI initialiser;
     juce::ConsoleApplication app;
     app.addHelpCommand("--help|-h", "osci-motion-cli: draws osci-motion projects offline, as Export draws them.\n"
-        "Times are in seconds; --rate=Hz sets the sample rate (the project's own: 48000 times its ratio).", true);
+        "Times are in seconds; --rate=Hz sets the sample rate (the project's own).", true);
     app.addCommand({"make", "make <scene.recipe.json> [--out=scene.osci-motion]",
         "Makes a project from a recipe: objects from generators or files, their properties and keys, a camera.",
         "Every command takes a recipe wherever it takes a project. See Source/motion/cli/Recipe.h for the format.", make});

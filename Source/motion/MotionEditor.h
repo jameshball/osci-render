@@ -345,6 +345,9 @@ private:
     // (1-based per item) for the items added to them here.
     enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, audioMenu, viewMenu, timingMenuIndex };
     static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100, outputMenuId = 2000;
+    // The rates a project can be drawn at, from what audio runs at to four
+    // times 192 kHz.
+    static constexpr std::array<double, 8> projectSampleRates {44100, 48000, 88200, 96000, 176400, 192000, 384000, 768000};
     // The add menu's items, and the first id of each list in it.
     struct AddMenuId {
         static constexpr int importFile = 1, blenderSource = 2, drawing = 3;

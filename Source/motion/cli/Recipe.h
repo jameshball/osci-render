@@ -13,7 +13,7 @@ namespace motion::cli {
 // is made again exactly whatever the project format comes to be.
 //
 //   {
-//     "name": "Ball", "duration": 8, "fps": 60, "bpm": 120, "rateRatio": 4, "beam": {"intensity": 20},
+//     "name": "Ball", "duration": 8, "fps": 60, "bpm": 120, "sampleRate": 192000, "beam": {"intensity": 20},
 //     "camera": {"lookAt": "Ball",
 //                "properties": {"position.z": 4, "hideLines": 100}, "keys": {"position.x": [[0, -1], [8, 1, "linear"]]}},
 //     "objects": [
@@ -69,8 +69,9 @@ private:
         project.duration = number(recipe, "duration", 8);
         project.frameRate = number(recipe, "fps", 60);
         project.bpm = number(recipe, "bpm", 120);
-        // The audio at this many times the device's rate (1, 2, 4 or 8).
-        project.sampleRateRatio = number(recipe, "rateRatio", 1);
+        // The rate the beam is drawn at (192 kHz unless said).
+        project.sampleRate = number(recipe, "sampleRate", Project::defaultSampleRate);
+        if (!Project::validSampleRate(project.sampleRate)) { return juce::Result::fail("A sample rate is 22050 to 768000 Hz."); }
         // Names for parts of expressions, used by any expression after.
         const auto* defined = recipe["define"].getDynamicObject();
         if (defined != nullptr) {

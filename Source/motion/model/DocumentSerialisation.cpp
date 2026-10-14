@@ -711,7 +711,7 @@ juce::XmlElement Document::save(const Project& project) {
     xml.setAttribute("scopeTravel", exactNumber(project.scope.travelMicrosPerUnit));
     xml.setAttribute("scopeSettle", exactNumber(project.scope.settleMicros));
     if (project.scope.xyOnly) { xml.setAttribute("scopeXYOnly", true); }
-    if (project.sampleRateRatio != 1) { xml.setAttribute("sampleRateRatio", exactNumber(project.sampleRateRatio)); }
+    xml.setAttribute("sampleRate", exactNumber(project.sampleRate));
     auto* beam = xml.createNewChildElement("scopeBeam");
     saveProperties(*beam, project.beam.properties);
     for (const auto& asset : project.assets) {
@@ -808,10 +808,10 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         notes.note("Scope timing that isn't valid, reset");
         project.scope = defaults;
     }
-    project.sampleRateRatio = xml.getDoubleAttribute("sampleRateRatio", 1);
-    if (!osci::IntegerRatioSampleRateAdapter::isRatioSupported(project.sampleRateRatio)) {
-        notes.note("Internal sample rate this version doesn't have, set to the device's", juce::String(project.sampleRateRatio) + " x");
-        project.sampleRateRatio = 1;
+    project.sampleRate = xml.getDoubleAttribute("sampleRate", Project::defaultSampleRate);
+    if (!Project::validSampleRate(project.sampleRate)) {
+        notes.note("Sample rate this version can't draw at, set to 192 kHz", juce::String(project.sampleRate) + " Hz");
+        project.sampleRate = Project::defaultSampleRate;
     }
     // The Scope's identity is reserved before anything else claims one.
     std::set<Id> identities {beamIdentity}, compositionIds;

@@ -543,7 +543,6 @@
       }
     }
   ],
-  "rateRatio": 4,
   "modulators": [
     {
       "name": "Spin",

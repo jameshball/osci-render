@@ -147,10 +147,12 @@ inline const GeneratorDefinition* generatorOf(const Asset& asset) {
 struct Project : Composition {
     // The output display belongs to the whole project, not to one composition.
     ScopeProfile scope;
-    // The audio runs at this many times the device's rate (1, 2, 4 or 8):
-    // more of the beam each frame, for a dense scene drawn cleanly. Set with
-    // the project, as it is made for it.
-    double sampleRateRatio = 1;
+    // The rate the beam is drawn at, in Hz: what the Scope shows and exports
+    // are, resampled to the audio device as it plays. Higher draws more of
+    // the beam each frame, for a dense scene drawn cleanly.
+    double sampleRate = defaultSampleRate;
+    static constexpr double defaultSampleRate = 192000, lowestSampleRate = 22050, highestSampleRate = 768000;
+    static bool validSampleRate(double rate) { return std::isfinite(rate) && rate >= lowestSampleRate && rate <= highestSampleRate; }
     // The Scope's picture: animatable beam and display properties.
     Beam beam;
     std::vector<std::shared_ptr<const Asset>> assets;

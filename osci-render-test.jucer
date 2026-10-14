@@ -268,6 +268,8 @@
       <FILE id="TstClH" name="TestCleanup.h" compile="0" resource="0" file="tests/TestCleanup.h"/>
       <FILE id="SmpAcc" name="SampleAccuracyTest.cpp" compile="1" resource="0"
             file="tests/SampleAccuracyTest.cpp"/>
+      <FILE id="PrjRate" name="ProjectRateAdapterTest.cpp" compile="1" resource="0"
+            file="tests/ProjectRateAdapterTest.cpp"/>
       <FILE id="IrsAdp" name="IntegerRatioSampleRateAdapterTest.cpp" compile="1"
             resource="0" file="tests/IntegerRatioSampleRateAdapterTest.cpp"/>
     </GROUP>

@@ -1,6 +1,7 @@
 {
   "duration": 1,
   "fps": 60,
+  "sampleRate": 48000,
   "beam": {
     "intensity": 20,
     "persistence": 0.2

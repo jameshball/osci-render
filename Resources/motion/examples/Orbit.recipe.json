@@ -183,7 +183,6 @@
       }
     }
   ],
-  "rateRatio": 4,
   "modulators": [
     {
       "name": "Camera orbit X",

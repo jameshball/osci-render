@@ -23,9 +23,9 @@ struct Composition {
         for (const auto& line : project.notes.lines()) { std::cerr << file.getFileName() << ": left out " << line << std::endl; }
         return prepare(project.project, sampleRate, opened);
     }
-    // `sampleRate` 0: the project's own, 48 kHz times its ratio.
+    // `sampleRate` 0: the project's own.
     static juce::Result prepare(const Project& project, double sampleRate, Composition& prepared) {
-        if (!(sampleRate > 0)) { sampleRate = 48000 * project.sampleRateRatio; }
+        if (!(sampleRate > 0)) { sampleRate = project.sampleRate; }
         prepared.sampleRate = sampleRate;
         prepared.frameRate = project.frameRate;
         const auto start = juce::Time::getMillisecondCounterHiRes();

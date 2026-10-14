@@ -76,9 +76,11 @@ public:
     double getEffectiveSampleRate();
     double getInternalSampleRateRatio() const { return internalSampleRate.getRatio(); }
     bool canSetInternalSampleRateRatio(double ratio) const;
-    // `remember`: kept as the app's setting for next time; osci-motion keeps
-    // it with each project instead.
-    void setInternalSampleRateRatio(double ratio, bool remember = true);
+    void setInternalSampleRateRatio(double ratio);
+    // A processing rate chosen outright, in place of the ratio, resampled to
+    // the device as it plays (osci-motion's project rate); never remembered
+    // for the app.
+    void setProcessingSampleRate(double rate);
     void loadAudioFile(const juce::File& file);
     virtual void loadAudioFile(std::unique_ptr<juce::InputStream> stream);
     virtual void stopAudioFile();
