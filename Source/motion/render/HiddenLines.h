@@ -296,8 +296,9 @@ public:
 private:
     // A piece kept, whether culling cut it, the faces it runs along, in the
     // scene, to light it by, and how bright it is drawn (by its style, how
-    // little its surface mirrors, then its light): its share of the beam's
-    // time follows that (see litWeight).
+    // little its surface mirrors, then its light, which draws nothing past
+    // full however bright: a light over 1 must not undo a mirror's dimming):
+    // its share of the beam's time follows that (see litWeight).
     struct Kept {
         std::unique_ptr<osci::Shape> shape;
         bool cut;
@@ -1039,7 +1040,7 @@ private:
                 const auto lightOf = [&](std::size_t sample) { return std::max({light[sample][0], light[sample][1], light[sample][2]}); };
                 for (std::size_t stop = 0; stop + 1 < breaks.size(); ++stop) {
                     const auto a = breaks[stop], b = breaks[stop + 1];
-                    const auto brightness = (lightOf(a) + lightOf(b)) * .5 * piece.brightness;
+                    const auto brightness = std::min(1.0, (lightOf(a) + lightOf(b)) * .5) * piece.brightness;
                     std::vector<LitPart::Stop> ends {{0.0f, light[a]}, {1.0f, light[b]}};
                     litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(positionOf(a)), static_cast<float>(positionOf(b)), std::move(ends)), piece.cut, {}, brightness});
                 }
@@ -1048,7 +1049,7 @@ private:
             }
             float brightest = 0;
             for (auto sample = index; sample <= last; ++sample) { brightest = std::max({brightest, light[sample][0], light[sample][1], light[sample][2]}); }
-            litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(from), static_cast<float>(to), std::move(stops)), piece.cut, {}, brightest * piece.brightness});
+            litPieces.push_back({std::make_unique<LitPart>(shape, static_cast<float>(from), static_cast<float>(to), std::move(stops)), piece.cut, {}, std::min(1.0f, brightest) * piece.brightness});
             index = last + 1;
         }
         if (partial) {

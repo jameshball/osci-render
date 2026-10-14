@@ -398,7 +398,7 @@ private:
         const auto lineColour = [&](double share, double& shade, float& reaching) {
             std::array<float, 3> light {1, 1, 1};
             if (lit) { light = lightAt(lights, from + (to - from) * share, normals.at(start + (end - start) * share), response, &shade); }
-            reaching = drawn * (lit ? std::max({light[0], light[1], light[2]}) : 1.0f);
+            reaching = drawn * (lit ? std::min(1.0f, std::max({light[0], light[1], light[2]})) : 1.0f);
             const auto drawnAs = composition.applyCompositionEffects(item.clip->processPoint(litColour(shape.nextVector(static_cast<float>(start + (end - start) * share)), light), time), time);
             return std::array<float, 3> {std::max(0.0f, drawnAs.r) * itself, std::max(0.0f, drawnAs.g) * itself, std::max(0.0f, drawnAs.b) * itself};
         };
