@@ -21,7 +21,7 @@
     {
       "name": "Torus",
       "generator": "torus",
-      "properties": {"generator.radius": 0.55, "generator.thickness": 0.18, "rotation.x": 60}
+      "properties": {"position.y": 0.35, "generator.radius": 0.55, "generator.thickness": 0.18, "rotation.x": 60}
     },
     {
       "name": "Cube",
