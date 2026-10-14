@@ -10,9 +10,8 @@ Versioning scheme here is 4-part: A.B.C.D
 
 By default, the installer gets a patch bump whenever the script is run.
 
-osci-motion (--motion) is optional and defaults to none. It is a
-standalone-only app with no installer packaging (.iss/.pkgproj), so only
-osci-motion.jucer is bumped for it.
+osci-motion (--motion) is optional and defaults to none; its .jucer and its
+installer packaging (.iss/.pkgproj) are bumped together.
 
 Usage:
     ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--installer {major,minor,patch,none}] [--motion {major,minor,patch,none}] [--message MSG] [--skip-validation]
@@ -247,8 +246,8 @@ def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
         choices=["major", "minor", "patch", "none"],
         default="none",
         help=(
-            "Bump kind for osci-motion (default: none). osci-motion has no "
-            "installer packaging, so only osci-motion.jucer is updated."
+            "Bump kind for osci-motion (default: none): its .jucer and "
+            "installer packaging."
         ),
     )
 
@@ -289,6 +288,8 @@ def main(argv: Sequence[str]) -> int:
     sosci_iss = REPO_ROOT / "packaging" / "sosci.iss"
     osci_pkgproj = REPO_ROOT / "packaging" / "osci-render.pkgproj"
     sosci_pkgproj = REPO_ROOT / "packaging" / "sosci.pkgproj"
+    motion_iss = REPO_ROOT / "packaging" / "osci-motion.iss"
+    motion_pkgproj = REPO_ROOT / "packaging" / "osci-motion.pkgproj"
 
     osci_old = get_jucer_version(osci_jucer)
     sosci_old = get_jucer_version(sosci_jucer)
@@ -323,6 +324,11 @@ def main(argv: Sequence[str]) -> int:
         changed.append(osci_pkgproj)
     if set_pkgproj_versions(sosci_pkgproj, sosci_new):
         changed.append(sosci_pkgproj)
+    if motion_new is not None:
+        if set_iss_version(motion_iss, motion_new):
+            changed.append(motion_iss)
+        if set_pkgproj_versions(motion_pkgproj, motion_new):
+            changed.append(motion_pkgproj)
 
     if osci_new == osci_old and sosci_new == sosci_old and installer_new == installer_old and motion_new == motion_old:
         raise FatalError("No version bump requested (all products unchanged).")
@@ -353,7 +359,7 @@ def main(argv: Sequence[str]) -> int:
     if motion_new is not None:
         print(
             f"osci-motion {motion_old}->{motion_new} "
-            "(osci-motion.jucer only; osci-motion has no installer packaging)"
+            "(osci-motion.jucer and its installer packaging)"
         )
 
     return 0
