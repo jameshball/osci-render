@@ -73,6 +73,20 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
                                  + juce::SystemStats::getUserRegion() + ")");
     }
 
+    // A standalone app that crashes leaves where it crashed at the end of its
+    // log. A plugin leaves crash handling to its host.
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        crashLogFile() = applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log");
+        juce::SystemStats::setApplicationCrashHandler([](void*) {
+            juce::FileOutputStream log(crashLogFile());
+            if (log.openedOk()) {
+                log << "\n==== " << JucePlugin_Name << " crashed at " << juce::Time::getCurrentTime().toString(true, true, true, true) << " ====\n"
+                    << juce::SystemStats::getStackBacktrace() << "\n";
+                log.flush();
+            }
+        });
+    }
+
     globalSettings = osci::SettingsStore::forProductGlobals (JucePlugin_Name);
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
@@ -430,10 +444,25 @@ const juce::String CommonAudioProcessor::getProgramName(int index) {
 
 void CommonAudioProcessor::changeProgramName(int index, const juce::String& newName) {}
 
+juce::File& CommonAudioProcessor::crashLogFile() {
+    static juce::File file;
+    return file;
+}
+
 void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     juce::Logger::writeToLog("prepareToPlay: sampleRate=" + juce::String(sampleRate)
         + " samplesPerBlock=" + juce::String(samplesPerBlock)
         + " effects=" + juce::String(effects.size()));
+    // Which device a standalone app plays through, for reports of audio problems.
+    const auto* holder = juce::JUCEApplicationBase::isStandaloneApp() ? juce::StandalonePluginHolder::getInstance() : nullptr;
+    auto* device = holder != nullptr ? holder->deviceManager.getCurrentAudioDevice() : nullptr;
+    if (device != nullptr) {
+        juce::Logger::writeToLog("Audio device: " + device->getTypeName() + " / " + device->getName()
+            + " (" + juce::String(device->getActiveOutputChannels().countNumberOfSetBits()) + " out, "
+            + juce::String(device->getActiveInputChannels().countNumberOfSetBits()) + " in, "
+            + juce::String(device->getCurrentSampleRate()) + " Hz, buffer " + juce::String(device->getCurrentBufferSizeSamples())
+            + ", output latency " + juce::String(device->getOutputLatencyInSamples()) + " samples)");
+    }
 
     const int numChannels = juce::jmax(getTotalNumInputChannels(), getTotalNumOutputChannels(), 1);
     const auto prepared = internalSampleRate.prepare(sampleRate, samplesPerBlock, numChannels, supportsInternalSampleRateOverride());
