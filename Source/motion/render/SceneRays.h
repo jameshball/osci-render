@@ -50,13 +50,13 @@ public:
     // Whether a face is between `from` and `to`, other than a face of
     // `ignored`. Hits within `nearFrom` of `from` or `nearTo` of `to` (in the
     // scene's units) don't count: a point on a surface is never hidden by it.
-    bool blocked(Vec3 from, Vec3 to, double nearFrom, double nearTo, std::uint32_t ignored = none, GrazedSurface near = {}) const {
+    bool blocked(Vec3 from, Vec3 to, double nearFrom, double nearTo, std::uint32_t ignored = none, GrazedSurface nearby = {}) const {
         if (nodes.empty()) { return false; }
         const auto span = to - from;
         const auto length = span.length();
         if (!(length > nearFrom + nearTo)) { return false; }
         const auto first = nearFrom / length, last = 1 - nearTo / length;
-        const auto nearFirst = near.within / length, nearLast = 1 - near.within / length;
+        const auto nearFirst = nearby.within / length, nearLast = 1 - nearby.within / length;
         const Vec3 inverse {1 / span.x, 1 / span.y, 1 / span.z};
         // Deep enough for any tree fill() builds (see deepest).
         std::array<std::uint32_t, deepest + 34> stack {};
@@ -71,7 +71,7 @@ public:
                     if (face.surface == ignored) { continue; }
                     const auto along = hit(face, from, span);
                     if (!(along > first && along < last)) { continue; }
-                    if (face.surface != near.surface || (along > nearFirst && along < nearLast)) { return true; }
+                    if (face.surface != nearby.surface || (along > nearFirst && along < nearLast)) { return true; }
                 }
                 continue;
             }

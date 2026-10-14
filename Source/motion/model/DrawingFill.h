@@ -63,10 +63,10 @@ inline PreparedDrawing::Mesh of(const PreparedDrawing& drawing) {
     Clipper2Lib::PathsD outlines;
     Clipper2Lib::PathD current;
     osci::Point first, last;
-    const auto near = [](const osci::Point& a, const osci::Point& b) { return std::abs(a.x - b.x) < 1.0e-4f && std::abs(a.y - b.y) < 1.0e-4f; };
+    const auto nearby = [](const osci::Point& a, const osci::Point& b) { return std::abs(a.x - b.x) < 1.0e-4f && std::abs(a.y - b.y) < 1.0e-4f; };
     const auto finish = [&] {
         // Closed, with an area: back where it began.
-        if (current.size() >= 4 && near(first, last)) {
+        if (current.size() >= 4 && nearby(first, last)) {
             current.pop_back();
             outlines.push_back(std::move(current));
         }
@@ -76,7 +76,7 @@ inline PreparedDrawing::Mesh of(const PreparedDrawing& drawing) {
         auto* shape = drawing.shape(index);
         if (shape == nullptr || !(shape->length() > 0)) { continue; }
         const auto start = shape->nextVector(0);
-        if (current.empty() || !near(start, last)) {
+        if (current.empty() || !nearby(start, last)) {
             finish();
             first = start;
             current.push_back({start.x, start.y});

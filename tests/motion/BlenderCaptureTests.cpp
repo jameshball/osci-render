@@ -12,13 +12,13 @@ void check(bool condition, const char* message) {
     }
 }
 
-bool near(double left, double right) { return std::abs(left - right) < 1.0e-12; }
+bool nearby(double left, double right) { return std::abs(left - right) < 1.0e-12; }
 
 bool sameSegments(const std::vector<motion::BlenderSegment>& left, const std::vector<motion::BlenderSegment>& right) {
     if (left.size() != right.size()) { return false; }
     for (std::size_t index = 0; index < left.size(); ++index) {
-        if (!near(left[index].x1, right[index].x1) || !near(left[index].y1, right[index].y1)
-            || !near(left[index].x2, right[index].x2) || !near(left[index].y2, right[index].y2)) {
+        if (!nearby(left[index].x1, right[index].x1) || !nearby(left[index].y1, right[index].y1)
+            || !nearby(left[index].x2, right[index].x2) || !nearby(left[index].y2, right[index].y2)) {
             return false;
         }
     }
@@ -57,8 +57,8 @@ int main() {
     check(static_cast<bool>(encodedBurst), "submillisecond capture encodes");
     const auto decodedBurst = motion::BlenderCaptureArchive::decode(encodedBurst.bytes);
     check(decodedBurst && decodedBurst.frames.size() == 3, "submillisecond capture decodes every accepted frame");
-    check(near(decodedBurst.timing->frameEnd(0), .000125) && near(decodedBurst.timing->frameEnd(1), .001)
-        && near(decodedBurst.timing->duration(), .001125), "submillisecond receive boundaries and final hold survive archive round-trip");
+    check(nearby(decodedBurst.timing->frameEnd(0), .000125) && nearby(decodedBurst.timing->frameEnd(1), .001)
+        && nearby(decodedBurst.timing->duration(), .001125), "submillisecond receive boundaries and final hold survive archive round-trip");
     const auto firstEnd = decodedBurst.timing->frameEnd(0);
     const auto secondEnd = decodedBurst.timing->frameEnd(1);
     check(decodedBurst.timing->frameIndex(std::nextafter(firstEnd, 0.0)) == 0 && decodedBurst.timing->frameIndex(firstEnd) == 1
@@ -75,7 +75,7 @@ int main() {
     const auto decodedCollision = motion::BlenderCaptureArchive::decode(encodedCollision.bytes);
     check(decodedCollision && decodedCollision.frames.size() == 1 && sameSegments(decodedCollision.frames.front()->segments, second->segments),
         "zero-duration timestamp collisions collapse to the later geometry");
-    check(near(decodedCollision.timing->duration(), .25), "collision collapse retains final hold duration");
+    check(nearby(decodedCollision.timing->duration(), .25), "collision collapse retains final hold duration");
 
     motion::BlenderCapture blank(true);
     blank.begin(0, nullptr);
@@ -85,7 +85,7 @@ int main() {
     const auto decodedBlank = motion::BlenderCaptureArchive::decode(encodedBlank.bytes);
     check(decodedBlank && decodedBlank.frames.size() == 2 && decodedBlank.frames[0]->segments.empty()
         && sameSegments(decodedBlank.frames[1]->segments, first->segments), "blank intervals remain explicit captured frames");
-    check(near(decodedBlank.timing->frameEnd(0), .1) && near(decodedBlank.timing->frameEnd(1), .3), "blank interval timing remains source-local");
+    check(nearby(decodedBlank.timing->frameEnd(0), .1) && nearby(decodedBlank.timing->frameEnd(1), .3), "blank interval timing remains source-local");
 
     auto truncated = encodedBurst.bytes;
     truncated.pop_back();

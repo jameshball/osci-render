@@ -87,7 +87,7 @@ public:
         {
             // A low bar behind the box, and a block that comes between the
             // floor and the bar where the eye sees the bar in the floor.
-            const auto near = [&](bool blocked) {
+            const auto nearby = [&](bool blocked) {
                 auto project = scene(100, false);
                 addClip(project, generatorAsset(5, "box"), 50, {{"position.y", -.6}, {"position.z", -1.5}, {"generator.width", .6}, {"generator.height", .02}, {"generator.depth", .02}, {"green", 0}, {"blue", 0}});
                 if (blocked) { addClip(project, generatorAsset(6, "box"), 60, {{"position.y", -.7}, {"position.z", -1.28}, {"generator.width", .2}, {"generator.height", .2}, {"generator.depth", .2}}); }
@@ -102,8 +102,8 @@ public:
                 for (const auto& point : pointsOf(reflectionOf(*frame, floorClip))) { count += point.r > 0 && point.g == 0 && (point - seen).length() < .04 ? 1 : 0; }
                 return count;
             };
-            expect(near(false) > 0, "the bar is seen in the floor");
-            expectEquals(near(true), 0, "but not where the block stands between them");
+            expect(nearby(false) > 0, "the bar is seen in the floor");
+            expectEquals(nearby(true), 0, "but not where the block stands between them");
         }
 
         beginTest("A mirror shows where surfaces cut through each other");

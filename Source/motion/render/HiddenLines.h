@@ -49,14 +49,14 @@ inline bool bends(const PreparedClipStage& stage) {
 // corners, edge middles or middle shows are dropped before crossings are
 // looked for; larger ones are kept, as a point could show between those.
 inline void dropUnseen(std::vector<crossing::Triangle>& triangles, std::vector<std::array<osci::Point, 3>>& sources, const DepthBuffer& depth, double focalLength) {
-    constexpr double small = 3 * DepthBuffer::pixel;
+    constexpr double slight = 3 * DepthBuffer::pixel;
     std::size_t kept = 0;
     for (std::size_t index = 0; index < triangles.size(); ++index) {
         const auto& eye = triangles[index].eye;
         const auto at = [&](Vec3 point) { return Screen {point.x / point.z * focalLength, point.y / point.z * focalLength, 1 / point.z}; };
         const std::array<Screen, 3> corners {at(eye[0]), at(eye[1]), at(eye[2])};
         const auto reach = std::max({std::abs(corners[1].x - corners[0].x), std::abs(corners[2].x - corners[0].x), std::abs(corners[1].y - corners[0].y), std::abs(corners[2].y - corners[0].y)});
-        bool seen = reach > small;
+        bool seen = reach > slight;
         const std::array<Vec3, 7> probes {eye[0], eye[1], eye[2], (eye[0] + eye[1]) * .5, (eye[1] + eye[2]) * .5, (eye[2] + eye[0]) * .5, (eye[0] + eye[1] + eye[2]) / 3};
         for (std::size_t probe = 0; probe < probes.size() && !seen; ++probe) { seen = depth.shows(at(probes[probe])); }
         if (!seen) { continue; }
@@ -479,8 +479,8 @@ private:
         from.position = from.right * ((left + right) / 2) + from.up * ((bottom + top) / 2) + from.forward * nearest;
         const auto half = std::max({(right - left) / 2, (top - bottom) / 2, 1.0e-9});
         Projection projection {1 / half, true};
-        projection.far = furthest - nearest;
-        projection.span = std::max(projection.far, 1.0e-6);
+        projection.farthest = furthest - nearest;
+        projection.span = std::max(projection.farthest, 1.0e-6);
         return see(from, projection, false);
     }
 

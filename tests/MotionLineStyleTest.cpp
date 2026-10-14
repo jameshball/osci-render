@@ -196,15 +196,15 @@ public:
                 const auto right = forward.cross({0, 1, 0}).normalized().value();
                 const motion::hidden::OtherEye other {{position, right, right.cross(forward), forward, 2}, {1.5, 1.5}};
                 const auto frame = motion::hidden::cull(prepared, 1, workspace, nullptr, &other);
-                int far = 0;
+                int farthest = 0;
                 for (const auto& point : pointsOf(frame->drawing(0))) {
                     const motion::Vec3 at {point.x, point.y, point.z};
                     // Beyond eight degrees past the rim: nearer it, lines lifted
                     // onto the round surface graze its flat faces, and on
                     // screen are within a percent of its radius of the rim.
-                    far += at.normalized().value().dot((position - at).normalized().value()) < -.14 ? 1 : 0;
+                    farthest += at.normalized().value().dot((position - at).normalized().value()) < -.14 ? 1 : 0;
                 }
-                return far;
+                return farthest;
             };
             expect(farPoints(false) > 100, "with nothing hidden, all of it shows");
             expectEquals(farPoints(true), 0, "with lines hidden, none of its far side");

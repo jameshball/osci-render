@@ -13,7 +13,7 @@ void check(bool condition, const char* message) {
     }
 }
 
-bool near(double a, double b, double tolerance = 1.0e-9) { return std::abs(a - b) <= tolerance; }
+bool nearby(double a, double b, double tolerance = 1.0e-9) { return std::abs(a - b) <= tolerance; }
 
 // The twelve triangles of a box's faces.
 void addBox(std::vector<Triangle>& triangles, Vec3 low, Vec3 high, std::uint32_t surface) {
@@ -37,9 +37,9 @@ void throughAPlane() {
     check(!through({0, 0, 0}, 1.0e-9).has_value(), "a triangle in the plane does not cross it");
     const auto cut = through({-1, 1, 1}, 1.0e-9);
     check(cut.has_value(), "one corner alone on its side crosses");
-    check(near((*cut)[0][0], .5) && near((*cut)[0][1], .5) && near((*cut)[1][0], .5) && near((*cut)[1][2], .5), "it crosses halfway along both its edges");
+    check(nearby((*cut)[0][0], .5) && nearby((*cut)[0][1], .5) && nearby((*cut)[1][0], .5) && nearby((*cut)[1][2], .5), "it crosses halfway along both its edges");
     const auto corner = through({0, -1, 1}, 1.0e-9);
-    check(corner.has_value() && near((*corner)[0][0], 1) && near((*corner)[1][1], .5) && near((*corner)[1][2], .5), "through a corner it crosses the far edge");
+    check(corner.has_value() && nearby((*corner)[0][0], 1) && nearby((*corner)[1][1], .5) && nearby((*corner)[1][2], .5), "through a corner it crosses the far edge");
 }
 
 void twoTriangles() {
@@ -50,10 +50,10 @@ void twoTriangles() {
     const auto piece = between(triangles, 0, 1);
     check(piece.has_value(), "a triangle standing through another crosses it");
     check(piece->triangle == 0, "the crossing belongs to the earlier surface");
-    check(near(piece->eyeFrom.x, 0) && near(piece->eyeTo.x, 0) && near(piece->eyeFrom.z, 5) && near(piece->eyeTo.z, 5), "it lies where the two planes meet");
-    check(near(std::abs(piece->eyeTo.y - piece->eyeFrom.y), .5), "it spans only where both triangles reach");
+    check(nearby(piece->eyeFrom.x, 0) && nearby(piece->eyeTo.x, 0) && nearby(piece->eyeFrom.z, 5) && nearby(piece->eyeTo.z, 5), "it lies where the two planes meet");
+    check(nearby(std::abs(piece->eyeTo.y - piece->eyeFrom.y), .5), "it spans only where both triangles reach");
     const auto again = Vec3 {piece->eyeFrom.x, piece->eyeFrom.y, piece->eyeFrom.z};
-    check(near((motion::hidden::weighted(triangles[0].eye, piece->from) - again).length(), 0), "its weights find it on its own triangle");
+    check(nearby((motion::hidden::weighted(triangles[0].eye, piece->from) - again).length(), 0), "its weights find it on its own triangle");
 
     std::vector<Triangle> resting {
         {{Vec3 {-1, -1, 5}, Vec3 {1, -1, 5}, Vec3 {0, 1, 5}}, 0},
@@ -82,11 +82,11 @@ void sunkBoxes() {
     check(found.size() == 1, "the crossing of two boxes is one run");
     double length = 0;
     for (const auto& piece : found.front()) {
-        check(near(piece.eyeFrom.x, 1, 1.0e-9) && near(piece.eyeTo.x, 1, 1.0e-9), "it lies on the big box's side");
+        check(nearby(piece.eyeFrom.x, 1, 1.0e-9) && nearby(piece.eyeTo.x, 1, 1.0e-9), "it lies on the big box's side");
         check(triangles[piece.triangle].surface == 0, "it belongs to the big box");
         length += (piece.eyeTo - piece.eyeFrom).length();
     }
-    check(near(length, 2 * (.5 + .5), 1.0e-9), "it goes all the way round the small box");
+    check(nearby(length, 2 * (.5 + .5), 1.0e-9), "it goes all the way round the small box");
     for (std::size_t index = 1; index < found.front().size(); ++index) {
         check((found.front()[index].eyeFrom - found.front()[index - 1].eyeTo).length() < 1.0e-6, "each piece starts where the last ended");
     }

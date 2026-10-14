@@ -117,18 +117,18 @@ inline std::optional<Piece> between(const std::vector<Triangle>& triangles, std:
 namespace detail {
 // A triangle's reach on screen and in depth.
 struct Box {
-    double left, right, bottom, top, near, far;
+    double left, right, bottom, top, nearby, farthest;
     static Box empty() { return {1.0e300, -1.0e300, 1.0e300, -1.0e300, 1.0e300, -1.0e300}; }
     void include(const Box& other) {
         left = std::min(left, other.left);
         right = std::max(right, other.right);
         bottom = std::min(bottom, other.bottom);
         top = std::max(top, other.top);
-        near = std::min(near, other.near);
-        far = std::max(far, other.far);
+        nearby = std::min(nearby, other.nearby);
+        farthest = std::max(farthest, other.farthest);
     }
     bool overlaps(const Box& other) const {
-        return !(right < other.left || other.right < left || top < other.bottom || other.top < bottom || far < other.near || other.far < near);
+        return !(right < other.left || other.right < left || top < other.bottom || other.top < bottom || farthest < other.nearby || other.farthest < nearby);
     }
 };
 inline Box boxOf(const Triangle& triangle, double focalLength) {

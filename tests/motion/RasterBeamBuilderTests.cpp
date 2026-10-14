@@ -9,7 +9,7 @@ void check(bool condition, const char* message) {
     if (!condition) { std::cerr << "FAIL: " << message << '\n'; std::exit(1); }
 }
 bool dark(const motion::PointSample& p) { return p.r == 0 && p.g == 0 && p.b == 0; }
-bool near(float a, float b) { return std::abs(a - b) < 1.0e-6f; }
+bool nearby(float a, float b) { return std::abs(a - b) < 1.0e-6f; }
 struct Image {
     int width, height;
     std::vector<std::uint8_t> pixels;
@@ -32,7 +32,7 @@ void verify(const motion::RasterBeamBuilder::Result& result, std::size_t size) {
         check(p.r >= 0 && p.r <= 1 && p.g >= 0 && p.g <= 1 && p.b >= 0 && p.b <= 1, "finite source colour");
         // An on/off transition must be a stationary fade; only pairs of dark
         // samples may travel between separate illuminated paths.
-        if (dark(p) != dark(q)) { check(near(p.x, q.x) && near(p.y, q.y), "blanking preserves XY and prevents bright travel"); }
+        if (dark(p) != dark(q)) { check(nearby(p.x, q.x) && nearby(p.y, q.y), "blanking preserves XY and prevents bright travel"); }
     }
 }
 std::size_t pathCount(const motion::RasterBeamBuilder::Result& result) {
@@ -56,9 +56,9 @@ int main() {
     float maxX = 0, maxY = 0;
     for (const auto& p : outline.points) {
         maxX = std::max(maxX, std::abs(p.x)); maxY = std::max(maxY, std::abs(p.y));
-        if (!dark(p)) { check(near(p.r, 1) && near(p.g, 64.0f / 255) && near(p.b, 32.0f / 255), "contour samples source RGB"); }
+        if (!dark(p)) { check(nearby(p.r, 1) && nearby(p.g, 64.0f / 255) && nearby(p.b, 32.0f / 255), "contour samples source RGB"); }
     }
-    check(near(maxX, .5f) && near(maxY, .25f), "aspect preserved and centered");
+    check(nearby(maxX, .5f) && nearby(maxY, .25f), "aspect preserved and centered");
     check(outline.points[1].y > 0, "image top maps to positive Y");
     auto repeated = rectangle.build(settings);
     check(std::memcmp(outline.points.data(), repeated.points.data(), 64 * sizeof(motion::PointSample)) == 0, "deterministic exact samples");
@@ -84,7 +84,7 @@ int main() {
     auto alphaResult = alpha.build(settings);
     verify(alphaResult, 64);
     check(pathCount(alphaResult) == 1, "transparent pixel excluded");
-    for (const auto& p : alphaResult.points) { if (!dark(p)) { check(near(p.r, 128.0f / 255), "alpha multiplies emitted RGB"); } }
+    for (const auto& p : alphaResult.points) { if (!dark(p)) { check(nearby(p.r, 128.0f / 255), "alpha multiplies emitted RGB"); } }
     settings.threshold = .75;
     auto thresholded = alpha.build(settings);
     verify(thresholded, 64);

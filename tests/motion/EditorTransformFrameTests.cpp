@@ -12,7 +12,7 @@ void check(bool condition, const char* message) {
         std::exit(1);
     }
 }
-bool near(Vec3 a, Vec3 b) { return (a - b).length() < 1.0e-9; }
+bool nearby(Vec3 a, Vec3 b) { return (a - b).length() < 1.0e-9; }
 struct Project {
     double bpm = 120;
     motion::Tempo tempo() const { return motion::Tempo(bpm); }
@@ -37,12 +37,12 @@ Project fixture() {
 int main() {
     auto project = fixture();
     auto frame = clipTransformFrame(project, 2, 0);
-    check(frame.has_value() && near(frame->worldOrigin, {1, 2, 3}), "ungrouped origin uses clip position");
-    check(near(*frame->positionDelta({4, 5, 6}), {4, 5, 6}), "ungrouped world delta is position delta");
+    check(frame.has_value() && nearby(frame->worldOrigin, {1, 2, 3}), "ungrouped origin uses clip position");
+    check(nearby(*frame->positionDelta({4, 5, 6}), {4, 5, 6}), "ungrouped world delta is position delta");
     project.tracks[0].clips[0].properties["rotation.x"] = Curve(47);
     project.tracks[0].clips[0].properties["scale.y"] = Curve(0);
     frame = clipTransformFrame(project, 2, 0);
-    check(frame.has_value() && near(frame->worldOrigin, {1, 2, 3}), "own rotation and collapsed scale do not change position frame");
+    check(frame.has_value() && nearby(frame->worldOrigin, {1, 2, 3}), "own rotation and collapsed scale do not change position frame");
 
     Group inner;
     inner.id = 3;
@@ -61,10 +61,10 @@ int main() {
     project.groups = { inner, outer };
     project.tracks[0].group = 3;
     frame = clipTransformFrame(project, 2, 0);
-    check(frame.has_value() && near(frame->worldOrigin, {6, 9, -4}), "nested groups apply inner to outer scale rotate translate");
-    check(near(frame->parentBasis[0], {0, 4, 0}) && near(frame->parentBasis[1], {0, 0, 3})
-        && near(frame->parentBasis[2], {2, 0, 0}), "parent basis retains rotated non-uniform scale");
-    check(near(*frame->positionDelta({1, 8, -3}), {2, -1, 0.5}), "world translation removes ancestors in reverse order");
+    check(frame.has_value() && nearby(frame->worldOrigin, {6, 9, -4}), "nested groups apply inner to outer scale rotate translate");
+    check(nearby(frame->parentBasis[0], {0, 4, 0}) && nearby(frame->parentBasis[1], {0, 0, 3})
+        && nearby(frame->parentBasis[2], {2, 0, 0}), "parent basis retains rotated non-uniform scale");
+    check(nearby(*frame->positionDelta({1, 8, -3}), {2, -1, 0.5}), "world translation removes ancestors in reverse order");
     project.groups[0].properties["rotation.x"] = Curve(31);
     project.groups[0].properties["rotation.y"] = Curve(-58);
     project.groups[1].properties["rotation.z"] = Curve(-73);
@@ -72,7 +72,7 @@ int main() {
     frame = clipTransformFrame(project, 2, 0);
     const Vec3 delta {0.37, -1.25, 2.4};
     const auto world = frame->parentBasis[0] * delta.x + frame->parentBasis[1] * delta.y + frame->parentBasis[2] * delta.z;
-    check(near(*frame->positionDelta(world), delta), "all-axis nested mirrored transforms invert without changing rotation order");
+    check(nearby(*frame->positionDelta(world), delta), "all-axis nested mirrored transforms invert without changing rotation order");
 
     project = fixture();
     auto& clip = project.tracks[0].clips[0];
@@ -88,7 +88,7 @@ int main() {
     project.groups.push_back(animated);
     project.tracks[0].group = 3;
     frame = clipTransformFrame(project, 2, 2);
-    check(frame.has_value() && near(frame->worldOrigin, {5, 4, 3}), "clip keys use offset/rate local time and ancestors use project time");
+    check(frame.has_value() && nearby(frame->worldOrigin, {5, 4, 3}), "clip keys use offset/rate local time and ancestors use project time");
 
 
     check(!clipTransformFrame(project, 999, 0), "missing clip is unavailable");
@@ -121,7 +121,7 @@ int main() {
     check(gizmo.has_value() && gizmo->evaluatedScale.x == -2, "gizmo exposes evaluated negative scale for handle orientation");
     check(gizmo.has_value(), "mirrored nonuniform ancestors support Euler gizmos");
     constexpr double radians = std::numbers::pi / 180;
-    check(near(gizmo->eulerRadians, {31 * radians, 49 * radians, -23 * radians}), "gizmo retains evaluated radians");
+    check(nearby(gizmo->eulerRadians, {31 * radians, 49 * radians, -23 * radians}), "gizmo retains evaluated radians");
     for (int axis = 0; axis < 3; ++axis) {
         const Vec3 normal = axis == 0 ? Vec3 {1, 0, 0} : (axis == 1 ? Vec3 {0, 1, 0} : Vec3 {0, 0, 1});
         const auto worldAxis = gizmo->axisDirection(axis, true);
@@ -130,11 +130,11 @@ int main() {
             const auto ring = gizmo->rotationRingPoint(axis, angle, 0.8);
             check(ring.has_value(), "world ring point remains finite");
             const auto ray = gizmo->rotationRay({*ring + *worldAxis * 2, *worldAxis * -1}, axis);
-            check(ray.has_value() && near(ray->direction, normal * -1), "inverse ray preserves direction and affine parameter");
+            check(ray.has_value() && nearby(ray->direction, normal * -1), "inverse ray preserves direction and affine parameter");
             const auto hit = ray->origin + ray->direction * 2;
             const auto expected = axis == 0 ? Vec3 {0, std::cos(angle) * 0.8, std::sin(angle) * 0.8}
                 : (axis == 1 ? Vec3 {std::sin(angle) * 0.8, 0, std::cos(angle) * 0.8} : Vec3 {std::cos(angle) * 0.8, std::sin(angle) * 0.8, 0});
-            check(near(hit, expected), "inverse parent and post-Euler maps every ring back to canonical plane");
+            check(nearby(hit, expected), "inverse parent and post-Euler maps every ring back to canonical plane");
             const auto initial = axis == 0 ? Vec3 {0, 1, 0} : (axis == 1 ? Vec3 {0, 0, 1} : Vec3 {1, 0, 0});
             const auto signedAngle = std::atan2(normal.dot(initial.cross(hit)), initial.dot(hit));
             check(std::abs(signedAngle - angle) < 1.0e-9, "mirrored parents preserve canonical signed-angle orientation without a sign correction");
@@ -142,10 +142,10 @@ int main() {
     }
     const auto xScale = gizmo->axisDirection(0, false);
     const auto xRotate = gizmo->axisDirection(0, true);
-    check(xScale.has_value() && near(*xScale, *xRotate), "X scale and rotation axis agree because Rx preserves X");
+    check(xScale.has_value() && nearby(*xScale, *xRotate), "X scale and rotation axis agree because Rx preserves X");
     const auto yScale = gizmo->axisDirection(1, false);
     const auto yRotate = gizmo->axisDirection(1, true);
-    check(yScale.has_value() && yRotate.has_value() && !near(*yScale, *yRotate), "Y scale includes earlier Rx while Y parameter rotation excludes it");
+    check(yScale.has_value() && yRotate.has_value() && !nearby(*yScale, *yRotate), "Y scale includes earlier Rx while Y parameter rotation excludes it");
     check(!gizmo->axisDirection(-1, true) && !gizmo->axisDirection(3, false), "invalid gizmo axes are unavailable");
     check(!gizmo->rotationRingPoint(0, 0, 0) && !gizmo->rotationRingPoint(0, 0, -1), "degenerate ring radii are rejected");
     check(!gizmo->rotationRay({{}, {}}, 0), "zero direction ray is rejected");
@@ -172,10 +172,10 @@ int main() {
     grouped.groups = { child, parent };
     grouped.tracks[0].group = 5;
     const auto groupGizmo = gizmoFrameFor(grouped, 5, 0);
-    check(groupGizmo.has_value() && near(groupGizmo->parent.worldOrigin, {3, 2, 0}), "a group's origin is its position through its parents");
-    check(near(groupGizmo->eulerRadians, {0, 0, 30 * radians}), "a group's gizmo turns with the group");
-    check(near(*groupGizmo->parent.positionDelta({3, 0, 0}), {1, 0, 0}), "a drag moves the group in its parent's space");
-    check(near(gizmoFrameFor(grouped, 2, 0)->parent.worldOrigin, gizmoFrameForClip(grouped, 2, 0)->parent.worldOrigin), "a clip's gizmo is unchanged");
+    check(groupGizmo.has_value() && nearby(groupGizmo->parent.worldOrigin, {3, 2, 0}), "a group's origin is its position through its parents");
+    check(nearby(groupGizmo->eulerRadians, {0, 0, 30 * radians}), "a group's gizmo turns with the group");
+    check(nearby(*groupGizmo->parent.positionDelta({3, 0, 0}), {1, 0, 0}), "a drag moves the group in its parent's space");
+    check(nearby(gizmoFrameFor(grouped, 2, 0)->parent.worldOrigin, gizmoFrameForClip(grouped, 2, 0)->parent.worldOrigin), "a clip's gizmo is unchanged");
     grouped.groups[1].parent = 5;
     check(!gizmoFrameFor(grouped, 5, 0), "cyclic groups have no gizmo");
     check(groupHolds(grouped, 6, 5) && groupHolds(grouped, 5, 5) && !groupHolds(grouped, 7, 5), "membership follows the parent chain");

@@ -6,7 +6,7 @@
 static void check(bool condition, const char* message) {
     if (!condition) { std::cerr << message << '\n'; std::exit(1); }
 }
-static bool near(double left, double right) { return std::abs(left - right) < 1.0e-15; }
+static bool nearby(double left, double right) { return std::abs(left - right) < 1.0e-15; }
 
 int main() {
     const auto timing = motion::FrameTiming::create({100, 300, 100});
@@ -31,8 +31,8 @@ int main() {
     check(fractional.timing->frameIndex(std::nextafter(2.01, 3.0)) == 1, "Immediately after a millisecond boundary remains next frame");
     const auto highResolution = motion::FrameTiming::createFromEndSeconds({0.000125, 0.001, 0.001125});
     check(static_cast<bool>(highResolution), "Submillisecond cumulative frame boundaries prepare without quantisation");
-    check(near(highResolution.timing->frameStart(1), 0.000125) && near(highResolution.timing->frameEnd(1), 0.001)
-        && near(highResolution.timing->duration(), 0.001125), "Precise cumulative boundaries remain exact for frame lookup");
+    check(nearby(highResolution.timing->frameStart(1), 0.000125) && nearby(highResolution.timing->frameEnd(1), 0.001)
+        && nearby(highResolution.timing->duration(), 0.001125), "Precise cumulative boundaries remain exact for frame lookup");
     check(highResolution.timing->frameIndex(std::nextafter(0.000125, 0.0)) == 0
         && highResolution.timing->frameIndex(0.000125) == 1
         && highResolution.timing->frameIndex(std::nextafter(0.001, 0.0)) == 1

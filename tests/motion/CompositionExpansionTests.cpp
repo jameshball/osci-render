@@ -13,7 +13,7 @@ struct Scope {
 struct Definition : Scope { motion::Id id = 0; };
 struct Project : Scope { std::vector<std::shared_ptr<const Definition>> definitions; };
 void check(bool value, const char* message) { if (!value) { std::cerr << message << '\n'; std::exit(1); } }
-void near(double a, double b, const char* message) { check(std::abs(a - b) < 1e-10, message); }
+void nearby(double a, double b, const char* message) { check(std::abs(a - b) < 1e-10, message); }
 }
 int main() {
     Project project;
@@ -30,16 +30,16 @@ int main() {
     check(static_cast<bool>(expand()) && leaves.size() == 1, "one nested leaf");
     const auto stages = leaves[0];
     check(stages.size() == 2, "instance ancestry retained");
-    near(stages[1].clipClock.start, 4, "parent trim clips child start");
-    near(stages[1].clipClock.end(), 6.5, "child end maps into main clock");
-    near(stages[1].clipClock.localTime(5), 11.5, "source clock composes offset and rate");
-    near(stages[1].scopeClock.localTime(5), 4, "track and group clock remains definition local");
-    near(stages[0].scopeClock.localTime(5), 5, "outer track clock remains main time");
-    near(stages[0].clipClock.localTime(5), 4, "instance animation follows its own source time");
+    nearby(stages[1].clipClock.start, 4, "parent trim clips child start");
+    nearby(stages[1].clipClock.end(), 6.5, "child end maps into main clock");
+    nearby(stages[1].clipClock.localTime(5), 11.5, "source clock composes offset and rate");
+    nearby(stages[1].scopeClock.localTime(5), 4, "track and group clock remains definition local");
+    nearby(stages[0].scopeClock.localTime(5), 5, "outer track clock remains main time");
+    nearby(stages[0].clipClock.localTime(5), 4, "instance animation follows its own source time");
     auto second = instance; second.id = 5; second.start = 10; second.rate = 1;
     project.tracks[0].clips.push_back(second);
     check(static_cast<bool>(expand()) && leaves.size() == 2, "shared definition expands independent instances");
-    near(leaves[1][1].clipClock.localTime(11), 11, "second instance has independent clock");
+    nearby(leaves[1][1].clipClock.localTime(11), 11, "second instance has independent clock");
     project.tracks[0].muted = true;
     check(static_cast<bool>(expand()) && leaves.empty(), "muted parent hides entire subtree");
     project.tracks[0].muted = false;
@@ -48,7 +48,7 @@ int main() {
     definition->tracks[0].muted = false;
     definition->duration = 3;
     check(static_cast<bool>(expand()), "short definition expands");
-    near(leaves[0][1].clipClock.end(), 4.5, "definition duration clips long instance");
+    nearby(leaves[0][1].clipClock.end(), 4.5, "definition duration clips long instance");
     definition->duration = 8;
     auto outer = std::make_shared<Definition>(); outer->id = 20; outer->bpm = 60;
     auto innerInstance = instance; innerInstance.start = 2; innerInstance.duration = 8;
@@ -60,9 +60,9 @@ int main() {
     mainInstance.duration = 10; mainInstance.offset = 0; mainInstance.rate = 2;
     project.tracks[0].clips = {mainInstance};
     check(static_cast<bool>(expand()) && leaves.size() == 1 && leaves[0].size() == 3, "two levels with mixed tempos expand");
-    near(leaves[0][2].clipClock.start, 3, "beat placement resolves at owning tempo before nesting");
-    near(leaves[0][2].clipClock.localTime(4), 10.5, "composed source clock preserves authored time");
-    near(leaves[0][1].scopeClock.localTime(4), 6, "intermediate scope clock is independent of beat conversion");
+    nearby(leaves[0][2].clipClock.start, 3, "beat placement resolves at owning tempo before nesting");
+    nearby(leaves[0][2].clipClock.localTime(4), 10.5, "composed source clock preserves authored time");
+    nearby(leaves[0][1].scopeClock.localTime(4), 6, "intermediate scope clock is independent of beat conversion");
     project.tracks[0].clips[0].rate = std::numeric_limits<double>::max();
     outer->tracks[0].clips[0].rate = 4;
     check(!expand(), "composed speed overflow reports an error rather than silently dropping content");

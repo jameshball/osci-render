@@ -168,15 +168,15 @@ public:
             float half = 0;
             const auto withSmallCube = [&](const char* axis, float offset) {
                 auto sunk = cubeProject(true);
-                auto small = sunk.tracks[0].clips[0];
-                small.id = 21;
-                small.properties["scale.x"] = motion::Curve(.4);
-                small.properties["scale.y"] = motion::Curve(.4);
-                small.properties["scale.z"] = motion::Curve(.4);
-                small.properties[axis] = motion::Curve(offset);
+                auto slight = sunk.tracks[0].clips[0];
+                slight.id = 21;
+                slight.properties["scale.x"] = motion::Curve(.4);
+                slight.properties["scale.y"] = motion::Curve(.4);
+                slight.properties["scale.z"] = motion::Curve(.4);
+                slight.properties[axis] = motion::Curve(offset);
                 motion::Track track;
                 track.id = 11;
-                track.insert(small, sunk.tempo());
+                track.insert(slight, sunk.tempo());
                 sunk.tracks.push_back(track);
                 return sunk;
             };

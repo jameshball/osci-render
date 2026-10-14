@@ -45,16 +45,16 @@ struct Eye {
 struct Projection {
     double focalLength = 1;
     bool parallel = false;
-    double far = 0, span = 1;
+    double farthest = 0, span = 1;
     std::optional<Screen> operator()(Vec3 eye) const {
-        if (parallel) { return Screen {eye.x * focalLength, eye.y * focalLength, 1 + (far - eye.z) / span}; }
+        if (parallel) { return Screen {eye.x * focalLength, eye.y * focalLength, 1 + (farthest - eye.z) / span}; }
         if (!(eye.z > nearPlane)) { return std::nullopt; }
         return Screen {eye.x / eye.z * focalLength, eye.y / eye.z * focalLength, 1 / eye.z};
     }
     std::optional<Screen> operator()(const std::optional<Vec3>& eye) const { return eye.has_value() ? (*this)(*eye) : std::nullopt; }
     // A point on the buffer back in the eye's space.
     Vec3 unproject(const Screen& at) const {
-        if (parallel) { return {at.x / focalLength, at.y / focalLength, far - (at.w - 1) * span}; }
+        if (parallel) { return {at.x / focalLength, at.y / focalLength, farthest - (at.w - 1) * span}; }
         return {at.x / at.w / focalLength, at.y / at.w / focalLength, 1 / at.w};
     }
     // Whether a corner is kept whole rather than cut where it comes into view.

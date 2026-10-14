@@ -9,7 +9,7 @@ void check(bool value, const char* message) {
         std::exit(1);
     }
 }
-bool near(float value, double expected) { return std::abs(value - expected) < 1.0e-6; }
+bool nearby(float value, double expected) { return std::abs(value - expected) < 1.0e-6; }
 struct Asset {
     motion::Id id = 1;
     std::shared_ptr<const motion::PreparedAudio> audio;
@@ -50,8 +50,8 @@ Project fixture() {
 int main() {
     auto project = fixture();
     motion::PreparedSoundtrack prepared(project);
-    check(near(prepared.sample(2.125).left, 0.5), "project clock maps to interpolated source time");
-    check(near(prepared.sample(2.25).left, 1) && near(prepared.sample(2.25).right, 1), "default gain and pan preserve both channels");
+    check(nearby(prepared.sample(2.125).left, 0.5), "project clock maps to interpolated source time");
+    check(nearby(prepared.sample(2.25).left, 1) && nearby(prepared.sample(2.25).right, 1), "default gain and pan preserve both channels");
     check(prepared.sample(1.99).left == 0 && prepared.sample(3).left == 0, "clip boundaries are half open");
     check(prepared.sample(-1).left == 0 && prepared.sample(std::numeric_limits<double>::infinity()).left == 0,
           "invalid or out of range time is silent");
@@ -80,7 +80,7 @@ int main() {
     clip.properties["gain"].setKeyValue(0, 0);
     clip.properties["gain"].setKeyValue(0.5, 2);
     motion::PreparedSoundtrack animated(project);
-    check(near(animated.sample(2.25).left, 1), "gain automation evaluates in content-local time");
+    check(nearby(animated.sample(2.25).left, 1), "gain automation evaluates in content-local time");
     clip.properties.clear();
     auto second = project.tracks[0];
     second.id = 4;
@@ -117,12 +117,12 @@ int main() {
     motion::Track container; container.clips = {instance}; project.tracks = {container};
     motion::PreparedSoundtrack nested(project);
     check(nested.preparationError.empty(), "nested soundtrack prepares");
-    check(near(nested.sample(5.125).left, 0.5), "nested rate and inherited gain reach source audio");
+    check(nearby(nested.sample(5.125).left, 0.5), "nested rate and inherited gain reach source audio");
     check(nested.sample(4.99).left == 0 && nested.sample(5.5).left == 0, "nested boundaries remain silent");
     auto repeated = instance; repeated.id = 12; repeated.start = 10; repeated.rate = 1;
     project.tracks[0].clips.push_back(repeated);
     motion::PreparedSoundtrack shared(project);
-    check(near(shared.sample(10.25).left, 0.5) && near(shared.sample(5.125).left, 0.5), "shared source instances seek independently");
+    check(nearby(shared.sample(10.25).left, 0.5) && nearby(shared.sample(5.125).left, 0.5), "shared source instances seek independently");
     project.tracks[0].muted = true;
     check(motion::PreparedSoundtrack(project).sample(5.125).left == 0, "muting visual instance track also mutes nested audio");
     std::atomic<bool> cancelled {true};

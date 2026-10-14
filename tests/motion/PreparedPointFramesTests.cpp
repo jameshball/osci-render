@@ -6,7 +6,7 @@ namespace {
 void check(bool condition, const char* message) {
     if (!condition) { std::cerr << "FAIL: " << message << '\n'; std::exit(1); }
 }
-bool near(float a, float b, double tolerance = 1.0e-6) { return std::abs(static_cast<double>(a) - b) < tolerance; }
+bool nearby(float a, float b, double tolerance = 1.0e-6) { return std::abs(static_cast<double>(a) - b) < tolerance; }
 std::vector<motion::PointSample> fixture() {
     std::vector<motion::PointSample> result;
     for (int frame = 0; frame < 2; ++frame) {
@@ -28,16 +28,16 @@ int main() {
         && source.source->frameRate() == 2 && source.source->duration() == 1 && source.source->data().size() == 32, "metadata preserves exact stored frame layout");
     check(source.source->hasExplicitColour(), "explicit colour cached during preparation");
     const auto half = source.source->sample(0, 0.5 / 16);
-    check(near(half.x, 0.5f) && near(half.y, 1) && near(half.z, -2)
-        && near(half.r, 0.5f / 15) && near(half.g, 0.25f) && near(half.b, 0.5f), "adjacent samples interpolate every channel by phase density");
-    check(near(source.source->sample(0, 15.5 / 16).x, 7.5f), "last point interpolates toward first within same frame");
-    check(near(source.source->sample(0, -1).x, 0) && near(source.source->sample(0, 2).x, 0), "phase clamps at endpoints with final wrapped segment");
-    check(near(source.source->sample(0.5, 0).x, 100) && near(source.source->sample(std::nextafter(0.5, 0.0), 0).x, 0), "frame selection changes exactly at frame boundary");
-    check(near(source.source->sample(1, 0).x, 0) && near(source.source->sample(-0.25, 0).x, 100)
-        && near(source.source->sample(-1, 0).x, 0), "source time loops and negative offsets wrap deterministically");
+    check(nearby(half.x, 0.5f) && nearby(half.y, 1) && nearby(half.z, -2)
+        && nearby(half.r, 0.5f / 15) && nearby(half.g, 0.25f) && nearby(half.b, 0.5f), "adjacent samples interpolate every channel by phase density");
+    check(nearby(source.source->sample(0, 15.5 / 16).x, 7.5f), "last point interpolates toward first within same frame");
+    check(nearby(source.source->sample(0, -1).x, 0) && nearby(source.source->sample(0, 2).x, 0), "phase clamps at endpoints with final wrapped segment");
+    check(nearby(source.source->sample(0.5, 0).x, 100) && nearby(source.source->sample(std::nextafter(0.5, 0.0), 0).x, 0), "frame selection changes exactly at frame boundary");
+    check(nearby(source.source->sample(1, 0).x, 0) && nearby(source.source->sample(-0.25, 0).x, 100)
+        && nearby(source.source->sample(-1, 0).x, 0), "source time loops and negative offsets wrap deterministically");
     for (const double time : { 0.75, -0.25, 12.75, 0.25, -20.75, 0.75 }) {
         const auto expected = source.source->frameIndex(time) == 0 ? 4.0f : 104.0f;
-        check(near(source.source->sample(time, 0.25).x, expected), "independent seeks have no accumulated frame state");
+        check(nearby(source.source->sample(time, 0.25).x, expected), "independent seeks have no accumulated frame state");
     }
     check(source.source->frameIndex(std::numeric_limits<double>::max()) < 2, "extreme finite time stays bounded");
     const auto nan = std::numeric_limits<double>::quiet_NaN();
@@ -51,7 +51,7 @@ int main() {
     const auto mixed = PreparedPointFrames::create(24, 1, 16, std::move(mixedPoints));
     check(static_cast<bool>(mixed) && mixed.source->hasExplicitColour(), "mixed source records explicit colour");
     const auto boundary = mixed.source->sample(0, 0.5 / 16);
-    check(boundary.r == -1 && boundary.g == -1 && boundary.b == -1 && near(boundary.x, 0.5f), "mixed colour segment keeps whole sentinel while interpolating geometry");
+    check(boundary.r == -1 && boundary.g == -1 && boundary.b == -1 && nearby(boundary.x, 0.5f), "mixed colour segment keeps whole sentinel while interpolating geometry");
     check(mixed.source->sample(0, 0).r == 1, "exact explicit point keeps its own colour");
 
     check(!PreparedPointFrames::validate(240, 1, 16384).size(), "maximum frame rate and stride accepted when budget allows");

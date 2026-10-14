@@ -233,11 +233,11 @@ private:
         const auto pointAt = [&](double share) { return from + (to - from) * share; };
         // As finely as a pixel of its reflection, from a few points of it.
         double length = 0;
-        std::optional<Vec3> near;
+        std::optional<Vec3> nearby;
         std::optional<Screen> previous;
         for (int probe = 0; probe <= 3; ++probe) {
-            near = reflection(pointAt(low + (high - low) * probe / 3.0), near);
-            const auto next = screen(near);
+            nearby = reflection(pointAt(low + (high - low) * probe / 3.0), nearby);
+            const auto next = screen(nearby);
             length += distance(previous, next);
             previous = next;
         }
@@ -404,7 +404,7 @@ private:
         };
         if (mirror.sphere.has_value()) {
             const auto& sphere = *mirror.sphere;
-            trace(from, to, 0.0, 1.0, [&](Vec3 point, std::optional<Vec3> near) { return sphere.reflectionOf(eye.position, point, near); }, current->surface, lineColour, grazed);
+            trace(from, to, 0.0, 1.0, [&](Vec3 point, std::optional<Vec3> nearby) { return sphere.reflectionOf(eye.position, point, nearby); }, current->surface, lineColour, grazed);
             return;
         }
         for (const auto& flat : mirror.flats) {

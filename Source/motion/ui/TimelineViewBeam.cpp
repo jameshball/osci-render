@@ -160,7 +160,7 @@ void MotionTimelineView::paintBeamLabel(juce::Graphics& g) const {
 
 std::optional<MotionTimelineView::BeamTarget> MotionTimelineView::beamEdgeAt(juce::Point<int> point) const {
     if (point.x < namesWidth || point.y < rulerHeight) { return std::nullopt; }
-    const auto near = [&](motion::Id id, juce::Rectangle<float> area, bool drawing) -> std::optional<BeamTarget> {
+    const auto nearby = [&](motion::Id id, juce::Rectangle<float> area, bool drawing) -> std::optional<BeamTarget> {
         if (area.getHeight() < 10) { return std::nullopt; }
         const auto share = beamShareAt(id, static_cast<float>(point.x));
         if (!share.has_value() || (drawing && !(*share > 0))) { return std::nullopt; }
@@ -171,7 +171,7 @@ std::optional<MotionTimelineView::BeamTarget> MotionTimelineView::beamEdgeAt(juc
     if (group != 0) {
         const auto area = groupBeamArea(group);
         // A group's edge is wherever what it holds is drawing.
-        return area.has_value() ? near(group, *area, true) : std::nullopt;
+        return area.has_value() ? nearby(group, *area, true) : std::nullopt;
     }
     int row = 0;
     const auto* clip = clipAt(point, row);
@@ -181,7 +181,7 @@ std::optional<MotionTimelineView::BeamTarget> MotionTimelineView::beamEdgeAt(juc
     const auto bounds = clipBounds(*clip, row);
     // Clear of the trim handles at either end.
     if (point.x < bounds.getX() + 8 || point.x > bounds.getRight() - 8) { return std::nullopt; }
-    return near(clip->id, beamArea(*clip, row), false);
+    return nearby(clip->id, beamArea(*clip, row), false);
 }
 
 bool MotionTimelineView::beamDown(const juce::MouseEvent& event) {

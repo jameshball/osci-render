@@ -16,14 +16,14 @@ void check(bool condition, const std::string& message) {
     }
 }
 
-bool near(double a, double b, double within = 1.0e-9) { return std::abs(a - b) <= within; }
+bool nearby(double a, double b, double within = 1.0e-9) { return std::abs(a - b) <= within; }
 
 // The law of reflection at a point with a normal: the ways to the eye and to
 // the point make equal angles with it, in one plane with it.
 bool reflects(Vec3 seen, Vec3 normal, Vec3 eye, Vec3 point, double within = 1.0e-9) {
     const auto toEye = (eye - seen).normalized().value(), toPoint = (point - seen).normalized().value();
     const auto halfway = (toEye + toPoint).normalized().value();
-    return near(normal.dot(toEye), normal.dot(toPoint), within) && halfway.cross(normal).length() < within * 10;
+    return nearby(normal.dot(toEye), normal.dot(toPoint), within) && halfway.cross(normal).length() < within * 10;
 }
 
 // A square of floor, 2 across, at y = 0, as a surface's corners and faces.
@@ -58,10 +58,10 @@ int main() {
         const Vec3 eye {0, 2, 3};
         mirror.face(eye);
         const auto& flat = mirror.flats.front();
-        check(near(flat.normal.y, 1) && flat.outline.size() == 4, "facing the eye, its outline its four sides");
+        check(nearby(flat.normal.y, 1) && flat.outline.size() == 4, "facing the eye, its outline its four sides");
         const Vec3 point {0, 1, -1};
         const auto seen = flat.reflectionOf(eye, point);
-        check(seen.has_value() && near(seen->y, 0) && near(seen->z, 1.0 / 3), "a point above it is seen where the line to its image crosses it");
+        check(seen.has_value() && nearby(seen->y, 0) && nearby(seen->z, 1.0 / 3), "a point above it is seen where the line to its image crosses it");
         check(reflects(*seen, flat.normal, eye, point), "with equal angles to the eye and the point");
         check(!flat.reflectionOf(eye, {0, -1, 0}).has_value(), "a point below it is not seen in it");
         check(flat.contains(*seen) && !flat.contains({1.5, 0, 0}), "the outline holds what it holds");
@@ -70,7 +70,7 @@ int main() {
         check(spans.size() == 1, "a line partly over the mirror is seen in it once");
         const auto [from, to] = spans.front();
         const auto enters = flat.reflectionOf(eye, Vec3 {0, .5, -3} + Vec3 {0, 0, 3} * from);
-        check(enters.has_value() && near(enters->z, -1, 1.0e-9) && near(to, 1), "from where its reflection crosses the far edge to its end");
+        check(enters.has_value() && nearby(enters->z, -1, 1.0e-9) && nearby(to, 1), "from where its reflection crosses the far edge to its end");
         check(flat.spans(eye, {3, 1, 0}, {4, 1, 0}).empty(), "a line whose reflection misses the mirror is not seen in it");
         check(flat.spans(eye, {0, -1, 0}, {0, -2, 0}).empty(), "nor a line under it");
     }
@@ -89,7 +89,7 @@ int main() {
         std::vector<std::array<std::uint32_t, 3>> roundFaces;
         ball({.3, -.2, .5}, .4, round, roundFaces);
         const auto sphere = Mirror::of(round, roundFaces);
-        check(sphere.sphere.has_value() && near(sphere.sphere->radius, .4, 1.0e-9) && (sphere.sphere->centre - Vec3 {.3, -.2, .5}).length() < 1.0e-9, "a ball is the sphere through its corners");
+        check(sphere.sphere.has_value() && nearby(sphere.sphere->radius, .4, 1.0e-9) && (sphere.sphere->centre - Vec3 {.3, -.2, .5}).length() < 1.0e-9, "a ball is the sphere through its corners");
         // A flat disc's rim lies on many spheres, and is none of them.
         std::vector<std::optional<Vec3>> disc {Vec3 {}};
         std::vector<std::array<std::uint32_t, 3>> discFaces;
@@ -112,7 +112,7 @@ int main() {
             if (!at.has_value()) { continue; }
             ++seen;
             const auto normal = (*at - sphere.centre) / sphere.radius;
-            check(near((*at - sphere.centre).length(), sphere.radius, 1.0e-12), "the reflection is on the sphere");
+            check(nearby((*at - sphere.centre).length(), sphere.radius, 1.0e-12), "the reflection is on the sphere");
             check(reflects(*at, normal, eye, point, 1.0e-7), "with equal angles to the eye and the point");
         }
         check(seen > 1000, "most points round a ball are seen in it");
@@ -120,14 +120,14 @@ int main() {
         check(!sphere.reflectionOf({0, 0, 3}, {.2, .1, -.3}).has_value(), "a point inside it is not seen");
         // Straight back along the line through its middle.
         const auto back = sphere.reflectionOf({.2, .1, 3}, {.2, .1, 1});
-        check(back.has_value() && near(back->z, .2, 1.0e-12), "a point between it and the eye is seen straight back");
+        check(back.has_value() && nearby(back->z, .2, 1.0e-12), "a point between it and the eye is seen straight back");
         // Its rim: on it, and where the line from the eye only grazes it.
         const Vec3 eye {.4, 1.5, 2};
         const auto rim = sphere.rimFrom(eye);
         check(rim.has_value(), "a ball seen from outside has a rim");
         for (int step = 0; step < 16; ++step) {
             const auto at = rim->at(step * .4);
-            check(near((at - sphere.centre).length(), sphere.radius, 1.0e-12) && near((at - eye).dot(at - sphere.centre), 0, 1.0e-12), "its rim is where the eye's lines graze it");
+            check(nearby((at - sphere.centre).length(), sphere.radius, 1.0e-12) && nearby((at - eye).dot(at - sphere.centre), 0, 1.0e-12), "its rim is where the eye's lines graze it");
         }
         // Behind it and off to one side (straight behind is hidden by it).
         const auto edge = sphere.reflectionOf({.2, .1, 3}, {1.6, .1, -4});
@@ -146,10 +146,10 @@ int main() {
         // Many faces in a tree, against testing each in turn.
         std::vector<SceneRays::Triangle> faces;
         std::mt19937 random(3);
-        std::uniform_real_distribution<double> spread(-2, 2), small(-.3, .3);
+        std::uniform_real_distribution<double> spread(-2, 2), slight(-.3, .3);
         for (std::uint32_t index = 0; index < 500; ++index) {
             const Vec3 at {spread(random), spread(random), spread(random)};
-            faces.push_back({at, at + Vec3 {small(random), small(random), small(random)}, at + Vec3 {small(random), small(random), small(random)}, index});
+            faces.push_back({at, at + Vec3 {slight(random), slight(random), slight(random)}, at + Vec3 {slight(random), slight(random), slight(random)}, index});
         }
         SceneRays many, one;
         many.build(faces);

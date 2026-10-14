@@ -19,7 +19,7 @@ class Coverage {
 public:
     // How near a line must be to one drawn, and how nearly along it (the sine
     // of the widest angle between them).
-    static constexpr double near = DepthBuffer::pixel;
+    static constexpr double nearby = DepthBuffer::pixel;
     static constexpr double along = .1;
     // How far inside a drawn line's ends a point must be to be covered by it.
     static constexpr double inset = .5 * DepthBuffer::pixel;
@@ -99,12 +99,12 @@ private:
         const auto length = std::hypot(vx, vy);
         // Inside a drawn line's ends; past a join between its segments, as
         // far as a point beside it can be.
-        const auto from = segment.first ? inset : -near, to = segment.last ? length - inset : length + near;
+        const auto from = segment.first ? inset : -nearby, to = segment.last ? length - inset : length + nearby;
         if (!(to > from)) { return false; }
         // Along it either way, beside it, and away from its ends.
         if (std::abs(vx * uy - vy * ux) > along * length) { return false; }
         const auto px = point.x - segment.ax, py = point.y - segment.ay;
-        if (std::abs(vx * py - vy * px) > near * length) { return false; }
+        if (std::abs(vx * py - vy * px) > nearby * length) { return false; }
         const auto t = (px * vx + py * vy) / length;
         return t >= from && t <= to;
     }

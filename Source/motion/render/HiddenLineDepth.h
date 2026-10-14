@@ -214,9 +214,9 @@ public:
         bool covered = false;
         for (auto row = std::max(0, y - 1); row <= std::min(height - 1, y + 1); ++row) {
             for (auto column = std::max(0, x - 1); column <= std::min(width - 1, x + 1); ++column) {
-                const auto& near = pixels[static_cast<std::size_t>(row) * static_cast<std::size_t>(width) + static_cast<std::size_t>(column)];
-                if (near.w == 0 || near.owner == here.owner) { continue; }
-                const auto& other = planes[static_cast<std::size_t>(near.owner)];
+                const auto& nearby = pixels[static_cast<std::size_t>(row) * static_cast<std::size_t>(width) + static_cast<std::size_t>(column)];
+                if (nearby.w == 0 || nearby.owner == here.owner) { continue; }
+                const auto& other = planes[static_cast<std::size_t>(nearby.owner)];
                 if (other.outside(px, py) > 0) { continue; }
                 covered = true;
                 if (!inFront(point, other.at(px, py))) { return false; }

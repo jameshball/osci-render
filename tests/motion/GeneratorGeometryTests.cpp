@@ -15,7 +15,7 @@ void check(bool condition, const std::string& message) {
     }
 }
 
-bool near(Vec3 a, Vec3 b, double tolerance = 1.0e-9) { return (a - b).length() <= tolerance; }
+bool nearby(Vec3 a, Vec3 b, double tolerance = 1.0e-9) { return (a - b).length() <= tolerance; }
 
 std::vector<double> defaults(const GeneratorDefinition& definition) {
     std::vector<double> values;
@@ -39,9 +39,9 @@ void everyGeneratorDraws() {
             check(!path.empty(), std::string(definition.name) + " draws no empty strokes");
             for (std::size_t index = 0; index < path.size(); ++index) {
                 for (const auto& point : path[index].points) { check(point.finite(), std::string(definition.name) + " draws only finite points"); }
-                if (index > 0) { check(near(path[index - 1].points[3], path[index].points[0], 1.0e-6), std::string(definition.name) + "'s strokes run end to end"); }
+                if (index > 0) { check(nearby(path[index - 1].points[3], path[index].points[0], 1.0e-6), std::string(definition.name) + "'s strokes run end to end"); }
             }
-            if (geometry.filled) { check(near(path.front().points[0], path.back().points[3], 1.0e-6), std::string(definition.name) + "'s filled strokes close"); }
+            if (geometry.filled) { check(nearby(path.front().points[0], path.back().points[3], 1.0e-6), std::string(definition.name) + "'s filled strokes close"); }
         }
         for (const auto& triangle : geometry.triangles) {
             for (const auto corner : triangle) { check(corner < geometry.vertices.size(), std::string(definition.name) + "'s faces use its vertices"); }
@@ -70,7 +70,7 @@ void shapesAreWhatTheySay() {
     // A five-pointed star: ten corners, its first point straight up.
     const auto star = built("star");
     check(star.paths.size() == 1 && star.paths.front().size() == 10, "a star is one stroke of ten edges");
-    check(near(star.paths.front().front().points[0], {0, .5, 0}), "a star points up");
+    check(nearby(star.paths.front().front().points[0], {0, .5, 0}), "a star points up");
     // Rounding turns each corner into a curve.
     const auto rounded = built("star", {5, .5, .2, 50});
     check(rounded.paths.front().size() == 20, "a rounded star has a curve at each corner and an edge between");
@@ -102,7 +102,7 @@ void shapesAreWhatTheySay() {
     check(boxEdges == 12, "a box has twelve edges, each once");
     // A spirograph closes: it ends where it began.
     const auto spirograph = built("spirograph");
-    check(near(spirograph.paths.front().front().points[0], spirograph.paths.front().back().points[3], 1.0e-6), "a spirograph closes");
+    check(nearby(spirograph.paths.front().front().points[0], spirograph.paths.front().back().points[3], 1.0e-6), "a spirograph closes");
     // The Lissajous figure fits its size.
     const auto lissajous = built("lissajous");
     for (const auto& segment : lissajous.paths.front()) { check(std::abs(segment.points[0].x) <= .5 + 1.0e-9 && std::abs(segment.points[0].y) <= .5 + 1.0e-9, "a Lissajous figure stays within its size"); }

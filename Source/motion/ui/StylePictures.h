@@ -67,12 +67,12 @@ inline bool facing(Vec3 point) { return turned(point).z > 0; }
 // `steps`, and to exactly where it turns away, so it meets the rim.
 template <typename At>
 void traceFacing(juce::Path& path, At&& at, int steps) {
-    const auto rim = [&](double near, double far) {
+    const auto rim = [&](double nearby, double farthest) {
         for (int halving = 0; halving < 30; ++halving) {
-            const auto middle = (near + far) * .5;
-            (facing(at(middle)) ? near : far) = middle;
+            const auto middle = (nearby + farthest) * .5;
+            (facing(at(middle)) ? nearby : farthest) = middle;
         }
-        return at(near);
+        return at(nearby);
     };
     bool open = false;
     double previous = 0;

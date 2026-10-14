@@ -10,7 +10,7 @@ void check(bool passed, const char* message) {
         std::exit(1);
     }
 }
-bool near(float left, float right) { return std::abs(left - right) < 0.00001f; }
+bool nearby(float left, float right) { return std::abs(left - right) < 0.00001f; }
 motion::PreparedAudio::Result mono(double rate, const std::vector<float>& samples) {
     const std::array<std::span<const float>, 1> channels { samples };
     return motion::PreparedAudio::fromPlanar(rate, channels);
@@ -22,7 +22,7 @@ int main() {
     const auto source = mono(4, { 0, 1, 0, -1 });
     check(static_cast<bool>(source), "valid mono PCM prepares");
     check(source.audio->duration() == 1 && source.audio->frameCount() == 4 && source.audio->channelCount() == 1, "source metadata remains exact");
-    check(near(source.audio->sample(0.125).left, 0.5f), "linear resampling interpolates unequal source/output rates");
+    check(nearby(source.audio->sample(0.125).left, 0.5f), "linear resampling interpolates unequal source/output rates");
     for (int frame = 0; frame < 8; ++frame) {
         const auto sample = source.audio->sample(frame / 8.0);
         check(sample.left == sample.right, "mono is duplicated to stereo");

@@ -5,33 +5,33 @@
 static void check(bool ok, const char* message) {
     if (!ok) { std::cerr << message << '\n'; std::exit(1); }
 }
-static bool near(double a, double b) { return std::abs(a - b) < 1e-10; }
+static bool nearby(double a, double b) { return std::abs(a - b) < 1e-10; }
 int main() {
     motion::Clip clip;
     clip.id = 1; clip.start = 3; clip.duration = 4; clip.offset = 0.5; clip.rate = 1.25;
     clip.properties["position.x"].setKey({0.5, 0, motion::Interpolation::cubic, 0, 2});
     clip.properties["position.x"].setKey({5.5, 10, motion::Interpolation::cubic, 2, 0});
     check(clip.anchorToBeats(motion::Tempo(150)), "beat assignment succeeds");
-    check(near(clip.start, 7.5) && near(clip.duration, 10) && near(clip.offset, 1.25), "canonical values are beats");
+    check(nearby(clip.start, 7.5) && nearby(clip.duration, 10) && nearby(clip.offset, 1.25), "canonical values are beats");
     const auto same = clip.timing(motion::Tempo(150)), slow = clip.timing(motion::Tempo(75));
-    check(near(same.start, 3) && near(same.duration(), 4) && near(same.offset, .5) && near(same.rate, 1.25), "assignment retains source timing");
-    check(near(slow.start, 6) && near(slow.duration(), 8) && near(slow.rate, .625), "tempo resolves placement and playback speed");
-    check(near(clip.localTime(10, motion::Tempo(75)), 3), "source clock follows musical position");
+    check(nearby(same.start, 3) && nearby(same.duration(), 4) && nearby(same.offset, .5) && nearby(same.rate, 1.25), "assignment retains source timing");
+    check(nearby(slow.start, 6) && nearby(slow.duration(), 8) && nearby(slow.rate, .625), "tempo resolves placement and playback speed");
+    check(nearby(clip.localTime(10, motion::Tempo(75)), 3), "source clock follows musical position");
     check(clip.curveBpm(motion::Tempo(75)) == 150, "clip modulation retains content tempo");
     const auto parts = clip.split(10, 2, motion::Tempo(75));
     check(parts.has_value(), "split resolves seconds to beats");
     check(!parts->first.contains(10, motion::Tempo(75)) && parts->second.contains(10, motion::Tempo(75)), "split half-open boundary");
-    check(near(parts->second.localTime(12, motion::Tempo(75)), clip.localTime(12, motion::Tempo(75))), "split preserves animation and MIDI offset");
+    check(nearby(parts->second.localTime(12, motion::Tempo(75)), clip.localTime(12, motion::Tempo(75))), "split preserves animation and MIDI offset");
     auto trimmed = clip;
     check(trimmed.trim(8, 12, motion::Tempo(75)), "trim at changed tempo");
-    check(near(trimmed.localTime(10, motion::Tempo(75)), clip.localTime(10, motion::Tempo(75))), "trim preserves content clock");
+    check(nearby(trimmed.localTime(10, motion::Tempo(75)), clip.localTime(10, motion::Tempo(75))), "trim preserves content clock");
     auto stretched = clip;
     check(stretched.stretch(16, motion::Tempo(75)), "stretch at changed tempo");
-    check(near(stretched.localTime(14, motion::Tempo(75)), clip.localTime(10, motion::Tempo(75))), "stretch preserves normalized content");
+    check(nearby(stretched.localTime(14, motion::Tempo(75)), clip.localTime(10, motion::Tempo(75))), "stretch preserves normalized content");
     auto moved = clip;
     auto timing = moved.timing(motion::Tempo(75)); timing.moveTo(20);
     check(moved.setTiming(timing, motion::Tempo(75)), "UI edits resolved seconds");
-    check(near(moved.start, 25) && near(moved.offset, clip.offset) && near(moved.rate, clip.rate), "move changes only musical placement");
+    check(nearby(moved.start, 25) && nearby(moved.offset, clip.offset) && nearby(moved.rate, clip.rate), "move changes only musical placement");
     const auto key = clip.properties.at("position.x").keyframes()[0];
     for (int i = 0; i < 10000; ++i) { static_cast<void>(clip.timing(motion::Tempo(i % 2 ? 63.7 : 199.3))); }
     check(clip.start == 7.5 && clip.duration == 10 && key.outgoingSlope == 2 && key.time == .5, "tempo resolution never rewrites authored content");
@@ -74,7 +74,7 @@ int main() {
         check(seconds.anchorToBeats(motion::Tempo(bpm)), "fractional seconds clip anchors inward");
         const auto anchored = seconds.timing(motion::Tempo(bpm));
         check(anchored.start >= original.start && anchored.end() <= original.end(), "anchoring never expands the original interval");
-        check(near(anchored.start, original.start) && near(anchored.end(), original.end()), "inward anchoring retains placement to floating precision");
+        check(nearby(anchored.start, original.start) && nearby(anchored.end(), original.end()), "inward anchoring retains placement to floating precision");
         motion::Track touching;
         check(touching.insert(seconds, motion::Tempo(bpm)) && touching.insert(following, motion::Tempo(bpm)), "anchored clip accepts exact-touching seconds neighbour");
         following.start = anchored.end() - 1e-8;

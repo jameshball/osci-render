@@ -90,8 +90,8 @@ private:
         const auto first = lengthSquared(u, middle), second = lengthSquared(middle, v);
         if (std::min(first, second) < jumpLength) { return true; }
         if (!deep) { return false; }
-        const auto near = std::max(u.at->w, v.at->w), far = std::min(u.at->w, v.at->w);
-        return std::max(first, second) > .81 * lengthSquared(u, v) && near < 1.5 * far;
+        const auto nearby = std::max(u.at->w, v.at->w), farthest = std::min(u.at->w, v.at->w);
+        return std::max(first, second) > .81 * lengthSquared(u, v) && nearby < 1.5 * farthest;
     }
 
     static osci::Point mix(const osci::Point& from, const osci::Point& u, const osci::Point& v, double s, double t) {

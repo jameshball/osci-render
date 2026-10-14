@@ -142,7 +142,7 @@ struct SphereMirror {
     // ball, the eye inside it, or a point the ball itself hides from where
     // it would be seen (beyond its rim from the eye, or from the point).
     // `near`, a reflection of a point close by, is where the search starts.
-    std::optional<Vec3> reflectionOf(Vec3 eye, Vec3 point, std::optional<Vec3> near = std::nullopt) const {
+    std::optional<Vec3> reflectionOf(Vec3 eye, Vec3 point, std::optional<Vec3> nearby = std::nullopt) const {
         const auto toEye = eye - centre, toPoint = point - centre;
         const auto eyeDistance = toEye.length(), pointDistance = toPoint.length();
         if (!(eyeDistance > radius) || !(pointDistance > radius)) { return std::nullopt; }
@@ -174,8 +174,8 @@ struct SphereMirror {
         // or from where a point close by is seen, kept inside the bracket
         // that holds it.
         double low = 0, high = apart, angle = apart / 2;
-        if (near.has_value()) {
-            const auto towards = *near - centre;
+        if (nearby.has_value()) {
+            const auto towards = *nearby - centre;
             const auto guess = std::atan2(towards.dot(second), towards.dot(first));
             if (guess > 0 && guess < apart) { angle = guess; }
         }

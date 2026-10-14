@@ -14,7 +14,7 @@ void check(bool condition, const std::string& message) {
     }
 }
 
-bool near(double a, double b, double within = 1.0e-9) { return std::abs(a - b) <= within; }
+bool nearby(double a, double b, double within = 1.0e-9) { return std::abs(a - b) <= within; }
 
 LightView lightOf(GeneratorKind kind, Vec3 position, Vec3 direction = {0, 0, -1}) {
     LightView light;
@@ -43,7 +43,7 @@ void falloff() {
     point.state.range = 4;
     point.state.intensity = 2;
     const std::vector<LightView> lights {point};
-    check(near(red(lights, {1.0e-6, 0, 0}), 2, 1.0e-6), "a point light is at its intensity where it is");
+    check(nearby(red(lights, {1.0e-6, 0, 0}), 2, 1.0e-6), "a point light is at its intensity where it is");
     check(red(lights, {4, 0, 0}) == 0 && red(lights, {9, 0, 0}) == 0, "and nothing at its range and past it");
     double last = 3;
     for (double distance = .5; distance < 4; distance += .5) {
@@ -65,7 +65,7 @@ void cone() {
     };
     const auto full = red(lights, at(0));
     check(full > .99, "a spot light shines fully down its middle");
-    check(near(red(lights, at(14), {}), full, 1.0e-3), "and fully inside its inner cone");
+    check(nearby(red(lights, at(14), {}), full, 1.0e-3), "and fully inside its inner cone");
     const auto edge = red(lights, at(22));
     check(edge > 0 && edge < full, "it fades across its soft edge");
     check(red(lights, at(31)) == 0 && red(lights, Vec3 {0, 0, 1}) == 0, "and nothing outside its cone or behind it");
@@ -83,25 +83,25 @@ void facing() {
     LineNormals edge;
     edge.add(Vec3 {0, 1, 0});
     edge.add(Vec3 {1, 0, 0});
-    check(near(red(lights, {}, up), 1), "a face square on to a light takes all of it");
-    check(near(red(lights, {}, side), 0), "one edge on to it, none");
-    check(near(red(lights, {}, edge), .5), "an edge between them half");
+    check(nearby(red(lights, {}, up), 1), "a face square on to a light takes all of it");
+    check(nearby(red(lights, {}, side), 0), "one edge on to it, none");
+    check(nearby(red(lights, {}, edge), .5), "an edge between them half");
     LineNormals down;
     down.add(Vec3 {0, -1, 0});
-    check(near(red(lights, {}, down), 1), "either side of a face takes it");
-    check(near(red(lights, {}), 1), "a line on no face takes it whichever way it comes");
+    check(nearby(red(lights, {}, down), 1), "either side of a face takes it");
+    check(nearby(red(lights, {}), 1), "a line on no face takes it whichever way it comes");
     auto ambient = lightOf(GeneratorKind::ambientLight, {});
     ambient.state.intensity = .25;
     ambient.state.colour = {1, .5, 0};
     const auto fill = illumination({ambient}, {3, 4, 5}, side);
-    check(near(fill[0], .25) && near(fill[1], .125) && near(fill[2], 0), "an ambient light is its colour everywhere, however faces face");
+    check(nearby(fill[0], .25) && nearby(fill[1], .125) && nearby(fill[2], 0), "an ambient light is its colour everywhere, however faces face");
 }
 
 void parallelShadow() {
     // A unit square a metre above the ground, under a light shining straight down.
     DepthBuffer depth;
     ShadowView view {Eye::looking({0, 5, 0}, {0, -1, 0}, {0, 0, -1}), Projection {.5, true}, &depth};
-    view.projection.far = 10;
+    view.projection.farthest = 10;
     view.projection.span = 10;
     square(view, {Vec3 {-1, 1, -1}, Vec3 {1, 1, -1}, Vec3 {1, 1, 1}, Vec3 {-1, 1, 1}});
     auto light = lightOf(GeneratorKind::directionalLight, {}, {0, -1, 0});
@@ -112,7 +112,7 @@ void parallelShadow() {
     check(light.reaching({0, 2, 0}) == 1, "above it is lit");
     check(light.reaching({1.6, 0, 0}) == 1, "beside its shadow is lit");
     light.state.shadows = .25;
-    check(near(light.reaching({0, 0, 0}), .75), "a weaker shadow lets some through");
+    check(nearby(light.reaching({0, 0, 0}), .75), "a weaker shadow lets some through");
 }
 
 void cubeShadow() {
