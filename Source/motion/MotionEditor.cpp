@@ -75,6 +75,27 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     auto* holder = juce::StandalonePluginHolder::getInstance();
     if (holder != nullptr) { holder->deviceManager.addChangeListener(this); }
     sliderBakes.onStatus = [this](const juce::String& text, bool error) { statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice); };
+    // Beam overloaded: why, and the next rate up to draw it whole.
+    statusBar.onOverload = [this](juce::Component& mark) {
+        const auto rate = processor.document.mainProject().sampleRate;
+        // Up to the default from below it; past that, twice as fast.
+        std::optional<double> higher;
+        const auto wanted = rate < motion::Project::defaultSampleRate - .5 ? motion::Project::defaultSampleRate : rate * 2;
+        for (const auto candidate : projectSampleRates) {
+            if (candidate > wanted - .5) { higher = candidate; break; }
+        }
+        auto popover = std::make_unique<motion::ui::BeamOverloadPopover>(rate, higher);
+        auto* raw = popover.get();
+        raw->onChoose = [this, raw](std::optional<double> chosen) {
+            if (chosen.has_value() && processor.document.mainProject().sampleRate != *chosen) {
+                const auto value = *chosen;
+                processor.document.edit("Change the sample rate", [value](motion::Project& project) { project.sampleRate = value; });
+                statusBar.show("Sample rate " + motion::ui::BeamOverloadPopover::kilohertz(value), MotionStatusBar::Kind::notice);
+            }
+            dismissPopover(raw);
+        };
+        showPopover(std::move(popover), getLocalArea(&statusBar, mark.getBounds()));
+    };
     sliderBakes.update();
     composition.refresh();
     timeline.refreshTracks();
@@ -456,7 +477,7 @@ void MotionEditor::timerCallback() {
             details.add("Drawing " + juce::String(layers) + (layers == 1 ? " object" : " objects"));
             // Too much to draw in a cycle: its shortest strokes are left out.
             if (simplified) {
-                line.add("simplified to fit");
+                overloadSeenAt = juce::Time::getMillisecondCounterHiRes();
                 details.add("Simplified to fit: too much to draw in one cycle of the beam, so the shortest strokes are left out (a higher sample rate draws more)");
             }
         }
@@ -480,6 +501,9 @@ void MotionEditor::timerCallback() {
                 details.add("Every frame baked: " + baked.joinIntoString(", "));
             }
         }
+        // Overloaded until a moment has passed with nothing simplified, so
+        // the mark doesn't flicker as frames come and go.
+        statusBar.setOverloaded(juce::Time::getMillisecondCounterHiRes() - overloadSeenAt < 1500);
         statusBar.setStatistics(line.joinIntoString(dot), details.joinIntoString("\n"));
     }
     processor.collectPreparedState();

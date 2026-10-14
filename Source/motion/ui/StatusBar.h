@@ -5,7 +5,8 @@
 // One quiet line at the foot of the window: the latest message on the left
 // (errors stay until dismissed, notices fade after a few seconds), with a
 // button to act on it when there is something to do, and live beam
-// statistics on the right.
+// statistics on the right, led by a small red mark while frames are more
+// than the beam has time to draw.
 class MotionStatusBar final : public juce::Component, private juce::Timer {
 public:
     enum class Kind { notice, warning, error };
@@ -36,7 +37,27 @@ public:
             if (act) { act(); }
         };
         addChildComponent(action);
+        overload.setButtonText("Beam overloaded");
+        overload.setName("Beam overloaded");
+        overload.setTitle("Beam overloaded");
+        overload.setTooltip("Some frames are simplified to fit the beam's time. Click for what would help.");
+        overload.getProperties().set(motion::style::captionButton, true);
+        overload.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+        overload.setColour(juce::TextButton::textColourOffId, osci::Colours::danger().withAlpha(.85f));
+        overload.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        overload.onClick = [this] { if (onOverload) { onOverload(overload); } };
+        addChildComponent(overload);
     }
+
+    // The overloaded mark, shown or not; a click on it calls `onOverload`
+    // with it, to anchor what it opens.
+    void setOverloaded(bool overloaded) {
+        if (overload.isVisible() == overloaded) { return; }
+        overload.setVisible(overloaded);
+        resized();
+        repaint();
+    }
+    std::function<void(juce::Component&)> onOverload;
 
     // `actionLabel` and `act`, when given: a button after the message that
     // does what it suggests, and clears it.
@@ -77,6 +98,11 @@ public:
     // A problem is a pill as long as its words: a dot in its colour, the
     // message, and the dismiss button inside it. A notice is just text.
     void paint(juce::Graphics& g) override {
+        // The overload mark's dot, in its colour.
+        if (overload.isVisible()) {
+            g.setColour(osci::Colours::danger().withAlpha(.85f));
+            g.fillEllipse(juce::Rectangle<float>(5, 5).withCentre({static_cast<float>(overload.getX()) + 4.5f, static_cast<float>(overload.getBounds().getCentreY())}));
+        }
         if (message.getText().isEmpty() || current == Kind::notice) { return; }
         const auto colour = current == Kind::error ? osci::Colours::danger() : osci::Colours::warning();
         g.setColour(colour.withAlpha(.12f));
@@ -88,6 +114,10 @@ public:
         auto area = getLocalBounds().reduced(motion::style::padding, 0);
         const auto statsWidth = juce::roundToInt(juce::TextLayout::getStringWidth(stats.getFont(), stats.getText())) + 8;
         stats.setBounds(area.removeFromRight(std::min(statsWidth, area.getWidth() / 2)));
+        if (overload.isVisible()) {
+            const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::buttonFont(overload), overload.getButtonText())) + 22;
+            overload.setBounds(area.removeFromRight(width).withSizeKeepingCentre(width, 20));
+        }
         area.removeFromRight(motion::style::padding);
         // The action keeps its whole label; the message gives way to it.
         constexpr int actionHeight = 20;
@@ -113,7 +143,7 @@ private:
     void timerCallback() override { clear(); }
 
     juce::Label message, stats;
-    juce::TextButton action;
+    juce::TextButton action, overload;
     std::function<void()> onAction;
     juce::Rectangle<int> pill;
     osci::CloseButton dismiss {"Dismiss message"};

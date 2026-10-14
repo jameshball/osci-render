@@ -5,6 +5,7 @@
 #include "model/LightPresets.h"
 #include "model/MirrorPresets.h"
 #include "MotionProcessor.h"
+#include "ui/BeamOverload.h"
 #include "ui/TimelineView.h"
 #include "ui/BeamShares.h"
 #include "ui/CompositionView.h"
@@ -377,6 +378,8 @@ private:
     juce::ComboBox monitorOutput;
     MotionPropertyInspector propertyInspector;
     MotionStatusBar statusBar;
+    // When a frame was last simplified to fit the beam's time.
+    double overloadSeenAt = -1.0e9;
     motion::Id selection = 0;
     motion::Id curveTarget = 0;
     std::string curvePropertyName = "position.x";
