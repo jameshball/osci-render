@@ -929,8 +929,11 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
         for (const auto& spec : motion::propertySpecs(*target)) {
             if (motion::hasProperty(generator, spec.id, surface)) { add(spec.id); }
         }
-        // A Lua clip's slider curves are graphable once they exist.
+        // A Lua clip's slider curves, and an L-system's depth, are graphable once they exist.
         for (const auto& spec : motion::luaSliderSpecs) {
+            if (target->properties != nullptr && target->properties->contains(spec.id)) { add(spec.id); }
+        }
+        for (const auto& spec : motion::fractalPropertySpecs) {
             if (target->properties != nullptr && target->properties->contains(spec.id)) { add(spec.id); }
         }
     }

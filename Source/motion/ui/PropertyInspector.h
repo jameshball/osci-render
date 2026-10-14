@@ -173,6 +173,8 @@ private:
     // Sliders a Lua clip's script reads (slider_a ...), plus any it already
     // animates. Their curves are created on first edit.
     std::vector<motion::PropertySpec> luaSliders() const;
+    // An L-system clip's depth, at the depth its source was imported at.
+    std::optional<motion::PropertySpec> fractalDepthSpec() const;
     // A generator clip's parameters, under a heading of the generator's name
     // above its transform.
     const motion::GeneratorDefinition* targetGenerator() const;

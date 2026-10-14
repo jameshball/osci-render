@@ -2,6 +2,7 @@
 #include "../Source/motion/render/BeamRenderer.h"
 #include <thread>
 #include "../Source/motion/import/FractalPreparation.h"
+#include "../Source/motion/import/FractalDrawing.h"
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/model/ProjectFile.h"
 #include "../Source/motion/model/LightPresets.h"
@@ -314,6 +315,27 @@ public:
         expect(!motion::fractal::prepare(R"({"axiom":"X"})", 0));
         expect(!motion::fractal::prepare(R"({"axiom":"F","angle":"90"})", 0));
         expect(!motion::fractal::prepare(R"({"axiom":"F","rules":[{"variable":"F","replacement":"F"},{"variable":"F","replacement":"FF"}]})", 1));
+
+        beginTest("A depth between two grows the deeper drawing out of the shallower");
+        {
+            auto& cache = motion::fractal::DrawingCache::shared();
+            const auto two = motion::fractal::prepare(source, 2), three = motion::fractal::prepare(source, 3);
+            expect(motion::fractal::between(two.segments, three.segments, 0) == two.segments, "nothing grown at the shallower depth");
+            expect(motion::fractal::between(two.segments, three.segments, 1) == three.segments, "all grown at the deeper");
+            const auto half = motion::fractal::between(two.segments, three.segments, .5);
+            expectEquals(half.size(), three.segments.size());
+            bool inside = true, differs = false;
+            for (std::size_t index = 0; index < half.size(); ++index) {
+                for (const auto coordinate : half[index]) { inside = inside && std::isfinite(coordinate) && std::abs(coordinate) <= 1.000001; }
+                differs = differs || half[index] != three.segments[index];
+            }
+            expect(inside, "fitted to the frame as whole depths are");
+            expect(differs, "part-way between");
+            expect(cache.at(source, 2) != nullptr && cache.at(source, 2) == cache.at(source, 2.0001), "depths a blend step apart share a drawing");
+            // Past the deepest it can draw, the deepest.
+            expect(cache.at(source, 15) != nullptr && cache.at(source, 15)->bytes() == cache.at(source, 14)->bytes());
+            expect(cache.at(R"({"axiom":"X"})", 1) == nullptr);
+        }
         std::atomic<bool> cancelled {true};
         expect(!motion::fractal::prepare(source, 3, &cancelled));
 

@@ -21,7 +21,8 @@ constexpr std::array<SurfaceStyle, 6> surfaceStyles {{
 }};
 
 // The heading each property group sits under (a generator's own numbers sit
-// under its name, a script's sliders under theirs; anything else is Beam).
+// under its name, a script's sliders under theirs, an L-system's depth under
+// Fractal; anything else is Beam).
 constexpr std::array<std::pair<std::string_view, std::string_view>, 23> sectionOfGroup {{
     {"Position", "Transform"}, {"Rotation", "Transform"}, {"Scale", "Transform"}, {"Anchor", "Transform"},
     {"Colour", "Appearance"}, {"Opacity", "Appearance"}, {"Lit by lights", "Appearance"}, {"Beam", "Appearance"},
@@ -119,6 +120,8 @@ void MotionPropertyInspector::refresh() {
         const auto surface = motion::hasSurface(processor.document.project(), target);
         std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [generator, surface](const auto& spec) { return motion::hasProperty(generator, spec.id, surface); });
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
+        const auto depth = fractalDepthSpec();
+        if (depth.has_value()) { specList.insert(specList.begin(), *depth); }
     }
     const auto specs = std::span<const motion::PropertySpec>(specList);
     const auto modes = currentModes();
@@ -405,6 +408,7 @@ juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec
     if (found != sectionOfGroup.end()) { return juce::String(found->second.data(), found->second.size()); }
     if (spec.group == "Field of view") { return "Lens"; }
     if (spec.group.starts_with("Slider")) { return "Script sliders"; }
+    if (spec.id.starts_with("fractal.")) { return "Fractal"; }
     return "Beam";
 }
 
@@ -954,15 +958,35 @@ std::vector<motion::PropertySpec> MotionPropertyInspector::luaSliders() const {
     return result;
 }
 
+std::optional<motion::PropertySpec> MotionPropertyInspector::fractalDepthSpec() const {
+    const auto& project = processor.document.project();
+    for (const auto& track : project.tracks) {
+        for (const auto& clip : track.clips) {
+            if (clip.id != target || clip.composition != 0) { continue; }
+            const auto asset = motion::findAsset(project.assets, clip.asset);
+            if (asset == nullptr || !motion::isFractal(asset->extension)) { return std::nullopt; }
+            auto spec = motion::fractalPropertySpecs[0];
+            spec.defaultValue = asset->fractalDepth;
+            return spec;
+        }
+    }
+    return std::nullopt;
+}
+
 const motion::GeneratorDefinition* MotionPropertyInspector::targetGenerator() const {
     return motion::generatorFor(processor.document.project(), target);
 }
 
 motion::Curve* MotionPropertyInspector::createSlider(motion::Project& project, const std::string& property) const {
     if (property.starts_with("generator.") || property.starts_with("light.")) { return motion::ensurePropertyCurve(project, target, property); }
-    if (!property.starts_with("slider.")) { return nullptr; }
+    if (!property.starts_with("slider.") && !property.starts_with("fractal.")) { return nullptr; }
     auto found = motion::findPropertyTarget(project, target);
     if (!found.has_value() || found->properties == nullptr) { return nullptr; }
+    // A depth not yet stored is the one the source was imported at.
+    if (property.starts_with("fractal.") && !found->properties->contains(property)) {
+        const auto depth = fractalDepthSpec();
+        return &found->properties->emplace(property, motion::Curve(depth.has_value() ? depth->defaultValue : 3)).first->second;
+    }
     return &(*found->properties)[property];
 }
 

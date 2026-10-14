@@ -765,9 +765,10 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
         return juce::Result::fail(audio(*found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
     }
     const bool lua = replacement->extension.equalsIgnoreCase(".lua");
+    const bool fractal = isFractal(replacement->extension);
     const auto* generator = generatorOf(*replacement);
     // Every clip of it, in every composition, not only the one being edited.
-    editProject("Replace source", [assetId, replacement, lua, generator](Project& project) {
+    editProject("Replace source", [assetId, replacement, lua, fractal, generator](Project& project) {
         for (auto& asset : project.assets) {
             if (asset != nullptr && asset->id == assetId) { asset = replacement; }
         }
@@ -776,7 +777,7 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
         // links to them are pruned.
         const auto ownedByNew = [&](const Track& track, const std::string& name) {
             const auto specs = track.kind == TrackKind::audio ? std::span<const PropertySpec>(audioPropertySpecs) : std::span<const PropertySpec>(objectPropertySpecs);
-            return findPropertySpec(specs, name) != nullptr || (lua && name.starts_with("slider."))
+            return findPropertySpec(specs, name) != nullptr || (lua && name.starts_with("slider.")) || (fractal && findPropertySpec(fractalPropertySpecs, name) != nullptr)
                 || (generator != nullptr && findPropertySpec(generator->parameters, name) != nullptr);
         };
         const auto trackUses = [assetId](const Track& track) {
@@ -1944,6 +1945,8 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
         clip.duration = asset.source->duration();
     }
     clip.properties = defaultProperties(objectPropertySpecs);
+    // An L-system's clip starts at the depth chosen as it was imported.
+    if (isFractal(asset.extension)) { clip.properties["fractal.depth"] = Curve(asset.fractalDepth); }
     // A generator's clip holds its own values of the generator's parameters.
     // A solid starts turned, seen a little from above and the side, so it
     // reads as 3D in a camera looking straight at it.

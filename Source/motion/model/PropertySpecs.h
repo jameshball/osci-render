@@ -142,6 +142,13 @@ inline constexpr auto luaSliderSpecs = std::to_array<PropertySpec>({
     {"slider.y", "Slider Y", "Slider Y", "", 0, 1, 0, .01, 3, ""}, {"slider.z", "Slider Z", "Slider Z", "", 0, 1, 0, .01, 3, ""},
 });
 
+// An L-system's depth, per clip: whole depths are its generations, and a
+// depth between two grows the deeper out of the shallower.
+inline constexpr auto fractalPropertySpecs = std::to_array<PropertySpec>({
+    {"fractal.depth", "Depth", "Depth", "", 0, 15, 3, .05, 2, ""},
+});
+inline bool isFractal(const juce::String& extension) { return extension.equalsIgnoreCase(".lsystem"); }
+
 // Hide lines: how far lines behind the faces of 3D meshes fade from view,
 // from all of them drawn (0) to none (100); part-way they are dimmed.
 // Hatching: the scene shaded by a Hilbert curve over the frame, denser where
@@ -186,7 +193,7 @@ consteval bool namedOnce(const std::array<PropertySpec, size>& specs) {
     }
     return true;
 }
-static_assert(namedOnce(objectPropertySpecs) && namedOnce(audioPropertySpecs) && namedOnce(luaSliderSpecs) && namedOnce(cameraPropertySpecs) && namedOnce(beamPropertySpecs), "every property has a name of its own");
+static_assert(namedOnce(objectPropertySpecs) && namedOnce(audioPropertySpecs) && namedOnce(luaSliderSpecs) && namedOnce(fractalPropertySpecs) && namedOnce(cameraPropertySpecs) && namedOnce(beamPropertySpecs), "every property has a name of its own");
 
 // A new target's properties: each spec's default, unanimated.
 template <std::size_t size>

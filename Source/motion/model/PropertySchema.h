@@ -109,6 +109,7 @@ std::optional<PropertySpec> specFor(const ProjectType& project, Id target, std::
     const auto found = findPropertyTarget(project, target);
     const auto* spec = found.has_value() ? findPropertySpec(propertySpecs(*found), property) : nullptr;
     if (spec == nullptr) { spec = findPropertySpec(luaSliderSpecs, property); }
+    if (spec == nullptr) { spec = findPropertySpec(fractalPropertySpecs, property); }
     if (spec == nullptr) { spec = generatorSpec(project, target, property); }
     return spec != nullptr ? std::optional<PropertySpec>(*spec) : std::nullopt;
 }

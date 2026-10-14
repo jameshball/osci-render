@@ -2313,6 +2313,7 @@ std::vector<std::string> MotionTimelineView::animatedProperties(const motion::Tr
     specs.assign(base.begin(), base.end());
     if (track.kind == motion::TrackKind::visual) {
         specs.insert(specs.end(), motion::luaSliderSpecs.begin(), motion::luaSliderSpecs.end());
+        specs.insert(specs.end(), motion::fractalPropertySpecs.begin(), motion::fractalPropertySpecs.end());
         // Every generator's parameters, each name once.
         for (const auto& generator : motion::generatorDefinitions) {
             for (const auto& spec : generator.parameters) {

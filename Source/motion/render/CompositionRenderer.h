@@ -3,6 +3,7 @@
 #include "../model/Cancellation.h"
 #include "../model/Document.h"
 #include "../model/GeneratorDrawing.h"
+#include "../import/FractalDrawing.h"
 #include "../model/CompositionGraph.h"
 #include "PreparedEffects.h"
 #include "PreparedSoundtrack.h"
@@ -719,6 +720,16 @@ struct PreparedComposition {
                     for (std::size_t index = 0; index < parameters.size(); ++index) { values[index] = parameters[index].evaluate(seconds); }
                     return values;
                 });
+            }
+            // An L-system is drawn at this clip's depth, keyed, modulated and
+            // linked like any property; a depth between two grows the next.
+            if (isFractal(asset->extension)) {
+                const auto& scope = scopeOf(stages, stages.size() - 1);
+                const auto stored = clip.properties.find("fractal.depth");
+                auto depth = stored != clip.properties.end() ? stored->second : Curve(asset->fractalDepth);
+                drivers.drive(depth, scope, leaf.scopeClock, clip.id, "fractal.depth");
+                const auto drawn = fractal::clipSource(asset->data.toString(), leaf.clipClock.localTime(leaf.clipClock.end()), project.frameRate, [&](double seconds) { return depth.evaluate(seconds); });
+                if (drawn != nullptr) { item.source = drawn; }
             }
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));
