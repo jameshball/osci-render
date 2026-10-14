@@ -20,11 +20,17 @@ on:
       - packaging/osci-motion.iss
       - packaging/osci-motion.pkgproj
   workflow_dispatch:
+    inputs:
+      products:
+        description: Which products to build and publish
+        type: choice
+        options: [all, osci-motion]
+        default: all
 
 jobs:
   build:
     name: Build (${{ matrix.project }} ${{ matrix.version }} @ ${{ matrix.os }})
-    if: github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/develop' && contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]'))
+    if: (github.event_name == 'workflow_dispatch' && inputs.products == 'all') || (github.ref == 'refs/heads/develop' && contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]'))
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:
