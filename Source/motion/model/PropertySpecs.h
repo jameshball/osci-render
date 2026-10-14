@@ -147,7 +147,6 @@ inline constexpr auto luaSliderSpecs = std::to_array<PropertySpec>({
 inline constexpr auto fractalPropertySpecs = std::to_array<PropertySpec>({
     {"fractal.depth", "Depth", "Depth", "", 0, 15, 3, .05, 2, ""},
 });
-inline bool isFractal(const juce::String& extension) { return extension.equalsIgnoreCase(".lsystem"); }
 
 // Hide lines: how far lines behind the faces of 3D meshes fade from view,
 // from all of them drawn (0) to none (100); part-way they are dimmed.

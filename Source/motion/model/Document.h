@@ -140,6 +140,9 @@ inline std::shared_ptr<const Asset> findAsset(const std::vector<std::shared_ptr<
 
 // The generator an asset is, if it is one: a ".generator" whose text is the
 // generator's id.
+// Whether a source of this extension is an L-system (its clips have a depth).
+inline bool isFractal(const juce::String& extension) { return extension.equalsIgnoreCase(".lsystem"); }
+
 inline const GeneratorDefinition* generatorOf(const Asset& asset) {
     if (!asset.extension.equalsIgnoreCase(juce::String(generatorExtension.data(), generatorExtension.size()))) { return nullptr; }
     return findGenerator(asset.data.toString().trim().toStdString());

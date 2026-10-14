@@ -7,6 +7,15 @@ using namespace motion;
 using namespace motion::hidden::hatching;
 
 namespace {
+// The curve over the square `half` either side of the middle of the frame,
+// `look(x, y)` saying what is seen at a point: `visit(seen, size)` is told of
+// each of its cells in order (see Field::curve).
+template <typename Look, typename Visit>
+void curve(double half, int across, Look&& look, Visit&& visit) {
+    Field field(half, across, std::forward<Look>(look));
+    field.curve(1, [&](const std::optional<Seen>& seen, double size, float) { visit(seen, size); });
+}
+
 void check(bool condition, const std::string& message) {
     if (!condition) {
         std::cerr << "FAIL: " << message << '\n';
