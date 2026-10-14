@@ -59,6 +59,14 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
                 if (FramePresenter::usesNativeSurface()) {
                     dw->setOpaque(false);
                 }
+                // A launch that only renders, from the command line, shows
+                // nothing: its window is there for the renderer to draw into,
+                // unseen, and the app takes no place in the Dock or switcher.
+                const auto* holder = juce::StandalonePluginHolder::getInstance();
+                if (holder != nullptr && holder->commandLine.contains("--render-video")) {
+                    dw->setAlpha(0.0f);
+                    juce::Process::setDockIconVisible(false);
+                }
             }
         }
 
