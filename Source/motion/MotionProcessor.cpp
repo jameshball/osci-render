@@ -273,6 +273,7 @@ void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
     saveProperties(project);
     VisualiserState::save(project, visualiserParameters, recordingParameters);
     project.addChildElement(new juce::XmlElement(document.save()));
+    motion::ProjectPicture::write(project, picture);
     copyXmlToBinary(project, destination);
 }
 
@@ -305,6 +306,7 @@ void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlEl
     // with the editor and the live-source owner, after worker preparation.
     const juce::MessageManagerLock messageLock;
     VisualiserState::load(state, visualiserParameters, recordingParameters);
+    picture = motion::ProjectPicture::read(state);
     document.reset(std::move(prepared));
     restoreStandaloneProjectFilePathFromXml(state);
     loadProperties(state);

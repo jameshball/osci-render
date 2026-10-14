@@ -173,12 +173,6 @@ void MotionEditor::loadProject(const juce::File& file, bool example) {
                 owner->processor.currentProjectFile = file.getFullPathName();
                 owner->processor.setLastOpenedDirectory(file.getParentDirectory());
                 owner->processor.addRecentProjectFile(file);
-                // A project saved before pictures were kept gets one once it shows.
-                if (!owner->projectPictures.pictureOf(file).existsAsFile()) {
-                    juce::Timer::callAfterDelay(1500, [owner, file] {
-                        if (owner != nullptr && juce::File(owner->processor.currentProjectFile) == file) { owner->keepProjectPicture(file); }
-                    });
-                }
             }
             owner->updateTitle();
             // Saved by a version with things this one can't use: what was left out.

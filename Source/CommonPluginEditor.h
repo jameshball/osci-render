@@ -30,6 +30,9 @@ public:
     virtual void openProject(const juce::File& file);
     virtual void openProject();
     void saveProject();
+    // Runs `write` once the project is ready to be written: a product can
+    // first gather what it saves with it (osci-motion takes a picture).
+    virtual void beforeSaving(std::function<void()> write) { write(); }
     void saveProjectAs();
     virtual void resetWindowSizeAndPosition();
     void updateTitle();

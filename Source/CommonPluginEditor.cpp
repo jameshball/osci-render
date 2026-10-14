@@ -424,15 +424,21 @@ void CommonPluginEditor::saveProject() {
     if (audioProcessor.currentProjectFile.isEmpty()) {
         saveProjectAs();
     } else {
-        auto data = juce::MemoryBlock();
-        audioProcessor.getStateInformation(data);
-        auto file = juce::File(audioProcessor.currentProjectFile);
-        if (!file.replaceWithData(data.getData(), data.getSize())) {
-            osci::showOverlayMessage(*this, "Save Project Failed", "Could not write:\n" + file.getFullPathName());
-            return;
-        }
-        projectSaved();
-        updateTitle();
+        juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+        const auto file = juce::File(audioProcessor.currentProjectFile);
+        beforeSaving([safeThis, file] {
+            if (safeThis == nullptr) {
+                return;
+            }
+            auto data = juce::MemoryBlock();
+            safeThis->audioProcessor.getStateInformation(data);
+            if (!file.replaceWithData(data.getData(), data.getSize())) {
+                osci::showOverlayMessage(*safeThis, "Save Project Failed", "Could not write:\n" + file.getFullPathName());
+                return;
+            }
+            safeThis->projectSaved();
+            safeThis->updateTitle();
+        });
     }
 }
 

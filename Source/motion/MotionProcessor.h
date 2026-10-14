@@ -115,14 +115,17 @@ private:
     std::unique_ptr<motion::LiveBlenderController> blender;
     std::uint64_t previousLiveRevision = 0;
 public:
-    // The current composition's bake of its hidden lines, when it has one,
-    // and how many of its frames are still to bake; message thread.
     // A launch that only renders: the session saved on quitting is the one
     // it was launched with, and nothing joins the recent lists.
     void keepLaunchSession() {
         keepsLaunchSession = true;
         remembersFiles = false;
     }
+    // The project's picture (see ProjectPicture), saved with it: the Scope's
+    // frame when it was last saved; message thread.
+    juce::MemoryBlock picture;
+    // The current composition's bake of its hidden lines, when it has one,
+    // and how many of its frames are still to bake; message thread.
     std::shared_ptr<const motion::hidden::Bake> hiddenLineBake() const { return publishedBake; }
     std::optional<std::size_t> hiddenLinesRemaining() const { return publishedBake != nullptr && !publishedBake->complete() ? std::optional(publishedBake->remaining()) : std::nullopt; }
     // Bakes from the playhead's frame on, wherever it goes; message thread.

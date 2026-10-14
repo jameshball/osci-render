@@ -10,7 +10,8 @@ namespace motion::cli {
 // A project described in JSON, built as it would be built by hand in the app:
 // each object a clip on its own track, from a generator (a box, a sphere, a
 // light) or a file, with its properties set and keyed. Kept as text, a scene
-// is made again exactly whatever the project format comes to be.
+// is made again exactly whatever the project format comes to be. "picture":
+// a time whose frame `make` has the app draw as the project's picture.
 //
 //   {
 //     "name": "Ball", "duration": 8, "fps": 60, "bpm": 120, "sampleRate": 192000, "beam": {"intensity": 20},

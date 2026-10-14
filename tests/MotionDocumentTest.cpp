@@ -689,6 +689,28 @@ public:
             motion::ProjectFile missing;
             expect(motion::ProjectFile::read(juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("no such project.osci-motion"), missing).failed() && missing.problem == Problem::unreadable);
         }
+
+        beginTest("A project's picture is the first thing in its file, read from its start alone");
+        {
+            juce::Image frame(juce::Image::RGB, 300, 200, true);
+            juce::Graphics(frame).fillAll(juce::Colours::green);
+            const auto jpeg = motion::ProjectPicture::encode(frame);
+            expect(!jpeg.isEmpty());
+            const juce::TemporaryFile pictured(".osci-motion"), plain(".osci-motion");
+            expect(motion::ProjectFile::write(document.project(), pictured.getFile(), jpeg).wasOk());
+            expect(motion::ProjectFile::write(document.project(), plain.getFile()).wasOk());
+            juce::MemoryBlock bytes;
+            pictured.getFile().loadFileAsData(bytes);
+            const auto start = juce::String::createStringFromData(static_cast<const char*>(bytes.getData()) + 8, 504);
+            expect(start.contains("<picture "), "the picture comes before the composition");
+            const auto picture = motion::ProjectPicture::peek(pictured.getFile());
+            expect(picture.getWidth() == motion::ProjectPicture::width && picture.getHeight() == motion::ProjectPicture::height);
+            expect(picture.getPixelAt(256, 192).getGreen() > 100 && picture.getPixelAt(256, 192).getRed() < 40, "the frame's middle, as it was");
+            motion::ProjectFile opened;
+            expect(motion::ProjectFile::read(pictured.getFile(), opened).wasOk() && opened.notes.empty());
+            expect(motion::ProjectPicture::read(*opened.xml) == jpeg);
+            expect(!motion::ProjectPicture::peek(plain.getFile()).isValid(), "a project saved without one has none");
+        }
         testCameras(document);
         testAnimatedSources();
         testEffects(document.project());

@@ -51,7 +51,9 @@ public:
     // changes are lost.
     void openProject(const juce::File& file) override;
     void resetToDefault() override;
-    void projectSaved() override;
+    void projectSaved() override { processor.document.markSaved(); }
+    // The Scope's next frame becomes the project's picture as it is saved.
+    void beforeSaving(std::function<void()> write) override;
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
     // `below`: under the anchor, wherever there is more room.
     // Where a popover goes: the side with room, under its button (though
@@ -277,11 +279,8 @@ private:
     void showStartScreenAtLaunch();
     juce::Component::SafePointer<osci::OverlayComponent> startScreenOverlay;
     juce::Component::SafePointer<motion::ui::StartScreen> startScreen;
-    // Keeps the Scope's next frame as the picture of `file` (see ProjectPictures).
-    void keepProjectPicture(const juce::File& file);
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
-    motion::ui::ProjectPictures projectPictures {processor.applicationFolder};
     motion::style::LookAndFeel motionLookAndFeel;
     // The examples' pictures for the Add source menu, made in the background.
     motion::ui::ExamplePictures examplePictures;

@@ -1,5 +1,6 @@
 {
   "name": "Mirror ball tour",
+  "picture": 21,
   "duration": 24,
   "fps": 60,
   "beam": {

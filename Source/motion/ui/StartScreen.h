@@ -6,51 +6,6 @@
 #include <osci_gui/osci_gui.h>
 
 namespace motion::ui {
-// Pictures of saved projects, for the start screen: the Scope's frame when a
-// project was last saved or opened, kept in the app's folder under a name
-// made from the project's path, cropped to the cards' 4:3.
-class ProjectPictures {
-public:
-    static constexpr int width = 512, height = 384;
-    explicit ProjectPictures(const juce::File& root) : folder(root.getChildFile("osci-motion pictures")) {}
-    juce::File pictureOf(const juce::File& project) const {
-        return folder.getChildFile(juce::String::toHexString(project.getFullPathName().hashCode64()) + ".jpg");
-    }
-    void keep(const juce::File& project, const juce::Image& frame) const {
-        if (!frame.isValid() || !folder.createDirectory().wasOk()) {
-            return;
-        }
-        juce::TemporaryFile temporary(pictureOf(project));
-        {
-            auto stream = temporary.getFile().createOutputStream();
-            juce::JPEGImageFormat jpeg;
-            jpeg.setQuality(.88f);
-            if (stream == nullptr || !jpeg.writeImageToStream(cropped(frame), *stream)) {
-                return;
-            }
-        }
-        temporary.overwriteTargetFileWithTemporary();
-    }
-    juce::Image load(const juce::File& project) const {
-        const auto file = pictureOf(project);
-        return file.existsAsFile() ? juce::ImageFileFormat::loadFrom(file) : juce::Image();
-    }
-    void forget(const juce::File& project) const { pictureOf(project).deleteFile(); }
-    // The middle of `frame` at 4:3, scaled to a picture's size.
-    static juce::Image cropped(const juce::Image& frame) {
-        auto area = frame.getBounds();
-        if (area.getWidth() * 3 > area.getHeight() * 4) {
-            area = area.withSizeKeepingCentre(area.getHeight() * 4 / 3, area.getHeight());
-        } else {
-            area = area.withSizeKeepingCentre(area.getWidth(), area.getWidth() * 3 / 4);
-        }
-        return frame.getClippedImage(area).rescaled(width, height, juce::Graphics::highResamplingQuality);
-    }
-
-private:
-    juce::File folder;
-};
-
 // A project on the start screen: one opened lately, or an example.
 struct StartCard {
     juce::String name, detail;

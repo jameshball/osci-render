@@ -538,19 +538,11 @@ const std::map<juce::String, juce::String>& exampleAbouts() {
         {"Surface shapes", "Every surface style, one by one"}};
     return abouts;
 }
-// The picture shipped with an example: the image named as it is.
+// The picture an example was saved with.
 juce::Image examplePicture(const juce::String& resource) {
-    const auto base = juce::String(BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8())).upToLastOccurrenceOf(".", false, false);
-    for (int index = 0; index < BinaryData::namedResourceListSize; ++index) {
-        const juce::String file = BinaryData::getNamedResourceOriginalFilename(BinaryData::namedResourceList[index]);
-        if (file != base + ".jpg") {
-            continue;
-        }
-        int size = 0;
-        const auto* data = BinaryData::getNamedResource(BinaryData::namedResourceList[index], size);
-        return data != nullptr ? juce::ImageCache::getFromMemory(data, size) : juce::Image();
-    }
-    return {};
+    int size = 0;
+    const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);
+    return data != nullptr ? motion::ProjectPicture::peek(data, static_cast<std::size_t>(size)) : juce::Image();
 }
 }
 
@@ -569,7 +561,7 @@ void MotionEditor::showStartScreen() {
         card.name = file.getFileNameWithoutExtension();
         card.detail = edited(file.getLastModificationTime());
         card.file = file;
-        card.picture = projectPictures.load(file);
+        card.picture = motion::ProjectPicture::peek(file);
         card.open = file == current;
         recents.push_back(std::move(card));
     }
@@ -600,10 +592,7 @@ void MotionEditor::showStartScreen() {
     actions.openRecent = [owner](const juce::File& file) { if (owner != nullptr) { owner->openProject(file); } };
     actions.revealRecent = [](const juce::File& file) { file.revealToUser(); };
     actions.forgetRecent = [owner](const juce::File& file) {
-        if (owner != nullptr) {
-            owner->processor.removeRecentProjectFile(file);
-            owner->projectPictures.forget(file);
-        }
+        if (owner != nullptr) { owner->processor.removeRecentProjectFile(file); }
     };
     actions.openExample = [owner](const juce::String& resource) { if (owner != nullptr) { owner->openExample(resource); } };
     actions.showAtStartup = [owner](bool show) {
@@ -630,19 +619,26 @@ void MotionEditor::showStartScreenAtLaunch() {
     showStartScreen();
 }
 
-void MotionEditor::projectSaved() {
-    processor.document.markSaved();
-    keepProjectPicture(juce::File(processor.currentProjectFile));
-}
-
-void MotionEditor::keepProjectPicture(const juce::File& file) {
-    if (file == juce::File() || !processor.remembersFiles) {
-        return;
-    }
+// If no frame comes soon (the Scope hidden behind a dialog), the project
+// keeps the picture it had.
+void MotionEditor::beforeSaving(std::function<void()> write) {
+    struct Saving {
+        std::function<void()> write;
+        bool done = false;
+    };
+    auto saving = std::make_shared<Saving>();
+    saving->write = std::move(write);
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    visualiser.captureFrame([owner, file](juce::Image frame) {
-        if (owner != nullptr) { owner->projectPictures.keep(file, frame); }
-    });
+    const auto finish = [owner, saving](const juce::Image& frame) {
+        if (saving->done) {
+            return;
+        }
+        saving->done = true;
+        if (owner != nullptr && frame.isValid()) { owner->processor.picture = motion::ProjectPicture::encode(frame); }
+        saving->write();
+    };
+    visualiser.captureFrame(finish);
+    juce::Timer::callAfterDelay(250, [finish] { finish({}); });
 }
 
 void MotionEditor::refreshTiming() {

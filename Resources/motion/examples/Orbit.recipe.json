@@ -1,5 +1,6 @@
 {
   "name": "Orbit",
+  "picture": 4,
   "duration": 16,
   "fps": 60,
   "beam": {
