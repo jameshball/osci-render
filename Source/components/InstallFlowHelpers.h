@@ -7,6 +7,10 @@ namespace osci {
         if (juce::String (product) == "sosci") {
             return { "sosci", "sosci", "sosci", { "sosci.vst3" }, {}, "AudioVideo;Audio;" };
         }
+        // Standalone only: no plug-ins.
+        if (juce::String (product) == "osci-motion") {
+            return { "osci-motion", "osci-motion", "osci-motion", {}, {}, "AudioVideo;Audio;Graphics;" };
+        }
 
         return { "osci-render", "osci-render", "osci-render",
                  { "osci-render.vst3" }, { "osci-render-instrument.vst3" }, "AudioVideo;Audio;" };

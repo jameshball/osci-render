@@ -9,7 +9,7 @@ struct ProductIdentity {
 
 inline constexpr ProductIdentity currentProduct() {
 #if defined(OSCI_MOTION)
-    return { "osci-motion", "osci-motion", false };
+    return { "osci-motion", "osci-motion", true };
 #elif defined(SOSCI)
     return { "sosci", "sosci", true };
 #else

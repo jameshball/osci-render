@@ -282,6 +282,7 @@ private:
     // As osci-motion opens: the work a crash cut short reopened, then the
     // start screen.
     void atLaunch();
+    void showStartScreenOnceReady();
     // The session written every little while for a crash to leave behind;
     // none for a launch that only renders.
     std::unique_ptr<motion::SessionRecovery> recovery;

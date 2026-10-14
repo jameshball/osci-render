@@ -619,7 +619,22 @@ void MotionEditor::atLaunch() {
         statusBar.show("Reopened your work from " + left.getLastModificationTime().formatted("%H:%M") + ", after osci-motion closed unexpectedly. Save it to keep it.", MotionStatusBar::Kind::notice);
     }
     recoveredState = {processor.document.generation(), processor.document.revision(), processor.document.unsaved()};
-    if (osci::isJucewrightAutomationLaunch() || !processor.globalSettings.getBool("showStartScreen", true) || commandLineProject != CommandLineProject::none || projectLoad != nullptr) {
+    if (osci::isJucewrightAutomationLaunch() || !processor.globalSettings.getBool("showStartScreen", true)) {
+        return;
+    }
+    showStartScreenOnceReady();
+}
+
+// After Privacy & Terms, when they are to be accepted first.
+void MotionEditor::showStartScreenOnceReady() {
+    if (commandLineProject != CommandLineProject::none || projectLoad != nullptr) {
+        return;
+    }
+    if (processor.legalNoticePending.load()) {
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        juce::Timer::callAfterDelay(250, [owner] {
+            if (owner != nullptr) { owner->showStartScreenOnceReady(); }
+        });
         return;
     }
     showStartScreen();
