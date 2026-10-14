@@ -73,7 +73,7 @@ VideoEncodingConfiguration MotionEditor::exportConfiguration(const motion::Proje
 
 void MotionEditor::exportVideo(bool leaveOutLive) {
 #if OSCI_PREMIUM
-    if (exportState != nullptr) { return; }
+    if (exportState != nullptr || waitsForSliderBakes()) { return; }
     const juce::Component::SafePointer<MotionEditor> self(this);
     if (!leaveOutLive && waitsForCapture(true, [self] { if (self != nullptr) { self->exportVideo(true); } })) { return; }
     if (!processor.ensureFFmpegExists()) { return; }
@@ -293,6 +293,10 @@ void MotionEditor::continueCommandLineRender() {
     if (commandLineProject == CommandLineProject::failed) { failCommandLineRender("the project could not be opened."); return; }
     if (commandLineProject != CommandLineProject::loaded) { return; }
     if (processor.getPreparationError().isNotEmpty()) { failCommandLineRender(processor.getPreparationError()); return; }
+    // Lua sliders bake in the background: frames drawn before they land
+    // would be drawn without them.
+    sliderBakes.update();
+    if (sliderBakes.busy()) { return; }
     commandLineRenderStarted = true;
     if (!processor.ensureFFmpegExists()) { failCommandLineRender("FFmpeg is unavailable."); return; }
     std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
@@ -323,8 +327,18 @@ void MotionEditor::continueCommandLineRender() {
 #endif
 }
 
+// An export drawn before the Lua sliders finish baking would leave them out.
+bool MotionEditor::waitsForSliderBakes() {
+    sliderBakes.update();
+    if (!sliderBakes.busy()) {
+        return false;
+    }
+    statusBar.show("The Lua sliders are still baking. Export once they're done.", MotionStatusBar::Kind::notice);
+    return true;
+}
+
 void MotionEditor::exportSignal(bool leaveOutLive) {
-    if (exportState != nullptr) {
+    if (exportState != nullptr || waitsForSliderBakes()) {
         return;
     }
     const juce::Component::SafePointer<MotionEditor> self(this);

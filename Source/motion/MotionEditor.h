@@ -84,6 +84,8 @@ private:
     static juce::File withExtension(juce::File chosen, const juce::String& extension);
     // Says an export is done, with a way to find it.
     void exported(const juce::File& file);
+    // True (and says so) while Lua sliders are still baking.
+    bool waitsForSliderBakes();
 
     // Construction, by area of the workspace.
     void setUpMenus();
