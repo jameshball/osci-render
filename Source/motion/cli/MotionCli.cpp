@@ -338,7 +338,7 @@ void check(const juce::ArgumentList& args) {
             juce::Array<juce::var> list;
             for (const auto& frame : frames) { list.add(toVar(frame, false)); }
             auto object = std::make_unique<juce::DynamicObject>();
-            object->setProperty("rate", rate);
+            object->setProperty("rate", composition.sampleRate);
             object->setProperty("frames", list);
             if (!kept.replaceWithText(juce::JSON::toString(juce::var(object.release()), false), false, false, "\n")) { juce::ConsoleApplication::fail("Couldn't write " + kept.getFullPathName() + "."); }
         }
