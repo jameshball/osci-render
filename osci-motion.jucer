@@ -22,12 +22,6 @@
               file="Resources/fonts/FiraSans-SemiBold.ttf"/>
       </GROUP>
       <GROUP id="{9C3B71E2-5A04-4F6E-8D21-7B5E0A9C4D33}" name="example projects">
-        <FILE id="ExPrOrbit" name="Orbit.osci-motion" compile="0" resource="1"
-              file="Resources/motion/examples/Orbit.osci-motion"/>
-        <FILE id="ExPrMirrorTour" name="Mirror_ball_tour.osci-motion" compile="0"
-              resource="1" file="Resources/motion/examples/Mirror_ball_tour.osci-motion"/>
-        <FILE id="ExPrSurfaces" name="Surface_shapes.osci-motion" compile="0"
-              resource="1" file="Resources/motion/examples/Surface_shapes.osci-motion"/>
         <FILE id="ExPrFirstLines" name="First_lines.osci-motion" compile="0"
               resource="1" file="Resources/motion/examples/First_lines.osci-motion"/>
         <FILE id="ExPrTitleCard" name="Title_card.osci-motion" compile="0"
@@ -40,6 +34,12 @@
               file="Resources/motion/examples/Beat_cuts.osci-motion"/>
         <FILE id="ExPrSynthwave" name="Synthwave_drive.osci-motion" compile="0"
               resource="1" file="Resources/motion/examples/Synthwave_drive.osci-motion"/>
+        <FILE id="ExPrOrbit" name="Orbit.osci-motion" compile="0" resource="1"
+              file="Resources/motion/examples/Orbit.osci-motion"/>
+        <FILE id="ExPrSurfaces" name="Surface_shapes.osci-motion" compile="0"
+              resource="1" file="Resources/motion/examples/Surface_shapes.osci-motion"/>
+        <FILE id="ExPrMirrorTour" name="Mirror_ball_tour.osci-motion" compile="0"
+              resource="1" file="Resources/motion/examples/Mirror_ball_tour.osci-motion"/>
       </GROUP>
       <GROUP id="{6E1A0C2B-4D11-4B7A-9E0D-5A7C3E2F9B10}" name="examples">
         <FILE id="Ex3793e4" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>

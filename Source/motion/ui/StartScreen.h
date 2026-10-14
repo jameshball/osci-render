@@ -458,7 +458,8 @@ private:
                 return {};
             }
             const auto& card = *placed[static_cast<std::size_t>(index)].card;
-            return card.isExample() ? juce::String() : card.file.getFullPathName();
+            // What it is in full, and where it is.
+            return card.isExample() ? card.detail : card.detail + "\n" + card.file.getFullPathName();
         }
         void mouseMove(const juce::MouseEvent& event) override { setHovered(cardAt(event.getPosition())); }
         void mouseExit(const juce::MouseEvent&) override { setHovered(-1); }
@@ -545,7 +546,7 @@ private:
 
     private:
         static constexpr std::size_t maxRecents = 6;
-        static constexpr int columns = 3, gutter = 18, rowGap = 22, textHeight = 44, headingHeight = 30, sectionGap = 18;
+        static constexpr int columns = 3, gutter = 18, rowGap = 18, textHeight = 58, headingHeight = 30, sectionGap = 18;
         struct Placed {
             const StartCard* card;
             juce::Rectangle<int> bounds;
@@ -669,7 +670,7 @@ private:
             g.drawText(card.name, nameLine, juce::Justification::centredLeft, true);
             g.setFont(style::caption());
             g.setColour(osci::Colours::textMuted());
-            g.drawText(card.detail, text.removeFromTop(16), juce::Justification::centredLeft, true);
+            g.drawFittedText(card.detail, text.removeFromTop(30).toNearestInt(), juce::Justification::topLeft, 2, 1.0f);
             if (appear < 1.0f) { g.endTransparencyLayer(); }
         }
 
