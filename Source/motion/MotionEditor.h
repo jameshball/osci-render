@@ -27,6 +27,7 @@
 #include "ui/ExamplePictures.h"
 #include "ui/StatusBar.h"
 #include "ui/ShortcutsOverlay.h"
+#include "ui/StartScreen.h"
 #include "ui/MotionIcons.h"
 #include "ui/DrawingEditor.h"
 #include "ui/TextSourceEditor.h"
@@ -50,7 +51,7 @@ public:
     // changes are lost.
     void openProject(const juce::File& file) override;
     void resetToDefault() override;
-    void projectSaved() override { processor.document.markSaved(); }
+    void projectSaved() override;
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
     // `below`: under the anchor, wherever there is more room.
     // Where a popover goes: the side with room, under its button (though
@@ -270,8 +271,16 @@ private:
     bool clipSelected() const;
     void placeClipAtPlayhead(bool start, bool trim);
     void showShortcuts();
+    // The start screen: recent projects and the examples, as pictures, and
+    // the ways to begin. Shown as osci-motion opens unless turned off.
+    void showStartScreen();
+    void showStartScreenAtLaunch();
+    juce::Component::SafePointer<osci::OverlayComponent> startScreenOverlay;
+    // Keeps the Scope's next frame as the picture of `file` (see ProjectPictures).
+    void keepProjectPicture(const juce::File& file);
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
+    motion::ui::ProjectPictures projectPictures {processor.applicationFolder};
     motion::style::LookAndFeel motionLookAndFeel;
     // The examples' pictures for the Add source menu, made in the background.
     motion::ui::ExamplePictures examplePictures;

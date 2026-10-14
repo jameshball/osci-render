@@ -205,6 +205,12 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
                                                    nullptr);
 }
 
+void CommonAudioProcessor::removeRecentProjectFile(const juce::File& file) {
+    recentProjectFiles.removeFile(file);
+    globalSettings.set("recentProjectFiles", recentProjectFiles.toString());
+    globalSettings.save();
+}
+
 void CommonAudioProcessor::clearRecentProjectFiles() {
     recentProjectFiles.clear();
     globalSettings.set("recentProjectFiles", juce::String());

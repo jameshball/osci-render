@@ -1,4 +1,5 @@
 #include "MotionEditor.h"
+#include "../JucewrightAutomation.h"
 
 namespace {
 bool canSplitClip(const motion::Clip* clip, double time, const motion::Tempo& bpm) {
@@ -36,6 +37,7 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
         examples.addItem(firstExampleId + index, file.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' '));
     }
     if (examples.getNumItems() > 0) { menu.addSubMenu("Examples", examples); }
+    menu.addItem(1008, "Start screen...");
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Save project", 1003, "Cmd+S"));
     menu.addItem(motion::style::menuItem("Save project as...", 1004, "Cmd+Shift+S"));
@@ -68,6 +70,7 @@ bool MotionEditor::fileMenuItemSelected(int id) {
         case 1005: chooseSourceFile(); return true;
         case 1006: exportSignal(); return true;
         case 1007: exportVideo(); return true;
+        case 1008: showStartScreen(); return true;
         default: return false;
     }
 }
@@ -512,6 +515,133 @@ void MotionEditor::showShortcuts() {
         {"1 / 3 / 7", "Front, right and top views (Ctrl: opposite side)"}, {"N", "Fly through the scene"}, {"P", "Show the motion path"},
         {"Two fingers / wheel", "Orbit / zoom"}, {"Shift + two fingers", "Pan"}, {"Alt+drag", "Orbit with the mouse"}}});
     Overlay::show(*this, std::move(sections));
+}
+
+namespace {
+// When a file was last saved, as a person would say it.
+juce::String edited(juce::Time time) {
+    const auto seconds = (juce::Time::getCurrentTime() - time).inSeconds();
+    const auto count = [](juce::int64 amount, const char* unit) { return juce::String(amount) + " " + unit + (amount == 1 ? "" : "s") + " ago"; };
+    if (seconds < 60) { return "Edited just now"; }
+    if (seconds < 3600) { return "Edited " + count(static_cast<juce::int64>(seconds / 60), "minute"); }
+    if (seconds < 86400) { return "Edited " + count(static_cast<juce::int64>(seconds / 3600), "hour"); }
+    const auto days = static_cast<juce::int64>(seconds / 86400);
+    if (days == 1) { return "Edited yesterday"; }
+    if (days < 7) { return "Edited " + count(days, "day"); }
+    return "Edited " + time.formatted("%e %b %Y").trim();
+}
+// What each example shows, under its name.
+const std::map<juce::String, juce::String>& exampleAbouts() {
+    static const std::map<juce::String, juce::String> abouts {
+        {"Orbit", "Shadows as the camera circles"},
+        {"Mirror ball tour", "Lights, shadows and a mirror ball"},
+        {"Surface shapes", "Every surface style, one by one"}};
+    return abouts;
+}
+// The picture shipped with an example: the image named as it is.
+juce::Image examplePicture(const juce::String& resource) {
+    const auto base = juce::String(BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8())).upToLastOccurrenceOf(".", false, false);
+    for (int index = 0; index < BinaryData::namedResourceListSize; ++index) {
+        const juce::String file = BinaryData::getNamedResourceOriginalFilename(BinaryData::namedResourceList[index]);
+        if (file != base + ".jpg") {
+            continue;
+        }
+        int size = 0;
+        const auto* data = BinaryData::getNamedResource(BinaryData::namedResourceList[index], size);
+        return data != nullptr ? juce::ImageCache::getFromMemory(data, size) : juce::Image();
+    }
+    return {};
+}
+}
+
+void MotionEditor::showStartScreen() {
+    if (startScreenOverlay != nullptr) {
+        return;
+    }
+    const juce::File current(processor.currentProjectFile);
+    std::vector<motion::ui::StartCard> recents, examples;
+    for (int index = 0; index < processor.getNumRecentProjectFiles(); ++index) {
+        const auto file = processor.getRecentProjectFile(index);
+        if (!file.existsAsFile()) {
+            continue;
+        }
+        motion::ui::StartCard card;
+        card.name = file.getFileNameWithoutExtension();
+        card.detail = edited(file.getLastModificationTime());
+        card.file = file;
+        card.picture = projectPictures.load(file);
+        card.open = file == current;
+        recents.push_back(std::move(card));
+    }
+    // The project open now comes first.
+    std::stable_partition(recents.begin(), recents.end(), [](const motion::ui::StartCard& card) { return card.open; });
+    for (const auto& resource : exampleProjects()) {
+        motion::ui::StartCard card;
+        card.name = juce::String(BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8())).upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' ');
+        const auto about = exampleAbouts().find(card.name);
+        card.detail = about != exampleAbouts().end() ? about->second : juce::String("Example project");
+        card.resource = resource;
+        card.picture = examplePicture(resource);
+        examples.push_back(std::move(card));
+    }
+    // Carrying on is offered when there is something to carry on with.
+    const auto& project = processor.document.mainProject();
+    const auto anything = std::any_of(project.tracks.begin(), project.tracks.end(), [](const motion::Track& track) { return !track.clips.empty(); });
+    juce::String continuing;
+    if (anything) {
+        continuing = current.existsAsFile() ? current.getFileNameWithoutExtension() : juce::String("Untitled project");
+        if (processor.document.unsaved()) { continuing << motion::style::dot() << "edited"; }
+    }
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    motion::ui::StartScreen::Actions actions;
+    actions.newProject = [owner] { if (owner != nullptr) { owner->resetToDefault(); } };
+    actions.openProject = [owner] { if (owner != nullptr) { owner->CommonPluginEditor::openProject(); } };
+    actions.showShortcuts = [owner] { if (owner != nullptr) { owner->showShortcuts(); } };
+    actions.openRecent = [owner](const juce::File& file) { if (owner != nullptr) { owner->openProject(file); } };
+    actions.revealRecent = [](const juce::File& file) { file.revealToUser(); };
+    actions.forgetRecent = [owner](const juce::File& file) {
+        if (owner != nullptr) {
+            owner->processor.removeRecentProjectFile(file);
+            owner->projectPictures.forget(file);
+        }
+    };
+    actions.openExample = [owner](const juce::String& resource) { if (owner != nullptr) { owner->openExample(resource); } };
+    actions.showAtStartup = [owner](bool show) {
+        if (owner != nullptr) {
+            owner->processor.globalSettings.set("showStartScreen", show);
+            owner->processor.globalSettings.save();
+        }
+    };
+    const auto atStartup = processor.globalSettings.getBool("showStartScreen", true);
+    auto screen = std::make_unique<motion::ui::StartScreen>(std::move(recents), std::move(examples), continuing, atStartup, juce::String("Version ") + JucePlugin_VersionString, std::move(actions));
+    startScreenOverlay = motion::ui::StartScreen::show(*this, std::move(screen));
+}
+
+// Unless it was turned off, or osci-motion was opened to render, to open a
+// file, or by automation.
+void MotionEditor::showStartScreenAtLaunch() {
+    if (!juce::JUCEApplicationBase::isStandaloneApp() || osci::isJucewrightAutomationLaunch() || !processor.globalSettings.getBool("showStartScreen", true)) {
+        return;
+    }
+    if (commandLineRender != juce::File() || commandLineProject != CommandLineProject::none || projectLoad != nullptr) {
+        return;
+    }
+    showStartScreen();
+}
+
+void MotionEditor::projectSaved() {
+    processor.document.markSaved();
+    keepProjectPicture(juce::File(processor.currentProjectFile));
+}
+
+void MotionEditor::keepProjectPicture(const juce::File& file) {
+    if (file == juce::File() || !processor.remembersFiles) {
+        return;
+    }
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    visualiser.captureFrame([owner, file](juce::Image frame) {
+        if (owner != nullptr) { owner->projectPictures.keep(file, frame); }
+    });
 }
 
 void MotionEditor::refreshTiming() {

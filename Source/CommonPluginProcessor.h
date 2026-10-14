@@ -41,6 +41,7 @@ public:
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
     void clearRecentProjectFiles();
+    void removeRecentProjectFile(const juce::File& file);
     void recordingExportCompleted(const juce::File& file);
     juce::File getRecentRecordingFile(int index) const;
     int createRecentRecordingsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo, int baseItemId);

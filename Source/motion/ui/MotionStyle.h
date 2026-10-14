@@ -45,6 +45,7 @@ inline juce::Colour gridZero() { return juce::Colours::white.withAlpha(.12f); }
 // caption: field labels, hints, secondary details and the ruler.
 // heading: section headings in Properties, popovers and forms.
 // mono: the position readout and code.
+// display: the app's name on the start screen, and nothing else.
 // The separator between short facts, as in the status bar.
 inline juce::String dot() { return juce::String::fromUTF8(" \xc2\xb7 "); }
 inline juce::Font title() { return juce::Font(juce::FontOptions(13.0f, juce::Font::bold)); }
@@ -58,6 +59,7 @@ inline const juce::Identifier captionButton {"motionCaptionButton"};
 inline const juce::Identifier captionWidth {"motionCaptionWidth"};
 inline juce::Font buttonFont(const juce::Button& button) { return button.getProperties()[captionButton] ? caption() : body(); }
 inline juce::Font heading() { return juce::Font(juce::FontOptions(11.0f, juce::Font::bold)); }
+inline juce::Font display() { return juce::Font(juce::FontOptions(19.0f, juce::Font::bold)); }
 inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)); }
 // A shortcut written "Cmd+Shift+F9" as the platform shows it: ⇧⌘F9 on macOS,
 // Ctrl+Shift+F9 elsewhere, with arrow keys as arrows (⇧←). Mouse gestures

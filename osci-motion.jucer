@@ -28,6 +28,11 @@
               resource="1" file="Resources/motion/examples/Mirror_ball_tour.osci-motion"/>
         <FILE id="ExPrSurfaces" name="Surface_shapes.osci-motion" compile="0"
               resource="1" file="Resources/motion/examples/Surface_shapes.osci-motion"/>
+        <FILE id="ExPiOrbit" name="Orbit.jpg" compile="0" resource="1" file="Resources/motion/examples/Orbit.jpg"/>
+        <FILE id="ExPiMirrorTour" name="Mirror_ball_tour.jpg" compile="0" resource="1"
+              file="Resources/motion/examples/Mirror_ball_tour.jpg"/>
+        <FILE id="ExPiSurfaces" name="Surface_shapes.jpg" compile="0" resource="1"
+              file="Resources/motion/examples/Surface_shapes.jpg"/>
       </GROUP>
       <GROUP id="{6E1A0C2B-4D11-4B7A-9E0D-5A7C3E2F9B10}" name="examples">
         <FILE id="Ex3793e4" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
@@ -511,7 +516,8 @@
               resource="0" file="Source/motion/model/CompositionGraph.h"/>
         <FILE id="MotionDoc" name="Document.cpp" compile="1" resource="0" file="Source/motion/model/Document.cpp"/>
         <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
-        <FILE id="MotLoadNotes" name="LoadNotes.h" compile="0" resource="0" file="Source/motion/model/LoadNotes.h"/>
+        <FILE id="MotLoadNotes" name="LoadNotes.h" compile="0" resource="0"
+              file="Source/motion/model/LoadNotes.h"/>
         <FILE id="MotProjectFile" name="ProjectFile.h" compile="0" resource="0"
               file="Source/motion/model/ProjectFile.h"/>
         <FILE id="MotmodelDocumentSerialisationcpp" name="DocumentSerialisation.cpp"

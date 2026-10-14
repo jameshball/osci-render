@@ -105,6 +105,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     loadLayout();
     juce::Desktop::getInstance().addFocusChangeListener(this);
     resized();
+    // After the command line is read: a file or render opened with it goes
+    // straight there.
+    juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] {
+        if (owner != nullptr) { owner->showStartScreenAtLaunch(); }
+    });
 }
 
 void MotionEditor::setUpMenus() {
