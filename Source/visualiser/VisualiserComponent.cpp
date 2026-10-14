@@ -148,6 +148,7 @@ VisualiserComponent::VisualiserComponent(
             framePresenter->present(texture.id, texture.width, texture.height);
         }
         serviceTextureOutputFrame();
+        answerFrameCapture();
 
         if (recordingController.isRecording()) {
             if (recordingController.capturesVideo()) {
@@ -179,6 +180,47 @@ VisualiserComponent::VisualiserComponent(
     };
     framePresenter = FramePresenter::create(*this, openGLContext);
     setShouldBeRunning(active);
+}
+
+void VisualiserComponent::captureFrame(std::function<void(juce::Image)> done) {
+    {
+        juce::SpinLock::ScopedLockType lock(frameCaptureLock);
+        frameCapture = std::move(done);
+    }
+    frameCapturePending.store(true);
+}
+
+// GL thread: reads the frame just drawn; the image is made on the message thread.
+void VisualiserComponent::answerFrameCapture() {
+    if (!frameCapturePending.exchange(false)) {
+        return;
+    }
+    std::function<void(juce::Image)> done;
+    {
+        juce::SpinLock::ScopedLockType lock(frameCaptureLock);
+        done = std::move(frameCapture);
+        frameCapture = nullptr;
+    }
+    const auto texture = getRenderTexture();
+    if (done == nullptr || texture.width <= 0 || texture.height <= 0) {
+        return;
+    }
+    auto pixels = std::make_shared<std::vector<std::uint8_t>>(static_cast<std::size_t>(texture.width) * static_cast<std::size_t>(texture.height) * 4);
+    getFrame(std::span<std::uint8_t>(*pixels));
+    juce::MessageManager::callAsync([pixels, width = texture.width, height = texture.height, done = std::move(done)] {
+        juce::Image image(juce::Image::RGB, width, height, false);
+        {
+            juce::Image::BitmapData bitmap(image, juce::Image::BitmapData::writeOnly);
+            // OpenGL's rows run from the bottom up.
+            for (int y = 0; y < height; ++y) {
+                const auto* row = pixels->data() + static_cast<std::size_t>(height - 1 - y) * static_cast<std::size_t>(width) * 4;
+                for (int x = 0; x < width; ++x) {
+                    bitmap.setPixelColour(x, y, juce::Colour(row[x * 4], row[x * 4 + 1], row[x * 4 + 2]));
+                }
+            }
+        }
+        done(image);
+    });
 }
 
 VisualiserComponent::~VisualiserComponent() {

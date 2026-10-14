@@ -93,6 +93,9 @@ public:
     std::function<void()> onControlsChanged;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+    // The next frame drawn, as an image, handed to `done` on the message
+    // thread. A later request replaces one not yet answered.
+    void captureFrame(std::function<void(juce::Image)> done);
 
     enum ColourIds
     {
@@ -109,6 +112,12 @@ private:
     };
 
     static constexpr int overlayFadeDurationMs = 225;
+
+    // A captureFrame request, answered after the next frame is drawn.
+    juce::SpinLock frameCaptureLock;
+    std::function<void(juce::Image)> frameCapture;
+    std::atomic<bool> frameCapturePending {false};
+    void answerFrameCapture();
 
     void updatePausedState();
     void updateFramePresentation();
