@@ -445,7 +445,18 @@ void CommonPluginEditor::saveProject() {
 }
 
 void CommonPluginEditor::saveProjectAs() {
-    chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
+    // The current file, or a new one named for the project, so the dialog
+    // offers a name rather than an empty field.
+    auto start = audioProcessor.getLastOpenedDirectory();
+    if (audioProcessor.currentProjectFile.isNotEmpty()) {
+        start = juce::File(audioProcessor.currentProjectFile);
+    } else {
+        const auto named = juce::File::createLegalFileName(suggestedProjectName().trim());
+        if (named.isNotEmpty()) {
+            start = start.getChildFile(named + "." + projectFileType);
+        }
+    }
+    chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", start, "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::saveMode;
 
     juce::Component::SafePointer<CommonPluginEditor> safeThis(this);

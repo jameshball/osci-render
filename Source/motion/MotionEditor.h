@@ -78,6 +78,7 @@ private:
     // Where an export goes unless told otherwise: in the last folder used,
     // named for the project. A name chosen without the extension gets it.
     juce::File defaultExportFile(const juce::String& extension) const;
+    juce::String suggestedProjectName() const override { return processor.document.mainProject().name; }
     // How the project's export settings encode: its frame, codec, quality and
     // soundtrack, with the file and audio its codec takes.
     VideoEncodingConfiguration exportConfiguration(const motion::Project& project);

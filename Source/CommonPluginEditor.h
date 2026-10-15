@@ -34,6 +34,8 @@ public:
     // first gather what it saves with it (osci-motion takes a picture).
     virtual void beforeSaving(std::function<void()> write) { write(); }
     void saveProjectAs();
+    // The name Save As suggests for a project not yet saved, without extension.
+    virtual juce::String suggestedProjectName() const { return {}; }
     virtual void resetWindowSizeAndPosition();
     void updateTitle();
     void fileUpdated(juce::String fileName);
