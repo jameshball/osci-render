@@ -749,7 +749,7 @@ void CommonPluginEditor::toggleFullScreen() {
 #if JUCE_WINDOWS
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !window->isFullScreen();
+        fullScreen = !fullScreen;
 
         if (fullScreen) {
             // Store the current window bounds before going fullscreen
@@ -782,6 +782,11 @@ void CommonPluginEditor::toggleFullScreen() {
 }
 
 bool CommonPluginEditor::isFullScreen() {
+#if JUCE_WINDOWS
+    // Windows counts a maximised window as full screen: only ours is.
+    return fullScreen;
+#else
     auto* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     return window != nullptr && window->isFullScreen();
+#endif
 }
