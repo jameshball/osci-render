@@ -73,6 +73,9 @@ VideoEncodingConfiguration MotionEditor::exportConfiguration(const motion::Proje
 
 bool MotionEditor::ffmpegReady(std::function<void()> resume) {
 #if OSCI_PREMIUM
+    // In place already: checked, and nothing to resume (its success
+    // callback would run at once and call back in here).
+    if (processor.getFFmpegFile().existsAsFile()) { return processor.ensureFFmpegExists(); }
     if (ffmpegDownloader.isThreadRunning()) {
         statusBar.showWorking("Downloading FFmpeg...");
         return false;
