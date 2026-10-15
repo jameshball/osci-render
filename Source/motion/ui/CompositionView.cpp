@@ -1433,13 +1433,15 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
         if (partMode && !picked.empty()) { picked.clear(); refreshPartBar(); return true; }
         if (partMode) { setPartMode(false); return true; }
     }
+    // Letters as capitals: Linux reports them in lower case.
+    const auto letter = juce::CharacterFunctions::toUpperCase(static_cast<juce::juce_wchar>(key.getKeyCode()));
     // Tab switches between objects and their parts, as Blender's edit mode.
     if (key == juce::KeyPress::tabKey && !navigating) { setPartMode(!partMode); return true; }
     if (partMode && key == juce::KeyPress('a', juce::ModifierKeys::commandModifier, 0)) {
         pickAllParts();
         return true;
     }
-    if (partMode && !key.getModifiers().isAnyModifierKeyDown() && key.getKeyCode() == 'E') { extractPicked(); return true; }
+    if (partMode && !key.getModifiers().isAnyModifierKeyDown() && letter == 'E') { extractPicked(); return true; }
     // Views along an axis: numpad 1, 3, 7 (Ctrl for the opposite side), or
     // 1, 3, 7 on the number row as with Blender's emulated numpad.
     const auto code = key.getKeyCode();
@@ -1450,7 +1452,7 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
     if (!navigating && (code == juce::KeyPress::numberPad7 || (plain && code == '7'))) { setViewPreset(opposite ? ViewPreset::bottom : ViewPreset::top); return true; }
     if (key.getModifiers().isCommandDown() || key.getModifiers().isCtrlDown()) {
         // Undo mid-drag takes back the drag alone, as the Graph's does.
-        const auto undoing = key.getKeyCode() == 'Z' && !key.getModifiers().isShiftDown() && validGesture();
+        const auto undoing = letter == 'Z' && !key.getModifiers().isShiftDown() && validGesture();
         cancelGesture();
         setNavigating(false);
         return undoing;
@@ -1460,13 +1462,13 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
     // Single-letter tools take plain keys only, so Shift+R and friends
     // reach the editor's commands.
     if (key.getModifiers().isShiftDown()) { return false; }
-    if (key.getKeyCode() == 'P') { setMotionPathVisible(!showMotionPath); return true; }
-    if (key.getKeyCode() == 'G') { setTool(MotionTransformTool::move); return true; }
-    if (key.getKeyCode() == 'Y') { setTool(MotionTransformTool::anchor); return true; }
-    if (key.getKeyCode() == 'R') { setTool(MotionTransformTool::rotate); return true; }
-    if (key.getKeyCode() == 'S') { setTool(MotionTransformTool::scale); return true; }
-    if (key.getKeyCode() == 'F') { frameSelection(); return true; }
-    if (key.getKeyCode() == 'N') { setNavigating(true); return true; }
+    if (letter == 'P') { setMotionPathVisible(!showMotionPath); return true; }
+    if (letter == 'G') { setTool(MotionTransformTool::move); return true; }
+    if (letter == 'Y') { setTool(MotionTransformTool::anchor); return true; }
+    if (letter == 'R') { setTool(MotionTransformTool::rotate); return true; }
+    if (letter == 'S') { setTool(MotionTransformTool::scale); return true; }
+    if (letter == 'F') { frameSelection(); return true; }
+    if (letter == 'N') { setNavigating(true); return true; }
     if (key.getKeyCode() == '0') { resetView(); return true; }
 
     return false;

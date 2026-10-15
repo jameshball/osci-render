@@ -348,25 +348,27 @@ CommonPluginEditor::~CommonPluginEditor() {
 // editor operations, not "special keys" like j/k for file switching.
 
 bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
-    if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'Z') {
+    // Linux reports Ctrl with a letter as the lowercase letter.
+    const auto letter = juce::CharacterFunctions::toUpperCase(static_cast<juce::juce_wchar>(key.getKeyCode()));
+    if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && letter == 'Z') {
         undoRedoControls.redo();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z') {
+    } else if (key.getModifiers().isCommandDown() && letter == 'Z') {
         undoRedoControls.undo();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
+    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && letter == 'S') {
         saveProjectAs();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'S') {
+    } else if (key.getModifiers().isCommandDown() && letter == 'S') {
         saveProject();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
+    } else if (key.getModifiers().isCommandDown() && letter == 'O') {
         openProject();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'N' && juce::JUCEApplicationBase::isStandaloneApp()) {
+    } else if (key.getModifiers().isCommandDown() && letter == 'N' && juce::JUCEApplicationBase::isStandaloneApp()) {
         resetToDefault();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'M') {
+    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && letter == 'M') {
         audioProcessor.muteParameter->setBoolValueNotifyingHost(!audioProcessor.muteParameter->getBoolValue());
         return true;
     } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
