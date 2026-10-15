@@ -59,14 +59,35 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
                                  + (premium ? " (Premium)" : " (Free)"));
         juce::Logger::writeToLog("Wrapper: " + juce::String(getWrapperTypeDescription(wrapperType)));
         juce::Logger::writeToLog("JUCE: " + juce::SystemStats::getJUCEVersion());
-        juce::Logger::writeToLog("OS: " + juce::SystemStats::getOperatingSystemName()
-                                 + (juce::SystemStats::isOperatingSystem64Bit() ? " (64-bit)" : " (32-bit)"));
-        juce::Logger::writeToLog("CPU: " + juce::SystemStats::getCpuModel()
-                                 + " (" + juce::String(juce::SystemStats::getNumCpus()) + " cores, "
-                                 + juce::String(juce::SystemStats::getCpuSpeedInMegahertz()) + " MHz)");
+        juce::String os = juce::SystemStats::getOperatingSystemName();
+#if JUCE_LINUX
+        // The distribution, which "Linux" alone doesn't say.
+        for (const auto& line : juce::StringArray::fromLines(juce::File("/etc/os-release").loadFileAsString())) {
+            if (line.startsWith("PRETTY_NAME=")) {
+                os << " (" << line.fromFirstOccurrenceOf("=", false, false).unquoted() << ")";
+            }
+        }
+#endif
+        juce::Logger::writeToLog("OS: " + os + (juce::SystemStats::isOperatingSystem64Bit() ? " (64-bit)" : " (32-bit)"));
+        // The build's architecture: an x86-64 build on an Arm machine runs emulated.
+#if JUCE_ARM
+        const juce::String architecture = "arm64";
+#else
+        const juce::String architecture = "x86-64";
+#endif
+        juce::StringArray cpu { juce::String(juce::SystemStats::getNumCpus()) + " cores" };
+        if (juce::SystemStats::getCpuSpeedInMegahertz() > 0) {
+            cpu.add(juce::String(juce::SystemStats::getCpuSpeedInMegahertz()) + " MHz");
+        }
+        cpu.add(architecture + " build");
+        const auto cpuModel = juce::SystemStats::getCpuModel().trim();
+        juce::Logger::writeToLog("CPU: " + (cpuModel.isNotEmpty() ? cpuModel + " " : juce::String()) + "(" + cpu.joinIntoString(", ") + ")");
         juce::Logger::writeToLog("RAM: " + juce::String(juce::SystemStats::getMemorySizeInMegabytes()) + " MB");
-        juce::Logger::writeToLog("Device: " + juce::SystemStats::getDeviceDescription()
-                                 + " / " + juce::SystemStats::getDeviceManufacturer());
+        juce::StringArray device { juce::SystemStats::getDeviceDescription().trim(), juce::SystemStats::getDeviceManufacturer().trim() };
+        device.removeEmptyStrings();
+        if (!device.isEmpty()) {
+            juce::Logger::writeToLog("Device: " + device.joinIntoString(" / "));
+        }
         juce::Logger::writeToLog("User: " + juce::SystemStats::getLogonName()
                                  + " @ " + juce::SystemStats::getComputerName()
                                  + " (" + juce::SystemStats::getUserLanguage() + "_"
