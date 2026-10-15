@@ -542,8 +542,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-24.04 and windows-2022 are unvalidated for osci-motion (see note above).
-        os: [macos-latest, ubuntu-24.04, windows-2022]
+        # ubuntu-24.04, ubuntu-24.04-arm and windows-2022 are unvalidated for osci-motion (see note above).
+        os: [macos-latest, ubuntu-24.04, ubuntu-24.04-arm, windows-2022]
     steps:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
@@ -558,7 +558,10 @@ jobs:
         shell: bash
         run: |
           echo "OUTPUT_NAME=osci-motion" >> $GITHUB_ENV
-          if [[ "${{ matrix.os }}" == ubuntu* ]]; then
+          if [[ "${{ matrix.os }}" == ubuntu*-arm ]]; then
+            echo "OS=linux" >> $GITHUB_ENV
+            echo "RELEASE_PLATFORM=linux-arm64" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == ubuntu* ]]; then
             echo "OS=linux" >> $GITHUB_ENV
             echo "CFLAGS=-mavx" >> $GITHUB_ENV
             echo "RELEASE_PLATFORM=linux-x86_64" >> $GITHUB_ENV
@@ -734,6 +737,14 @@ jobs:
         if: matrix.os == 'windows-2022'
         shell: bash
         run: mv "packaging/build/osci-motion.exe" "bin/${OUTPUT_NAME}.exe"
+
+      - name: Upload Linux build
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: osci-motion-${{ env.RELEASE_PLATFORM }}
+          retention-days: 7
+          path: bin/${{ env.OUTPUT_NAME }}.zip
 
       - name: Upload Windows test binaries
         if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && !inputs.publish
