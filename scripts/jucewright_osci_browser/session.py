@@ -661,6 +661,29 @@ end clickDenyButton
             self.app_pid = None
 
         time.sleep(0.9)
+        if not self.legal_only and not self.installer_legal_only:
+            self.acknowledge_startup_legal()
+
+    def acknowledge_startup_legal(self) -> None:
+        # A copied profile may not have acknowledged this build's documents:
+        # agree in the isolated automation profile, with statistics off.
+        agree = "I agree to the terms and acknowledge the privacy policy"
+        for _ in range(8):
+            snapshot = subprocess.run([str(part) for part in self.cli("snapshot", "--json", "--full")], cwd=self.root_dir, text=True, capture_output=True).stdout
+            if agree in snapshot:
+                break
+            time.sleep(0.5)
+        else:
+            return
+        self.log("Agreeing to Privacy & Terms in the isolated profile")
+        for args in (("set-checked", "--name", "Share anonymous version and platform statistics", "--exact", "false"),
+                     ("set-checked", "--name", agree, "--exact", "true"),
+                     ("click", "--name", "Continue", "--exact")):
+            completed = subprocess.run([str(part) for part in self.cli(*args)], cwd=self.root_dir, text=True, capture_output=True)
+            # Statistics are optional; agreeing and continuing are not.
+            if completed.returncode != 0 and "statistics" not in args[2]:
+                self.die("Could not agree to Privacy & Terms: " + completed.stdout[-400:])
+        time.sleep(0.5)
 
     def mcp_call(self, label: str, request: dict) -> bool:
         payload = json.dumps(request)
