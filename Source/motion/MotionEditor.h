@@ -193,6 +193,10 @@ private:
     SourceRequest textRequest;
     // Typing previews after a short pause rather than on every key.
     double textPreviewDue = 0;
+    // The Scope as drawn a moment ago (every couple of seconds), so saving
+    // can take its picture without waiting for the next frame.
+    juce::Image recentFrame;
+    double recentFrameRequested = 0;
     void showLuaEditor(SourceRequest request);
     SourceRequest luaRequest;
     bool luaSubmitted = false;

@@ -468,6 +468,12 @@ void MotionEditor::refreshUndo() {
 void MotionEditor::timerCallback() {
     continueCommandLineRender();
     keepRecovery();
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (now - recentFrameRequested > 2000.0) {
+        recentFrameRequested = now;
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        visualiser.captureFrame([owner](juce::Image frame) { if (owner != nullptr && frame.isValid()) { owner->recentFrame = frame; } });
+    }
     refreshUndo();
     if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) { previewText(); }
     processor.showIdleSeek(processor.document.mainProject().duration);

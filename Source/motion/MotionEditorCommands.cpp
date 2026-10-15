@@ -659,31 +659,13 @@ void MotionEditor::keepRecovery() {
     if (recovery->write(std::move(session))) { recoveredState = current; }
 }
 
-// If no frame comes soon (the Scope hidden behind a dialog), the project
-// keeps the picture it had.
+// Written at once, with the picture of the Scope drawn a moment ago; with
+// none yet (the Scope hidden), the project keeps the picture it had.
 void MotionEditor::beforeSaving(std::function<void()> write) {
-    struct Saving {
-        std::function<void()> write;
-        bool done = false;
-    };
-    auto saving = std::make_shared<Saving>();
-    saving->write = std::move(write);
-    const juce::Component::SafePointer<MotionEditor> owner(this);
-    const auto finish = [owner, saving](const juce::Image& frame) {
-        if (saving->done) {
-            return;
-        }
-        saving->done = true;
-        if (owner == nullptr) {
-            return;
-        }
-        if (frame.isValid()) { owner->processor.picture = motion::ProjectSummary::encode(frame); }
-        owner->processor.savingProjectFile = true;
-        saving->write();
-        if (owner != nullptr) { owner->processor.savingProjectFile = false; }
-    };
-    visualiser.captureFrame(finish);
-    juce::Timer::callAfterDelay(250, [finish] { finish({}); });
+    if (recentFrame.isValid()) { processor.picture = motion::ProjectSummary::encode(recentFrame); }
+    processor.savingProjectFile = true;
+    write();
+    processor.savingProjectFile = false;
 }
 
 void MotionEditor::refreshTiming() {
