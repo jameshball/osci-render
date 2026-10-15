@@ -766,7 +766,7 @@
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="Jk6VkC"
-            bigIcon="Jk6VkC" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
+            bigIcon="Jk6VkC" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX /utf-8"
             extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"

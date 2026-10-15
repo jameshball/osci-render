@@ -332,7 +332,7 @@
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/sosci/VisualStudio2022" smallIcon="KigaoN"
-            bigIcon="KigaoN" extraCompilerFlags="/arch:AVX">
+            bigIcon="KigaoN" extraCompilerFlags="/arch:AVX /utf-8">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="sosci" alwaysGenerateDebugSymbols="1"
