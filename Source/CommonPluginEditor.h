@@ -36,6 +36,9 @@ public:
     void saveProjectAs();
     // The name Save As suggests for a project not yet saved, without extension.
     virtual juce::String suggestedProjectName() const { return {}; }
+    // Where the update prompt goes, given its size: top right by default. A
+    // product moves it off an OpenGL view, which would draw over it.
+    virtual juce::Rectangle<int> updatePromptArea(int width, int height) const { return {getWidth() - width - 14, 42, width, height}; }
     virtual void resetWindowSizeAndPosition();
     void updateTitle();
     void fileUpdated(juce::String fileName);

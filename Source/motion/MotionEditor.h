@@ -79,6 +79,9 @@ private:
     // named for the project. A name chosen without the extension gets it.
     juce::File defaultExportFile(const juce::String& extension) const;
     juce::String suggestedProjectName() const override { return processor.document.mainProject().name; }
+    // Above the status bar, over the timeline: off the Scope, whose OpenGL
+    // would draw over it.
+    juce::Rectangle<int> updatePromptArea(int width, int height) const override { return {getWidth() - width - 14, getHeight() - height - 32, width, height}; }
     // How the project's export settings encode: its frame, codec, quality and
     // soundtrack, with the file and audio its codec takes.
     VideoEncodingConfiguration exportConfiguration(const motion::Project& project);

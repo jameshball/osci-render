@@ -210,7 +210,7 @@ void CommonPluginEditor::resized() {
 
     const int promptWidth = juce::jmin(updatePrompt.getPreferredWidth(), getWidth() - 28);
     if (promptWidth > 340) {
-        updatePrompt.setBounds(getWidth() - promptWidth - 14, 42, promptWidth, updatePrompt.getPreferredHeight());
+        updatePrompt.setBounds(updatePromptArea(promptWidth, updatePrompt.getPreferredHeight()));
     } else {
         updatePrompt.setBounds({});
     }
