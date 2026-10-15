@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "RepositoryRoot.h"
 
 // osci-motion's UI text uses only the type styles in MotionStyle.h. This scans
 // the Motion sources so a stray font size cannot creep back in.
@@ -8,7 +9,7 @@ public:
 
     void runTest() override {
         beginTest("Motion UI text uses only the MotionStyle type styles");
-        const auto root = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(__FILE__)).getParentDirectory().getSiblingFile("Source").getChildFile("motion");
+        const auto root = repositoryRoot().getChildFile("Source/motion");
         expect(root.isDirectory(), root.getFullPathName());
         // Fonts are defined by MotionStyle; text sources render the user's own font.
         const juce::StringArray allowed {"MotionStyle.h", "TextSettings.h"};

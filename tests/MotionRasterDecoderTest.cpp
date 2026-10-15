@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "RepositoryRoot.h"
 #include <osci_file_import/img/osci_RasterDecoder.h>
 
 namespace motion_raster_test {
@@ -73,7 +74,7 @@ public:
     // __FILE__ is absolute from Xcode but relative to the Makefile directory on
     // Linux, so also search upwards from the working directory and the binary.
     static juce::File fixtures() {
-        const auto source = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(__FILE__)).getParentDirectory().getChildFile("fixtures/motion");
+        const auto source = repositoryRoot().getChildFile("tests/fixtures/motion");
         if (source.isDirectory()) { return source; }
         for (auto start : {juce::File::getCurrentWorkingDirectory(), juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory()}) {
             for (int depth = 0; depth < 8 && start.exists(); ++depth) {

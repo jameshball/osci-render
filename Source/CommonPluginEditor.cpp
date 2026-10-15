@@ -65,7 +65,9 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
                 const auto* holder = juce::StandalonePluginHolder::getInstance();
                 if (holder != nullptr && holder->commandLine.contains("--render-video")) {
                     dw->setAlpha(0.0f);
+#if JUCE_MAC
                     juce::Process::setDockIconVisible(false);
+#endif
                 }
             }
         }
