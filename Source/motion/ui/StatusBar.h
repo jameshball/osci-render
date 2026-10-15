@@ -77,6 +77,13 @@ public:
         resized();
         repaint();
     }
+    // A notice that stays while the work it describes goes on.
+    void showWorking(const juce::String& text) {
+        show(text, Kind::notice);
+        stopTimer();
+        dismiss.setVisible(false);
+        resized();
+    }
     void clear() {
         stopTimer();
         message.setText({}, juce::dontSendNotification);

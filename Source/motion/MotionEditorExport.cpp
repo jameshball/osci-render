@@ -71,12 +71,41 @@ VideoEncodingConfiguration MotionEditor::exportConfiguration(const motion::Proje
     return config;
 }
 
+bool MotionEditor::ffmpegReady(std::function<void()> resume) {
+#if OSCI_PREMIUM
+    if (ffmpegDownloader.isThreadRunning()) {
+        statusBar.showWorking("Downloading FFmpeg...");
+        return false;
+    }
+    const juce::Component::SafePointer<MotionEditor> self(this);
+    ffmpegDownloader.onProgress = [self](double fraction) {
+        if (self == nullptr) { return; }
+        self->statusBar.showWorking(fraction < 0 ? juce::String("Downloading FFmpeg...") : "Downloading FFmpeg... " + juce::String(juce::roundToInt(fraction * 100)) + "%");
+    };
+    ffmpegDownloader.onFailedDownload = [self, resume] {
+        if (self == nullptr) { return; }
+        self->statusBar.show("Couldn't download FFmpeg, which video needs. Check the internet connection.", MotionStatusBar::Kind::error, "Try again", [self, resume] {
+            if (self != nullptr && self->ffmpegReady(resume)) { resume(); }
+        });
+    };
+    return processor.ensureFFmpegExists([self] { if (self != nullptr) { self->statusBar.showWorking("Downloading FFmpeg..."); } },
+                                        [self, resume] {
+                                            if (self == nullptr) { return; }
+                                            self->statusBar.show("FFmpeg is ready.", MotionStatusBar::Kind::notice);
+                                            resume();
+                                        });
+#else
+    juce::ignoreUnused(resume);
+    return false;
+#endif
+}
+
 void MotionEditor::exportVideo(bool leaveOutLive) {
 #if OSCI_PREMIUM
     if (exportState != nullptr || waitsForSliderBakes()) { return; }
     const juce::Component::SafePointer<MotionEditor> self(this);
     if (!leaveOutLive && waitsForCapture(true, [self] { if (self != nullptr) { self->exportVideo(true); } })) { return; }
-    if (!processor.ensureFFmpegExists()) { return; }
+    if (!ffmpegReady([self, leaveOutLive] { if (self != nullptr) { self->exportVideo(leaveOutLive); } })) { return; }
     std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
     try {
         beamSnapshot = std::make_shared<OfflineVisualiserParameters>(processor.visualiserParameters, OfflineVisualiserParameters::ExternalModulation::replace);

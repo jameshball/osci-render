@@ -409,14 +409,8 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     if (request.generation != processor.document.generation()) { return; }
     const auto extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension();
     if (osci::files::isVideo(extension) && request.uniqueClip == 0) {
-        if (!processor.getFFmpegFile().existsAsFile()) {
-            const juce::Component::SafePointer<MotionEditor> owner(this);
-            processor.ensureFFmpegExists({}, [owner, request, settings, rasterSettings] {
-                if (owner != nullptr) { owner->beginSourceImport(request, settings, rasterSettings); }
-            });
-            return;
-        }
-        if (!processor.ensureFFmpegExists()) { return; }
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        if (!ffmpegReady([owner, request, settings, rasterSettings] { if (owner != nullptr) { owner->beginSourceImport(request, settings, rasterSettings); } })) { return; }
     }
     statusBar.clear();
     auto asset = std::make_shared<motion::Asset>();

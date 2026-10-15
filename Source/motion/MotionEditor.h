@@ -202,6 +202,9 @@ private:
     // `leaveOutLive`: export without the clips of live sources.
     void exportSignal(bool leaveOutLive = false);
     void exportVideo(bool leaveOutLive = false);
+    // True when FFmpeg is ready. Otherwise offers to download it, shows the
+    // download in the status bar, and calls `resume` once it is in place.
+    bool ffmpegReady(std::function<void()> resume);
     // Export draws every frame offline, so a live source has to be captured
     // first. Says so before anything else is asked, with the ways on:
     // record a capture (its clips then draw it) or export the rest. False
