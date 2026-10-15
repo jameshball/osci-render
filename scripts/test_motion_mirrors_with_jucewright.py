@@ -92,12 +92,6 @@ def scope_lit(name):
     return count
 
 
-def status():
-    """The status bar's text: what the frames are baked for."""
-    texts = (str(n.get("name", "")) + " " + str(n.get("value", "")) for n in nodes(json.loads(command("snapshot", "--json", "--full"))))
-    return " ".join(text for text in texts if "kHz" in text)
-
-
 root = ET.Element("motion-project", schema="1")
 ET.SubElement(root, "composition", name="Mirrors", duration="8", bpm="120", fps="60")
 xml = ET.tostring(root, encoding="utf-8")
@@ -124,8 +118,6 @@ try:
     set_field("position.x", ".5", "Change Position X")
     time.sleep(3)
     mirrored = scope_lit("mirror-ball.png")
-    if "reflect" not in status():
-        raise RuntimeError("The status bar says the frames reflect: " + status())
 
     # Not reflecting, it draws its own lines, and nothing of the box.
     set_field("reflects", "0", "Change Mirror")

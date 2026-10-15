@@ -103,7 +103,16 @@ try:
                     return found
         return None
     card = first(tree, lambda node: str(node.get("class", "")).endswith("Card") and node.get("componentName") == "LFO 1")["bounds"]
-    field = first(tree, lambda node: node.get("componentName") == "position.y")["bounds"]
+    # Properties opens with Surface's tiles, so Y may be below the panel's
+    # fold: scroll it into view.
+    inspector = first(tree, lambda node: node.get("class") == "MotionPropertyInspector")["bounds"]
+    field = first(tree, lambda node: node.get("componentName") == "position.y" and "ScrubField" in str(node.get("class", "")))["bounds"]
+    for _ in range(30):
+        if inspector["y"] + 40 <= field["y"] and field["y"] + field["h"] <= inspector["y"] + inspector["h"] - 10:
+            break
+        step("scroll properties", "wheel", inspector["x"] + inspector["w"] // 2, inspector["y"] + inspector["h"] // 2, "--dy", "-0.2" if field["y"] > inspector["y"] else "0.2")
+        tree = json.loads(command("snapshot", "--json", "--full"))
+        field = first(tree, lambda node: node.get("componentName") == "position.y" and "ScrubField" in str(node.get("class", "")))["bounds"]
     step("route lfo by dragging", "drag-xy", card["x"] + 30, card["y"] + card["h"] // 2, field["x"] + field["w"] // 2, field["y"] + field["h"] // 2, "--steps", 20)
     wait_undo("Route modulator")
     step("route amount", "set-value", "--name", "Route amount LFO 1", "0.4")

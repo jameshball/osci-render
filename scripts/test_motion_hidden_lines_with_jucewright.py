@@ -65,22 +65,14 @@ project = session.artifact_dir / "hidden-lines.osci-motion"
 project.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
 
 
-def status_says(text, timeout=10.0):
+def lit_once_baked(name, done, timeout=20.0):
+    """The Scope's lit count, once `done` holds for it (the bake runs in the background)."""
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if any(text in str(n.get("value", "")) + str(n.get("name", "")) for n in nodes(json.loads(command("snapshot", "--json", "--full")))):
-            return True
-        time.sleep(.25)
-    return False
-
-
-def status_stops_saying(text, timeout=10.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if not any(text in str(n.get("value", "")) + str(n.get("name", "")) for n in nodes(json.loads(command("snapshot", "--json", "--full")))):
-            return True
-        time.sleep(.25)
-    return False
+    lit = lit_on_scope(name)
+    while not done(lit) and time.monotonic() < deadline:
+        time.sleep(.5)
+        lit = lit_on_scope(name)
+    return lit
 
 
 def lit_on_scope(name):
@@ -110,24 +102,36 @@ try:
     whole = lit_on_scope("whole.png")
     # The Cameras band shows the camera; clicking it selects it.
     step("select camera", "click", "--class", "MotionTimelineView", "--position", "400,39")
-    command("wait-for-locator", "--name", "Camera hidden lines", "--exact")
-    step("open hidden lines", "click", "--name", "Camera hidden lines", "--exact")
-    step("hide them", "click", "--name", "Removed", "--role", "menuItem", "--exact")
-    session.wait_for_undo("Remove hidden lines")
-    # Baked in the background; the status bar says when it is done.
-    if not status_says("hidden lines removed"):
-        raise RuntimeError("The status bar should say the hidden lines are removed once baked")
-    hidden = lit_on_scope("hidden.png")
+    # Hide lines is a camera property in Properties: 100% removes them.
+    hide = None
+    for _ in range(25):
+        hide = next((n for n in nodes(json.loads(command("snapshot", "--json", "--full"))) if n.get("componentName") == "hideLines" and "ScrubField" in n.get("class", "") and n.get("visible")), None)
+        if hide is not None:
+            break
+        time.sleep(.2)
+    if hide is None:
+        raise RuntimeError("The camera's Properties should have Hide lines")
+    step("open hide lines", "click", hide["ref"], "--click-count", "2")
+    editor = next((n for n in nodes(next(n for n in nodes(json.loads(command("snapshot", "--json", "--full"))) if n.get("componentName") == "hideLines" and "ScrubField" in n.get("class", ""))) if n.get("class") == "juce::TextEditor"), None)
+    if editor is None:
+        raise RuntimeError("Hide lines should open for typing")
+    step("hide them", "fill", editor["ref"], "100")
+    step("commit hide lines", "press", "Return")
+    # Baked in the background: the lines behind the faces leave the Scope.
+    hidden = lit_once_baked("hidden.png", lambda lit: lit < whole * .95)
+    if hidden >= whole * .95:
+        raise RuntimeError(f"Hiding lines should leave fewer lines on the Scope ({hidden} lit of {whole})")
     step("save", "press", "command + s", "--class", "MotionEditor")
     data = project.read_bytes()
     saved = ET.fromstring(data[8:8 + struct.unpack("<I", data[4:8])[0]]).find("composition")
     camera = next(c for c in saved.iter("camera") if c.get("id") == "9")
-    if camera.get("hideHiddenLines") not in ("1", "true"):
-        raise RuntimeError("The camera's setting should save with the project")
+    hide_lines = next((p for p in camera.iter("property") if p.get("name") == "hideLines"), None)
+    if hide_lines is None or float(hide_lines.get("base")) != 100:
+        raise RuntimeError("The camera's Hide lines should save with the project")
     step("undo", "click", "--name", "Undo", "--exact")
-    if not status_stops_saying("hidden lines removed"):
-        raise RuntimeError("Undo should show the hidden lines again")
-    lit_on_scope("restored.png")
+    restored = lit_once_baked("restored.png", lambda lit: lit > whole * .95)
+    if restored <= whole * .95:
+        raise RuntimeError(f"Undo should show the hidden lines again ({restored} lit of {whole})")
     print("Motion hidden lines passed", flush=True)
 finally:
     session.stop_app()

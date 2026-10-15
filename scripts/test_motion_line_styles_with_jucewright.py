@@ -116,6 +116,8 @@ try:
     add("Generate", "Sphere")
     if not tile("Edges").get("checked") or tile("Outline").get("checked"):
         raise RuntimeError("A surface draws its edges until asked otherwise")
+    # Each style's amount is folded under Advanced.
+    step("open advanced settings", "click", "--name", "Advanced settings", "--exact")
     # Only what is on has a row for how much.
     field("edges")
     field("outline", present=False)
