@@ -26,6 +26,10 @@ on:
         type: choice
         options: [all, osci-motion]
         default: all
+      publish:
+        description: Publish the osci-motion builds to release-plane (off uploads them as run artifacts instead)
+        type: boolean
+        default: true
 
 jobs:
   build:
@@ -652,6 +656,22 @@ jobs:
           source ./ci/setup-env.sh
           source ./ci/test.sh Motion MotionLive MotionBake MotionRaster MotionVideo
 
+      # An unpublished run hands its Windows binaries over for testing on
+      # other Windows machines: the CLI is built here, after the tests.
+      - name: Build osci-motion-cli (Windows)
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && !inputs.publish
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ./ci/setup-env.sh
+          eval "$PROJUCER_PATH --resave '$ROOT/osci-motion-cli.jucer'"
+          VS_WHERE="C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
+          cd "$ROOT/Builds/MotionCli/VisualStudio2022"
+          "$MSBUILD_EXE" "//m" "osci-motion-cli.sln" "//p:MultiProcessorCompilation=true" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
+          find . -name "osci-motion-cli.exe"
+
       - name: Build osci-motion (Standalone)
         shell: bash
         env:
@@ -715,10 +735,22 @@ jobs:
         shell: bash
         run: mv "packaging/build/osci-motion.exe" "bin/${OUTPUT_NAME}.exe"
 
+      - name: Upload Windows test binaries
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && !inputs.publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: osci-motion-windows-test
+          retention-days: 7
+          path: |
+            bin/${{ env.OUTPUT_NAME }}.exe
+            Builds/Test/VisualStudio2022/x64/Release/ConsoleApp/osci-render-test.exe
+            Builds/MotionCli/VisualStudio2022/x64/Release/ConsoleApp/osci-motion-cli.exe
+
       # -- Release publish ----------------------------------------
       # Every successful build publishes a signed alpha artifact to
       # release-plane, for the updater to fetch once promoted.
       - name: Publish release artifact
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         shell: bash
         env:
           PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
