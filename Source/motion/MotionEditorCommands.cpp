@@ -572,7 +572,9 @@ void MotionEditor::showStartScreen() {
     const auto anything = std::any_of(project.tracks.begin(), project.tracks.end(), [](const motion::Track& track) { return !track.clips.empty(); });
     juce::String continuing;
     if (anything) {
-        continuing = current.existsAsFile() ? current.getFileNameWithoutExtension() : juce::String("Untitled project");
+        // An unsaved one by its own name, such as the example it came from.
+        const auto named = juce::String(project.name).trim();
+        continuing = current.existsAsFile() ? current.getFileNameWithoutExtension() : named.isNotEmpty() ? named : juce::String("Untitled project");
         if (processor.document.unsaved()) { continuing << motion::style::dot() << "edited"; }
     }
     const juce::Component::SafePointer<MotionEditor> owner(this);
