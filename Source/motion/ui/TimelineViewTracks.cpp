@@ -146,9 +146,13 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
     // Right-clicking one of several picked headers acts on them all.
     if (selectedTracks.size() > 1 && selectedTracks.contains(id)) {
         juce::PopupMenu menu;
-        menu.addItem(motion::style::menuItem("Group " + juce::String(static_cast<int>(selectedTracks.size())) + " tracks", 1, "Cmd+G"));
+        const auto count = juce::String(static_cast<int>(selectedTracks.size()));
+        menu.addItem(motion::style::menuItem("Group " + count + " tracks", 1, "Cmd+G"));
+        menu.addSeparator();
+        menu.addItem(motion::style::menuItem("Delete " + count + " tracks", 2, "Delete"));
         motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this](int result) {
             if (result == 1) { groupTracks({selectedTracks.begin(), selectedTracks.end()}); }
+            if (result == 2) { deleteTracks(pickedTracks()); }
         });
         return;
     }
@@ -180,7 +184,7 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
     }
     menu.addSubMenu("Label colour", labels);
     menu.addSeparator();
-    menu.addItem(3, "Delete track");
+    menu.addItem(motion::style::menuItem("Delete track", 3, "Delete"));
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, groups](int result) {
         cancelGesture();
         const auto& current = processor.document.project().tracks;
@@ -205,10 +209,7 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
         if (result >= 100 && result - 100 < static_cast<int>(groups.size())) {
             placeTrack(id, index, groups[result - 100]);
         } else if (result == 3) {
-            processor.document.edit("Delete track", [id](motion::Project& project) {
-                project.tracks.eraseIf([id](const auto& item) { return item.id == id; });
-            });
-            refreshTracks();
+            deleteTracks({id});
         } else {
             const auto direction = result == 1 ? -1 : 1;
             for (int candidate = index + direction; candidate >= 0 && candidate < static_cast<int>(current.size()); candidate += direction) {

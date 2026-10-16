@@ -381,6 +381,9 @@ public:
 private:
     void pickTrack(motion::Id id, juce::ModifierKeys mods);
     std::vector<motion::Id> tracksToGroup() const;
+    // The track headers picked: several, or the one selected.
+    std::vector<motion::Id> pickedTracks() const;
+    void deleteTracks(const std::vector<motion::Id>& ids);
     mutable std::set<motion::Id> selectedTracks;
     mutable motion::Id trackAnchor = 0;
     void showGroupMenu(motion::Id id);

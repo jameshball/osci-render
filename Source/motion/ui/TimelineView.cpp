@@ -102,6 +102,24 @@ std::vector<motion::Id> MotionTimelineView::tracksToGroup() const {
     return result;
 }
 
+std::vector<motion::Id> MotionTimelineView::pickedTracks() const {
+    std::vector<motion::Id> result;
+    for (const auto& track : processor.document.project().tracks) {
+        if (selectedTracks.size() > 1 ? selectedTracks.contains(track.id) : track.id == selected) { result.push_back(track.id); }
+    }
+    return result;
+}
+
+void MotionTimelineView::deleteTracks(const std::vector<motion::Id>& ids) {
+    if (ids.empty()) { return; }
+    const std::set<motion::Id> doomed(ids.begin(), ids.end());
+    processor.document.edit(ids.size() == 1 ? juce::String("Delete track") : "Delete " + juce::String(static_cast<int>(ids.size())) + " tracks", [&doomed](motion::Project& project) {
+        project.tracks.eraseIf([&doomed](const auto& item) { return doomed.contains(item.id); });
+    });
+    selectedTracks.clear();
+    refreshTracks();
+}
+
 void MotionTimelineView::groupSelectedTracks() { groupTracks(tracksToGroup()); }
 
 void MotionTimelineView::groupTracks(const std::vector<motion::Id>& ids) {
@@ -229,7 +247,8 @@ std::vector<motion::Document::CopiedClip> MotionTimelineView::copiedClips() cons
 
 void MotionTimelineView::deleteSelection() {
     if (!selectedKeys.empty()) { deleteSelectedKeys(); return; }
-    if (!selectedClips.empty()) { deleteSelectedClips(false); }
+    if (!selectedClips.empty()) { deleteSelectedClips(false); return; }
+    deleteTracks(pickedTracks());
 }
 
 std::optional<std::pair<double, motion::Id>> MotionTimelineView::dropTarget(juce::Point<int> point) const {
@@ -1847,7 +1866,13 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
             selectedMarker = 0;
             return true;
         }
-        if (selectedClips.empty()) { return false; }
+        if (selectedClips.empty()) {
+            // Picked track headers go, with their clips.
+            const auto tracks = pickedTracks();
+            if (tracks.empty()) { return false; }
+            deleteTracks(tracks);
+            return true;
+        }
         deleteSelectedClips(key.getModifiers().isShiftDown());
         return true;
     }
