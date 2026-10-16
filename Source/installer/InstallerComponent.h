@@ -69,13 +69,18 @@ namespace osci::installer {
         return path == InstallPath::SosciPremium ? "sosci" : path == InstallPath::OsciMotionPremium ? "osci-motion" : "osci-render";
     }
 
-    // osci-motion is in beta: it has no stable release yet.
-    osci::ReleaseTrack releaseTrack (juce::StringRef product) {
-        return juce::String (product) == "osci-motion" ? osci::ReleaseTrack::Beta : osci::ReleaseTrack::Stable;
-    }
-
-    juce::String trackName (juce::StringRef product) {
-        return releaseTrack (product) == osci::ReleaseTrack::Beta ? "beta" : "stable";
+    // The latest stable release, or a beta one while a product has no stable
+    // release yet (as osci-motion in its beta). `result` says if asking failed.
+    std::optional<osci::VersionInfo> latestInstallable (juce::StringRef product, juce::StringRef variant, juce::Result& result) {
+        for (const auto track : { osci::ReleaseTrack::Stable, osci::ReleaseTrack::Beta }) {
+            osci::UpdateChecker checker;
+            auto version = checker.checkForUpdate (product, currentInstallerVersionBaseline(), track, variant);
+            result = checker.getLastResult();
+            if (version.has_value() || result.failed()) {
+                return version;
+            }
+        }
+        return std::nullopt;
     }
 
     juce::String errorWithContext (juce::StringRef context, juce::StringRef detail) {
@@ -96,7 +101,7 @@ public:
     InstallerComponent()
         : osciRenderTile ("osci-render", loadImage (BinaryData::osci_mac_png, BinaryData::osci_mac_pngSize), "osci-render"),
           sosciTile ("sosci", loadImage (BinaryData::sosci_mac_saturated_png, BinaryData::sosci_mac_saturated_pngSize), "sosci"),
-          motionTile ("osci-motion", loadImage (BinaryData::motion_mac_png, BinaryData::motion_mac_pngSize), "osci-motion (beta)"),
+          motionTile ("osci-motion", loadImage (BinaryData::motion_mac_png, BinaryData::motion_mac_pngSize), "osci-motion"),
           needLicenseLink ("Find my license key", juce::URL()),
           progressBar (progressValue) {
         addAndMakeVisible (headingLabel);
@@ -840,9 +845,9 @@ private:
     }
 
     juce::String buttonTextForPremiumPath() const {
-        // osci-motion has one edition, in beta.
+        // osci-motion has one edition.
         if (currentPath == InstallPath::OsciMotionPremium) {
-            return hasCachedPremiumToken ? "Install osci-motion beta" : "Activate and install beta";
+            return hasCachedPremiumToken ? "Install osci-motion" : "Activate and install";
         }
         if (hasCachedPremiumToken) {
             return cachedTokenNeedsRefresh ? "Refresh and install premium" : "Install premium";
@@ -920,9 +925,8 @@ private:
         }
 #endif
         juce::Thread::launch([owner, path, request] {
-            osci::UpdateChecker checker;
-            const auto version = checker.checkForUpdate(request.productSlug, currentInstallerVersionBaseline(), releaseTrack(request.productSlug), request.variant);
-            const auto result = checker.getLastResult();
+            auto result = juce::Result::ok();
+            const auto version = latestInstallable(request.productSlug, request.variant, result);
             juce::MessageManager::callAsync([owner, path, result, version] {
                 if (owner == nullptr) { return; }
                 owner->setBusy(false, {});
@@ -1009,22 +1013,18 @@ private:
                     return;
                 }
 
-                safeThis->statusLabel.setText ("Checking latest " + trackName (request.productSlug) + " " + request.productName + " " + request.variant + " release...",
+                safeThis->statusLabel.setText ("Checking latest " + request.productName + " " + request.variant + " release...",
                                                juce::dontSendNotification);
             });
 
-            osci::UpdateChecker checker;
-            version = checker.checkForUpdate (request.productSlug,
-                                              currentInstallerVersionBaseline(),
-                                              releaseTrack (request.productSlug),
-                                              request.variant);
+            auto checkResult = juce::Result::ok();
+            version = latestInstallable (request.productSlug, request.variant, checkResult);
 
             if (!version.has_value()) {
-                const auto checkResult = checker.getLastResult();
                 result = checkResult.failed()
-                    ? failWithContext ("Could not check for the latest " + trackName (request.productSlug) + " " + request.productName + " " + request.variant + " installer",
+                    ? failWithContext ("Could not check for the latest " + request.productName + " " + request.variant + " installer",
                                        checkResult)
-                    : juce::Result::fail ("No " + trackName (request.productSlug) + " " + request.productName + " " + request.variant
+                    : juce::Result::fail ("No " + request.productName + " " + request.variant
                                           + " installer is available for " + osci::HardwareInfo::getCurrentPlatform() + ".");
             }
         }
@@ -1198,8 +1198,9 @@ private:
             return;
         }
 
-        // Installed from beta, it updates from beta too.
-        if (releaseTrack (request.productSlug) == osci::ReleaseTrack::Beta) {
+        // Installed from beta (no stable release yet), it updates from beta
+        // too. A stable install leaves whatever track was chosen alone.
+        if (version->releaseTrack == "beta") {
             osci::UpdateSettings (request.productSlug).setReleaseTrack (osci::ReleaseTrack::Beta);
         }
 
