@@ -90,7 +90,7 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
     addButton.setTitle("Add modulator");
     addButton.onClick = [this] { add(); };
     content.addAndMakeVisible(addButton);
-    emptyHint.setText("Modulators move properties over time: waves, random and the soundtrack's loudness. Add one, then drag it onto a property in Properties.", juce::dontSendNotification);
+    emptyHint.setText("Modulators move properties over time: waves, random and the audio's loudness. Add one, then drag it onto a property in Properties.", juce::dontSendNotification);
     emptyHint.setFont(motion::style::body());
     emptyHint.setJustificationType(juce::Justification::centredTop);
     emptyHint.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(.6f));
@@ -338,7 +338,7 @@ const std::array<MotionModulatorLibrary::Kind, 7>& MotionModulatorLibrary::kinds
     using motion::ModulationWaveform;
     static const std::array<Kind, 7> list {{
         {"Sine", ModulationWaveform::sine}, {"Triangle", ModulationWaveform::triangle}, {"Saw", ModulationWaveform::saw}, {"Square", ModulationWaveform::square},
-        {"Smooth random", ModulationWaveform::noiseSmooth}, {"Random steps", ModulationWaveform::noiseHold}, {"Soundtrack loudness", ModulationWaveform::soundtrack}}};
+        {"Smooth random", ModulationWaveform::noiseSmooth}, {"Random steps", ModulationWaveform::noiseHold}, {"Audio loudness", ModulationWaveform::soundtrack}}};
     return list;
 }
 

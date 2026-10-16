@@ -120,6 +120,8 @@ void MotionEditor::setUpMenus() {
     menus.customMenuLogic = [this](juce::PopupMenu& menu, int index) {
         if (index == fileMenu) { buildFileMenu(menu); }
         if (index == audioMenu) {
+            menu.addItem(importAudioMenuId, "Import audio...");
+            menu.addSeparator();
             juce::PopupMenu output;
             for (int id = 1; id <= monitorOutput.getNumItems(); ++id) { output.addItem(outputMenuId + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
             // Named as the chooser beside the transport is.
@@ -156,6 +158,10 @@ void MotionEditor::setUpMenus() {
         }
     };
     menus.customMenuSelectedLogic = [this](int id, int index) {
+        if (index == audioMenu && id == importAudioMenuId) {
+            chooseAudioFile();
+            return true;
+        }
         if (index == audioMenu && id > outputMenuId && id <= outputMenuId + monitorOutput.getNumItems()) {
             monitorOutput.setSelectedId(id - outputMenuId);
             return true;
@@ -236,12 +242,12 @@ void MotionEditor::setUpTransport() {
     monitorOutput.setName("Audio output mode");
     monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
     monitorOutput.setColour(juce::ComboBox::arrowColourId, osci::Colours::textMuted());
-    monitorOutput.addItem("Soundtrack", 1);
+    monitorOutput.addItem("Audio", 1);
     monitorOutput.addItem("Beam XY", 2);
     monitorOutput.addItem("Beam XYRGB (5 ch)", 3);
     refreshOutputChoices();
     monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
-    monitorOutput.setTooltip("What your audio interface plays: the soundtrack, or the beam itself to drive a real oscilloscope (XYRGB needs five output channels). The Scope always shows the beam.");
+    monitorOutput.setTooltip("What your audio interface plays: the project's audio, or the beam itself to drive a real oscilloscope (XYRGB needs five output channels). The Scope always shows the beam.");
     monitorOutput.onChange = [this] {
         const auto mode = static_cast<MotionProcessor::OutputMode>(monitorOutput.getSelectedId() - 1);
         if (mode == MotionProcessor::OutputMode::xyrgb) {
@@ -311,7 +317,7 @@ void MotionEditor::setUpTransport() {
     };
     tapButton.setName("Tap tempo");
     tapButton.setTitle("Tap tempo");
-    tapButton.setTooltip("Tap on the beat (four taps or more). The tempo is set when you stop tapping. Detect it from the soundtrack in the Timing menu.");
+    tapButton.setTooltip("Tap on the beat (four taps or more). The tempo is set when you stop tapping. Detect it from the audio in the Timing menu.");
     tapButton.setWantsKeyboardFocus(false);
     tapButton.onClick = [this] { tap(); };
     tempoValue.setName("Project tempo");
@@ -1054,8 +1060,8 @@ void MotionEditor::refreshKeyPanel() {
 }
 
 void MotionEditor::refreshOutputChoices() {
-    // Say so when "Soundtrack" would play silence.
-    const juce::String soundtrackChoice = soundtrackClip() != 0 ? "Soundtrack" : "Soundtrack (none yet)";
+    // Say so when "Audio" would play silence.
+    const juce::String soundtrackChoice = soundtrackClip() != 0 ? "Audio" : "Audio (none yet)";
     if (monitorOutput.getItemText(0) != soundtrackChoice) {
         const auto chosen = monitorOutput.getSelectedId();
         monitorOutput.changeItemText(1, soundtrackChoice);

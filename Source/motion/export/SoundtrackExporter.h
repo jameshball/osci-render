@@ -13,11 +13,11 @@ public:
             progress->store(0.0, std::memory_order_relaxed);
         }
         if (cancel.load(std::memory_order_relaxed)) {
-            return juce::Result::fail("Soundtrack export cancelled.");
+            return juce::Result::fail("Audio export cancelled.");
         }
         return writePrepared(PreparedSoundtrack(snapshot), snapshot.duration, destination, sampleRate, cancel, progress);
     } catch (...) {
-        return juce::Result::fail("Cannot prepare the soundtrack for WAV export.");
+        return juce::Result::fail("Cannot prepare the audio for WAV export.");
     }
 
     static juce::Result write(const PreparedComposition& composition, const juce::File& destination, double sampleRate, const std::atomic<bool>& cancel, std::atomic<double>* progress = nullptr) {
@@ -30,7 +30,7 @@ private:
             [&](double, double time) {
                 const auto value = soundtrack.sample(time);
                 return std::array<float, 2> { value.left, value.right };
-            }, "Soundtrack", "The soundtrack produced a non-finite sample. Check its audio gain and pan curves.");
+            }, "Audio", "The audio produced a non-finite sample. Check its gain and pan curves.");
     }
 };
 }

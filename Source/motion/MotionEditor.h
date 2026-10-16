@@ -128,6 +128,8 @@ private:
     void showNextPreparationSettings();
     void showBlenderSettings(motion::Id id = 0);
     void chooseSourceFile();
+    // Import, offering audio files only.
+    void chooseAudioFile();
     bool importSourceFile(const juce::File& file, motion::Id relink, std::optional<std::pair<double, motion::Id>> placement = std::nullopt);
     void replaceSourceFile(motion::Id asset);
     std::deque<SourceRequest> preparationRequests;
@@ -380,13 +382,13 @@ private:
     // The menu bar's menus, in order, and ids clear of the menu model's own
     // (1-based per item) for the items added to them here.
     enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, audioMenu, viewMenu, timingMenuIndex, helpMenu };
-    static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100, outputMenuId = 2000;
+    static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100, outputMenuId = 2000, importAudioMenuId = 3200;
     // The rates a project can be drawn at, from what audio runs at to four
     // times 192 kHz.
     static constexpr std::array<double, 8> projectSampleRates {44100, 48000, 88200, 96000, 176400, 192000, 384000, 768000};
     // The add menu's items, and the first id of each list in it.
     struct AddMenuId {
-        static constexpr int importFile = 1, blenderSource = 2, drawing = 3;
+        static constexpr int importFile = 1, blenderSource = 2, drawing = 3, importAudio = 4;
         static constexpr int firstExample = 100, firstGenerator = 1000, firstLightPreset = 2000, firstMirror = 3000;
     };
     juce::Label timeLabel;

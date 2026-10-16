@@ -96,10 +96,10 @@ try:
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
     # Detect tempo and downbeat from a 128 BPM loop whose first downbeat is 0.3 s in.
     step("import loop", "drop-files", "--file", loop, "--class", "MotionEditor", "--exact")
-    wait_undo("Import soundtrack", 60000)
+    wait_undo("Import audio", 60000)
     step("timing menu", "click", "--name", "Timing", "--class", "juce::MenuBarComponent::AccessibleItemComponent", "--exact")
-    step("detect", "click", "--name", "Detect tempo from soundtrack", "--role", "menuItem", "--exact")
-    wait_undo("Set tempo from soundtrack", 60000)
+    step("detect", "click", "--name", "Detect tempo from audio", "--role", "menuItem", "--exact")
+    wait_undo("Set tempo from audio", 60000)
     tree = saved()
     assert abs(float(tree.get("bpm")) - 128) < 0.05, tree.attrib
     clip = tree.find("track/clip")

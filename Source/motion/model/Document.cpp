@@ -570,8 +570,8 @@ juce::Result Document::setTempoFromAudio(Id clipId, double bpm, double downbeat,
     if (result.failed()) { return result; }
     const auto tempo = next.tempo();
     const auto* track = findClipTrack(next, clipId);
-    if (track == nullptr) { return juce::Result::fail("The soundtrack clip no longer exists."); }
-    if (track->locked) { return juce::Result::fail("Unlock the soundtrack's track first."); }
+    if (track == nullptr) { return juce::Result::fail("The audio clip no longer exists."); }
+    if (track->locked) { return juce::Result::fail("Unlock the audio track first."); }
     auto clip = *findClip(next, clipId);
     // Move the clip later (never cutting audio) until its first downbeat sits
     // on a bar line; a pickup lands in the bar before.
@@ -582,14 +582,14 @@ juce::Result Document::setTempoFromAudio(Id clipId, double bpm, double downbeat,
         moved = bar - shift;
         timing.moveTo(timing.start + moved);
         if (!clip.setTiming(timing, tempo) || !track->canPlace(clip, clip.id, tempo)) {
-            return juce::Result::fail("There is no room to move the soundtrack onto the bar grid.");
+            return juce::Result::fail("There is no room to move the audio onto the bar grid.");
         }
         *changeClip(next, clipId) = clip;
         next.duration = std::max(next.duration, timing.end());
     }
     // A tempo taken from the music is for working in bars.
     next.timeDisplay = TimeDisplay::beats;
-    edit("Set tempo from soundtrack", [next = std::move(next)](Project& project) { project = next; });
+    edit("Set tempo from audio", [next = std::move(next)](Project& project) { project = next; });
     return juce::Result::ok();
 }
 
@@ -762,7 +762,7 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
     if (replacement == nullptr || replacement->id != assetId) { return juce::Result::fail("Invalid replacement source."); }
     const auto audio = [](const Asset& asset) { return asset.audio != nullptr; };
     if (audio(*found) != audio(*replacement)) {
-        return juce::Result::fail(audio(*found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
+        return juce::Result::fail(audio(*found) ? "Replace audio with another audio file." : "Replace a visual source with another visual file.");
     }
     const bool lua = replacement->extension.equalsIgnoreCase(".lua");
     const bool fractal = isFractal(replacement->extension);

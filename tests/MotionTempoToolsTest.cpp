@@ -99,7 +99,7 @@ public:
             expectEquals(document.project().bpm, 120.0);
             expectWithinAbsoluteError(moved, 1.7, 1e-9, "the downbeat moves to bar 2, never cutting audio");
             expectWithinAbsoluteError(document.project().tracks[0].clips[0].timing(document.project().tempo()).start, 1.7, 1e-9);
-            expect(undo.getUndoDescription() == "Set tempo from soundtrack");
+            expect(undo.getUndoDescription() == "Set tempo from audio");
             expect(document.project().timeDisplay == motion::TimeDisplay::beats, "the ruler switches to bars in the same step");
             expect(undo.undo());
             expectEquals(document.project().bpm, 100.0);

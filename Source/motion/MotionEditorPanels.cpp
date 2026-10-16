@@ -267,6 +267,7 @@ void MotionEditor::setUpLibrary() {
         }
         menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
         menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder()));
+        menu.addItem(item(AddMenuId::importAudio, "Import audio...", icons::glyph::wave()));
         menu.addItem(item(AddMenuId::blenderSource, "Blender source...", icons::glyph::live()));
         // The examples that ship with osci-motion, by kind, each pictured as
         // it draws (a blank space until its picture is made).
@@ -299,6 +300,7 @@ void MotionEditor::setUpLibrary() {
                 return static_cast<std::size_t>(choice - first);
             };
             if (choice == AddMenuId::importFile) { owner->chooseSourceFile(); }
+            if (choice == AddMenuId::importAudio) { owner->chooseAudioFile(); }
             if (choice == AddMenuId::blenderSource) { owner->showBlenderSettings(); }
             if (choice == AddMenuId::drawing) { owner->showDrawingEditor(0); }
             const auto generator = chosen(AddMenuId::firstGenerator, motion::generatorDefinitions.size());

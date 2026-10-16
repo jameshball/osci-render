@@ -684,7 +684,7 @@ juce::PopupMenu MotionEditor::timingMenu() {
     menu.addItem(motion::style::menuItem("Add marker...", 700, "M"));
     menu.addItem(701, "Add tempo change...");
     menu.addSeparator();
-    menu.addItem(600, detectingTempo ? "Detecting tempo..." : "Detect tempo from soundtrack", !detectingTempo && soundtrackClip() != 0);
+    menu.addItem(600, detectingTempo ? "Detecting tempo..." : "Detect tempo from audio", !detectingTempo && soundtrackClip() != 0);
     menu.addSeparator();
     menu.addItem(101, "Seconds", true, project.timeDisplay == motion::TimeDisplay::seconds);
     menu.addItem(102, "Frames", true, project.timeDisplay == motion::TimeDisplay::frames);
@@ -803,7 +803,7 @@ void MotionEditor::detectTempo() {
     const auto asset = clip != nullptr ? motion::findAsset(project.assets, clip->asset) : nullptr;
     const auto audio = asset != nullptr ? asset->audio : nullptr;
     if (audio == nullptr || processor.document.editingComposition() != 0) {
-        statusBar.show(audio == nullptr ? "Import a soundtrack first." : "Tempo is set on the main composition. Go back to it first.");
+        statusBar.show(audio == nullptr ? "Import some audio first (Audio > Import audio)." : "Tempo is set on the main composition. Go back to it first.");
         return;
     }
     detectingTempo = true;
@@ -824,7 +824,7 @@ void MotionEditor::detectTempo() {
             owner->detectingTempo = false;
             if (owner->processor.document.generation() != generation) { return; }
             if (!estimate.has_value()) {
-                owner->statusBar.show("Could not find a steady tempo in the soundtrack. Set it by hand or tap it.", MotionStatusBar::Kind::warning);
+                owner->statusBar.show("Could not find a steady tempo in the audio. Set it by hand or tap it.", MotionStatusBar::Kind::warning);
                 return;
             }
             double moved = 0;
@@ -834,7 +834,7 @@ void MotionEditor::detectTempo() {
             const auto bpm = juce::String(estimate->bpm, estimate->bpm == std::round(estimate->bpm) ? 0 : 2);
             // Detection can land an octave off: the other reading is one click away.
             const auto other = estimate->bpm * 2 <= 200 ? estimate->bpm * 2 : estimate->bpm / 2;
-            auto message = "Tempo " + bpm + " BPM from the soundtrack" + (estimate->confidence < 0.4 ? " (low confidence)" : "");
+            auto message = "Tempo " + bpm + " BPM from the audio" + (estimate->confidence < 0.4 ? " (low confidence)" : "");
             if (moved > 0) { message += ", which moved " + juce::String(moved, 3) + " s so its first downbeat falls on a bar"; }
             message += bars ? "." : ". The ruler shows bars and beats.";
             owner->statusBar.show(message, MotionStatusBar::Kind::notice, "Use " + juce::String(other, other == std::round(other) ? 0 : 2) + " BPM", [owner, other, generation] {

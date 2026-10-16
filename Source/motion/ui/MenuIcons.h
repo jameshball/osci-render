@@ -126,6 +126,17 @@ inline juce::Path folder() {
     path.lineTo(88, 38);
     return fitted(path);
 }
+// A waveform: audio.
+inline juce::Path wave() {
+    juce::Path path;
+    const float heights[] {14, 30, 52, 30, 64, 40, 22, 46, 18};
+    for (int index = 0; index < 9; ++index) {
+        const auto x = 12.0f + static_cast<float>(index) * 9.0f, half = heights[index] * .5f;
+        path.startNewSubPath(x, 48 - half);
+        path.lineTo(x, 48 + half);
+    }
+    return fitted(path);
+}
 // A point sending in both directions: a source that arrives live.
 inline juce::Path live() {
     juce::Path path;

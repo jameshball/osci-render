@@ -191,7 +191,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
     juce::MessageManager::callAsync([owner, state, project, beamSnapshot, renderMode, config, destination, finished] {
         if (owner == nullptr) { return; }
         state->videoWithAudio = config.includeAudio;
-        auto content = std::make_unique<motion::ui::ProgressSheet>("Exporting video", destination.getFileName(), config.includeAudio ? "Preparing the beam signal and soundtrack..." : "Preparing the beam signal...", [state] {
+        auto content = std::make_unique<motion::ui::ProgressSheet>("Exporting video", destination.getFileName(), config.includeAudio ? "Preparing the beam signal and audio..." : "Preparing the beam signal...", [state] {
             return state->videoWithAudio ? (state->progress.load() + state->soundtrackProgress.load()) * 0.5 : state->progress.load();
         }, [state] { state->cancelled.store(true); }, "Cancel video preparation");
         const auto size = juce::Point<int>(content->getWidth(), content->getHeight());

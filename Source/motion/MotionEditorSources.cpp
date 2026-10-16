@@ -196,6 +196,16 @@ void MotionEditor::chooseSourceFile() {
     });
 }
 
+void MotionEditor::chooseAudioFile() {
+    chooser = std::make_unique<juce::FileChooser>("Import audio", processor.getLastOpenedDirectory(), osci::files::audioWildcard());
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [owner](const juce::FileChooser& chosen) {
+        if (owner != nullptr && chosen.getResult().existsAsFile()) {
+            owner->openSourceFile(chosen.getResult());
+        }
+    });
+}
+
 void MotionEditor::showBlenderSettings(motion::Id id) {
     auto& document = processor.document;
     const auto& assets = document.mainProject().assets;
@@ -539,7 +549,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             const auto target = std::find_if(tracks.begin(), tracks.end(), [&](const auto& item) { return item.id == request.track; });
             const auto onTrack = request.track != 0 && target != tracks.end() && !target->locked && target->kind == track.kind && target->canPlace(clip, 0, document.project().tempo());
             const auto trackId = onTrack ? request.track : 0;
-            document.edit(asset->audio != nullptr ? "Import soundtrack" : "Import source", [&](motion::Project& project) {
+            document.edit(asset->audio != nullptr ? "Import audio" : "Import source", [&](motion::Project& project) {
                 project.assets.push_back(asset);
                 auto* existing = trackId != 0 ? project.tracks.changeById(trackId) : nullptr;
                 if (existing != nullptr) { existing->insert(clip, project.tempo()); } else { project.tracks.push_back(track); }

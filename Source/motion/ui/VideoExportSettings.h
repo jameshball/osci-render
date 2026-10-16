@@ -33,7 +33,7 @@ public:
         quality.setValue(std::clamp(100.0 - (config.crf - 1) * 2.0, 1.0, 100.0));
         quality.setFill(fieldFill());
         soundtrack.setToggleState(config.includeAudio, juce::dontSendNotification);
-        soundtrack.setTooltip("Include the stereo soundtrack");
+        soundtrack.setTooltip("Include the project's audio");
         for (auto* label : { &frameLabel, &codecLabel, &qualityLabel, &soundtrackLabel, &note }) { styleCaption(*label); }
         note.setText(config.preserveAlpha ? "Transparent background: ProRes 4444 with alpha." : juce::String(), juce::dontSendNotification);
         primary.onClick = [this] {
@@ -72,8 +72,8 @@ private:
     }
     VideoEncodingConfiguration config;
     juce::Label note, frame;
-    juce::Label frameLabel { "Export frame caption", "Frame" }, codecLabel { "Video codec caption", "Codec" }, qualityLabel { "Video quality caption", "Quality" }, soundtrackLabel { "Soundtrack caption", "Soundtrack" };
+    juce::Label frameLabel { "Export frame caption", "Frame" }, codecLabel { "Video codec caption", "Codec" }, qualityLabel { "Video quality caption", "Quality" }, soundtrackLabel { "Audio caption", "Audio" };
     juce::ComboBox codec;
     motion::ui::ScrubField quality;
-    motion::ui::Switch soundtrack { "Include stereo soundtrack" };
+    motion::ui::Switch soundtrack { "Include audio" };
 };

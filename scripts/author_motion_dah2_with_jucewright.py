@@ -135,7 +135,7 @@ def import_source(name, start, duration=None, bake=None, offset=None):
     elif name.endswith(".gif"):
         command("wait-for-locator", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
         step("trace " + name, "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
-    label = "Undo Import soundtrack" if name.endswith(".flac") else "Undo Import source"
+    label = "Undo Import audio" if name.endswith(".flac") else "Undo Import source"
     command("wait-for-locator", "--name", label, "--role", "label", "--exact", "--timeout-ms", 120000)
     timing(duration=duration, offset=offset, back="Properties")
 
@@ -180,7 +180,7 @@ def modulate(label, waveform, amount, beats=None, hertz=None, mode="Add"):
         step("enable modulation", "click", enable["ref"])
     step("waveform " + waveform, "select-option", "--name", "Modulation waveform", "--text", waveform)
     step("mode " + mode, "select-option", "--name", "Modulation mode", "--text", mode)
-    if waveform != "Soundtrack loudness":
+    if waveform != "Audio loudness":
         step("clock", "select-option", "--name", "Modulation clock", "--text", "Beats" if beats is not None else "Hz")
         step("rate", "set-value", "--name", "Modulation rate", "--role", "slider", str(beats if beats is not None else hertz))
     step("amount", "set-value", "--name", "Modulation amount", "--role", "slider", str(amount))
@@ -387,7 +387,7 @@ def drop():
     rename_track("Letters")
     set_properties({"position.z": -2.5, "scale.x": 1.2, "scale.y": 1.2, "scale.z": 1.2, "red": 1, "green": 0.8, "blue": 0.55, "opacity": 100})
     for axis in ("X", "Y", "Z"):
-        modulate("Scale " + axis, "Soundtrack loudness", 0.9, mode="Multiply")
+        modulate("Scale " + axis, "Audio loudness", 0.9, mode="Multiply")
     modulate("Rotation Y", "Sine", 25, beats=8)
     duplicate_to(bar(96), duration=bar(112) - bar(96))
     save()
