@@ -226,6 +226,8 @@ public:
         return ++lastId;
     }
     void edit(juce::String label, std::function<void(Project&)> operation);
+    // Changes what the newest undo step made, as part of that step.
+    void amend(std::function<void(Project&)> operation);
     // An edit of the whole project wherever the scope is, for what reaches
     // past the composition being edited (sources, and clips everywhere that
     // use them). The operation keeps references whole itself.
@@ -388,6 +390,9 @@ public:
     // Called as an edit begins its own undo step: whatever else shares the
     // undo manager (parameter drags) starts a new step after it.
     std::function<void()> onUndoStep;
+    // After an edit is recorded (not an undo, redo or preview), with the
+    // composition edited as it was before it, for a look at what changed.
+    std::function<void(const Project& before)> onEdited;
 
     static Clip makeCompositionClip(Id id, const CompositionDefinition& definition, double time);
     static Clip makeClip(Id id, const Asset& asset, double time);

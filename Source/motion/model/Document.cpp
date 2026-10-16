@@ -318,7 +318,10 @@ void Document::record(const juce::String& label, Project view, bool joinPrevious
     // An edit made while a gesture previews starts from before the preview:
     // what was shown was never an undo step of its own.
     auto from = previewBase.has_value() ? std::move(*previewBase) : state;
+    const auto before = onEdited ? project() : Project();
+    const auto scope = scopeChanges;
     undo.perform(new Change(*this, std::move(from), finished(std::move(view))));
+    if (onEdited && scope == scopeChanges) { onEdited(before); }
 }
 
 void Document::preview(Project project) {
@@ -337,6 +340,12 @@ void Document::edit(juce::String label, std::function<void(Project&)> operation)
     auto after = project();
     operation(after);
     record(label, std::move(after));
+}
+
+void Document::amend(std::function<void(Project&)> operation) {
+    auto after = project();
+    operation(after);
+    record(undo.getUndoDescription(), std::move(after), true);
 }
 
 void Document::editProject(juce::String label, std::function<void(Project&)> operation) {
@@ -424,10 +433,13 @@ void Document::changeView(std::function<void(Composition&)> change) {
 void Document::commit(juce::String label, Project before) {
     undo.beginNewTransaction(label);
     if (onUndoStep) { onUndoStep(); }
+    const auto edited = onEdited ? before : Project();
+    const auto scope = scopeChanges;
     // Undo puts back the gesture, not a view option changed during it.
     auto from = mergeScope(std::move(before));
     if (previewOrigin.has_value()) { carryViewOptions(from, state, *previewOrigin); }
     undo.perform(new Change(*this, std::move(from), state));
+    if (onEdited && scope == scopeChanges) { onEdited(edited); }
 }
 
 void Document::reset(Project project) {

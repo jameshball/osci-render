@@ -109,6 +109,26 @@ private:
         int preferredHeight() const { return compact() ? motion::style::controlHeight : 17 + motion::style::controlHeight; }
         void paint(juce::Graphics& g) override;
         void resized() override;
+        // Hovered, a diamond with no keys yet opens into "Animate", saying
+        // what it does; a property's first key pulses once round it.
+        void paintOverChildren(juce::Graphics& g) override;
+        void mouseEnter(const juce::MouseEvent& event) override { hoverKey(event, true); }
+        void mouseExit(const juce::MouseEvent& event) override { hoverKey(event, false); }
+        void hoverKey(const juce::MouseEvent& event, bool over) {
+            if (event.eventComponent != &key || keyHovered == over) { return; }
+            keyHovered = over;
+            repaint();
+        }
+        bool keyHovered = false;
+        void showState(osci::KeyframeButton::State state, motion::Id target);
+        osci::KeyframeButton::State shownState = osci::KeyframeButton::State::unanimated;
+        motion::Id shownTarget = 0;
+        double pulseStart = 0;
+        static constexpr double pulseLength = 650;
+        juce::TimedCallback pulseFrames {[this] {
+            if (juce::Time::getMillisecondCounterHiRes() - pulseStart > pulseLength) { pulseFrames.stopTimer(); }
+            repaint();
+        }};
     };
     // The scrolled page: rows, and between groups of them a hairline and the
     // group's heading (Transform, Appearance, ...).

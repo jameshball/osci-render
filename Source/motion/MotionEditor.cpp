@@ -284,6 +284,12 @@ void MotionEditor::setUpTransport() {
     loopButton.setTitle("Loop playback");
     loopButton.setTooltip("Loop playback (L). I and O set the loop at the playhead; drag the brace in the ruler.");
     loopButton.onClick = [this] { toggleLoop(); };
+    addAndMakeVisible(autoKeyButton);
+    autoKeyButton.setClickingTogglesState(false);
+    autoKeyButton.onColour = motion::style::error().withAlpha(.2f);
+    autoKeyButton.setTooltip("Auto-key: what you change animates, from its clip's start to the playhead");
+    autoKeyButton.onClick = [this] { setAutoKey(!autoKeyButton.getToggleState()); };
+    processor.document.onEdited = [this](const motion::Project& before) { editRecorded(before); };
     startButton.onClick = [this] { seekAndReveal(0); };
     endButton.onClick = [this] { seekAndReveal(processor.document.project().duration); };
     timeLabel.setFont(motion::style::mono());
@@ -346,6 +352,7 @@ void MotionEditor::setUpTransport() {
 }
 
 MotionEditor::~MotionEditor() {
+    processor.document.onEdited = nullptr;
     juce::Desktop::getInstance().removeFocusChangeListener(this);
     // Closed as it should be: the session is kept by the app on quitting.
     if (recovery != nullptr) { recovery->finish(); }

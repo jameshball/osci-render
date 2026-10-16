@@ -8,7 +8,7 @@
 // drawn at 18 px so their 2 px strokes land on whole device pixels on
 // high-density displays. One button draws them all, so toolbars match.
 namespace motion::icons {
-enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search };
+enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, autoKey, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search };
 
 inline const juce::Path& path(Icon icon) {
     static const auto paths = [] {
@@ -26,6 +26,15 @@ inline const juce::Path& path(Icon icon) {
             juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded).createStrokedPath(tail, rope);
             lasso.addPath(tail);
             result[Icon::lasso] = lasso;
+        }
+        {
+            // Auto-key: a key in a ring, as a record button holds its dot.
+            juce::Path ring, outline, glyph;
+            ring.addEllipse(3.0f, 3.0f, 18.0f, 18.0f);
+            juce::PathStrokeType(2.0f).createStrokedPath(outline, ring);
+            glyph.addPath(outline);
+            glyph.addPolygon({12.0f, 12.0f}, 4, 5.0f, 0.0f);
+            result[Icon::autoKey] = glyph;
         }
         // The anchor: a crosshair in a ring; centring it: a dot in frame corners.
         add(Icon::anchor, "M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z");

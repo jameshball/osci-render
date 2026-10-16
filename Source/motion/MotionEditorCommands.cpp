@@ -302,6 +302,64 @@ void MotionEditor::seekAndReveal(double time) {
 
 // L toggles looping. Without a range yet, it loops the selection, or the
 // four bars from the playhead's bar.
+void MotionEditor::setAutoKey(bool on) {
+    autoKeyButton.setToggleState(on, juce::dontSendNotification);
+    autoKeyButton.tint = on ? std::optional<juce::Colour>(motion::style::error()) : std::nullopt;
+    autoKeyButton.repaint();
+    timeline.setAutoKey(on);
+    if (on) { statusBar.show("Auto-key is on: what you change animates, from its clip's start to the playhead.", MotionStatusBar::Kind::notice); }
+}
+
+void MotionEditor::editRecorded(const motion::Project& before) {
+    if (animating) { return; }
+    const auto& project = processor.document.project();
+    const auto time = project.frameTime(processor.position.load());
+    auto changes = motion::staticChanges(before, project);
+    std::erase_if(changes, [&](const auto& change) { return !motion::canAnimateAt(project, change, time); });
+    if (changes.empty()) { return; }
+    if (autoKeyButton.getToggleState()) {
+        const juce::ScopedValueSetter<bool> busy(animating, true);
+        processor.document.amend([&](motion::Project& edited) { motion::animateChanges(edited, changes, time); });
+        return;
+    }
+    // Changes in a row to the same values offer them all, each from where
+    // it first was.
+    if (!motion::sameTime(time, pendingAnimationTime)) { pendingAnimation.clear(); }
+    for (const auto& change : changes) {
+        const auto found = std::find_if(pendingAnimation.begin(), pendingAnimation.end(), [&](const auto& item) { return item.target == change.target && item.property == change.property; });
+        if (found == pendingAnimation.end()) {
+            pendingAnimation.push_back(change);
+        } else {
+            found->after = change.after;
+        }
+    }
+    std::erase_if(pendingAnimation, [](const auto& change) { return change.before == change.after; });
+    pendingAnimationTime = time;
+    if (pendingAnimation.empty()) { return; }
+    // Named by what changed: one setting, one group of them, or how many.
+    std::set<motion::Id> targets;
+    std::set<juce::String> groups;
+    juce::String setting;
+    for (const auto& change : pendingAnimation) {
+        targets.insert(change.target);
+        const auto spec = motion::specFor(project, change.target, change.property);
+        groups.insert(spec.has_value() ? juce::String(spec->group.data(), spec->group.size()) : juce::String(change.property));
+        setting = spec.has_value() ? juce::String(spec->label.data(), spec->label.size()) : juce::String(change.property);
+    }
+    const auto what = pendingAnimation.size() == 1 ? setting : groups.size() == 1 ? *groups.begin() : juce::String(static_cast<int>(pendingAnimation.size())) + " settings";
+    const auto target = motion::findPropertyTarget(project, *targets.begin());
+    const auto where = targets.size() > 1 ? juce::String(static_cast<int>(targets.size())) + " items" : target.has_value() ? juce::String(target->name.data(), target->name.size()) : juce::String("it");
+    statusBar.show(what + " changed for the whole of " + where + ".", MotionStatusBar::Kind::notice, "Animate this change", [this] { animatePending(); });
+}
+
+void MotionEditor::animatePending() {
+    auto changes = std::exchange(pendingAnimation, {});
+    const auto time = pendingAnimationTime;
+    const juce::ScopedValueSetter<bool> busy(animating, true);
+    const auto animated = processor.document.tryEdit("Animate change", [&](motion::Project& project) { return motion::animateChanges(project, changes, time); });
+    statusBar.show(animated ? "Animated: keys at the start and at the playhead." : "That has changed since, so there's nothing to animate now.", MotionStatusBar::Kind::notice);
+}
+
 void MotionEditor::toggleLoop() {
     const auto& project = processor.document.project();
     if (!project.hasLoop()) {

@@ -82,6 +82,11 @@ public:
     void fitProject();
 
     void revealTime(double seconds);
+    // While auto-key is on, a red edge says so, as a recording would.
+    void setAutoKey(bool on) {
+        autoKey = on;
+        repaint();
+    }
 
     void refreshTracks();
     void resized() override;
@@ -158,6 +163,7 @@ public:
 private:
     double pixelsPerSecond = 70;
     double scrollTime = 0;
+    bool autoKey = false;
     // Rows without their own height use this; Alt+wheel scales it.
     int defaultTrackHeight = 32;
     // Track names column; drag its edge to resize, within these (and half the

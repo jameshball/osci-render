@@ -510,6 +510,10 @@ void MotionTimelineView::paintOverChildren(juce::Graphics& g) {
     // JUCE can skip paint() under opaque children; rows must still be current.
     ensureTrackRows();
     validateTrackDrag();
+    if (autoKey) {
+        g.setColour(motion::style::error().withAlpha(.9f));
+        g.drawRect(getLocalBounds(), 2);
+    }
     const auto* trackDrag = active<TrackDrag>();
     if (trackDrag == nullptr) { return; }
     juce::Graphics::ScopedSaveState view(g);

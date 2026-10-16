@@ -2,6 +2,7 @@
 
 #include "../CommonPluginEditor.h"
 #include "export/Stretches.h"
+#include "model/AnimateChange.h"
 #include "model/LightPresets.h"
 #include "model/MirrorPresets.h"
 #include "MotionProcessor.h"
@@ -378,6 +379,17 @@ private:
     motion::icons::Button startButton { "Go to start", motion::icons::Icon::start };
     motion::icons::Button endButton { "Go to end", motion::icons::Icon::end };
     motion::icons::Button loopButton { "Loop playback", motion::icons::Icon::loop };
+    // Auto-key: a change animates, from where its clip starts to the
+    // playhead, without asking (off when osci-motion opens).
+    motion::icons::Button autoKeyButton { "Auto-key", motion::icons::Icon::autoKey };
+    void setAutoKey(bool on);
+    // A change to what wasn't animated, made past its clip's start, offers
+    // to animate (or with auto-key, does). The changes wait here for it.
+    void editRecorded(const motion::Project& before);
+    void animatePending();
+    std::vector<motion::StaticChange> pendingAnimation;
+    double pendingAnimationTime = 0;
+    bool animating = false;
     // Undo and redo in the transport's style; the shared control stays out.
     motion::icons::Button undoButton { "Undo", motion::icons::Icon::undo }, redoButton { "Redo", motion::icons::Icon::redo };
     juce::Label undoDescription;

@@ -203,8 +203,8 @@ void MotionPropertyInspector::refreshValues() {
         row->key.setEnabled(!found->locked);
         if (row->swatch != nullptr) { row->swatch->setEnabled(!found->locked); }
         if (row->mode != nullptr) { row->mode->setEnabled(!found->locked); }
-        row->key.setState(allKeyed && anyAnimated ? osci::KeyframeButton::State::keyed
-            : (anyAnimated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
+        row->showState(allKeyed && anyAnimated ? osci::KeyframeButton::State::keyed
+            : (anyAnimated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated), target);
         // Key navigation shows only once there are keys, lit towards them.
         row->previous.setVisible(anyAnimated);
         row->next.setVisible(anyAnimated);
@@ -378,6 +378,51 @@ void MotionPropertyInspector::Row::resized() {
     }
 }
 
+void MotionPropertyInspector::Row::showState(osci::KeyframeButton::State state, motion::Id owner) {
+    // Animated just now, not by choosing something that already was.
+    if (owner == shownTarget && shownState == osci::KeyframeButton::State::unanimated && state != osci::KeyframeButton::State::unanimated) {
+        pulseStart = juce::Time::getMillisecondCounterHiRes();
+        pulseFrames.startTimerHz(60);
+    }
+    shownState = state;
+    shownTarget = owner;
+    key.setState(state);
+    repaint();
+}
+
+void MotionPropertyInspector::Row::paintOverChildren(juce::Graphics& g) {
+    const auto centre = key.getBounds().toFloat().getCentre();
+    const auto since = juce::Time::getMillisecondCounterHiRes() - pulseStart;
+    if (pulseFrames.isTimerRunning() && since < pulseLength) {
+        const auto t = static_cast<float>(since / pulseLength);
+        const auto eased = 1.0f - (1.0f - t) * (1.0f - t);
+        const auto radius = 5.0f + 9.0f * eased;
+        g.setColour(motion::style::accent().withAlpha(.85f * (1.0f - t)));
+        juce::Path ring;
+        ring.addPolygon(centre, 4, radius * 1.15f, 0.0f);
+        g.strokePath(ring, juce::PathStrokeType(1.5f));
+    }
+    if (!key.isEnabled() || !keyHovered || shownState != osci::KeyframeButton::State::unanimated) { return; }
+    const auto text = juce::String("Animate");
+    const auto textWidth = std::ceil(juce::TextLayout::getStringWidth(motion::style::caption(), text));
+    const auto height = static_cast<float>(key.getHeight()) - 6.0f;
+    // A label floating over the row's end, ending in the diamond it explains.
+    const auto pill = juce::Rectangle<float>(centre.x + 10.0f - (textWidth + 34.0f), centre.y - height * .5f, textWidth + 34.0f, height);
+    juce::Path shape;
+    shape.addRoundedRectangle(pill, height * .5f);
+    juce::DropShadow(juce::Colours::black.withAlpha(.45f), 8, {0, 1}).drawForPath(g, shape);
+    g.setColour(osci::Colours::surfaceRaised().brighter(.12f));
+    g.fillPath(shape);
+    g.setColour(motion::style::hairline().brighter(.2f));
+    g.strokePath(shape, juce::PathStrokeType(1.0f));
+    juce::Path diamond;
+    diamond.addPolygon(centre, 4, 5.0f, 0.0f);
+    g.setColour(osci::Colours::text());
+    g.strokePath(diamond, juce::PathStrokeType(1.2f));
+    g.setFont(motion::style::caption());
+    g.drawText(text, pill.withTrimmedLeft(10.0f).withWidth(textWidth + 2.0f), juce::Justification::centredLeft, false);
+}
+
 void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
     for (const auto& [y, title] : sections) {
         g.setColour(motion::style::hairline());
@@ -446,7 +491,8 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             // Keys are neutral: filled on a key, outlined off one.
             row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
             row->key.setTitle(row->key.getName());
-            row->key.setTooltip("Add or remove keys for " + row->group.toLowerCase() + " at the playhead");
+            row->key.setTooltip("Key " + row->group.toLowerCase() + " at the playhead, to animate it; again to remove the key");
+            row->key.addMouseListener(row.get(), false);
             row->previous.setName("Previous " + row->group.toLowerCase() + " key");
             row->next.setName("Next " + row->group.toLowerCase() + " key");
             row->previous.setTooltip("Go to the previous key");

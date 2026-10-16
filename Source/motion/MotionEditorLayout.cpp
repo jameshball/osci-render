@@ -52,7 +52,7 @@ void MotionEditor::resized() {
     // for the workspace.
     // The transport goes compact (no BPM caption, tighter readout) before the
     // Output picker would have to hide.
-    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 390 ? 390 : 310;
+    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 418 ? 418 : 338;
     auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, transportWidth), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - transportWidth / 2));
     // What the audio interface plays sits with the other audio state (the
     // DSP meter), not in the Scope; without room it lives in the Audio menu.
@@ -72,6 +72,7 @@ void MotionEditor::resized() {
     playButton.setBounds(transport.removeFromLeft(32).reduced(1, 3));
     endButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     loopButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
+    autoKeyButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     // Narrow windows drop the BPM caption and tighten the readouts so the
     // timing menu never collapses to nothing.
     const auto compact = transport.getWidth() < 258;
