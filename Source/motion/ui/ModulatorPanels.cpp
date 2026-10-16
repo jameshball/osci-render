@@ -90,6 +90,11 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
     addButton.setTitle("Add modulator");
     addButton.onClick = [this] { add(); };
     content.addAndMakeVisible(addButton);
+    emptyHint.setText("Modulators move properties over time: waves, random and the soundtrack's loudness. Add one, then drag it onto a property in Properties.", juce::dontSendNotification);
+    emptyHint.setFont(motion::style::body());
+    emptyHint.setJustificationType(juce::Justification::centredTop);
+    emptyHint.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(.6f));
+    content.addChildComponent(emptyHint);
     name.setName("Modulator name");
     name.setTitle("Modulator name");
     name.setFont(motion::style::title());
@@ -217,6 +222,8 @@ void MotionModulatorLibrary::resized() {
     // The add button sits exactly where Assets' Add source does.
     auto area = juce::Rectangle<int>(0, 0, width, 100000).reduced(motion::style::padding, 0).withTrimmedTop(6);
     addButton.setBounds(area.removeFromTop(30));
+    emptyHint.setVisible(cards.empty());
+    if (cards.empty()) { emptyHint.setBounds(area.removeFromTop(120).withTrimmedTop(16)); }
     area.removeFromTop(cards.empty() ? 0 : 6);
     for (auto& card : cards) {
         card->setBounds(area.removeFromTop(cardHeight));

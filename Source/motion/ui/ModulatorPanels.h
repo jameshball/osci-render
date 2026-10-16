@@ -178,6 +178,7 @@ private:
     juce::Viewport viewport;
     Content content {*this};
     juce::TextButton addButton;
+    juce::Label emptyHint;
     motion::icons::Button remove {"Delete modulator", motion::icons::Icon::trash};
     std::array<std::unique_ptr<ShapeButton>, 7> shapes;
     std::vector<std::pair<motion::Modulator, int>> listedCards;

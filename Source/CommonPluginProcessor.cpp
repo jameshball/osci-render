@@ -760,13 +760,13 @@ juce::File CommonAudioProcessor::getLastOpenedDirectory()
 {
     juce::String savedDir = globalSettings.getString("lastOpenedDirectory");
     if (savedDir.isEmpty())
-        return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+        return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 
     juce::File dir(savedDir);
     if (dir.exists() && dir.isDirectory())
         return dir;
 
-    return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 }
 
 void CommonAudioProcessor::setLastOpenedDirectory(const juce::File& directory)

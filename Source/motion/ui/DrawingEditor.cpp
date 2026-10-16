@@ -102,6 +102,16 @@ void MotionDrawingEditor::paint(juce::Graphics& g) {
         g.strokePath(path, juce::PathStrokeType(selected ? 2.0f : 1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), transform);
     }
     paintPreview(g);
+    // How to draw, until something is drawn.
+    if (drawing.strokes.empty() && !drag.has_value() && tool != Tool::select) {
+        const auto hint = tool == Tool::pen ? "Click to place points, drag to curve them. Double-click or press Enter to finish."
+            : tool == Tool::freehand ? "Drag to draw."
+            : tool == Tool::line ? "Drag to draw a line."
+            : "Drag to draw it. Shift keeps it square, Alt draws from the centre.";
+        g.setColour(osci::Colours::text().withAlpha(.6f));
+        g.setFont(motion::style::body());
+        g.drawFittedText(hint, canvas.withTrimmedTop(canvas.getHeight() - 40).reduced(12, 0), juce::Justification::centred, 2);
+    }
     if (selectedStroke >= 0 && selectedStroke < static_cast<int>(drawing.strokes.size())) { paintAnchors(g, drawing.strokes[static_cast<std::size_t>(selectedStroke)], true); }
     if (activeStroke >= 0 && activeStroke < static_cast<int>(drawing.strokes.size())) { paintAnchors(g, drawing.strokes[static_cast<std::size_t>(activeStroke)], false); }
     if (snapTarget.has_value()) {
