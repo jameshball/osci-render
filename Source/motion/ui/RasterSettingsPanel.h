@@ -2,19 +2,30 @@
 
 #include "../model/RasterSettings.h"
 #include "../import/RasterSourcePreparer.h"
+#include "../import/VideoSourcePreparer.h"
 #include "Sheet.h"
 #include "ScrubField.h"
 #include "SourcePreview.h"
 #include <functional>
 
-// How an image or video is traced into beam strokes. Images show the traced
-// first frame beside the settings, updated as they change.
+// How an image or video is traced into beam strokes, the traced picture
+// beside the settings, updated as they change: an image's first frame, or a
+// frame FFmpeg picks from a video.
 class MotionRasterSettingsPanel final : public motion::ui::Sheet {
 public:
     // `xyOnlyScope`: the project's scope has X and Y alone, so a Hilbert
     // curve shades by its density unless told otherwise; else by colour.
-    MotionRasterSettingsPanel(motion::RasterSettings initial, bool video, const juce::String& fileName, juce::MemoryBlock image = {}, bool xyOnlyScope = false)
+    // A video's frame comes from `videoFile` (or its bytes, in `image`) by
+    // `ffmpeg`; without FFmpeg there is no picture.
+    MotionRasterSettingsPanel(motion::RasterSettings initial, bool video, const juce::String& fileName, juce::MemoryBlock image = {}, bool xyOnlyScope = false,
+            juce::File videoFile = {}, juce::File ffmpeg = {})
         : Sheet(video ? "Prepare video" : "Prepare image", fileName, "Prepare"), settings(initial), isVideo(video), data(std::move(image)) {
+        if (isVideo && ffmpeg.existsAsFile() && (videoFile.existsAsFile() || data.getSize() > 0)) {
+            still = std::make_shared<VideoStill>();
+            still->video = videoFile;
+            still->bytes = data;
+            still->ffmpeg = ffmpeg;
+        }
         setName("Image preparation settings");
         nameAction(isVideo ? "Prepare video" : "Prepare image");
         detailEdited = initial.resolution != motion::RasterSettings().resolution || initial.mode == motion::RasterSettings::Mode::scanlines;
@@ -123,7 +134,27 @@ protected:
 private:
     static constexpr motion::PropertySpec thresholdSpec {"threshold", "Threshold", "", "", 0, 100, 2, .1, 1, "%"};
     static constexpr motion::PropertySpec frameRateSpec {"frameRate", "Frame rate", "", "", 1, 120, 30, .5, 3, " fps"};
-    bool hasPreview() const { return !isVideo && data.getSize() > 0; }
+    bool hasPreview() const { return isVideo ? still != nullptr : data.getSize() > 0; }
+    // A video's frame, fetched once for each detail on the preview's thread.
+    struct VideoStill {
+        juce::File video, ffmpeg;
+        juce::MemoryBlock bytes;
+        std::unique_ptr<juce::TemporaryFile> copy;
+        int dimension = 0;
+        std::vector<std::uint8_t> rgba;
+
+        const std::vector<std::uint8_t>& at(int wanted, const std::atomic<bool>& cancel) {
+            if (wanted == dimension) { return rgba; }
+            if (!video.existsAsFile() && copy == nullptr) {
+                copy = std::make_unique<juce::TemporaryFile>(".mov");
+                copy->getFile().replaceWithData(bytes.getData(), bytes.getSize());
+            }
+            rgba = motion::VideoSourcePreparer::still(copy != nullptr ? copy->getFile() : video, ffmpeg, wanted, &cancel);
+            dimension = rgba.empty() || cancel.load() ? 0 : wanted;
+            return rgba;
+        }
+    };
+    std::shared_ptr<VideoStill> still;
     void selectSamples(std::size_t count) {
         const auto found = std::find(strides.begin(), strides.end(), count);
         if (found != strides.end()) { samples.setSelectedId(static_cast<int>(std::distance(strides.begin(), found) + 1), juce::dontSendNotification); }
@@ -158,6 +189,30 @@ private:
         if (!valid) { return; }
         settings = next;
         if (!hasPreview()) { return; }
+        if (isVideo) {
+            preview.request([still = still, chosen = settings](const std::atomic<bool>& cancel) {
+                motion::ui::SourcePreview::Result result;
+                const auto& rgba = still->at(chosen.resolution, cancel);
+                if (rgba.empty()) {
+                    if (!cancel.load()) { result.error = "Couldn't read a frame of this video."; }
+                    return result;
+                }
+                auto beam = motion::RasterBeamBuilder::build(rgba.data(), rgba.size(), chosen.resolution, chosen.resolution, chosen, &cancel);
+                if (!beam) {
+                    result.error = juce::String(beam.error);
+                    return result;
+                }
+                const auto frame = motion::PreparedPointFrames::create(chosen.videoFrameRate, 1, chosen.pointsPerFrame, std::move(beam.points));
+                if (!frame) {
+                    result.error = juce::String(frame.error);
+                    return result;
+                }
+                result.path = motion::ui::traceSource(motion::PreparedSource(frame.source), 0, static_cast<int>(chosen.pointsPerFrame));
+                result.caption = "One frame" + motion::style::dot() + juce::String(static_cast<juce::int64>(chosen.pointsPerFrame)) + " points";
+                return result;
+            });
+            return;
+        }
         preview.request([image = data, chosen = settings](const std::atomic<bool>& cancel) {
             motion::ui::SourcePreview::Result result;
             const auto prepared = motion::RasterSourcePreparer::prepare(image.getData(), image.getSize(), chosen, &cancel);

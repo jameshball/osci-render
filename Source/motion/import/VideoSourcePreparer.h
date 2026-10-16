@@ -33,13 +33,7 @@ public:
         if (maximumFrames == 0 || limits.decodeMilliseconds <= 0) { return {nullptr, "Video preparation limits are invalid."}; }
         juce::TemporaryFile input(".mov"), output(".rgba");
         if (!input.getFile().replaceWithData(data.getData(), data.getSize())) { return {nullptr, "Cannot create the temporary video source."}; }
-        const auto size = juce::String(dimension);
-        // Display aspect ratio includes non-square source pixels. Autorotation
-        // is handled by FFmpeg before filtering; pad with transparent black.
-        const auto filter = "setpts=PTS-STARTPTS,fps=" + juce::String(settings.videoFrameRate, 8)
-            + ":start_time=0,scale=w='if(gte(dar,1)," + size + ",max(1,trunc(" + size
-            + "*dar)))':h='if(gte(dar,1),max(1,trunc(" + size + "/dar))," + size
-            + ")':flags=area,setsar=1,format=rgba,pad=" + size + ":" + size + ":(ow-iw)/2:(oh-ih)/2:color=black@0";
+        const auto filter = "setpts=PTS-STARTPTS,fps=" + juce::String(settings.videoFrameRate, 8) + ":start_time=0," + fitFilter(dimension);
         juce::StringArray args {executable.getFullPathName(), "-nostdin", "-hide_banner", "-loglevel", "error", "-xerror", "-y",
             "-protocol_whitelist", "file,pipe", "-i", input.getFile().getFullPathName(), "-map", "0:v:0", "-an", "-sn", "-dn",
             "-vf", filter, "-frames:v", juce::String(static_cast<juce::int64>(maximumFrames + 1)), "-pix_fmt", "rgba", "-f", "rawvideo", output.getFile().getFullPathName()};
@@ -73,6 +67,37 @@ public:
             if (progress != nullptr) { progress->store(.2 + .8 * static_cast<double>(frame + 1) / frames); }
         }
         return PreparedPointFrames::create(settings.videoFrameRate, frames, settings.pointsPerFrame, std::move(points));
+    }
+
+    // The frame FFmpeg finds most typical of the video's opening seconds,
+    // fitted as prepare() fits every frame: RGBA, `dimension` square. Empty
+    // when it cannot be had.
+    static std::vector<std::uint8_t> still(const juce::File& video, const juce::File& executable, int dimension, const std::atomic<bool>* cancel = nullptr) {
+        if (!executable.existsAsFile() || !video.existsAsFile() || dimension <= 0) { return {}; }
+        juce::TemporaryFile output(".rgba");
+        juce::StringArray args {executable.getFullPathName(), "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-protocol_whitelist", "file,pipe", "-i", video.getFullPathName(), "-map", "0:v:0", "-an", "-sn", "-dn",
+            "-vf", "thumbnail=60," + fitFilter(dimension), "-frames:v", "1", "-pix_fmt", "rgba", "-f", "rawvideo", output.getFile().getFullPathName()};
+        VideoDecoderProcess decoder;
+        if (!decoder.start(args)) { return {}; }
+        const auto started = juce::Time::getMillisecondCounterHiRes();
+        while (!decoder.waitForProcessToFinish(30)) {
+            if (cancelled(cancel) || juce::Time::getMillisecondCounterHiRes() - started > 20000) { return {}; }
+        }
+        const auto bytes = static_cast<std::size_t>(dimension) * static_cast<std::size_t>(dimension) * 4;
+        juce::MemoryBlock data;
+        if (!decoder.wasSuccessful() || !output.getFile().loadFileAsData(data) || data.getSize() != bytes) { return {}; }
+        const auto* first = static_cast<const std::uint8_t*>(data.getData());
+        return {first, first + bytes};
+    }
+
+private:
+    // Display aspect ratio includes non-square source pixels. Autorotation is
+    // handled by FFmpeg before filtering; pad with transparent black.
+    static juce::String fitFilter(int dimension) {
+        const auto size = juce::String(dimension);
+        return "scale=w='if(gte(dar,1)," + size + ",max(1,trunc(" + size + "*dar)))':h='if(gte(dar,1),max(1,trunc(" + size + "/dar))," + size
+            + ")':flags=area,setsar=1,format=rgba,pad=" + size + ":" + size + ":(ow-iw)/2:(oh-ih)/2:color=black@0";
     }
 };
 }

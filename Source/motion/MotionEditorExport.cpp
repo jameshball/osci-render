@@ -96,6 +96,8 @@ bool MotionEditor::ffmpegReady(std::function<void()> resume) {
                                             if (self == nullptr) { return; }
                                             self->statusBar.show("FFmpeg is ready.", MotionStatusBar::Kind::notice);
                                             resume();
+                                            // Videos dropped while it came wait for it too.
+                                            self->showNextPreparationSettings();
                                         });
 #else
     juce::ignoreUnused(resume);

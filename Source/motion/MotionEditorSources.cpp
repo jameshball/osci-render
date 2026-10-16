@@ -365,6 +365,14 @@ void MotionEditor::showNextPreparationSettings() {
         showLuaEditor(std::move(request));
         return;
     }
+    // A video's settings show one of its frames, which needs FFmpeg first.
+    if (video) {
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        if (!ffmpegReady([owner] { if (owner != nullptr) { owner->showNextPreparationSettings(); } })) {
+            preparationRequests.push_front(std::move(request));
+            return;
+        }
+    }
     // The source's bytes, for the preview beside the settings.
     juce::MemoryBlock data;
     if (request.replacement != nullptr) {
@@ -373,8 +381,11 @@ void MotionEditor::showNextPreparationSettings() {
         request.file.loadFileAsData(data);
     }
     if (raster) {
+        // A video's frame is traced from the file, or the bytes of the source
+        // it replaces, when FFmpeg is already here.
         auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video, name,
-            video ? juce::MemoryBlock() : std::move(data), processor.document.project().scope.xyOnly);
+            std::move(data), processor.document.project().scope.xyOnly, request.replacement != nullptr ? juce::File() : request.file,
+            processor.getFFmpegFile().existsAsFile() ? processor.getFFmpegFile() : juce::File());
         imagePanel = panel.get();
         content = std::move(panel);
     } else if (fractal) {
