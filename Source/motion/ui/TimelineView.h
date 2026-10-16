@@ -190,6 +190,18 @@ private:
     }};
     std::pair<double, double> animationFrom, animationTo;
     double animationStart = 0;
+    // A drag held near the left or right edge of the tracks scrolls them,
+    // faster the nearer (or further past) the edge, and carries on while
+    // the pointer stays there.
+    std::optional<juce::MouseEvent> edgeEvent;
+    juce::TimedCallback edgeScroll {[this] { scrollAtEdge(); }};
+    void followEdge(const juce::MouseEvent& event);
+    void scrollAtEdge();
+    // Pixels a tick the timeline scrolls at x: negative to the left.
+    double edgeSpeed(int x) const;
+    // Where the drag under way began, moved with the tracks as they scroll.
+    int* dragOrigin();
+    bool scrollsAtEdge() { return dragOrigin() != nullptr || active<Scrub>() != nullptr; }
     // What a dragged source or effect would do where it is.
     void paintDropPreview(juce::Graphics& g);
     std::optional<int> playheadX() const;

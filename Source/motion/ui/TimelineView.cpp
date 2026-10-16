@@ -1330,7 +1330,64 @@ std::vector<double> MotionTimelineView::editPoints() const {
     return times;
 }
 
+double MotionTimelineView::edgeSpeed(int x) const {
+    constexpr int zone = 36;
+    const auto left = namesWidth + zone - x;
+    const auto right = x - (getWidth() - zone);
+    const auto depth = std::max(left, right);
+    if (depth <= 0) { return 0; }
+    // Gentle at the zone's inner edge, quicker at the edge, and quicker
+    // still past it.
+    const auto inside = std::min(1.0, depth / static_cast<double>(zone));
+    const auto speed = std::min(40.0, 1.0 + 11.0 * inside * inside + std::max(0, depth - zone) * 0.4);
+    return left > right ? -speed : speed;
+}
+
+int* MotionTimelineView::dragOrigin() {
+    auto* project = projectDrag();
+    auto* key = active<KeyDrag>();
+    auto* cameraKey = active<CameraKeyDrag>();
+    auto* cut = active<CutDrag>();
+    auto* clips = active<ClipMarquee>();
+    auto* keys = active<KeyMarquee>();
+    return project != nullptr ? &project->downX : key != nullptr ? &key->downX : cameraKey != nullptr ? &cameraKey->downX
+         : cut != nullptr ? &cut->downX : clips != nullptr ? &clips->start.x : keys != nullptr ? &keys->start.x : nullptr;
+}
+
+void MotionTimelineView::followEdge(const juce::MouseEvent& event) {
+    edgeEvent.reset();
+    if (!scrollsAtEdge() || edgeSpeed(event.x) == 0) {
+        edgeScroll.stopTimer();
+        return;
+    }
+    edgeEvent.emplace(event);
+    if (!edgeScroll.isTimerRunning()) { edgeScroll.startTimerHz(60); }
+}
+
+void MotionTimelineView::scrollAtEdge() {
+    if (!edgeEvent.has_value() || !scrollsAtEdge() || !juce::Desktop::getInstance().getMainMouseSource().isDragging()) {
+        edgeScroll.stopTimer();
+        return;
+    }
+    const auto speed = edgeSpeed(edgeEvent->x);
+    // Whole pixels, so the drag's origin moves exactly with the tracks; to
+    // the right no further than just past the end.
+    const auto limit = std::max(scrollTime, timelineSpan() - (getWidth() - namesWidth) / pixelsPerSecond * 0.5);
+    const auto target = std::clamp(scrollTime + speed / pixelsPerSecond, 0.0, limit);
+    const auto pixels = juce::roundToInt((target - scrollTime) * pixelsPerSecond);
+    if (pixels == 0) { return; }
+    viewAnimation.stopTimer();
+    scrollTime += pixels / pixelsPerSecond;
+    auto* origin = dragOrigin();
+    if (origin != nullptr) { *origin -= pixels; }
+    const auto event = *edgeEvent;
+    resized();
+    repaint();
+    mouseDrag(event);
+}
+
 void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
+    followEdge(event);
     if (active<BeamDrag>() != nullptr) { beamDragged(event); return; }
     if (active<BarDrag>() != nullptr) { barDragged(event); return; }
     if (active<LoopDrag>() != nullptr) { loopDragged(event); return; }
@@ -1575,6 +1632,8 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
 }
 
 void MotionTimelineView::mouseUp(const juce::MouseEvent&) {
+    edgeScroll.stopTimer();
+    edgeEvent.reset();
     snapGuide.reset();
     if (blocked.has_value()) {
         blocked.reset();
@@ -1984,6 +2043,8 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
     const auto badges = bounds.getWidth() > 90 ? beamBadge : juce::String();
     const auto badgeWidth = badges.isEmpty() ? 0.0f : juce::TextLayout::getStringWidth(motion::style::caption(), badges) + 10.0f;
     auto labelBounds = bounds.reduced(8, 0).withTrimmedRight((effects ? 32.0f : 0.0f) + badgeWidth).withHeight(nameBand);
+    // A clip starting off to the left keeps its name in view.
+    labelBounds.setLeft(std::min(labelBounds.getRight(), std::max(labelBounds.getX(), static_cast<float>(namesWidth) + 8.0f)));
     g.setFont(motion::style::caption());
     if (effects) {
         g.setColour(juce::Colours::white.withAlpha(0.55f * opacity));
