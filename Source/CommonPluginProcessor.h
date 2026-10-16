@@ -98,6 +98,9 @@ public:
     
     // Check if ffmpeg exists, if not download it
     bool ensureFFmpegExists(std::function<void()> onStart = nullptr, std::function<void()> onSuccess = nullptr);
+    // Verify the downloaded ffmpeg binary actually runs on this system.
+    // Returns true if ffmpeg -version exits successfully. Result is cached.
+    bool validateFFmpegBinary();
     
     // A static method to get the appropriate ffmpeg URL based on platform
     static juce::String getFFmpegURL();
@@ -301,9 +304,6 @@ private:
     bool heartbeatActive = false;
 
 #if OSCI_PREMIUM
-    // Verify the downloaded ffmpeg binary actually runs on this system.
-    // Returns true if ffmpeg -version exits successfully. Result is cached.
-    bool validateFFmpegBinary();
     bool ffmpegValidated = false;
 #endif
 

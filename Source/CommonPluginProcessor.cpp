@@ -899,38 +899,31 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
     if (ffmpegFile.existsAsFile()) {
         // Verify the binary actually works on this system
         if (!validateFFmpegBinary()) {
-            // Binary exists but is incompatible — delete it and show an error
-            juce::Logger::writeToLog("FFmpeg binary incompatible — deleting " + ffmpegFile.getFullPathName());
+            juce::Logger::writeToLog("FFmpeg binary unusable, deleting " + ffmpegFile.getFullPathName());
             ffmpegFile.deleteFile();
-
-            auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
-            juce::String message =
-                "The FFmpeg binary is not compatible with your version of macOS.\n\n"
 #if JUCE_MAC && JUCE_ARM
-                "On Apple Silicon Macs, macOS 12 (Monterey) or later is required "
-                "for video recording and video/GIF file import.\n\n"
-                "Please update your macOS to use these features."
-#else
-                "The existing FFmpeg binary could not be launched. "
-                "It will be re-downloaded on the next attempt.\n\n"
-                "If this problem persists, please contact support."
+            // Apple's own FFmpeg builds need macOS 12: another download won't help.
+            if (juce::SystemStats::getOperatingSystemType() < juce::SystemStats::MacOS_12) {
+                auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+                osci::showOverlayMessageOrAlert(editor,
+                                                "FFmpeg Needs macOS 12",
+                                                "On Apple Silicon Macs, macOS 12 (Monterey) or later is required "
+                                                "for video recording and video/GIF file import.\n\n"
+                                                "Please update your macOS to use these features.",
+                                                osci::ErrorOverlay::Icon::Warning,
+                                                juce::MessageBoxIconType::WarningIcon,
+                                                { 500, 360 },
+                                                juce::Justification::centredTop);
+                return false;
+            }
 #endif
-                ;
-
-            osci::showOverlayMessageOrAlert(editor,
-                                            "FFmpeg Incompatible",
-                                            message,
-                                            osci::ErrorOverlay::Icon::Warning,
-                                            juce::MessageBoxIconType::WarningIcon,
-                                            { 500, 360 },
-                                            juce::Justification::centredTop);
-            return false;
+            // Damaged or half downloaded: offered as a fresh download below.
+        } else {
+            if (onSuccess != nullptr) {
+                onSuccess();
+            }
+            return true;
         }
-
-        if (onSuccess != nullptr) {
-            onSuccess();
-        }
-        return true;
     }
 
     auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
