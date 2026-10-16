@@ -27,7 +27,7 @@ on:
         options: [all, osci-motion]
         default: all
       publish:
-        description: Publish the osci-motion builds to release-plane (off uploads them as run artifacts instead)
+        description: Publish the builds to release-plane (off builds and tests only; osci-motion uploads its builds as run artifacts)
         type: boolean
         default: true
 
@@ -98,6 +98,7 @@ jobs:
           echo "Using project version: $PROJECT_VERSION"
 
       - name: Prepare release
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         env:
           PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
         run: |
@@ -452,6 +453,7 @@ jobs:
       # Every successful build publishes a signed alpha artifact to release-plane
       # so the updater can fetch it after admin promotion.
       - name: Publish release artifact
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         shell: bash
         env:
           PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
@@ -584,6 +586,7 @@ jobs:
       # Soft, so a build still validates while osci-motion isn't yet set up on
       # release-plane; publishing at the end fails loudly if it isn't.
       - name: Prepare release
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         continue-on-error: true
         env:
           PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
