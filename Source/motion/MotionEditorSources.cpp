@@ -440,6 +440,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     asset->bakeSettings = settings;
     asset->rasterSettings = rasterSettings;
     asset->fractalDepth = request.fractalDepth.value_or(request.replacement != nullptr ? request.replacement->fractalDepth : 3);
+    asset->originalSize = request.originalSize.value_or(request.replacement != nullptr && request.replacement->originalSize);
     asset->textSettings = request.textSettings.value_or(request.replacement != nullptr ? request.replacement->textSettings : motion::TextSettings());
     const auto time = request.time;
     const auto generation = request.generation;
@@ -529,7 +530,10 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                     return;
                 }
                 asset->id = request.replacement->id;
-                document.edit(request.editedText.has_value() ? (asset->extension.equalsIgnoreCase(".lua") ? "Edit Lua source" : "Edit text source") : request.textSettings.has_value() ? "Animate text" : "Change source settings", [&](motion::Project& project) {
+                const auto label = request.editedText.has_value() ? juce::String(asset->extension.equalsIgnoreCase(".lua") ? "Edit Lua source" : "Edit text source")
+                    : request.textSettings.has_value() ? juce::String("Animate text")
+                    : request.originalSize.has_value() ? juce::String(*request.originalSize ? "Keep original size" : "Fit to the screen") : juce::String("Change source settings");
+                document.edit(label, [&](motion::Project& project) {
                     for (auto& item : project.assets) {
                         if (item == request.replacement) { item = asset; }
                     }

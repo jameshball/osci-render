@@ -320,6 +320,18 @@ void MotionEditor::setUpLibrary() {
     addLightButton.onClick = [this] { showAddLight(); };
     addMirrorButton.onClick = [this] { showAddMirror(); };
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
+    // A model switched to its file's own size, or back to fitted, is
+    // prepared again in place.
+    assetLibrary.onOriginalSize = [this](motion::Id id, bool keep) {
+        const auto& assets = processor.document.project().assets;
+        const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
+        if (found == assets.end()) { return; }
+        SourceRequest request;
+        request.replacement = *found;
+        request.generation = processor.document.generation();
+        request.originalSize = keep;
+        beginSourceImport(std::move(request));
+    };
     assetLibrary.onEditDrawing = [this](motion::Id id) { showDrawingEditor(id); };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {
         const auto& definitions = processor.document.mainProject().definitions;

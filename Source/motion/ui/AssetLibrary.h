@@ -2,6 +2,7 @@
 
 #include "MotionStyle.h"
 #include "DocumentMenu.h"
+#include "FormControls.h"
 
 #include "../model/Document.h"
 #include "../model/Drawing.h"
@@ -19,6 +20,8 @@ public:
     std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition, onReplace, onEditDrawing;
     std::function<void()> onCancelImport;
     std::function<void(motion::Id)> onBake;
+    // A 3D object kept at its file's own size (true) or fitted to the screen.
+    std::function<void(motion::Id, bool)> onOriginalSize;
     std::function<juce::String(motion::Id)> liveStatus;
     void updateLiveStatus();
 
@@ -84,5 +87,9 @@ private:
     motion::Id renaming = 0;
     juce::Label status;
     juce::TextButton cancelImport, bakeSettings;
+    // A selected 3D object's one setting, as a switch.
+    juce::Label originalSizeLabel {"Original size caption", "Original size"};
+    motion::ui::Switch originalSize {"Original size"};
+    bool modelRow(int row) const;
     juce::String importStatus;
 };

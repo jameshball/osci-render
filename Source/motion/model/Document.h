@@ -32,6 +32,10 @@ struct Asset {
     RasterSettings rasterSettings;
     TextSettings textSettings;
     int fractalDepth = 3;
+    // A 3D object at its file's own size and place, rather than fitted to
+    // the screen; and how much fitting scaled it (found when decoded).
+    bool originalSize = false;
+    double fittedScale = 1;
     juce::MemoryBlock bakedData;
     juce::String bakeKey;
     std::shared_ptr<const PreparedSource> source;

@@ -735,6 +735,7 @@ juce::XmlElement Document::save(const Project& project) {
             continue;
         }
         if (asset->extension.equalsIgnoreCase(".lsystem")) { item->setAttribute("fractalDepth", asset->fractalDepth); }
+        if (asset->originalSize) { item->setAttribute("originalSize", true); }
         if (asset->extension.equalsIgnoreCase(".lua")) {
             item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
             auto* bake = item->createNewChildElement("bake");
@@ -886,6 +887,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         }
         if (asset->name.isEmpty()) { asset->name = "Untitled" + asset->extension; }
         if (asset->extension.equalsIgnoreCase(".lsystem")) { asset->fractalDepth = item->getIntAttribute("fractalDepth", -1); }
+        asset->originalSize = asset->extension.equalsIgnoreCase(".obj") && item->getBoolAttribute("originalSize", false);
         if (asset->extension.equalsIgnoreCase(".txt")) {
             const auto* text = item->getChildByName("typography");
             if (text != nullptr) {

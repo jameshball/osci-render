@@ -3,6 +3,7 @@
 #include "SourcePreview.h"
 #include "GeneratorIcons.h"
 #include "SourceKind.h"
+#include "../model/SourceParts.h"
 
 MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(document), list("Motion assets", this) {
     setName("Asset library");
@@ -28,6 +29,16 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
         }
     };
     addChildComponent(bakeSettings);
+    originalSizeLabel.setFont(motion::style::body());
+    originalSizeLabel.setColour(juce::Label::textColourId, osci::Colours::text());
+    originalSizeLabel.setInterceptsMouseClicks(false, false);
+    originalSize.setTooltip("Keep the model at its file's own size and place, rather than fitted to the screen");
+    originalSize.onClick = [this] {
+        const auto row = list.getSelectedRow();
+        if (modelRow(row) && onOriginalSize) { onOriginalSize(assetId(row), originalSize.getToggleState()); }
+    };
+    addChildComponent(originalSizeLabel);
+    addChildComponent(originalSize);
     search.setName("Search sources");
     search.setTextToShowWhenEmpty("Search sources", osci::Colours::textMuted());
     search.setFont(motion::style::body());
@@ -118,6 +129,11 @@ void MotionAssetLibrary::resized() {
     const auto statusHeight = status.getText().isEmpty() && importStatus.isEmpty() ? 0 : live ? 48 : 52;
     status.setBounds(area.removeFromBottom(statusHeight).reduced(6, statusHeight > 0 ? 4 : 0));
     if (bakeSettings.isVisible()) { bakeSettings.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
+    if (originalSize.isVisible()) {
+        auto line = area.removeFromBottom(30).reduced(10, 2);
+        originalSize.setBounds(line.removeFromRight(motion::ui::Switch::width + 4));
+        originalSizeLabel.setBounds(line.withTrimmedLeft(-4));
+    }
     list.setBounds(area);
 }
 
@@ -140,7 +156,18 @@ void MotionAssetLibrary::selectedRowsChanged(int row) {
     const bool fractal = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lsystem");
     bakeSettings.setButtonText(live ? "Blender settings..." : definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (fractal ? "Fractal settings..." : (raster ? (osci::files::isVideo(assets[static_cast<std::size_t>(row)]->extension) ? "Video settings..." : "Image settings...") : "Bake settings...")));
     bakeSettings.setVisible(live || definitionRow(row) || text || fractal || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
+    const auto model = modelRow(row);
+    originalSize.setVisible(model);
+    originalSizeLabel.setVisible(model);
+    if (model) { originalSize.setToggleState(assets[static_cast<std::size_t>(row)]->originalSize, juce::dontSendNotification); }
     resized();
+}
+
+// A 3D object as imported, not parts split from one (which keep their place).
+bool MotionAssetLibrary::modelRow(int row) const {
+    if (!validAssetRow(row)) { return false; }
+    const auto& asset = *assets[static_cast<std::size_t>(row)];
+    return asset.extension.equalsIgnoreCase(".obj") && !motion::parts::isLineSet(asset.data.toString());
 }
 
 juce::String MotionAssetLibrary::getNameForRow(int row) {
@@ -178,6 +205,14 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     } else {
         const auto& asset = *assets[static_cast<std::size_t>(row)];
         detail = motion::ui::sourceKind(asset);
+        // A model says how it was sized for the screen.
+        if (modelRow(row) && asset.originalSize) {
+            detail += motion::style::dot() + "original size";
+        } else if (modelRow(row) && std::abs(asset.fittedScale - 1) > 1.0e-3) {
+            const auto scale = asset.fittedScale;
+            const auto places = scale >= 10 ? 0 : scale >= 1 ? 1 : std::clamp(1 - static_cast<int>(std::floor(std::log10(scale))), 2, 6);
+            detail += motion::style::dot() + "scaled " + juce::String::fromUTF8("\xc3\x97") + juce::String(scale, places);
+        }
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
             detail += motion::style::dot() + juce::String(asset.source->duration(), 1) + " s";

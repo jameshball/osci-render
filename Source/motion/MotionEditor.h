@@ -116,6 +116,7 @@ private:
         juce::String preparationError;
         std::optional<motion::TextSettings> textSettings;
         std::optional<int> fractalDepth;
+        std::optional<bool> originalSize; // a 3D object kept at its file's size
         motion::Id relink = 0; // source replaced in place by this file
         motion::Id track = 0;  // dropped on this timeline track (0: a new track)
     };

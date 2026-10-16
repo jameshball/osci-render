@@ -610,7 +610,8 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         shapes = parts::lineSetShapes(content);
         faces = mesh::facesOfLines(shapes);
     } else if (extension == ".obj") {
-        WorldObject object(content.toStdString());
+        WorldObject object(content.toStdString(), !asset.originalSize);
+        asset.fittedScale = object.fitScale;
         shapes = object.draw();
         faces = meshFaces(content.toStdString(), object.vs);
         // An OBJ of lines alone: the faces they enclose.
