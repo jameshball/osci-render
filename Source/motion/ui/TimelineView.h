@@ -38,6 +38,10 @@ public:
     std::function<void(motion::Id)> onSelection, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
     std::function<void()> onLoopSelection;
     std::function<void(const juce::String&)> onError;
+    // The source Sources has chosen (0: none), and a hint said meanwhile:
+    // double-clicking empty track space adds that source there.
+    std::function<motion::Id()> chosenSource;
+    std::function<void(const juce::String&)> onHint;
     std::function<void(motion::Id, double)> onEditMarker;
     // (beat, current bpm, beat of the change being edited, if any)
     std::function<void(double, double, std::optional<double>)> onEditTempo;
@@ -110,7 +114,9 @@ public:
 
     void itemDropped(const SourceDetails& details) override;
 
-    void insertAsset(motion::Id assetId, int x, int y);
+    // False when it doesn't fit there (a clip in the way, a locked track or
+    // one of the other kind).
+    bool insertAsset(motion::Id assetId, int x, int y);
 
     // The beam's time: every visual clip shows the share it gets as a fill
     // rising from its foot, and dragging that edge sets its Beam.

@@ -645,7 +645,7 @@ void MotionTimelineView::itemDropped(const SourceDetails& details) {
     repaint();
 }
 
-void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
+bool MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
     const auto& project = processor.document.project();
     const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [assetId](const auto& item) { return item->id == assetId; });
     if (asset == project.assets.end()) {
@@ -654,10 +654,13 @@ void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
         const auto track = row >= 0 && row < static_cast<int>(project.tracks.size()) ? project.tracks[row].id : 0;
         motion::Id inserted = 0;
         const auto result = processor.document.insertComposition(assetId, snapTime(time, juce::ModifierKeys::getCurrentModifiers()), track, groupAtY(y), inserted);
-        if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } return; }
+        if (result.failed()) {
+            if (onError) { onError(result.getErrorMessage()); }
+            return false;
+        }
         selectClip(inserted);
         refreshTracks();
-        return;
+        return true;
     }
     const auto time = x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
     const auto snapped = snapTime(time, juce::ModifierKeys::getCurrentModifiers());
@@ -667,7 +670,7 @@ void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
     auto clip = motion::Document::makeClip(processor.document.newId(), **asset, snapped);
     const auto id = clip.id;
     if (row >= 0 && row < static_cast<int>(project.tracks.size()) && (project.tracks[row].locked || project.tracks[row].kind != kind || !project.tracks[row].canPlace(clip, 0, project.tempo()))) {
-        return;
+        return false;
     }
     const auto trackId = processor.document.newId();
     processor.document.edit(kind == motion::TrackKind::audio ? "Add audio clip" : "Add object clip", [&](motion::Project& updated) {
@@ -685,6 +688,7 @@ void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
         }
     });
     selectClip(id);
+    return true;
 }
 
 void MotionTimelineView::updateBake() {
@@ -1729,7 +1733,19 @@ void MotionTimelineView::mouseDoubleClick(const juce::MouseEvent& event) {
     const auto* clip = clipAt(event.getPosition(), row);
     if (clip != nullptr && clip->composition != 0 && onEnterComposition) { onEnterComposition(clip->id); return; }
     // Other clips open their source's editor (text, Lua or a drawing).
-    if (clip != nullptr && onOpenSource) { onOpenSource(clip->id); }
+    if (clip != nullptr) {
+        if (onOpenSource) { onOpenSource(clip->id); }
+        return;
+    }
+    // Empty track space: the source chosen in Sources goes there, on that
+    // track (below the tracks, on a new one).
+    if (!dropTarget(event.getPosition()).has_value() || !chosenSource) { return; }
+    const auto source = chosenSource();
+    if (source == 0) {
+        if (onHint) { onHint("Choose a source in Sources, then double-click here to add it."); }
+        return;
+    }
+    if (!insertAsset(source, event.x, event.y) && onHint) { onHint("It doesn't fit there: another clip is in the way, or the track is locked or for audio."); }
 }
 
 // Whether a drag of any kind is under way: zooming or scrolling then would

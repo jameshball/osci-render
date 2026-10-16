@@ -22,6 +22,8 @@ public:
     std::function<void(motion::Id)> onBake;
     // A 3D object kept at its file's own size (true) or fitted to the screen.
     std::function<void(motion::Id, bool)> onOriginalSize;
+    // The source (or composition) selected, or 0.
+    motion::Id chosen() const { return validRow(list.getSelectedRow()) ? assetId(list.getSelectedRow()) : 0; }
     std::function<juce::String(motion::Id)> liveStatus;
     void updateLiveStatus();
 
@@ -67,6 +69,14 @@ private:
     void beginRename(motion::Id id);
     void finishRename(bool accept);
     void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override { insert(row); }
+    // The row under the pointer shows a + that adds it at the playhead, as
+    // double-clicking it does.
+    int hoveredRow = -1;
+    void mouseMove(const juce::MouseEvent& event) override { hover(event); }
+    void mouseExit(const juce::MouseEvent& event) override { hover(event); }
+    void hover(const juce::MouseEvent& event);
+    bool addable(int row) const { return validRow(row) && (!definitionRow(row) || document.canReferenceComposition(assetId(row))); }
+    static juce::Rectangle<int> addArea(int width, int height) { return {width - 36, (height - 24) / 2, 24, 24}; }
     void returnKeyPressed(int row) override { insert(row); }
 
     juce::var getDragSourceDescription(const juce::SparseSet<int>& rows) override;

@@ -13,6 +13,7 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     list.setColour(juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     list.setOutlineThickness(0);
     addAndMakeVisible(list);
+    list.addMouseListener(this, true);
     status.setJustificationType(juce::Justification::topLeft);
     status.setFont(motion::style::body());
     addAndMakeVisible(status);
@@ -113,7 +114,7 @@ void MotionAssetLibrary::updateStatus() {
 
 juce::String MotionAssetLibrary::getTooltipForRow(int row) {
     if (definitionRow(row) && !document.canReferenceComposition(assetId(row))) { return "Open it to edit it; it can't go inside the composition you're editing"; }
-    return "Drag into the Scene or timeline, or double-click (Return) to insert at the playhead";
+    return "Drag into the Scene or timeline, or click + (or double-click) to add at the playhead";
 }
 
 void MotionAssetLibrary::resized() {
@@ -191,6 +192,17 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     // A small picture of the source, like a project panel thumbnail.
     paintThumbnail(graphics, row, bounds.removeFromLeft(36).withSizeKeepingCentre(34, 34));
     bounds.removeFromLeft(8);
+    const auto hovered = row == hoveredRow && addable(row);
+    if (hovered) {
+        const auto add = addArea(width, height).toFloat();
+        bounds.setRight(juce::roundToInt(add.getX()) - 4);
+        graphics.setColour(osci::Colours::surfaceRaised().brighter(selected ? .25f : .15f));
+        graphics.fillEllipse(add);
+        graphics.setColour(osci::Colours::text());
+        const auto centre = add.getCentre();
+        graphics.drawLine(centre.x - 5.0f, centre.y, centre.x + 5.0f, centre.y, 1.5f);
+        graphics.drawLine(centre.x, centre.y - 5.0f, centre.x, centre.y + 5.0f, 1.5f);
+    }
     graphics.setColour(osci::Colours::text());
     graphics.setFont(motion::style::body());
     // The name as the timeline and renaming show it, file extension and all.
@@ -263,7 +275,21 @@ void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce:
     graphics.strokePath(path, juce::PathStrokeType(1.0f));
 }
 
+void MotionAssetLibrary::hover(const juce::MouseEvent& event) {
+    const auto local = event.getEventRelativeTo(&list).getPosition();
+    const auto inside = event.eventComponent != this || list.getBounds().contains(event.getPosition());
+    const auto row = inside && list.getLocalBounds().contains(local) ? list.getRowContainingPosition(local.x, local.y) : -1;
+    if (row == hoveredRow) { return; }
+    list.repaintRow(hoveredRow);
+    hoveredRow = row;
+    list.repaintRow(hoveredRow);
+}
+
 void MotionAssetLibrary::listBoxItemClicked(int row, const juce::MouseEvent& event) {
+    if (!event.mods.isPopupMenu() && addable(row) && event.eventComponent != nullptr && addArea(event.eventComponent->getWidth(), event.eventComponent->getHeight()).contains(event.getPosition())) {
+        insert(row);
+        return;
+    }
     if (event.mods.isPopupMenu() && validAssetRow(row)) { showSourceMenu(row); return; }
     if (!event.mods.isPopupMenu() || !definitionRow(row)) { return; }
     const auto id = assetId(row);

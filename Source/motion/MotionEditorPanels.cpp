@@ -547,6 +547,8 @@ void MotionEditor::setUpTimeline() {
         assetLibrary.selectAsset(asset);
     };
     timeline.onError = [this](const juce::String& message) { statusBar.show(message); };
+    timeline.chosenSource = [this] { return assetLibrary.chosen(); };
+    timeline.onHint = [this](const juce::String& message) { statusBar.show(message, MotionStatusBar::Kind::notice); };
     timeline.onPreview = [this](const motion::Project* project) {
         processor.prepareComposition(project != nullptr ? *project : processor.document.project());
         if (project != nullptr) { composition.preview(*project); } else { composition.refresh(); }
