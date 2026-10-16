@@ -49,6 +49,7 @@
         <FILE id="PqoazG" name="osci_installer_win.png" compile="0" resource="1"
               file="Resources/images/osci_installer_win.png"/>
         <FILE id="iOsciM" name="osci_mac.png" compile="0" resource="1" file="Resources/images/osci_mac.png"/>
+        <FILE id="iMotionM" name="motion_mac.png" compile="0" resource="1" file="Resources/images/motion_mac.png"/>
         <FILE id="iSosciM" name="sosci_mac_saturated.png" compile="0" resource="1"
               file="Resources/images/sosci_mac_saturated.png"/>
       </GROUP>
