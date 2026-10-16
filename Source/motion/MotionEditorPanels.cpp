@@ -221,6 +221,7 @@ void MotionEditor::setUpLibrary() {
             return result;
         };
         menu.addItem(item(AddMenuId::drawing, "Draw a shape...", icons::glyph::pencil()));
+        menu.addItem(item(AddMenuId::newScript, "Write a script...", icons::glyph::braces()));
         // Sources made from a few numbers, by category, each with its picture.
         juce::PopupMenu generate;
         for (const auto category : {motion::GeneratorCategory::shape, motion::GeneratorCategory::curve, motion::GeneratorCategory::grid, motion::GeneratorCategory::solid}) {
@@ -303,6 +304,7 @@ void MotionEditor::setUpLibrary() {
             if (choice == AddMenuId::importAudio) { owner->chooseAudioFile(); }
             if (choice == AddMenuId::blenderSource) { owner->showBlenderSettings(); }
             if (choice == AddMenuId::drawing) { owner->showDrawingEditor(0); }
+            if (choice == AddMenuId::newScript) { owner->newScript(); }
             const auto generator = chosen(AddMenuId::firstGenerator, motion::generatorDefinitions.size());
             const auto lightPreset = chosen(AddMenuId::firstLightPreset, motion::lightPresets.size());
             const auto mirror = chosen(AddMenuId::firstMirror, motion::mirrorPresets.size());

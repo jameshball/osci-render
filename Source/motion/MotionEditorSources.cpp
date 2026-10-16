@@ -866,6 +866,37 @@ void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView
 
 // Examples are written to a temporary folder and imported like any file;
 // the project keeps its own copy of the data.
+void MotionEditor::newScript() {
+    static constexpr const char* script =
+        "-- Runs for every point the beam draws.\n"
+        "-- Return {x, y} or {x, y, z}, each -1 to 1.\n"
+        "--\n"
+        "-- phase      0 to 2 pi across each frame\n"
+        "-- play_time  seconds since the clip began\n"
+        "-- slider_a   0 to 1, animated in Properties\n"
+        "--            (slider_b to slider_z too)\n"
+        "\n"
+        "local petals = 3 + math.floor(slider_a * 6)\n"
+        "local turn = play_time * 0.5\n"
+        "local r = 0.45 + 0.4 * math.cos(petals * phase)\n"
+        "\n"
+        "local x = r * math.cos(phase + turn)\n"
+        "local y = r * math.sin(phase + turn)\n"
+        "return {x, y}\n";
+    // Named Script, or Script 2 and on beside others.
+    juce::String name = "Script";
+    for (int number = 2; std::any_of(processor.document.project().assets.begin(), processor.document.project().assets.end(), [&](const auto& asset) { return asset->name.upToLastOccurrenceOf(".", false, false) == name; }); ++number) {
+        name = "Script " + juce::String(number);
+    }
+    const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion scripts").getChildFile(juce::Uuid().toString());
+    const auto file = folder.getChildFile(name + ".lua");
+    if (!folder.createDirectory().wasOk() || !file.replaceWithText(script)) {
+        statusBar.show("Could not start a new script.");
+        return;
+    }
+    importSourceFile(file, 0);
+}
+
 void MotionEditor::importExample(const juce::String& resource) {
     int size = 0;
     const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);

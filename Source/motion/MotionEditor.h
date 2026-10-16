@@ -204,6 +204,8 @@ private:
     juce::Image recentFrame;
     double recentFrameRequested = 0;
     void showLuaEditor(SourceRequest request);
+    // A new Lua source, written from a short working script.
+    void newScript();
     SourceRequest luaRequest;
     bool luaSubmitted = false;
     // `chosen`: the user picked this property; otherwise a new target opens
@@ -388,7 +390,7 @@ private:
     static constexpr std::array<double, 8> projectSampleRates {44100, 48000, 88200, 96000, 176400, 192000, 384000, 768000};
     // The add menu's items, and the first id of each list in it.
     struct AddMenuId {
-        static constexpr int importFile = 1, blenderSource = 2, drawing = 3, importAudio = 4;
+        static constexpr int importFile = 1, blenderSource = 2, drawing = 3, importAudio = 4, newScript = 5;
         static constexpr int firstExample = 100, firstGenerator = 1000, firstLightPreset = 2000, firstMirror = 3000;
     };
     juce::Label timeLabel;
