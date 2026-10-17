@@ -4,6 +4,7 @@
 #include "ui/MarkerPanel.h"
 #include "ui/GeneratorIcons.h"
 #include "ui/MenuIcons.h"
+#include "ui/ModelSizePanel.h"
 
 // Each panel set up: the Scene, the Scope, the library of sources, effects and
 // modulators, Properties, the timeline and the Graph; and the pickers that add
@@ -339,15 +340,22 @@ void MotionEditor::setUpLibrary() {
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
     // A model switched to its file's own size, or back to fitted, is
     // prepared again in place.
-    assetLibrary.onOriginalSize = [this](motion::Id id, bool keep) {
-        const auto& assets = processor.document.project().assets;
-        const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
-        if (found == assets.end()) { return; }
-        SourceRequest request;
-        request.replacement = *found;
-        request.generation = processor.document.generation();
-        request.originalSize = keep;
-        beginSourceImport(std::move(request));
+    // A model's size, in a popover by its row: the Scene shows the change
+    // as it is made, so nothing covers it.
+    assetLibrary.onModelSettings = [this](motion::Id id, juce::Component& button) {
+        const auto found = motion::findAsset(processor.document.project().assets, id);
+        if (found == nullptr) { return; }
+        auto panel = std::make_unique<MotionModelSizePanel>(found->name, found->originalSize, found->fittedScale);
+        panel->onChange = [this, id](bool keep) {
+            const auto current = motion::findAsset(processor.document.project().assets, id);
+            if (current == nullptr || current->originalSize == keep) { return; }
+            SourceRequest request;
+            request.replacement = current;
+            request.generation = processor.document.generation();
+            request.originalSize = keep;
+            beginSourceImport(std::move(request));
+        };
+        showPopover(std::move(panel), getLocalArea(&button, button.getLocalBounds()));
     };
     assetLibrary.onEditDrawing = [this](motion::Id id) { showDrawingEditor(id); };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {

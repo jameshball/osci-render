@@ -21,26 +21,10 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     cancelImport.setButtonText("Cancel import");
     cancelImport.onClick = [this] { if (onCancelImport) { onCancelImport(); } };
     addChildComponent(cancelImport);
-    bakeSettings.setButtonText("Bake settings...");
-    bakeSettings.onClick = [this] {
-        const auto row = list.getSelectedRow();
-        if (definitionRow(row)) {
-            if (onOpenComposition) { onOpenComposition(assetId(row)); }
-        } else if (validAssetRow(row) && onBake) {
-            onBake(assetId(row));
-        }
-    };
-    addChildComponent(bakeSettings);
-    originalSizeLabel.setFont(motion::style::body());
-    originalSizeLabel.setColour(juce::Label::textColourId, osci::Colours::text());
-    originalSizeLabel.setInterceptsMouseClicks(false, false);
-    originalSize.setTooltip("Keep the model at its file's own size and place, rather than fitted to the screen");
-    originalSize.onClick = [this] {
-        const auto row = list.getSelectedRow();
-        if (modelRow(row) && onOriginalSize) { onOriginalSize(assetId(row), originalSize.getToggleState()); }
-    };
-    addChildComponent(originalSizeLabel);
-    addChildComponent(originalSize);
+    edit.iconSize = 18.0f;
+    edit.onClick = [this] { editRow(list.getSelectedRow()); };
+    addChildComponent(edit);
+    list.getVerticalScrollBar().addListener(this);
     search.setName("Search sources");
     search.setTextToShowWhenEmpty("Search sources", osci::Colours::textMuted());
     search.setFont(motion::style::body());
@@ -130,13 +114,56 @@ void MotionAssetLibrary::resized() {
     // The status line takes room only when it has something to say.
     const auto statusHeight = status.getText().isEmpty() && importStatus.isEmpty() ? 0 : live ? 48 : 52;
     status.setBounds(area.removeFromBottom(statusHeight).reduced(6, statusHeight > 0 ? 4 : 0));
-    if (bakeSettings.isVisible()) { bakeSettings.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
-    if (originalSize.isVisible()) {
-        auto line = area.removeFromBottom(30).reduced(10, 2);
-        originalSize.setBounds(line.removeFromRight(motion::ui::Switch::width + 4));
-        originalSizeLabel.setBounds(line.withTrimmedLeft(-4));
-    }
     list.setBounds(area);
+    placeEdit();
+}
+
+juce::String MotionAssetLibrary::editLabel(int row) const {
+    if (definitionRow(row)) { return "Open composition"; }
+    if (!validAssetRow(row)) { return {}; }
+    const auto& asset = *assets[static_cast<std::size_t>(row)];
+    const auto extension = asset.extension.toLowerCase();
+    if (motion::texture::isSource(extension)) { return motion::texture::technology() + " settings..."; }
+    if (asset.liveIdentity != nullptr) { return "Blender settings..."; }
+    if (extension == ".txt") { return "Edit text..."; }
+    if (extension == ".lua") { return "Edit Lua..."; }
+    if (extension == ".lsystem") { return "Fractal settings..."; }
+    if (osci::files::isVideo(extension)) { return "Video settings..."; }
+    if (osci::files::isImage(extension)) { return "Image settings..."; }
+    if (extension == ".svg" && motion::drawing::isDrawing(asset.data.toString())) { return "Edit drawing..."; }
+    if (modelRow(row)) { return "3D object settings..."; }
+    return {};
+}
+
+void MotionAssetLibrary::editRow(int row) {
+    if (definitionRow(row)) {
+        if (onOpenComposition) { onOpenComposition(assetId(row)); }
+        return;
+    }
+    if (!validAssetRow(row)) { return; }
+    const auto& asset = *assets[static_cast<std::size_t>(row)];
+    if (modelRow(row)) {
+        if (onModelSettings) { onModelSettings(assetId(row), edit); }
+    } else if (asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset.data.toString())) {
+        if (onEditDrawing) { onEditDrawing(assetId(row)); }
+    } else if (onBake) {
+        onBake(assetId(row));
+    }
+}
+
+// Over the selected row's end, while that row is in view.
+void MotionAssetLibrary::placeEdit() {
+    const auto row = list.getSelectedRow();
+    const auto label = editLabel(row);
+    auto bounds = label.isEmpty() ? juce::Rectangle<int>() : list.getRowPosition(row, true).translated(list.getX(), list.getY());
+    const auto inView = !bounds.isEmpty() && list.getBounds().contains(bounds.getCentre());
+    edit.setVisible(inView);
+    if (!inView) { return; }
+    edit.setName(label);
+    edit.setTitle(label);
+    edit.setTooltip(label.trimCharactersAtEnd("."));
+    edit.setBounds(bounds.getRight() - 4 - 32, bounds.getCentreY() - 14, 28, 28);
+    edit.toFront(false);
 }
 
 void MotionAssetLibrary::paint(juce::Graphics& graphics) {
@@ -152,17 +179,8 @@ void MotionAssetLibrary::paint(juce::Graphics& graphics) {
 
 void MotionAssetLibrary::selectedRowsChanged(int row) {
     updateStatus();
-    const bool raster = validAssetRow(row) && osci::files::isImage(assets[static_cast<std::size_t>(row)]->extension);
-    const bool text = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".txt");
-    const bool live = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr;
-    const bool fractal = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lsystem");
-    const bool texture = live && motion::texture::isSource(assets[static_cast<std::size_t>(row)]->extension);
-    bakeSettings.setButtonText(texture ? motion::texture::technology() + " settings..." : live ? "Blender settings..." : definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (fractal ? "Fractal settings..." : (raster ? (osci::files::isVideo(assets[static_cast<std::size_t>(row)]->extension) ? "Video settings..." : "Image settings...") : "Bake settings...")));
-    bakeSettings.setVisible(live || definitionRow(row) || text || fractal || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
-    const auto model = modelRow(row);
-    originalSize.setVisible(model);
-    originalSizeLabel.setVisible(model);
-    if (model) { originalSize.setToggleState(assets[static_cast<std::size_t>(row)]->originalSize, juce::dontSendNotification); }
+    juce::ignoreUnused(row);
+    list.repaint();
     resized();
 }
 
@@ -194,16 +212,16 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     // A small picture of the source, like a project panel thumbnail.
     paintThumbnail(graphics, row, bounds.removeFromLeft(36).withSizeKeepingCentre(34, 34));
     bounds.removeFromLeft(8);
+    // The edit button covers the selected row's end.
+    if (selected && editLabel(row).isNotEmpty()) { bounds.setRight(width - 40); }
     const auto hovered = row == hoveredRow && addable(row);
     if (hovered) {
-        const auto add = addArea(width, height).toFloat();
+        const auto add = addArea(row, width, height).toFloat();
         bounds.setRight(juce::roundToInt(add.getX()) - 4);
-        graphics.setColour(osci::Colours::surfaceRaised().brighter(selected ? .25f : .15f));
-        graphics.fillEllipse(add);
-        graphics.setColour(osci::Colours::text());
-        const auto centre = add.getCentre();
-        graphics.drawLine(centre.x - 5.0f, centre.y, centre.x + 5.0f, centre.y, 1.5f);
-        graphics.drawLine(centre.x, centre.y - 5.0f, centre.x, centre.y + 5.0f, 1.5f);
+        // Drawn as the edit button beside it is drawn when hovered.
+        graphics.setColour(juce::Colours::white.withAlpha(.08f));
+        graphics.fillRoundedRectangle(add.reduced(1.0f), motion::style::radius + 1);
+        motion::icons::draw(graphics, motion::icons::Icon::add, add, osci::Colours::text().withAlpha(.72f), 18.0f);
     }
     graphics.setColour(osci::Colours::text());
     graphics.setFont(motion::style::body());
@@ -219,14 +237,9 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     } else {
         const auto& asset = *assets[static_cast<std::size_t>(row)];
         detail = motion::ui::sourceKind(asset);
-        // A model says how it was sized for the screen.
-        if (modelRow(row) && asset.originalSize) {
-            detail += motion::style::dot() + "original size";
-        } else if (modelRow(row) && std::abs(asset.fittedScale - 1) > 1.0e-3) {
-            const auto scale = asset.fittedScale;
-            const auto places = scale >= 10 ? 0 : scale >= 1 ? 1 : std::clamp(1 - static_cast<int>(std::floor(std::log10(scale))), 2, 6);
-            detail += motion::style::dot() + "scaled " + juce::String::fromUTF8("\xc3\x97") + juce::String(scale, places);
-        }
+        // A model kept at its file's size says so (its settings say how
+        // much fitting it would scale it).
+        if (modelRow(row) && asset.originalSize) { detail += motion::style::dot() + "unscaled"; }
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
             detail += motion::style::dot() + juce::String(asset.source->duration(), 1) + " s";
@@ -296,7 +309,7 @@ void MotionAssetLibrary::hover(const juce::MouseEvent& event) {
 }
 
 void MotionAssetLibrary::listBoxItemClicked(int row, const juce::MouseEvent& event) {
-    if (!event.mods.isPopupMenu() && addable(row) && event.eventComponent != nullptr && addArea(event.eventComponent->getWidth(), event.eventComponent->getHeight()).contains(event.getPosition())) {
+    if (!event.mods.isPopupMenu() && addable(row) && event.eventComponent != nullptr && addArea(row, event.eventComponent->getWidth(), event.eventComponent->getHeight()).contains(event.getPosition())) {
         insert(row);
         return;
     }
@@ -323,11 +336,10 @@ void MotionAssetLibrary::showSourceMenu(int row) {
     const auto uses = document.assetUses(id);
     juce::PopupMenu menu;
     menu.addItem(1, "Insert at playhead");
+    // What its edit button does, as the first thing to change.
+    const auto label = editLabel(row);
+    if (label.isNotEmpty()) { menu.addItem(8, label); }
     menu.addItem(2, "Rename...");
-    const auto& drawn = *assets[static_cast<std::size_t>(row)];
-    if (drawn.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(drawn.data.toString())) {
-        menu.addItem(8, "Edit drawing...");
-    }
     menu.addItem(6, "Replace with file...");
     menu.addItem(3, uses == 0 ? "Not used by any clip" : "Select " + juce::String(static_cast<int>(uses)) + (uses == 1 ? " clip using it" : " clips using it"), uses != 0);
     menu.addSeparator();
@@ -337,7 +349,11 @@ void MotionAssetLibrary::showSourceMenu(int row) {
         if (result == 1 && onInsert) { onInsert(id); }
         if (result == 2) { beginRename(id); }
         if (result == 6 && onReplace) { onReplace(id); }
-        if (result == 8 && onEditDrawing) { onEditDrawing(id); }
+        if (result == 8) {
+            for (int candidate = 0; candidate < static_cast<int>(assets.size()); ++candidate) {
+                if (assetId(candidate) == id) { editRow(candidate); }
+            }
+        }
         if (result == 3 && onSelectUses) { onSelectUses(id); }
         if (result == 4 || result == 5) {
             int removed = 0;

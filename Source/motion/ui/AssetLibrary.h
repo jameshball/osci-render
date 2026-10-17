@@ -3,15 +3,16 @@
 #include "MotionStyle.h"
 #include "DocumentMenu.h"
 #include "FormControls.h"
+#include "MotionIcons.h"
 
 #include "../model/Document.h"
 #include "../model/Drawing.h"
 #include <osci_gui/osci_gui.h>
 
-class MotionAssetLibrary : public juce::Component, private juce::ListBoxModel {
+class MotionAssetLibrary : public juce::Component, private juce::ListBoxModel, private juce::ScrollBar::Listener {
 public:
-    // While a source is written in the Scene, the panel's own edit action rests.
-    void setEditingSource(bool editing) { bakeSettings.setEnabled(!editing); }
+    // While a source is written in the Scene, its edit button rests.
+    void setEditingSource(bool editing) { edit.setEnabled(!editing); }
     explicit MotionAssetLibrary(motion::Document& document);
     std::function<void(motion::Id)> onSelectUses;
     // A notice (something done) or a problem, for the status bar.
@@ -20,8 +21,8 @@ public:
     std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition, onReplace, onEditDrawing;
     std::function<void()> onCancelImport;
     std::function<void(motion::Id)> onBake;
-    // A 3D object kept at its file's own size (true) or fitted to the screen.
-    std::function<void(motion::Id, bool)> onOriginalSize;
+    // A 3D object's settings, beside the button that asked for them.
+    std::function<void(motion::Id, juce::Component&)> onModelSettings;
     // The source (or composition) selected, or 0.
     motion::Id chosen() const { return validRow(list.getSelectedRow()) ? assetId(list.getSelectedRow()) : 0; }
     std::function<juce::String(motion::Id)> liveStatus;
@@ -76,7 +77,16 @@ private:
     void mouseExit(const juce::MouseEvent& event) override { hover(event); }
     void hover(const juce::MouseEvent& event);
     bool addable(int row) const { return validRow(row) && (!definitionRow(row) || document.canReferenceComposition(assetId(row))); }
-    static juce::Rectangle<int> addArea(int width, int height) { return {width - 36, (height - 24) / 2, 24, 24}; }
+    // The + sits at the row's end, or beside the edit button on the row
+    // that has one.
+    juce::Rectangle<int> addArea(int row, int width, int height) const { return {width - (editLabel(row).isNotEmpty() && row == list.getSelectedRow() ? 68 : 36), (height - 28) / 2, 28, 28}; }
+    // The selected source's edit button, over its row: what it edits or
+    // sets up, by kind ("Edit Lua...", "Image settings..."); empty for a
+    // source with nothing to change after the fact.
+    juce::String editLabel(int row) const;
+    void editRow(int row);
+    void placeEdit();
+    void scrollBarMoved(juce::ScrollBar*, double) override { placeEdit(); }
     void returnKeyPressed(int row) override { insert(row); }
 
     juce::var getDragSourceDescription(const juce::SparseSet<int>& rows) override;
@@ -96,10 +106,8 @@ private:
     juce::TextEditor search, rename;
     motion::Id renaming = 0;
     juce::Label status;
-    juce::TextButton cancelImport, bakeSettings;
-    // A selected 3D object's one setting, as a switch.
-    juce::Label originalSizeLabel {"Original size caption", "Original size"};
-    motion::ui::Switch originalSize {"Original size"};
+    juce::TextButton cancelImport;
+    motion::icons::Button edit {"Edit source", motion::icons::Icon::pen};
     bool modelRow(int row) const;
     juce::String importStatus;
 };

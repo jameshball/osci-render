@@ -56,6 +56,9 @@ try:
     if names() != ["Script.lua"]:
         raise RuntimeError("The new script should land on a track called Script: " + str(names()))
     step("baked screenshot", "screenshot", "--file", session.artifact_dir / "baked.png", "--scale", "2")
+    sources = next(n["bounds"] for n in nodes(json.loads(command("snapshot", "--json", "--full"))) if n.get("componentID") == "motion.assets" or n.get("name") == "Motion assets")
+    step("hover the script", "mouse-move", sources["x"] + sources["w"] // 2, sources["y"] + 23)
+    step("hover screenshot", "screenshot", "--file", session.artifact_dir / "hover.png", "--scale", "2")
     step("open Add source again", "click", "--name", "Add source", "--exact")
     step("write another", "click", "--name", "Write a script...", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Lua Code Editor", "--role", "editableText", "--exact")

@@ -203,6 +203,8 @@ void MotionEditor::resized() {
             visualiserControls->toFront(false);
         }
     }
+    // The tool strips came to the front above; an open popover stays over them.
+    if (popover != nullptr) { popover->toFront(false); }
 }
 
 void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
