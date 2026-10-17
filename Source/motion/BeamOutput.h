@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace motion {
@@ -32,6 +33,15 @@ inline float zBrightness(float r, float g, float b, bool inverted) {
     return inverted ? 1.0f - bright : bright;
 }
 
+// One sample of the beam (x, y and its colour) on the mode's channels: the
+// first beamOutputChannels(mode) of these.
+inline std::array<float, 5> beamSample(OutputMode mode, float x, float y, float r, float g, float b) {
+    if (mode == OutputMode::xyz || mode == OutputMode::xyzInverted) {
+        return {x, y, zBrightness(r, g, b, mode == OutputMode::xyzInverted), 0, 0};
+    }
+    return {x, y, r, g, b};
+}
+
 // Plays the beam's signal (x, y, z, r, g, b channels) on an output in the
 // mode's channels. False, leaving the output as it was, for audio or when
 // the output has too few channels.
@@ -40,20 +50,16 @@ inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, j
     if (channels == 0 || output.getNumChannels() < channels || signal.getNumChannels() < 6) {
         return false;
     }
-    output.copyFrom(0, 0, signal, 0, 0, count);
-    output.copyFrom(1, 0, signal, 1, 0, count);
-    if (channels == 5) {
-        for (int channel = 2; channel < 5; ++channel) {
-            output.copyFrom(channel, 0, signal, channel + 1, 0, count);
-        }
-    } else if (channels == 3) {
-        const auto inverted = mode == OutputMode::xyzInverted;
-        const auto* r = signal.getReadPointer(3);
-        const auto* g = signal.getReadPointer(4);
-        const auto* b = signal.getReadPointer(5);
-        auto* z = output.getWritePointer(2);
-        for (int i = 0; i < count; ++i) {
-            z[i] = zBrightness(r[i], g[i], b[i], inverted);
+    const auto* x = signal.getReadPointer(0);
+    const auto* y = signal.getReadPointer(1);
+    const auto* r = signal.getReadPointer(3);
+    const auto* g = signal.getReadPointer(4);
+    const auto* b = signal.getReadPointer(5);
+    auto* const* out = output.getArrayOfWritePointers();
+    for (int i = 0; i < count; ++i) {
+        const auto sample = beamSample(mode, x[i], y[i], r[i], g[i], b[i]);
+        for (int channel = 0; channel < channels; ++channel) {
+            out[channel][i] = sample[static_cast<std::size_t>(channel)];
         }
     }
     return true;

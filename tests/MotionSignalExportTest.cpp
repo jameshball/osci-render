@@ -181,6 +181,45 @@ public:
         }
         expectEquals(directory.getFile().findChildFiles(juce::File::findFiles, false).size(), 2);
 
+        beginTest("XY, XYZ and inverted-Z exports are the XYRGB export's beam, with its brightness on Z");
+        {
+            const std::pair<motion::OutputMode, int> formats[] {{motion::OutputMode::xy, 2}, {motion::OutputMode::xyz, 3}, {motion::OutputMode::xyzInverted, 3}};
+            for (const auto& [mode, channels] : formats) {
+                const auto file = directory.getFile().getChildFile("format-" + juce::String(static_cast<int>(mode)) + ".wav");
+                const auto written = motion::SignalExporter::write(makeProject((frames - 0.4) / sampleRate), file, sampleRate, cancel, nullptr, motion::squareScope(), nullptr, mode);
+                expect(written.wasOk(), written.getErrorMessage());
+                auto formatReader = read(file);
+                expect(formatReader != nullptr);
+                if (formatReader == nullptr) {
+                    continue;
+                }
+                expectEquals(static_cast<int>(formatReader->numChannels), channels);
+                expectEquals(formatReader->lengthInSamples, static_cast<juce::int64>(frames));
+                juce::AudioBuffer<float> format(channels, frames);
+                expect(formatReader->read(format.getArrayOfWritePointers(), channels, 0, frames));
+                int differing = 0, lit = 0;
+                for (int index = 0; index < frames; ++index) {
+                    if (format.getSample(0, index) != samples.getSample(0, index) || format.getSample(1, index) != samples.getSample(1, index)) { ++differing; }
+                    if (channels == 3) {
+                        // The line is drawn in (.2, .4, .8): lit at .8, dark at 0.
+                        const auto bright = samples.getSample(2, index) == 0 ? 0.0f : 0.8f;
+                        const auto z = mode == motion::OutputMode::xyzInverted ? 1 - bright : bright;
+                        if (std::abs(format.getSample(2, index) - z) > 1e-6f) { ++differing; }
+                        lit += bright > 0;
+                    }
+                }
+                expectEquals(differing, 0);
+                if (channels == 3) {
+                    expect(lit > 0 && lit < frames, "Expected both lit and dark samples on Z.");
+                }
+            }
+            const auto audio = motion::SignalExporter::write(makeProject(1), directory.getFile().getChildFile("audio.wav"), sampleRate, cancel, nullptr, motion::squareScope(), nullptr, motion::OutputMode::soundtrack);
+            expect(audio.failed());
+            for (const auto mode : {motion::OutputMode::xy, motion::OutputMode::xyz, motion::OutputMode::xyzInverted}) {
+                directory.getFile().getChildFile("format-" + juce::String(static_cast<int>(mode)) + ".wav").deleteFile();
+            }
+        }
+
         beginTest("A scope's Z input gets the beam's brightness: its brightest colour, inverted on request");
         {
             // x, y, z, r, g, b: lit warm, half lit blue, dark, too bright, not a number.

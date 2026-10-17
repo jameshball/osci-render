@@ -14,6 +14,18 @@ struct MotionVideoTemporaryFiles {
     juce::File signal() const { return directory.getChildFile("beam.wav"); }
     juce::File soundtrack() const { return directory.getChildFile("soundtrack.wav"); }
 };
+
+// The beam as an Output choice names it.
+juce::String exportedAs(motion::OutputMode mode) {
+    switch (mode) {
+        case motion::OutputMode::xy: return "Beam XY";
+        case motion::OutputMode::xyz: return "Beam XYZ";
+        case motion::OutputMode::xyzInverted: return "Beam XYZ, inverted Z";
+        case motion::OutputMode::xyrgb: return "Beam XYRGB";
+        case motion::OutputMode::soundtrack: break;
+    }
+    return "Audio";
+}
 }
 
 juce::File MotionEditor::defaultExportFile(const juce::String& extension) const {
@@ -374,37 +386,43 @@ bool MotionEditor::waitsForSliderBakes() {
     return true;
 }
 
-void MotionEditor::exportSignal(bool leaveOutLive) {
+void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutLive) {
     if (exportState != nullptr || waitsForSliderBakes()) {
         return;
     }
+    // The project's audio draws nothing, so live sources don't matter to it.
+    const auto beam = motion::beamOutputChannels(mode) > 0;
     const juce::Component::SafePointer<MotionEditor> self(this);
-    if (!leaveOutLive && waitsForCapture(false, [self] { if (self != nullptr) { self->exportSignal(true); } })) { return; }
+    if (beam && !leaveOutLive && waitsForCapture(false, [self, mode] { if (self != nullptr) { self->exportSignal(mode, true); } })) {
+        captureForSignal = mode;
+        return;
+    }
     auto state = std::make_shared<ExportState>();
     exportState = state;
     state->sampleRate = processor.exportSampleRate();
-    chooser = std::make_unique<juce::FileChooser>("Export XYRGB signal" + motion::style::dot() + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
+    chooser = std::make_unique<juce::FileChooser>("Export " + exportedAs(mode) + motion::style::dot() + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
         defaultExportFile("wav"), "*.wav");
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-        | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state, leaveOutLive](const juce::FileChooser& selected) {
+        | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state, leaveOutLive, mode, beam](const juce::FileChooser& selected) {
         if (owner == nullptr) { return; }
         if (selected.getResult() == juce::File()) { owner->exportState.reset(); return; }
         const auto destination = withExtension(selected.getResult(), "wav");
         if (!destination.getFileExtension().equalsIgnoreCase(".wav")) {
             owner->exportState.reset();
-            owner->statusBar.show("Signal export requires a .wav filename. Choose Export XYRGB signal again and use that extension.");
+            owner->statusBar.show("Audio exports as a .wav file. Choose Export audio again and use that extension.");
             return;
         }
         const auto project = leaveOutLive ? motion::Document::withoutLiveSources(owner->processor.document.mainProject()) : owner->processor.document.mainProject();
         const auto reach = owner->processor.canvasReach();
         const auto baked = owner->processor.hiddenLineBake();
-        owner->exportBar.setName("Signal export progress");
+        owner->exportBar.setName("Audio export progress");
         owner->exportProgress = 0;
         owner->exportBar.setVisible(true);
         owner->cancelExport.setVisible(true);
-        owner->exports.addJob([owner, state, project, destination, reach, baked] {
-            const auto result = motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach, baked.get());
+        owner->exports.addJob([owner, state, project, destination, reach, baked, mode, beam] {
+            const auto result = beam ? motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach, baked.get(), mode)
+                                     : motion::SoundtrackExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress);
             juce::MessageManager::callAsync([owner, state, result, destination] {
                 if (owner == nullptr) {
                     return;

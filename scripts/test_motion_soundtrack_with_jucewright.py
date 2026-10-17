@@ -111,6 +111,18 @@ try:
         if output is None or "XYZ" not in str(output.get("value", "")):
             raise RuntimeError("Three-channel device configuration failed")
         step("three channel output screenshot", "screenshot", "--file", session.artifact_dir / "xyz-output.png")
+    # Every Output choice exports, whatever the device has room for; the
+    # project's audio too, now there is some.
+    step("open file menu", "click", "--name", "File", "--exact")
+    step("open export audio", "click", "--name", "Export audio", "--exact")
+    for choice in ("Audio...", "Beam XY...", "Beam XYZ (3 ch)...", "Beam XYZ, inverted Z (3 ch)...", "Beam XYRGB (5 ch)..."):
+        item = find(snapshot(), lambda node: choice in (node.get("name"), node.get("title")))
+        # A disabled item has no menu item role.
+        if item is None or item.get("role") != "menuItem":
+            raise RuntimeError("Export audio lacks " + choice)
+    step("export audio menu screenshot", "screenshot", "--file", session.artifact_dir / "export-audio-menu.png")
+    step("close export audio menu", "press", "Escape")
+    step("close file menu", "press", "Escape")
     step("restore music monitor", "select-option", "--name", "Audio output mode", "--text", "Audio")
     step("return to timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     step("split soundtrack", "press", "command + k", "--class", "MotionTimelineView")

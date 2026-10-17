@@ -23,6 +23,8 @@ juce::StringArray exampleProjects() {
     return resources;
 }
 constexpr int firstExampleId = 1200;
+// One for each output mode.
+constexpr int firstExportAudioId = 1020;
 }
 
 void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
@@ -44,10 +46,15 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Import source...", 1005, "Cmd+I"));
     menu.addSeparator();
-    // One export at a time.
-    auto signal = motion::style::menuItem("Export XYRGB signal...", 1006, {});
-    signal.isEnabled = exportState == nullptr;
-    menu.addItem(std::move(signal));
+    // One export at a time. Audio as each Output choice plays it, whatever
+    // the audio device has room for.
+    juce::PopupMenu audio;
+    for (int item = 0; item < monitorOutput.getNumItems(); ++item) {
+        const auto id = monitorOutput.getItemId(item);
+        const auto soundtrack = static_cast<MotionProcessor::OutputMode>(id - 1) == MotionProcessor::OutputMode::soundtrack;
+        audio.addItem(firstExportAudioId + id - 1, (soundtrack ? juce::String("Audio") : monitorOutput.getItemText(item)) + "...", !soundtrack || soundtrackClip() != 0);
+    }
+    menu.addSubMenu("Export audio", audio, exportState == nullptr);
 #if OSCI_PREMIUM
     auto video = motion::style::menuItem("Export video...", 1007, {});
     video.isEnabled = exportState == nullptr;
@@ -62,13 +69,16 @@ bool MotionEditor::fileMenuItemSelected(int id) {
         openExample(examples[id - firstExampleId]);
         return true;
     }
+    if (id >= firstExportAudioId && id <= firstExportAudioId + static_cast<int>(MotionProcessor::OutputMode::xyzInverted)) {
+        exportSignal(static_cast<MotionProcessor::OutputMode>(id - firstExportAudioId));
+        return true;
+    }
     switch (id) {
         case 1001: resetToDefault(); return true;
         case 1002: CommonPluginEditor::openProject(); return true;
         case 1003: saveProject(); return true;
         case 1004: saveProjectAs(); return true;
         case 1005: chooseSourceFile(); return true;
-        case 1006: exportSignal(); return true;
         case 1007: exportVideo(); return true;
         case 1008: showStartScreen(); return true;
         default: return false;

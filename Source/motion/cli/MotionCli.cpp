@@ -167,6 +167,18 @@ void make(const juce::ArgumentList& args) {
     say("Project " + destination.getFullPathName());
 }
 
+// The beam's channels, as an Output choice plays them: --output=xy, xyz,
+// xyz-inverted or xyrgb (the default).
+motion::OutputMode outputOf(const juce::ArgumentList& args) {
+    const auto text = args.getValueForOption("--output");
+    if (text.isEmpty() || text == "xyrgb") { return motion::OutputMode::xyrgb; }
+    if (text == "xy") { return motion::OutputMode::xy; }
+    if (text == "xyz") { return motion::OutputMode::xyz; }
+    if (text == "xyz-inverted") { return motion::OutputMode::xyzInverted; }
+    juce::ConsoleApplication::fail("--output must be xy, xyz, xyz-inverted or xyrgb.");
+    return motion::OutputMode::xyrgb;
+}
+
 void render(const juce::ArgumentList& args) {
     const auto files = positional(args);
     if (files.size() != 1) { juce::ConsoleApplication::fail("render takes one project."); }
@@ -196,7 +208,7 @@ void render(const juce::ArgumentList& args) {
     const auto destination = out.isNotEmpty() ? fileArgument(out) : project.getSiblingFile(sceneName(project) + ".wav");
     const std::atomic<bool> cancel {false};
     const auto start = juce::Time::getMillisecondCounterHiRes();
-    const auto written = motion::SignalExporter::write(*composition.prepared, destination, composition.sampleRate, cancel);
+    const auto written = motion::SignalExporter::write(*composition.prepared, destination, composition.sampleRate, cancel, nullptr, nullptr, nullptr, outputOf(args));
     if (written.failed()) { juce::ConsoleApplication::fail(written.getErrorMessage()); }
     say("Signal " + destination.getFullPathName() + " (" + timeText(composition.duration()) + " in " + juce::String((juce::Time::getMillisecondCounterHiRes() - start) / 1000, 2) + " s)");
 }
@@ -382,8 +394,8 @@ int main(int argc, char* argv[]) {
     app.addCommand({"make", "make <scene.recipe.json> [--out=scene.osci-motion]",
         "Makes a project from a recipe: objects from generators or files, their properties and keys, a camera.",
         "Every command takes a recipe wherever it takes a project. See Source/motion/cli/Recipe.h for the format.", make});
-    app.addCommand({"render", "render <project> [--out=signal.wav] [--previews=folder [--sheet] [--frames=N | --at=t1,t2] [--whole | --video=file.mp4] [--app=osci-motion.app]] [--rate=Hz]",
-        "Writes the XYRGB signal (beside the project unless --out), and pictures of frames as the Scope shows them.",
+    app.addCommand({"render", "render <project> [--out=signal.wav] [--output=xy|xyz|xyz-inverted|xyrgb] [--previews=folder [--sheet] [--frames=N | --at=t1,t2] [--whole | --video=file.mp4] [--app=osci-motion.app]] [--rate=Hz]",
+        "Writes the beam's signal (XYRGB unless --output; beside the project unless --out), and pictures of frames as the Scope shows them.",
         "With --previews and no --out, writes only the pictures, rendered by the app: a short stretch up to each frame, in seconds,\n"
         "or with --whole a video of all of it, kept in that folder (--video takes them from one rendered before). --sheet puts them on one image.", render});
     app.addCommand({"video", "video <project> [--out=file.mp4] [--app=osci-motion.app]",

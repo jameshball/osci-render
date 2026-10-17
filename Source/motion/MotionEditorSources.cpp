@@ -466,9 +466,10 @@ void MotionEditor::captured(motion::Id live, motion::Id capture) {
         const auto used = document.drawSourceInstead(live, capture);
         if (used.failed()) { statusBar.show(used.getErrorMessage()); return; }
         const auto video = captureForVideo;
-        statusBar.show("The capture now draws in place of " + name, MotionStatusBar::Kind::notice, video ? "Export video" : "Export signal", [owner, video] {
+        const auto mode = captureForSignal;
+        statusBar.show("The capture now draws in place of " + name, MotionStatusBar::Kind::notice, video ? "Export video" : "Export audio", [owner, video, mode] {
             if (owner == nullptr) { return; }
-            if (video) { owner->exportVideo(); } else { owner->exportSignal(); }
+            if (video) { owner->exportVideo(); } else { owner->exportSignal(mode); }
         });
         return;
     }

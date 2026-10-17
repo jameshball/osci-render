@@ -234,7 +234,8 @@ private:
     // on its first animated channel.
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen = false);
     // `leaveOutLive`: export without the clips of live sources.
-    void exportSignal(bool leaveOutLive = false);
+    // Audio as an Output choice plays it: the project's audio, or the beam.
+    void exportSignal(MotionProcessor::OutputMode mode, bool leaveOutLive = false);
     void exportVideo(bool leaveOutLive = false);
     // True when FFmpeg is ready. Otherwise offers to download it, shows the
     // download in the status bar, and calls `resume` once it is in place.
@@ -249,6 +250,7 @@ private:
     motion::Id captureForExport = 0;
     std::uint64_t captureForExportGeneration = 0;
     bool captureForVideo = false;
+    MotionProcessor::OutputMode captureForSignal = MotionProcessor::OutputMode::xyrgb;
     // A capture of the live source `live` was saved as `capture`.
     void captured(motion::Id live, motion::Id capture);
     struct ExportState;
