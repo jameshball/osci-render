@@ -112,6 +112,7 @@ try:
     command("wait", "--ms", "600")
     step("live beam and editor", "screenshot", "--file", session.artifact_dir / "blender-live-workspace.png")
     sender.sendall(b"CLOSE\n"); sender.close(); sender = None
+    session.hover_selected_source()
     step("open source settings", "click", "--name", "Blender settings...", "--exact")
     command("wait-for-value", "--component-name", "Blender connection status", "--value", "Listening on port " + str(port) + " \u00b7 waiting for Blender", "--timeout-ms", "10000")
     step("choose blank on disconnect", "set-value", "--name", "Blender disconnect policy", "--exact", "Blank")
@@ -121,6 +122,7 @@ try:
     command("wait-for-value", "--component-name", "Blender connection status", "--value", "Connected \u00b7 2 frames received", "--timeout-ms", "10000")
     step("start capture before panel close", "click", "--component-name", "Record Blender capture")
     close_panel()
+    session.hover_selected_source()
     step("reopen after capture cancellation", "click", "--name", "Blender settings...", "--exact")
     step("start disposable capture", "click", "--component-name", "Record Blender capture")
     step("cancel disposable capture", "click", "--name", "Cancel capture", "--exact")
@@ -162,6 +164,7 @@ try:
     command("wait", "--ms", "600")
     step("reopened portable beam", "screenshot", "--file", session.artifact_dir / "blender-capture-reopened.png")
     step("select reopened source", "click", "--class", "juce::ListBox::RowComponent", "--name", "Live diamond", "--exact", "--position", "60,20")
+    session.hover_selected_source()
     step("reopen Blender settings", "click", "--name", "Blender settings...", "--exact")
     command("wait-for-value", "--component-name", "Blender connection status", "--value", "Offline \u00b7 start listening to connect Blender", "--timeout-ms", "10000")
     assert str(port) in str(field("Blender port"))

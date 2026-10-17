@@ -143,6 +143,37 @@ class BrowserSession:
         self.log(f"OK  {label} -> {file}")
         return True
 
+    def hover_selected_source(self) -> None:
+        """Moves the pointer over the source selected in Sources: its edit
+        button shows, with the +, on the row under the pointer."""
+        tree = json.loads(subprocess.run(self.cli("snapshot", "--json", "--full"), capture_output=True, text=True, check=True).stdout)
+
+        def find(node, inside=False):
+            if isinstance(node, list):
+                for child in node:
+                    found = find(child, inside)
+                    if found is not None:
+                        return found
+                return None
+            if not isinstance(node, dict):
+                return None
+            inside = inside or node.get("componentId") == "motion.assets" or node.get("componentID") == "motion.assets" or node.get("id") == "motion.assets"
+            if inside and node.get("role") == "listItem" and node.get("selected"):
+                return node
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    found = find(value, inside)
+                    if found is not None:
+                        return found
+            return None
+
+        row = find(tree)
+        if row is None:
+            raise StepError("No source is selected in Sources")
+        bounds = row["bounds"]
+        subprocess.run(self.cli("mouse-move", bounds["x"] + bounds["w"] // 3, bounds["y"] + bounds["h"] // 2), capture_output=True, text=True, check=True)
+        time.sleep(.2)
+
     def wait_for_undo(self, description: str, timeout: float = 10.0) -> None:
         """Waits for the undo button's description, shown or not: osci-motion
         hides it in narrow windows rather than wrapping it."""

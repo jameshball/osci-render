@@ -66,6 +66,7 @@ try:
     status = find(lambda n: str(n.get("value") or n.get("name") or "").startswith("Live"))
     if status is None:
         raise RuntimeError("Sources should say the picture is live")
+    session.hover_selected_source()
     step("open its settings", "click", "--name", "Syphon settings...", "--exact")
     command("wait-for-locator", "--name", "Done", "--exact")
     time.sleep(1.5)

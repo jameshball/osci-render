@@ -61,6 +61,8 @@ try:
     wait_undo("Import source")
     command("wait-for-locator", "--name", "koch_snowflake.lsystem", "--role", "label", "--exact", "--timeout-ms", "30000")
 
+    session.hover_selected_source()
+
     step("open fractal settings", "click", "--name", "Fractal settings...", "--exact")
     command("wait-for-locator", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
     assert fractal_depth() == 4
@@ -69,6 +71,7 @@ try:
     wait_undo("Change source settings")
 
     step("undo fractal reprepare", "click", "--name", "Undo", "--exact")
+    session.hover_selected_source()
     step("reopen restored fractal settings", "click", "--name", "Fractal settings...", "--exact")
     command("wait-for-locator", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
     assert fractal_depth() == 4

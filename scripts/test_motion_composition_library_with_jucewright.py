@@ -109,6 +109,7 @@ try:
     assert saved.find(f"./composition/definition[@id='{copy_id}']/composition").get("name") == "Independent motif"
     step("return from independent editor", "click", "--name", "Back to Main", "--exact")
     step("select original in library", "click", "--name", "Shared motif", "--role", "listItem", "--exact", "--position", "6,12")
+    session.hover_selected_source()
     step("open library definition", "click", "--name", "Open composition", "--role", "button", "--exact")
     command("wait-for-locator", "--name", "Shared motif", "--class", "juce::Label", "--exact")
     before_rejected = ET.tostring(saved.find(f"./composition/definition[@id='{original_id}']/composition"))

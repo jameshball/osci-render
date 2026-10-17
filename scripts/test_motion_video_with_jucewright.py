@@ -93,6 +93,7 @@ try:
     step("late video frame", "click", "--class", "MotionTimelineView", "--position", "340,12")
     command("wait", "--ms", "500")
     step("late frame screenshot", "screenshot", "--file", session.artifact_dir / "late-video.png")
+    session.hover_selected_source()
     step("edit video source", "click", "--name", "Video settings...", "--exact")
     step("change bake rate", "set-value", "--name", "Video bake frame rate", "--exact", "12")
     step("rebuild video source", "click", "--name", "Prepare video", "--exact")
@@ -122,6 +123,7 @@ try:
     command("wait-for-locator", "--name", "single-frame.mp4", "--role", "label", "--exact", "--timeout-ms", "30000")
     assert abs(float(save().findall("track/clip")[-1].get("duration")) - 1 / 24) < 1e-12
     step("compact video workspace", "resize-window", "--w", "1100", "--h", "740")
+    session.hover_selected_source()
     step("compact video settings", "click", "--name", "Video settings...", "--exact")
     command("wait-for-locator", "--name", "Prepare video", "--class", "juce::TextButton", "--exact")
     command("wait", "--ms", "500")

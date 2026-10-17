@@ -22,7 +22,13 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     cancelImport.onClick = [this] { if (onCancelImport) { onCancelImport(); } };
     addChildComponent(cancelImport);
     edit.iconSize = 18.0f;
-    edit.onClick = [this] { editRow(list.getSelectedRow()); };
+    edit.onClick = [this] {
+        const auto row = hoveredRow;
+        list.selectRow(row);
+        editRow(row);
+    };
+    // Leaving the button off its row hides it with the +.
+    edit.addMouseListener(this, false);
     addChildComponent(edit);
     list.getVerticalScrollBar().addListener(this);
     search.setName("Search sources");
@@ -151,9 +157,9 @@ void MotionAssetLibrary::editRow(int row) {
     }
 }
 
-// Over the selected row's end, while that row is in view.
+// Over the hovered row's end, beside the +, while that row is in view.
 void MotionAssetLibrary::placeEdit() {
-    const auto row = list.getSelectedRow();
+    const auto row = hoveredRow;
     const auto label = editLabel(row);
     auto bounds = label.isEmpty() ? juce::Rectangle<int>() : list.getRowPosition(row, true).translated(list.getX(), list.getY());
     const auto inView = !bounds.isEmpty() && list.getBounds().contains(bounds.getCentre());
@@ -213,8 +219,8 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     paintThumbnail(graphics, row, bounds.removeFromLeft(36).withSizeKeepingCentre(34, 34));
     bounds.removeFromLeft(8);
     // The edit button covers the selected row's end.
-    if (selected && editLabel(row).isNotEmpty()) { bounds.setRight(width - 72); }
     const auto hovered = row == hoveredRow && addable(row);
+    if (row == hoveredRow && editLabel(row).isNotEmpty()) { bounds.setRight(width - 72); }
     if (hovered) {
         const auto add = addArea(width, height).toFloat();
         bounds.setRight(std::min(bounds.getRight(), juce::roundToInt(add.getX()) - 4));
@@ -298,14 +304,13 @@ void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce:
     graphics.strokePath(path, juce::PathStrokeType(1.0f));
 }
 
-void MotionAssetLibrary::hover(const juce::MouseEvent& event) {
-    const auto local = event.getEventRelativeTo(&list).getPosition();
-    const auto inside = event.eventComponent != this || list.getBounds().contains(event.getPosition());
-    const auto row = inside && list.getLocalBounds().contains(local) ? list.getRowContainingPosition(local.x, local.y) : -1;
+void MotionAssetLibrary::hover(juce::Point<int> inList) {
+    const auto row = list.getLocalBounds().contains(inList) ? list.getRowContainingPosition(inList.x, inList.y) : -1;
     if (row == hoveredRow) { return; }
     list.repaintRow(hoveredRow);
     hoveredRow = row;
     list.repaintRow(hoveredRow);
+    placeEdit();
 }
 
 void MotionAssetLibrary::listBoxItemClicked(int row, const juce::MouseEvent& event) {

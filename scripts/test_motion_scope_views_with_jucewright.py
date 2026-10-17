@@ -82,6 +82,7 @@ try:
     baseline = session.artifact_dir / "parent-before.png"
     step("parent view before navigation", "screenshot", "--file", baseline)
     step("select library composition", "click", "--name", "Composition 1", "--role", "listItem", "--exact", "--position", "6,12")
+    session.hover_selected_source()
     step("enter from graph", "click", "--name", "Open composition", "--role", "button", "--exact")
     command("wait-for-locator", "--name", "Back to Main", "--exact")
     step("child preview", "screenshot", "--file", session.artifact_dir / "child-preview.png")

@@ -72,6 +72,7 @@ try:
     wait_undo("Import source")
     command("wait", "--ms", 500)
     step("colored outlines screenshot", "screenshot", "--file", session.artifact_dir / "outlines.png")
+    session.hover_selected_source()
     step("open image settings", "click", "--name", "Image settings...", "--exact")
     step("choose scanlines", "set-value", "--name", "Image trace mode", "--exact", "Scanlines")
     assert combo_value("Image trace mode") == "Scanlines"
@@ -86,6 +87,7 @@ try:
     command("wait", "--ms", 500)
     step("scanline screenshot", "screenshot", "--file", session.artifact_dir / "scanlines.png")
     # A Hilbert curve over it, as dense as it is bright.
+    session.hover_selected_source()
     step("open image settings for Hilbert", "click", "--name", "Image settings...", "--exact")
     step("choose Hilbert", "set-value", "--name", "Image trace mode", "--exact", "Hilbert")
     assert combo_value("Image trace mode") == "Hilbert"
@@ -96,6 +98,7 @@ try:
     wait_undo("Change source settings")
     command("wait", "--ms", 500)
     step("Hilbert by colour screenshot", "screenshot", "--file", session.artifact_dir / "hilbert-colour.png")
+    session.hover_selected_source()
     step("open image settings for density", "click", "--name", "Image settings...", "--exact")
     step("choose density", "set-value", "--name", "Image shading", "--exact", "Density")
     assert combo_value("Image shading") == "Density"
@@ -106,6 +109,7 @@ try:
     step("undo Hilbert by density", "click", "--name", "Undo", "--exact")
     step("undo Hilbert preparation", "click", "--name", "Undo", "--exact")
     step("undo image preparation", "click", "--name", "Undo", "--exact")
+    session.hover_selected_source()
     step("inspect restored image settings", "click", "--name", "Image settings...", "--exact")
     assert combo_value("Image trace mode") == "Outlines"
     step("close image settings", "press", "Escape", "--class", "MotionRasterSettingsPanel", "--exact")

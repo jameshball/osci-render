@@ -73,13 +73,15 @@ private:
     // The row under the pointer shows a + that adds it at the playhead, as
     // double-clicking it does.
     int hoveredRow = -1;
-    void mouseMove(const juce::MouseEvent& event) override { hover(event); }
-    void mouseExit(const juce::MouseEvent& event) override { hover(event); }
-    void hover(const juce::MouseEvent& event);
+    void mouseMove(const juce::MouseEvent& event) override { hover(event.getEventRelativeTo(&list).getPosition()); }
+    // Leaving a row (for its own edit button, or away) goes by where the
+    // pointer now is.
+    void mouseExit(const juce::MouseEvent&) override { hover(list.getMouseXYRelative()); }
+    void hover(juce::Point<int> inList);
     bool addable(int row) const { return validRow(row) && (!definitionRow(row) || document.canReferenceComposition(assetId(row))); }
-    // The + sits at the row's end; the selected row's edit button to its left.
+    // On the hovered row: the + at its end, its edit button to the left.
     static juce::Rectangle<int> addArea(int width, int height) { return {width - 36, (height - 28) / 2, 28, 28}; }
-    // The selected source's edit button, over its row: what it edits or
+    // The hovered source's edit button, over its row: what it edits or
     // sets up, by kind ("Edit Lua...", "Image settings..."); empty for a
     // source with nothing to change after the fact.
     juce::String editLabel(int row) const;

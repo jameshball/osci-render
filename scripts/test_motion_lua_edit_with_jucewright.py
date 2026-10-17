@@ -75,6 +75,7 @@ try:
     step("duplicate shared source", "press", "command + d", "--class", "MotionTimelineView")
     before = saved_asset()
     assert len(saved_clips()) == 2
+    session.hover_selected_source()
     step("open Lua source", "click", "--name", "Edit Lua...", "--exact")
     step("introduce runtime error", "fill", "--name", "Lua Code Editor", "--role", "editableText", "--exact", broken)
     step("bake invalid draft", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
@@ -93,6 +94,7 @@ try:
     assert saved_asset() == before
     step("redo successful edit", "click", "--name", "Redo", "--exact")
     assert saved_asset() == after
+    session.hover_selected_source()
     step("open source for cancellation", "click", "--name", "Edit Lua...", "--exact")
     step("unapplied edit", "fill", "--name", "Lua Code Editor", "--role", "editableText", "--exact", "return {0,0}")
     step("discard unapplied draft", "click", "--name", "Cancel", "--class", "juce::TextButton", "--exact")
@@ -104,6 +106,7 @@ try:
     session.open_project(project)
     command("wait", "--ms", 500)
     step("select saved source", "click", "--name", "Orbit.lua", "--role", "listItem", "--exact", "--position", "6,12")
+    session.hover_selected_source()
     step("reopen saved code", "click", "--name", "Edit Lua...", "--exact")
     snapshot = command("snapshot", "--json", "--full")
     assert revised in snapshot and "Keep this draft" not in snapshot

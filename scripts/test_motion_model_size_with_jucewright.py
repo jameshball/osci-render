@@ -45,6 +45,7 @@ try:
     step("import the teapot", "drop-files", "--file", session.root_dir / "Resources/models/teapot.obj", "--class", "MotionEditor", "--exact")
     session.wait_for_undo("Import source")
     step("fitted screenshot", "screenshot", "--file", session.artifact_dir / "fitted.png", "--scale", "2")
+    session.hover_selected_source()
     step("open its settings", "click", "--name", "3D object settings...", "--exact")
     command("wait-for-locator", "--name", "3D object size", "--exact")
     step("popover screenshot", "screenshot", "--file", session.artifact_dir / "popover.png", "--scale", "2")

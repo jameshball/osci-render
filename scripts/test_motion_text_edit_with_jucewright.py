@@ -64,6 +64,7 @@ try:
     before = saved_asset()
     clips = saved_clips()
     assert len(clips) == 2 and clips[0].get("asset") == clips[1].get("asset")
+    session.hover_selected_source()
     step("open shared text", "click", "--name", "Edit text...", "--exact")
     command("wait-for-locator", "--name", "Source text", "--class", "juce::TextEditor", "--exact")
     step("edit multiline text", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "RETURN\nTOGETHER")
@@ -80,6 +81,7 @@ try:
     typography = ET.fromstring(after).find("typography")
     assert typography.get("family") == FONT and typography.get("style") == "1" and typography.get("alignment") == "1"
     assert float(typography.get("lineSpacing")) == 1.8 and float(typography.get("tracking")) == 0.15
+    session.hover_selected_source()
     step("open text for preparation failure", "click", "--name", "Edit text...", "--exact")
     oversized_geometry = "MW" * 8000
     step("draft exceeding geometry budget", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", oversized_geometry)
@@ -101,6 +103,7 @@ try:
     step("recover shorter title", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "RECOVERED\nTITLE")
     step("retained formatting and error", "screenshot", "--file", session.artifact_dir / "text-recovery.png")
     step("apply recovered title", "click", "--name", "Apply text", "--exact")
+    session.hover_selected_source()
     command("wait-for-locator", "--name", "Edit text...", "--exact")
     command("wait", "--ms", 500)
     recovered = saved_asset()
@@ -111,6 +114,7 @@ try:
     assert saved_asset() == before
     step("redo shared edit", "click", "--name", "Redo", "--exact")
     assert saved_asset() == after
+    session.hover_selected_source()
     step("open text to cancel", "click", "--name", "Edit text...", "--exact")
     step("unapplied edit", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "DO NOT APPLY")
     step("dismiss edit", "click", "--name", "Cancel", "--class", "juce::TextButton", "--exact")
@@ -123,6 +127,7 @@ try:
     session.open_project(project)
     command("wait", "--ms", 500)
     step("select text asset", "click", "--name", "Title.txt", "--role", "listItem", "--exact", "--position", "6,12")
+    session.hover_selected_source()
     step("reopen saved text", "click", "--name", "Edit text...", "--exact")
     snapshot = command("snapshot", "--json", "--full")
     assert "RETURN" in snapshot and "TOGETHER" in snapshot and "DO NOT APPLY" not in snapshot
@@ -136,6 +141,7 @@ try:
     command("wait-for-locator", "--name", "Undo Make source unique", "--class", "juce::Label", "--exact")
     isolated_clips = saved_clips()
     assert len(isolated_clips) == 2 and isolated_clips[0].get("asset") != isolated_clips[1].get("asset")
+    session.hover_selected_source()
     step("edit isolated text", "click", "--name", "Edit text...", "--exact")
     step("replace isolated text", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "ONLY THIS CLIP")
     step("apply isolated text", "click", "--name", "Apply text", "--exact")
