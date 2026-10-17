@@ -82,7 +82,7 @@ try:
     baseline = session.artifact_dir / "parent-before.png"
     step("parent view before navigation", "screenshot", "--file", baseline)
     step("select library composition", "click", "--name", "Composition 1", "--role", "listItem", "--exact", "--position", "6,12")
-    step("enter from graph", "click", "--name", "Open composition", "--class", "juce::TextButton", "--exact")
+    step("enter from graph", "click", "--name", "Open composition", "--role", "button", "--exact")
     command("wait-for-locator", "--name", "Back to Main", "--exact")
     step("child preview", "screenshot", "--file", session.artifact_dir / "child-preview.png")
     step("return to parent graph", "click", "--name", "Back to Main", "--exact")

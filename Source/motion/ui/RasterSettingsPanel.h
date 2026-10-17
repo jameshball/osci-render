@@ -264,7 +264,7 @@ private:
                 result.framesPerSecond = job->settings.videoFrameRate;
                 result.frameStep = static_cast<double>(count) / static_cast<double>(std::max<std::size_t>(shown, 1));
                 result.caption = juce::String(static_cast<juce::int64>(count)) + " frames" + motion::style::dot()
-                    + juce::String(static_cast<double>(count) / job->settings.videoFrameRate, 1) + " s, as it will play";
+                    + juce::String(static_cast<double>(count) / job->settings.videoFrameRate, 1) + " s";
             } else {
                 result.error = juce::String(prepared.error);
             }
