@@ -387,11 +387,12 @@ bool MotionEditor::waitsForSliderBakes() {
 }
 
 void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutLive) {
-    if (exportState != nullptr || waitsForSliderBakes()) {
+    // The project's audio draws nothing: Lua sliders and live sources don't
+    // matter to it.
+    const auto beam = motion::beamOutputChannels(mode) > 0;
+    if (exportState != nullptr || (beam && waitsForSliderBakes())) {
         return;
     }
-    // The project's audio draws nothing, so live sources don't matter to it.
-    const auto beam = motion::beamOutputChannels(mode) > 0;
     const juce::Component::SafePointer<MotionEditor> self(this);
     if (beam && !leaveOutLive && waitsForCapture(false, [self, mode] { if (self != nullptr) { self->exportSignal(mode, true); } })) {
         captureForSignal = mode;

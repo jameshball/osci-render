@@ -65,4 +65,13 @@ inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, j
     return true;
 }
 
+// Silences the beam on an output: still and dark. Silence alone isn't dark
+// on an inverted Z input, where no voltage lights the beam where it rests.
+inline void blankBeam(OutputMode mode, juce::AudioBuffer<float>& output, int count) {
+    output.clear(0, count);
+    if (mode == OutputMode::xyzInverted && output.getNumChannels() >= 3) {
+        juce::FloatVectorOperations::fill(output.getWritePointer(2), zBrightness(0, 0, 0, true), count);
+    }
+}
+
 }

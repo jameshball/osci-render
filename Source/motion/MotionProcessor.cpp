@@ -241,7 +241,9 @@ void MotionProcessor::routeSignalOutput(juce::AudioBuffer<float>& buffer) {
     const auto mode = outputMode.load();
     const auto audible = !muteParameter->getBoolValue();
     const auto count = buffer.getNumSamples();
-    if (audible && motion::routeBeam(mode, signal, buffer, count)) {
+    if (!audible) {
+        motion::blankBeam(mode, buffer, count);
+    } else if (motion::routeBeam(mode, signal, buffer, count)) {
         applyVolumeAndThreshold(buffer.getArrayOfWritePointers(), count);
     }
 }

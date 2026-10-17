@@ -252,6 +252,17 @@ public:
             expect(!motion::routeBeam(motion::OutputMode::soundtrack, beam, five, 5));
             expect(motion::routeBeam(motion::OutputMode::xy, beam, stereo, 5));
             expectEquals(stereo.getSample(0, 4), .5f);
+            // Muted, the beam rests dark: no voltage on a Z input, full voltage on an inverted one.
+            for (const auto inverted : {false, true}) {
+                juce::AudioBuffer<float> muted(3, 5);
+                expect(motion::routeBeam(inverted ? motion::OutputMode::xyzInverted : motion::OutputMode::xyz, beam, muted, 5));
+                motion::blankBeam(inverted ? motion::OutputMode::xyzInverted : motion::OutputMode::xyz, muted, 5);
+                for (int i = 0; i < 5; ++i) {
+                    expectEquals(muted.getSample(0, i), 0.0f);
+                    expectEquals(muted.getSample(1, i), 0.0f);
+                    expectEquals(muted.getSample(2, i), inverted ? 1.0f : 0.0f);
+                }
+            }
         }
     }
 
