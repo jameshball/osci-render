@@ -75,6 +75,8 @@ public:
     }
 
     std::function<void(motion::BakeSettings)> onBake;
+    // Settings changed to ones that can be baked.
+    std::function<void()> onChanged;
     // The editor's header holds the bake button.
     juce::TextButton& bakeButton() { return bake; }
     // The last valid settings shown.
@@ -129,6 +131,7 @@ private:
         const auto frames = next.frameCount();
         const auto mib = static_cast<double>(frames) * next.pointsPerFrame * sizeof(motion::PointSample) / (1024 * 1024);
         summary.setText(juce::String(static_cast<juce::int64>(frames)) + " frames" + motion::style::dot() + juce::String(mib, 2) + " MiB", juce::dontSendNotification);
+        if (onChanged) { onChanged(); }
     }
     motion::BakeSettings settings;
     bool valid = false;

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Write a new script from Add source: the editor opens on a short working script, which bakes as it is."""
 import json
+import time
 import subprocess
 from jucewright_osci_browser.cli import parse_args
 from jucewright_osci_browser.session import BrowserSession
@@ -50,7 +51,19 @@ try:
     step("menu screenshot", "screenshot", "--file", session.artifact_dir / "menu.png", "--scale", "2")
     step("write a script", "click", "--name", "Write a script...", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Lua Code Editor", "--role", "editableText", "--exact")
+    time.sleep(2)
     step("editor screenshot", "screenshot", "--file", session.artifact_dir / "editor.png", "--scale", "2")
+    # Edits show on the Scope as they are made; a mistake shows as it is made.
+    code = next(n for n in nodes(json.loads(command("snapshot", "--json", "--full"))) if n.get("name") == "Lua Code Editor" and n.get("role") == "editableText")
+    step("five petals", "fill", "--name", "Lua Code Editor", "--role", "editableText", "--exact", code["value"].replace("3 + math.floor", "5 + math.floor"))
+    time.sleep(2)
+    step("edited screenshot", "screenshot", "--file", session.artifact_dir / "edited.png", "--scale", "2")
+    step("a mistake", "fill", "--name", "Lua Code Editor", "--role", "editableText", "--exact", code["value"].replace("return {x, y}", "return {x, y, nope()}"))
+    time.sleep(2)
+    command("wait-for-locator", "--component-name", "Source preparation error", "--role", "label", "--exact")
+    step("mistake screenshot", "screenshot", "--file", session.artifact_dir / "mistake.png", "--scale", "2")
+    step("put it right", "fill", "--name", "Lua Code Editor", "--role", "editableText", "--exact", code["value"])
+    time.sleep(2)
     step("bake it", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
     session.wait_for_undo("Import source", 60)
     if names() != ["Script.lua"]:

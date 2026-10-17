@@ -24,6 +24,7 @@ public:
         motion::style::makePrimary(bake);
         addAndMakeVisible(bake);
         baking.onBake = [this](motion::BakeSettings values) { if (onDone) { onDone(values, model.getCode()); } };
+        baking.onChanged = [this] { if (onChanged) { onChanged(); } };
         addAndMakeVisible(baking);
         // The code sits on the Scene's dark page. The shared editor's frame
         // and button row fall outside the clip, leaving only the code.
@@ -60,7 +61,27 @@ public:
 
     std::function<void(motion::BakeSettings, const juce::String&)> onDone;
     std::function<void()> onCancel;
+    // The code or its settings changed: the Scope shows them as they bake.
+    std::function<void()> onChanged;
     void focusCode() { editor.getEditor().grabKeyboardFocus(); }
+    juce::String code() const { return model.getCode(); }
+    motion::BakeSettings settings() const { return baking.currentSettings(); }
+    // What baking the code as it stands said: its problem, on its line and
+    // in the strip, or none.
+    void showLiveProblem(const juce::String& message) {
+        stale = false;
+        problemLine = errorLine(message);
+        model.clearDiagnostic();
+        if (problemLine > 0) { static_cast<ErrorListener&>(model).onError(problemLine, message.fromFirstOccurrenceOf(":", false, false).trim()); }
+        problem.setColour(juce::Label::textColourId, osci::Colours::text());
+        problem.setText(message, juce::dontSendNotification);
+        problem.setTooltip(message);
+        if (problem.isVisible() != message.isNotEmpty()) {
+            problem.setVisible(message.isNotEmpty());
+            resized();
+        }
+        repaint();
+    }
 
     void resized() override {
         titleArea = motion::style::sceneEditor::layoutHeader(getLocalBounds(), baking.bakeButton(), cancelButton);
@@ -122,8 +143,12 @@ public:
     }
 
 private:
-    void codeDocumentTextInserted(const juce::String&, int) override { markStale(); }
-    void codeDocumentTextDeleted(int, int) override { markStale(); }
+    void codeDocumentTextInserted(const juce::String&, int) override { codeChanged(); }
+    void codeDocumentTextDeleted(int, int) override { codeChanged(); }
+    void codeChanged() {
+        markStale();
+        if (onChanged) { onChanged(); }
+    }
     void markStale() {
         if (stale || !problem.isVisible()) { return; }
         stale = true;

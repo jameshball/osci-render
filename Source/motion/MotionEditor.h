@@ -211,6 +211,16 @@ private:
     SourceRequest textRequest;
     // Typing previews after a short pause rather than on every key.
     double textPreviewDue = 0;
+    // A script being written plays on the Scope a moment after each change:
+    // baked as it stands, off the message thread, the newest only.
+    void previewLua();
+    void showLuaPreview(std::shared_ptr<motion::Asset> asset);
+    double luaPreviewDue = 0;
+    // Playback started so the script shows running, stopped again with it.
+    bool luaStartedPlayback = false;
+    std::shared_ptr<std::atomic<bool>> luaPreviewCancel;
+    std::uint64_t luaPreviewGeneration = 0;
+    juce::ThreadPool luaPreviews {1};
     // The Scope as drawn a moment ago (every couple of seconds), so saving
     // can take its picture without waiting for the next frame.
     juce::Image recentFrame;

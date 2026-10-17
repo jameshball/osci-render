@@ -354,6 +354,8 @@ void MotionEditor::setUpTransport() {
 }
 
 MotionEditor::~MotionEditor() {
+    if (luaPreviewCancel != nullptr) { luaPreviewCancel->store(true); }
+    luaPreviews.removeAllJobs(true, 10000);
     processor.document.onEdited = nullptr;
     juce::Desktop::getInstance().removeFocusChangeListener(this);
     // Closed as it should be: the session is kept by the app on quitting.
@@ -492,6 +494,7 @@ void MotionEditor::timerCallback() {
     }
     refreshUndo();
     if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) { previewText(); }
+    if (luaPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= luaPreviewDue) { previewLua(); }
     processor.showIdleSeek(processor.document.mainProject().duration);
     auto& previewRate = processor.recordingParameters.frameRate;
     // Keep playback and export cadence aligned within the live renderer's supported range.

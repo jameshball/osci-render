@@ -791,6 +791,11 @@ void MotionEditor::closeSceneEditor() {
     sceneEditor.reset();
     assetLibrary.setEditingSource(false);
     textPreviewDue = 0;
+    luaPreviewDue = 0;
+    ++luaPreviewGeneration;
+    if (luaStartedPlayback) { processor.playing.store(false); }
+    luaStartedPlayback = false;
+    if (luaPreviewCancel != nullptr) { luaPreviewCancel->store(true); }
     for (auto* component : std::initializer_list<juce::Component*> {&composition, &viewportHeader}) { component->setVisible(true); }
     // Drop the preview of what was being edited.
     processor.prepareComposition(processor.document.project());
@@ -928,8 +933,64 @@ void MotionEditor::showLuaEditor(SourceRequest request) {
             if (owner->processor.document.generation() == next.generation) { owner->beginSourceImport(next, settings); }
         });
     };
+    editor.onChanged = [this] { luaPreviewDue = juce::Time::getMillisecondCounterHiRes() + 300; };
     resized();
     editor.focusCode();
+    previewLua();
+    // A script shows running, as osci-render plays it, while it is written.
+    luaStartedPlayback = !processor.playing.load();
+    processor.playing.store(true);
+}
+
+void MotionEditor::previewLua() {
+    luaPreviewDue = 0;
+    const auto* editor = sceneEditorAs<MotionLuaSourceEditor>();
+    if (editor == nullptr) { return; }
+    if (luaPreviewCancel != nullptr) { luaPreviewCancel->store(true); }
+    auto cancel = std::make_shared<std::atomic<bool>>(false);
+    luaPreviewCancel = cancel;
+    auto asset = std::make_shared<motion::Asset>();
+    asset->name = luaRequest.replacement != nullptr ? luaRequest.replacement->name : luaRequest.file.getFileName();
+    asset->extension = ".lua";
+    const auto code = editor->code();
+    asset->data.append(code.toRawUTF8(), code.getNumBytesAsUTF8());
+    asset->bakeSettings = editor->settings();
+    const auto generation = ++luaPreviewGeneration;
+    luaPreviews.addJob([owner = juce::Component::SafePointer<MotionEditor>(this), asset, cancel, generation] {
+        const auto result = motion::decodeAsset(*asset, cancel.get());
+        if (cancel->load()) { return; }
+        juce::MessageManager::callAsync([owner, asset, result, generation] {
+            if (owner == nullptr || generation != owner->luaPreviewGeneration) { return; }
+            auto* editor = owner->sceneEditorAs<MotionLuaSourceEditor>();
+            if (editor == nullptr) { return; }
+            // A problem shows as it is found; the Scope keeps the last that ran.
+            editor->showLiveProblem(result.failed() ? result.getErrorMessage() : juce::String());
+            if (result.wasOk()) { owner->showLuaPreview(asset); }
+        });
+    });
+}
+
+// In place of the source being edited, or a new one on a track of its own
+// for the whole project, as a drawing previews.
+void MotionEditor::showLuaPreview(std::shared_ptr<motion::Asset> asset) {
+    auto project = processor.document.project();
+    if (luaRequest.replacement != nullptr) {
+        asset->id = luaRequest.replacement->id;
+        for (auto& item : project.assets) {
+            if (item->id == asset->id) { item = asset; }
+        }
+    } else {
+        asset->id = std::numeric_limits<motion::Id>::max() - 4;
+        project.assets.push_back(asset);
+        motion::Track track;
+        track.id = std::numeric_limits<motion::Id>::max() - 5;
+        track.name = "Script";
+        auto clip = motion::Document::makeClip(std::numeric_limits<motion::Id>::max() - 6, *asset, 0);
+        clip.duration = project.duration;
+        track.insert(clip, project.tempo());
+        project.tracks.push_back(track);
+    }
+    processor.prepareComposition(project);
 }
 
 // The words being written, on the output: the source is swapped in place,
