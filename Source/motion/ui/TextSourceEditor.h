@@ -28,7 +28,6 @@ public:
         families = juce::Font::findAllTypefaceNames();
         families.sort(true);
         family.setName("Text font family");
-        family.setTooltip("Font");
         family.addItem("Default font", 1);
         for (int i = 0; i < families.size(); ++i) { family.addItem(families[i], i + 2); }
         if (settings.family.isNotEmpty() && !families.contains(settings.family)) {
@@ -44,8 +43,6 @@ public:
             settings.family = index >= 0 && index < families.size() ? families[index] : juce::String();
             changed();
         };
-        bold.setTooltip("Bold");
-        italic.setTooltip("Italic");
         for (auto [button, flag] : {std::pair {&bold, motion::TextSettings::bold}, std::pair {&italic, motion::TextSettings::italic}}) {
             button->setClickingTogglesState(true);
             button->onClick = [this, button, flag] {
@@ -53,13 +50,12 @@ public:
                 changed();
             };
         }
-        for (auto [button, value, tip] : {std::tuple {&alignLeft, 0, "Align left"}, std::tuple {&alignCentre, 1, "Align centre"}, std::tuple {&alignRight, 2, "Align right"}}) {
-            button->setTooltip(tip);
+        for (auto [button, value] : {std::pair {&alignLeft, 0}, std::pair {&alignCentre, 1}, std::pair {&alignRight, 2}}) {
             button->setRadioGroupId(71);
             button->setClickingTogglesState(true);
             button->onClick = [this, value] { settings.alignment = value; changed(); };
         }
-        for (auto [field, spec, tip] : {std::tuple {&lineSpacing, &lineSpacingSpec, "Line spacing (times the line height)"}, std::tuple {&tracking, &trackingSpec, "Tracking: extra space between letters (em)"}}) {
+        for (auto [field, spec, tip] : {std::tuple {&lineSpacing, &lineSpacingSpec, "Line spacing, in line heights"}, std::tuple {&tracking, &trackingSpec, "Extra space between letters"}}) {
             field->setSpec(*spec);
             field->setTooltip(tip);
             field->onChange = [this](double) { readFields(); };

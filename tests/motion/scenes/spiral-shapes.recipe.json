@@ -10,8 +10,7 @@
     "properties": {
       "position.y": 0.55,
       "position.z": 4.8,
-      "rotation.x": -12,
-      "hideLines": 100
+      "rotation.x": -12
     }
   },
   "objects": [

@@ -47,7 +47,8 @@
         "green": 0.7,
         "blue": 0.15,
         "scale.x": 4,
-        "scale.y": 4
+        "scale.y": 4,
+        "solid": 100
       }
     },
     {
@@ -63,7 +64,8 @@
         "scale.y": 3.1999999999999997,
         "red": 0.3,
         "green": 0.9,
-        "blue": 1
+        "blue": 1,
+        "solid": 100
       }
     },
     {
@@ -79,7 +81,8 @@
         "scale.y": 4.8,
         "red": 0.3,
         "green": 0.9,
-        "blue": 1
+        "blue": 1,
+        "solid": 100
       }
     },
     {
@@ -95,7 +98,8 @@
         "scale.y": 2.9333333333333336,
         "red": 0.3,
         "green": 0.9,
-        "blue": 1
+        "blue": 1,
+        "solid": 100
       }
     },
     {
@@ -111,7 +115,8 @@
         "scale.y": 4.0,
         "red": 0.3,
         "green": 0.9,
-        "blue": 1
+        "blue": 1,
+        "solid": 100
       }
     },
     {
@@ -127,15 +132,15 @@
         "scale.y": 5.2,
         "red": 0.3,
         "green": 0.9,
-        "blue": 1
+        "blue": 1,
+        "solid": 100
       }
     }
   ],
   "camera": {
     "properties": {
       "position.y": 0.3,
-      "position.z": 1.5,
-      "hideLines": 100
+      "position.z": 1.5
     }
   },
   "modulators": [

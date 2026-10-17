@@ -42,8 +42,7 @@ public:
         nameAction(live.has_value() ? "Done" : isVideo ? "Prepare video" : "Prepare image");
         detailEdited = initial.resolution != motion::RasterSettings().resolution || initial.mode == motion::RasterSettings::Mode::scanlines;
         mode.setSelected(initial.mode == motion::RasterSettings::Mode::scanlines ? 1 : initial.mode == motion::RasterSettings::Mode::hilbert ? 2 : 0);
-        mode.setTooltip("Outlines follow image edges. Scanlines fill the visible image with horizontal beam passes. "
-            "Hilbert draws one curve over it, as dense as the image is bright: shading that shows on any scope, by X and Y alone.");
+        mode.setTooltip("Outlines follow image edges. Scanlines fill it with horizontal passes. Hilbert draws one curve, denser where brighter, which shows on any scope.");
         // Samples the other modes start with, back when leaving Hilbert.
         const auto otherSamples = initial.mode == motion::RasterSettings::Mode::hilbert ? motion::RasterSettings().pointsPerFrame : initial.pointsPerFrame;
         mode.onChange = [this, otherSamples](int index) {
@@ -54,13 +53,12 @@ public:
         };
         if (initial.mode != motion::RasterSettings::Mode::hilbert) { settings.shading = xyOnlyScope ? motion::RasterSettings::Shading::density : motion::RasterSettings::Shading::colour; }
         shading.setSelected(settings.shading == motion::RasterSettings::Shading::colour ? 1 : 0);
-        shading.setTooltip("How the Hilbert curve shows how bright the picture is: by how dense it is, which a scope shows by X and Y alone; "
-            "or by how bright it is drawn, in the picture's colours, the curve as dense all over, for a scope with brightness (XYRGB).");
+        shading.setTooltip("Density shows brightness by how dense the curve is, on any scope. Brightness draws it in the picture's colours, for a scope with brightness (XYRGB).");
         shading.onChange = [this](int) { refresh(); };
         threshold.setName("Image threshold");
         threshold.setSpec(thresholdSpec);
         threshold.setValue(std::isfinite(initial.threshold) ? std::clamp(initial.threshold * 100, 0.0, 100.0) : 0);
-        threshold.setTooltip("Pixels below this brightness are blanked. Transparency also reduces brightness.");
+        threshold.setTooltip("Pixels darker than this are blanked");
         threshold.onChange = [this](double) { thresholdEdited = true; refresh(); };
         threshold.onCommit = threshold.onChange;
         resolutions = {64, 128, 256, 512};
@@ -70,22 +68,21 @@ public:
         detail.setName("Image detail");
         for (std::size_t i = 0; i < resolutions.size(); ++i) { detail.addItem(juce::String(resolutions[i]) + " px", static_cast<int>(i + 1)); }
         selectResolution(initial.resolution);
-        detail.setTooltip("Maximum tracing dimension. Lower detail simplifies outlines and reduces preparation work.");
+        detail.setTooltip("The size the image is traced at; lower simplifies outlines");
         detail.onChange = [this] { detailEdited = true; refresh(); };
         samples.setName("Image samples per frame");
         for (std::size_t i = 0; i < strides.size(); ++i) {
             samples.addItem(juce::String(static_cast<juce::int64>(strides[i])), static_cast<int>(i + 1));
             if (strides[i] == initial.pointsPerFrame) { samples.setSelectedId(static_cast<int>(i + 1), juce::dontSendNotification); }
         }
-        samples.setTooltip("Beam samples stored per frame. Increase this if the image is too complex.");
+        samples.setTooltip("Increase this if the image is too complex");
         samples.onChange = [this] { samplesEdited = true; refresh(); };
         invert.setToggleState(initial.invert, juce::dontSendNotification);
-        invert.setTooltip("Invert image colours before tracing, for dark artwork on a light background. Transparency stays unchanged.");
+        invert.setTooltip("For dark artwork on a light background");
         invert.onClick = [this] { refresh(); };
         frameRate.setName("Video bake frame rate");
         frameRate.setSpec(frameRateSpec);
         frameRate.setValue(initial.videoFrameRate);
-        frameRate.setTooltip("Resample video timing at this rate for deterministic seeking and export.");
         frameRate.onChange = [this](double value) { settings.videoFrameRate = value; refresh(); };
         frameRate.onCommit = frameRate.onChange;
         for (auto* field : {&threshold, &frameRate}) { field->setFill(fieldFill()); }
@@ -127,7 +124,7 @@ public:
             cancel.setVisible(false);
             error.setVisible(false);
             record.setName("Record capture");
-            record.setTooltip("Record what arrives, to draw it offline: export needs a capture of a live picture.");
+            record.setTooltip("Export needs a capture of a live picture");
             record.onClick = [this] {
                 const auto result = live->onRecord ? live->onRecord() : juce::Result::fail("Recording isn't available.");
                 if (result.failed()) { recordError = result.getErrorMessage(); }

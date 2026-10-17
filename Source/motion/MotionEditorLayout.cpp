@@ -46,6 +46,7 @@ void MotionEditor::resized() {
         // One line, shortened at its end when long (its tooltip has it whole).
         const auto line = undo.withTrimmedRight(4);
         undoDescription.setBounds(line.withSizeKeepingCentre(line.getWidth(), 16));
+        motion::style::tooltipWhenCut(undoDescription);
     }
     top.removeFromRight(8);
     // Transport sits centred in the menu row, leaving the full height below
@@ -131,9 +132,6 @@ void MotionEditor::resized() {
     effectLibrary.setBounds(library.reduced(4, 0));
     modulatorLibrary.setBounds(library);
     importButton.setBounds(library.removeFromTop(42).reduced(8, 6).withTrimmedBottom(-2));
-    auto quick = library.removeFromTop(34).reduced(8, 4);
-    addLightButton.setBounds(quick.removeFromLeft((quick.getWidth() - motion::style::gap) / 2));
-    addMirrorButton.setBounds(quick.withTrimmedLeft(motion::style::gap));
     assetLibrary.setBounds(library.reduced(4, 0));
     area.removeFromLeft(3);
     inspectorBounds = area.removeFromRight(std::clamp(300 + extra * 3 / 20, 300, 420));

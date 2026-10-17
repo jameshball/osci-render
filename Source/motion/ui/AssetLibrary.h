@@ -62,6 +62,13 @@ private:
     mutable std::vector<Thumbnail> thumbnails;
 
     void paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const;
+    // Where a row's picture is, and the badge in its corner saying its file is
+    // linked from disk.
+    static juce::Rectangle<int> thumbnailArea(int width, int height) { return juce::Rectangle<int>(0, 0, width, height).reduced(4, 2).reduced(8, 3).removeFromLeft(36).withSizeKeepingCentre(34, 34); }
+    static juce::Rectangle<float> linkBadge(int width, int height) {
+        const auto picture = thumbnailArea(width, height).toFloat();
+        return juce::Rectangle<float>(12, 12).withCentre(picture.getBottomRight() - juce::Point<float>(3, 3));
+    }
 
     void listBoxItemClicked(int row, const juce::MouseEvent& event) override;
 
@@ -73,7 +80,7 @@ private:
     // The row under the pointer shows a + that adds it at the playhead, as
     // double-clicking it does.
     int hoveredRow = -1;
-    void mouseMove(const juce::MouseEvent& event) override { hover(event.getEventRelativeTo(&list).getPosition()); }
+    void mouseMove(const juce::MouseEvent& event) override;
     // Leaving a row (for its own edit button, or away) goes by where the
     // pointer now is.
     void mouseExit(const juce::MouseEvent&) override { hover(list.getMouseXYRelative()); }
@@ -104,6 +111,7 @@ private:
     std::vector<std::shared_ptr<const motion::Asset>> assets;
     std::vector<std::shared_ptr<const motion::CompositionDefinition>> definitions;
     juce::ListBox list;
+    osci::ListBoxScrollFades fades {list};
     juce::TextEditor search, rename;
     motion::Id renaming = 0;
     juce::Label status;

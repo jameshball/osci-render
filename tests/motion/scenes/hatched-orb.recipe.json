@@ -10,8 +10,7 @@
     "properties": {
       "position.z": 4.6,
       "hatching": 100,
-      "hatchDetail": 64,
-      "hideLines": 100
+      "hatchDetail": 64
     }
   },
   "objects": [

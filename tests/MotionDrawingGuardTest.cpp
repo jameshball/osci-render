@@ -204,6 +204,26 @@ public:
             if (std::abs(a.x - b.x) > 2) { expect(dark(a) && dark(b), "Every spatial travel has two dark endpoints"); }
         }
 
+        beginTest("Without blanking (XY only), strokes have no dark ends: the beam steps from one straight to the next");
+        expectEquals(uneven.minimumTraversalSamples(false), std::int64_t(4));
+        expectEquals(uneven.coarseTraversalSamples(false), std::int64_t(4));
+        {
+            // The same six extras, split 2:4, with no dark samples to make room for.
+            motion::PreparedDrawing::TraversalCursor kept;
+            for (std::int64_t index = 0; index < 10; ++index) {
+                const auto point = uneven.sampleTraversal(index, 10, false, nullptr, false);
+                expect(!dark(point), "every sample is lit");
+                samePosition(point, uneven.sampleTraversal(index, 10, false, &kept, false));
+            }
+            expectEquals(uneven.sampleTraversal(0, 10, false, nullptr, false).x, 0.0f);
+            expectEquals(uneven.sampleTraversal(3, 10, false, nullptr, false).x, 1.0f);
+            expectEquals(uneven.sampleTraversal(4, 10, false, nullptr, false).x, 10.0f);
+            expectEquals(uneven.sampleTraversal(9, 10, false, nullptr, false).x, 12.0f);
+            int crossings = 0;
+            for (std::int64_t index = 0; index + 1 < 10; ++index) { crossings += std::abs(uneven.sampleTraversal(index + 1, 10, false, nullptr, false).x - uneven.sampleTraversal(index, 10, false, nullptr, false).x) > 2 ? 1 : 0; }
+            expectEquals(crossings, 1, "the gap is crossed in one step");
+        }
+
         beginTest("A traversal cursor samples just as searching does, in any order");
         {
             // Strokes of curves and corners, so samples land in many runs of shapes.

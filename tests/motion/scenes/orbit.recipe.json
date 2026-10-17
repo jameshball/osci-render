@@ -9,8 +9,7 @@
   "camera": {
     "lookAt": "Floor",
     "properties": {
-      "position.y": 2.7,
-      "hideLines": 100
+      "position.y": 2.7
     },
     "keys": {
       "position.x": {

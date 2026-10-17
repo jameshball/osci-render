@@ -34,10 +34,14 @@ inline constexpr double defaultCameraFieldOfView = 28.072486935852957;
 // it: at 0 it draws in its own colour whatever lights shine, as a flame or a
 // screen gives off its own light. Mirror is how brightly its surfaces show
 // the rest of the scene, as a mirror does: at 100 a perfect mirror. A group's
-// makes what it holds reflect at least as much. The Lines properties are how
-// a surface draws itself: its own lines (Edges), its outline as the camera
-// sees it, and patterns over it that show its shape, each as bright as set
-// (Fill detail is how many lines across a pattern draws).
+// makes what it holds reflect at least as much. Solid is how far its faces
+// hide what is behind them, its own far side included: at 100 (as it starts)
+// they hide it all; at 0 it is a wireframe, seen through; part-way, what it
+// hides is dimmed. A group's multiplies what it holds by its own, as Lit by
+// lights does. The Lines properties are how a surface draws itself: its own
+// lines (Edges), its outline as the camera sees it, and patterns over it that
+// show its shape, each as bright as set (Fill detail is how many lines across
+// a pattern draws).
 inline constexpr auto objectPropertySpecs = std::to_array<PropertySpec>({
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.y", "Position Y", "Position", "Y", -unbounded, unbounded, 0, .01, 3, ""},
@@ -58,6 +62,7 @@ inline constexpr auto objectPropertySpecs = std::to_array<PropertySpec>({
     {"beam", "Beam", "Beam", "", 0, maximumBeam, 1, .01, 2, "×"},
     {"lit", "Lit by lights", "Lit by lights", "", 0, 100, 100, 1, 0, "%"},
     {"reflects", "Mirror", "Mirror", "", 0, 100, 0, 1, 0, "%"},
+    {"solid", "Solid", "Solid", "", 0, 100, 100, 1, 0, "%"},
     {"edges", "Edges", "Edges", "", 0, 100, 100, 1, 0, "%"},
     {"outline", "Outline", "Outline", "", 0, 100, 0, 1, 0, "%"},
     {"spiral", "Spiral", "Spiral", "", 0, 100, 0, 1, 0, "%"},
@@ -78,7 +83,7 @@ consteval std::size_t specIndex(const std::array<PropertySpec, size>& specs, std
     throw "No such property";
 }
 inline constexpr auto opacityIndex = specIndex(objectPropertySpecs, "opacity"), anchorIndex = specIndex(objectPropertySpecs, "anchor.x"), beamIndex = specIndex(objectPropertySpecs, "beam"),
-                      litIndex = specIndex(objectPropertySpecs, "lit"), reflectsIndex = specIndex(objectPropertySpecs, "reflects");
+                      litIndex = specIndex(objectPropertySpecs, "lit"), reflectsIndex = specIndex(objectPropertySpecs, "reflects"), solidIndex = specIndex(objectPropertySpecs, "solid");
 // The Lines properties: edges, outline, the four patterns (in Pattern order:
 // spiral, noise, slices, rings), the fill's detail, and how
 // the noise morphs: where it is in its loop, and how fast it goes round.
@@ -93,11 +98,12 @@ inline bool isLinesProperty(std::string_view id) {
 }
 
 // The same properties as Properties shows them: the anchor closes Transform,
-// and Mirror closes Surface, after how the surface draws itself.
+// Solid opens Surface, and Mirror closes it, after how the surface draws
+// itself.
 inline constexpr auto objectInspectorSpecs = [] {
     constexpr std::array<std::string_view, objectPropertySpecs.size()> order {"position.x", "position.y", "position.z", "rotation.x", "rotation.y", "rotation.z",
         "scale.x", "scale.y", "scale.z", "anchor.x", "anchor.y", "anchor.z", "red", "green", "blue", "opacity", "lit", "beam",
-        "edges", "outline", "spiral", "noise", "slices", "rings", "fillDetail", "noisePhase", "noiseFlow", "reflects"};
+        "solid", "edges", "outline", "spiral", "noise", "slices", "rings", "fillDetail", "noisePhase", "noiseFlow", "reflects"};
     std::array<PropertySpec, order.size()> result {};
     for (std::size_t index = 0; index < order.size(); ++index) {
         for (const auto& spec : objectPropertySpecs) {
@@ -148,8 +154,6 @@ inline constexpr auto fractalPropertySpecs = std::to_array<PropertySpec>({
     {"fractal.depth", "Depth", "Depth", "", 0, 15, 3, .05, 2, ""},
 });
 
-// Hide lines: how far lines behind the faces of 3D meshes fade from view,
-// from all of them drawn (0) to none (100); part-way they are dimmed.
 // Hatching: the scene shaded by a Hilbert curve over the frame, denser where
 // more light falls, rather than by brightness. Hatch detail is how many of
 // its cells span the frame where the light is full.
@@ -161,11 +165,9 @@ inline constexpr auto cameraPropertySpecs = std::to_array<PropertySpec>({
     {"rotation.y", "Rotation Y", "Rotation", "Y", -unbounded, unbounded, 0, 1, 1, "°"},
     {"rotation.z", "Rotation Z", "Rotation", "Z", -unbounded, unbounded, 0, 1, 1, "°"},
     {"fov", "Field of view", "Field of view", "", 1, 179, defaultCameraFieldOfView, .5, 1, "°"},
-    {"hideLines", "Hide lines", "Hide lines", "", 0, 100, 0, 1, 0, "%"},
     {"hatching", "Hatching", "Hatching", "", 0, 100, 0, 1, 0, "%"},
     {"hatchDetail", "Hatch detail", "Hatch detail", "", 8, 256, 64, 1, 0, ""},
 });
-inline constexpr auto cameraHideLinesIndex = specIndex(cameraPropertySpecs, "hideLines");
 inline constexpr auto cameraHatchingIndex = specIndex(cameraPropertySpecs, "hatching"), cameraHatchDetailIndex = specIndex(cameraPropertySpecs, "hatchDetail");
 
 // The Scope's picture: one row each, in the visualiser's own ranges.

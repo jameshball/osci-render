@@ -16,12 +16,13 @@
 namespace motion {
 // Immutable PCM and waveform data, constructed off the realtime thread.
 // One or two channels only. PCM and pyramid payload together are limited to
-// 256 MiB; the small vector/object bookkeeping is additional. Decode callbacks
+// 2 GiB (about an hour and a half of stereo at 48 kHz); the small
+// vector/object bookkeeping is additional. Decode callbacks
 // run synchronously in blocks of at most 4096 frames and must fill every frame.
 class PreparedAudio {
 public:
-    static constexpr std::size_t maximumBytes = 256 * 1024 * 1024;
-    static constexpr std::uint64_t maximumFrames = 64 * 1024 * 1024;
+    static constexpr std::size_t maximumBytes = std::size_t {2048} * 1024 * 1024;
+    static constexpr std::uint64_t maximumFrames = std::uint64_t {512} * 1024 * 1024;
     static constexpr double maximumSampleRate = 384000;
     static constexpr std::size_t peakBlockFrames = 64;
     static constexpr std::size_t decodeBlockFrames = 4096;
@@ -178,7 +179,7 @@ private:
             return "Only mono and stereo audio are supported; downmix additional channels explicitly.";
         }
         if (frames == 0 || frames > maximumFrames || frames > std::numeric_limits<std::size_t>::max()) {
-            return "Audio requires 1 to 67108864 frames.";
+            return "Audio requires 1 to 536870912 frames.";
         }
         std::uint64_t bytes = frames * channels * sizeof(float);
         auto nodes = (frames + peakBlockFrames - 1) / peakBlockFrames;
@@ -190,7 +191,7 @@ private:
             nodes = (nodes + 1) / 2;
         }
         if (bytes > maximumBytes) {
-            return "Decoded audio and waveform data exceed the 256 MiB preparation budget. Shorten the source.";
+            return "This audio is too long to hold in memory: about an hour and a half of stereo at 48 kHz is the most. Shorten it.";
         }
         return {};
     }

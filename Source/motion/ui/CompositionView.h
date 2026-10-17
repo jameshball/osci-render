@@ -75,6 +75,9 @@ public:
     }
     std::function<void(bool)> onMotionPathChanged;
     void setMotionPathVisible(bool visible);
+    // Solid view: the faces of what is shown hide the lines behind them, as
+    // if filled with the background, so a busy scene reads at a glance.
+    void setSolidView(bool on);
     struct ViewState { motion::editor::Camera camera; MotionTransformTool tool = MotionTransformTool::move; bool motionPath = false; };
     ViewState viewState() const { return {camera, tool, showMotionPath}; }
     void restoreView(const ViewState& state);
@@ -211,8 +214,12 @@ private:
         double time, x, y, z, yaw, pitch, fov;
         motion::Id selected;
         int width, height;
+        bool solid;
         bool operator==(const PiecesKey&) const = default;
     };
+    bool solidView = true;
+    // The pieces' parts no face is in front of, from this view.
+    void keepUnhidden(const CameraView& view, double time) const;
     const std::vector<ScreenPiece>& screenPieces() const;
     mutable std::vector<ScreenPiece> pieceCache;
     mutable std::optional<PiecesKey> pieceKey;

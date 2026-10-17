@@ -67,7 +67,7 @@ public:
         const auto bar = std::max(1, beatsPerBar);
         detail = "Bar " + juce::String(static_cast<int>(std::floor(beat / bar)) + 1) + ", beat " + juce::String(beat - bar * std::floor(beat / bar) + 1, beat == std::round(beat) ? 0 : 2);
         ramp.setToggleState(ramped, juce::dontSendNotification);
-        ramp.setTooltip("Off: the tempo jumps here. On: it changes smoothly (linearly in beats) from the previous tempo point and arrives here.");
+        ramp.setTooltip("Off, the tempo jumps here; on, it changes smoothly from the previous tempo point");
         tempo.setName("Tempo change BPM");
         tempo.setTitle("Tempo change BPM");
         tempo.setText(juce::String(bpm, bpm == std::round(bpm) ? 0 : 2), false);

@@ -24,7 +24,7 @@ public:
         colours = composition.reflects(time) || hatching > 0;
         add(camera != nullptr ? static_cast<double>(camera - composition.cameras.data()) : -1.0);
         if (camera != nullptr) {
-            add(camera->hidesLines(time), hatching, hatching > 0 ? static_cast<double>(camera->hatchDetail(time)) : 0.0);
+            add(hatching, hatching > 0 ? static_cast<double>(camera->hatchDetail(time)) : 0.0);
             const auto view = camera->frame(time);
             if (view.has_value()) {
                 for (const auto& axis : {view->position, view->right, view->up, view->forward}) { add(axis.x, axis.y, axis.z); }
@@ -44,7 +44,7 @@ public:
             const auto active = clip.active(time);
             add(active ? 1.0 : 0.0);
             if (!active) { continue; }
-            add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0, clip.lit(time), clip.reflects(time));
+            add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0, clip.lit(time), clip.reflects(time), clip.solid(time));
             const auto lines = clip.lines(time);
             // Its noise's turn only while it draws noise.
             add(lines.edges, lines.outline, lines.detail, lines.patterns[static_cast<std::size_t>(surface::Pattern::noise)] > 0 ? lines.noiseTurn : 0.0);

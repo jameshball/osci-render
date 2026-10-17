@@ -40,7 +40,6 @@ public:
         port.setText(juce::String(settings.port));
         port.setJustification(juce::Justification::centredRight);
         policy.setSelected(settings.freezeOnDisconnect ? 0 : 1);
-        policy.setTooltip("What the source shows while Blender is disconnected");
         policy.fill = fieldFill();
         for (auto* editor : {&name, &port}) {
             editor->setFont(motion::style::body());

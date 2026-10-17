@@ -17,12 +17,8 @@ public:
         addAndMakeVisible(title);
         const std::array<const char*, 4> labels {"Start", "Duration", "Offset", "Speed"};
         const std::array<const char*, 4> names {"Clip start", "Clip duration", "Clip source offset", "Clip speed"};
-        const std::array<const char*, 4> hints {
-            "Move the clip without changing its source offset or animation. Type a time as the ruler shows it, or add s for seconds.",
-            "Change the right edge without stretching the source or animation. Musical lengths read bars.beats (1.2 is a bar and two beats); add s for seconds.",
-            "Source offset in seconds: slip the source and its animation inside the existing clip.",
-            "Playback multiplier. 1 is normal speed; 2 is twice as fast. Clip duration stays unchanged."
-        };
+        const std::array<const char*, 4> hints {"", "Musical lengths read bars.beats (1.2 is a bar and two beats); add s for seconds", "Slips the source and its animation inside the clip",
+            "Playback multiplier; the clip's duration stays the same"};
         for (std::size_t i = 0; i < values.size(); ++i) {
             motion::style::inspector::styleCaption(captions[i], labels[i]);
             addAndMakeVisible(captions[i]);
@@ -71,7 +67,6 @@ public:
         updating = false;
         // Which clock the clip keeps, on the heading line.
         details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "follows tempo" : "ignores tempo", juce::dontSendNotification);
-        details.setTooltip(clip != nullptr && clip->timeBase == motion::ClipTimeBase::beats ? "Follows tempo changes" : "Keeps its time when the tempo changes");
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
         status.setVisible(clip != nullptr && status.getText().isNotEmpty());

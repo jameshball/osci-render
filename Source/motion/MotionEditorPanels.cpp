@@ -1,14 +1,13 @@
 #include "MotionEditor.h"
-#include "ui/AddPicker.h"
 #include "ui/CanvasSizeEditor.h"
 #include "ui/MarkerPanel.h"
 #include "ui/GeneratorIcons.h"
 #include "ui/MenuIcons.h"
 #include "ui/ModelSizePanel.h"
+#include "ui/StylePictures.h"
 
 // Each panel set up: the Scene, the Scope, the library of sources, effects and
-// modulators, Properties, the timeline and the Graph; and the pickers that add
-// lights and mirrors.
+// modulators, Properties, the timeline and the Graph.
 
 namespace {
 // Panel tabs at their natural width, in the panel title style.
@@ -88,6 +87,7 @@ void MotionEditor::setUpScene() {
         timeline.selectClips(chosen);
     };
     sceneTools.path.onClick = [this] { composition.setMotionPathVisible(sceneTools.path.getToggleState()); };
+    sceneTools.faces.onClick = [this] { composition.setSolidView(sceneTools.faces.getToggleState()); };
     composition.onMotionPathChanged = [this](bool visible) { sceneTools.path.setToggleState(visible, juce::dontSendNotification); };
     sceneTools.fly.onClick = [this] { composition.setNavigating(!composition.isNavigating()); };
     composition.onNavigationChanged = [this](bool active) { sceneTools.fly.setToggleState(active, juce::dontSendNotification); };
@@ -203,8 +203,6 @@ void MotionEditor::setUpLibrary() {
     libraryTabs.onSelectionChanged = [this](int index) {
         assetLibrary.setVisible(index == 0);
         importButton.setVisible(index == 0);
-        addLightButton.setVisible(index == 0);
-        addMirrorButton.setVisible(index == 0);
         effectLibrary.setVisible(index == 1);
         modulatorLibrary.setVisible(index == 2);
         if (index == 2) { modulatorLibrary.refresh(); }
@@ -333,10 +331,6 @@ void MotionEditor::setUpLibrary() {
             if (example.has_value()) { owner->importExample(resources[*example]); }
         });
     };
-    addLightButton.setTooltip("Add a light: what the Scope draws is lit by it");
-    addMirrorButton.setTooltip("Add a mirror: a surface that reflects the rest of the scene");
-    addLightButton.onClick = [this] { showAddLight(); };
-    addMirrorButton.onClick = [this] { showAddMirror(); };
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
     // A model switched to its file's own size, or back to fitted, is
     // prepared again in place.
@@ -592,8 +586,7 @@ void MotionEditor::setUpGraph() {
     keyPanel.onEase = [this] { curveEditor.easeSelected(true, true); };
     curveEditor.onSelectionChanged = [this] { refreshKeyPanel(); };
     graphSideViewport.setViewedComponent(&graphSide, false);
-    graphSideViewport.setScrollBarsShown(true, false);
-    graphSideViewport.setScrollBarThickness(6);
+    motion::style::fadeScrolling(graphSideViewport);
     routingPanel.onLayoutChanged = [this] { layoutGraphSide(); };
     routingPanel.onError = [this](const juce::String& text) { statusBar.show(text); };
     curveEditor.setVisible(false);
@@ -617,48 +610,6 @@ void MotionEditor::setUpGraph() {
         processor.prepareComposition(preview);
         composition.preview(preview);
     };
-}
-
-// Small edits (a marker, a tempo change, the canvas) open in a panel that
-// points at what was clicked instead of covering the window.
-void MotionEditor::showAddLight() {
-    std::vector<motion::ui::TileGrid::Choice> lights, moving;
-    // Every kind of light, as the Add menu lists them.
-    std::vector<const motion::GeneratorDefinition*> kinds;
-    for (const auto& definition : motion::generatorDefinitions) {
-        if (definition.category == motion::GeneratorCategory::light) { kinds.push_back(&definition); }
-    }
-    for (const auto* kind : kinds) {
-        const auto& definition = *kind;
-        const juce::String name(definition.name.data(), definition.name.size());
-        const auto article = juce::String("aeiou").containsChar(name.toLowerCase()[0]) ? "Add an " : "Add a ";
-        lights.push_back({name.upToLastOccurrenceOf(" light", false, true), article + name.toLowerCase(), motion::ui::pictures::ofGenerator(definition)});
-    }
-    // A point light already moving on its own.
-    for (const auto preset : motion::lightPresets) {
-        const juce::String name(motion::lightPresetName(preset).data());
-        const auto& definition = motion::lightPresetDefinition(preset);
-        moving.push_back({motion::ui::pictures::lightPresetShortName(preset), "Add a point light: " + name + ". " + juce::String(definition.description.data(), definition.description.size()), {motion::ui::pictures::lightPresetPicture(preset), {}}});
-    }
-    std::vector<motion::ui::AddPicker::Section> sections {{"Lights", std::move(lights), 2}, {"Presets", std::move(moving), 2}};
-    showPopover(std::make_unique<motion::ui::AddPicker>("Add a light", std::move(sections), [this, kinds](std::size_t section, std::size_t index) {
-        if (section == 0) {
-            addGenerator(*kinds[index]);
-        } else {
-            addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[index]);
-        }
-    }), getLocalArea(&addLightButton, addLightButton.getLocalBounds()), Placement::below);
-}
-
-void MotionEditor::showAddMirror() {
-    std::vector<motion::ui::TileGrid::Choice> choices;
-    for (const auto& preset : motion::mirrorPresets) {
-        choices.push_back({juce::String(preset.name.data(), preset.name.size()), juce::String(preset.description.data(), preset.description.size()), motion::ui::pictures::ofMirror(preset)});
-    }
-    std::vector<motion::ui::AddPicker::Section> sections {{{}, std::move(choices), 2}};
-    showPopover(std::make_unique<motion::ui::AddPicker>("Add a mirror", std::move(sections), [this](std::size_t, std::size_t index) {
-        addMirror(motion::mirrorPresets[index]);
-    }), getLocalArea(&addMirrorButton, addMirrorButton.getLocalBounds()), Placement::below);
 }
 
 // A preset's generator reflecting wholly (every preset names one: see MirrorPresets.h).

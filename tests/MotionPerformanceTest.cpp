@@ -70,6 +70,7 @@ private:
             // Copies overlap, so their surfaces cut through each other.
             clip.properties["position.x"] = motion::Curve(copies == 1 ? 0 : -.45 + .9 * copy / (copies - 1));
             if (bulge) { clip.effects.push_back(motion::makeEffect(next++, *motion::effectDefinition("bulge"))); }
+            clip.properties["solid"] = motion::Curve(100.0);
             for (const auto& [property, value] : set) { clip.properties[property] = motion::Curve(value); }
             motion::Track track;
             track.id = next++;
@@ -78,7 +79,6 @@ private:
         }
         motion::Camera camera;
         camera.id = next++;
-        camera.properties["hideLines"] = motion::Curve(100.0);
         project.cameras.push_back(camera);
         return project;
     }
@@ -94,6 +94,7 @@ private:
         project.assets.push_back(asset);
         auto clip = motion::Document::makeClip(id + 1, *asset, 0);
         clip.duration = 2;
+        clip.properties["solid"] = motion::Curve(100.0);
         for (const auto& [name, value] : properties) { clip.properties[name] = motion::Curve(value); }
         motion::Track track;
         track.id = id + 2;

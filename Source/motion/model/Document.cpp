@@ -1985,12 +1985,19 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
         clip.duration = asset.source->duration();
     }
     clip.properties = defaultProperties(objectPropertySpecs);
+    // What has depth (a solid, a grid, a model) starts solid, hiding what is
+    // behind it; a flat drawing (a shape, text, an SVG's fill) starts a
+    // wireframe, so flat designs laid over each other all show.
+    const auto* generator = generatorOf(asset);
+    const auto* drawing = asset.source != nullptr && asset.source->frameCount() > 0 ? asset.source->drawingAt(0) : nullptr;
+    const auto flat = generator != nullptr ? generator->category == GeneratorCategory::shape : drawing != nullptr && drawing->faces().planar;
+    if (flat) { clip.properties["solid"] = Curve(0); }
     // An L-system's clip starts at the depth chosen as it was imported.
     if (isFractal(asset.extension)) { clip.properties["fractal.depth"] = Curve(asset.fractalDepth); }
     // A generator's clip holds its own values of the generator's parameters.
     // A solid starts turned, seen a little from above and the side, so it
     // reads as 3D in a camera looking straight at it.
-    if (const auto* generator = generatorOf(asset)) {
+    if (generator != nullptr) {
         for (const auto& spec : generator->parameters) { clip.properties[std::string(spec.id)] = Curve(spec.defaultValue); }
         if (generator->category == GeneratorCategory::solid) {
             clip.properties["rotation.x"] = Curve(25);

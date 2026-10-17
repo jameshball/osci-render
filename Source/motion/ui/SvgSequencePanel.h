@@ -16,14 +16,13 @@ public:
           files(std::move(chosen)) {
         setName("SVG sequence import");
         nameAction("Import SVGs");
-        mode.setTooltip("One animation: the SVGs as its frames, in name order. Separate: a source for each.");
+        mode.setTooltip("Animation plays the SVGs as frames, in name order; Separate adds a source for each");
         mode.setSelected(motion::svgsequence::numbered(files) ? 0 : 1);
         mode.onChange = [this](int) { refresh(); };
         frameRate.setName("Sequence frame rate");
         frameRate.setSpec(frameRateSpec);
         frameRate.setValue(motion::svgsequence::defaultFrameRate);
         frameRate.setFill(fieldFill());
-        frameRate.setTooltip("How many of the SVGs play each second. A clip's Speed changes it later.");
         frameRate.onChange = [this](double value) { preview.setFrameRate(animation() ? value : 0); };
         frameRate.onCommit = frameRate.onChange;
         styleCaption(modeLabel);

@@ -13,30 +13,33 @@ public:
         setName("Scene tools");
         for (auto* tool : {&move, &rotate, &scale, &anchor, &parts}) { tool->setRadioGroupId(91); tool->setClickingTogglesState(true); }
         path.setClickingTogglesState(true);
+        faces.setClickingTogglesState(true);
+        faces.setToggleState(true, juce::dontSendNotification);
         move.setTooltip("Move (G)");
         rotate.setTooltip("Rotate (R)");
         scale.setTooltip("Scale (S)");
         anchor.setTooltip("Anchor (Y): drag the point the object rotates and scales about");
         parts.setTooltip("Pick parts (Tab)");
         path.setTooltip("Motion path (P)");
+        faces.setTooltip("Solid view: faces hide the lines behind them");
         fly.setTooltip("Fly (N): mouse to look, WASD to move, Esc to finish");
         frame.setTooltip("Frame selection (F)");
         lookThrough.setClickingTogglesState(true);
         lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");
-        setGroups({{&move, &rotate, &scale, &anchor, &parts}, {&path, &fly, &frame}, {&lookThrough}});
+        setGroups({{&move, &rotate, &scale, &anchor, &parts}, {&path, &faces, &fly, &frame}, {&lookThrough}});
         lookThrough.setEnabled(false);
     }
     Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale}, anchor {"Anchor tool", motion::icons::Icon::anchor}, parts {"Pick parts", motion::icons::Icon::parts};
     Tool lookThrough {"Look through camera", motion::icons::Icon::videocam};
-    Tool path {"Show motion path", motion::icons::Icon::path}, fly {"Navigate composition view", motion::icons::Icon::fly}, frame {"Frame composition selection", motion::icons::Icon::frame};
+    Tool path {"Show motion path", motion::icons::Icon::path}, faces {"Solid view", motion::icons::Icon::solidView}, fly {"Navigate composition view", motion::icons::Icon::fly}, frame {"Frame composition selection", motion::icons::Icon::frame};
     // A short Scene keeps only the transform tools.
     void setCompact(bool value) {
         if (compact == value) { return; }
         compact = value;
-        for (auto* tool : {&path, &fly, &frame}) { tool->setVisible(!compact); }
+        for (auto* tool : {&path, &faces, &fly, &frame}) { tool->setVisible(!compact); }
         resized();
     }
-    int fullHeight() const { return cell * 9 + groupGap * 2 + inset * 2; }
+    int fullHeight() const { return cell * 10 + groupGap * 2 + inset * 2; }
     bool compact = false;
 };
 

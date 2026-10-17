@@ -13,6 +13,7 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     list.setMultipleSelectionEnabled(false);
     list.setColour(juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     list.setOutlineThickness(0);
+    fades.setBackground(osci::Colours::surface());
     addAndMakeVisible(list);
     list.addMouseListener(this, true);
     status.setJustificationType(juce::Justification::topLeft);
@@ -94,8 +95,7 @@ void MotionAssetLibrary::updateStatus() {
     cancelImport.setVisible(importStatus.isNotEmpty());
     status.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(0.6f));
     const auto row = list.getSelectedRow();
-    // Only say something the row does not already show; the generic
-    // how-to lives in the list's tooltip.
+    // Only say something the row does not already show.
     juce::String help;
     if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr && liveStatus) { help = liveStatus(assetId(row)); }
     if (definitionRow(row) && !document.canReferenceComposition(assetId(row))) { help = "It contains the composition you're editing, so it can't go inside it."; }
@@ -105,7 +105,15 @@ void MotionAssetLibrary::updateStatus() {
 
 juce::String MotionAssetLibrary::getTooltipForRow(int row) {
     if (definitionRow(row) && !document.canReferenceComposition(assetId(row))) { return "Open it to edit it; it can't go inside the composition you're editing"; }
-    return "Drag into the Scene or timeline, or click + (or double-click) to add at the playhead";
+    // Over a linked source's badge: where its file is.
+    if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->isLinked()) {
+        const auto position = list.getRowPosition(row, true);
+        const auto at = list.getMouseXYRelative() - position.getPosition();
+        if (linkBadge(position.getWidth(), position.getHeight()).expanded(2).contains(at.toFloat())) {
+            return "Linked from disk, not kept in the project: " + assets[static_cast<std::size_t>(row)]->linked.getFullPathName();
+        }
+    }
+    return {};
 }
 
 void MotionAssetLibrary::resized() {
@@ -213,11 +221,21 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
         graphics.fillRoundedRectangle(bounds.toFloat(), motion::style::radius);
         graphics.setColour(motion::style::accent());
         graphics.fillRect(bounds.withWidth(2).reduced(0, 5));
+    } else if (row == hoveredRow) {
+        graphics.setColour(motion::style::hoverFill());
+        graphics.fillRoundedRectangle(bounds.toFloat(), motion::style::radius);
     }
     bounds.reduce(8, 3);
     // A small picture of the source, like a project panel thumbnail.
-    paintThumbnail(graphics, row, bounds.removeFromLeft(36).withSizeKeepingCentre(34, 34));
-    bounds.removeFromLeft(8);
+    paintThumbnail(graphics, row, thumbnailArea(width, height));
+    bounds.removeFromLeft(44);
+    // A file linked rather than held: a link in the picture's corner.
+    if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->isLinked()) {
+        const auto badge = linkBadge(width, height);
+        graphics.setColour(osci::Colours::surface());
+        graphics.fillEllipse(badge.expanded(1));
+        motion::icons::draw(graphics, motion::icons::Icon::link, badge, osci::Colours::text().withAlpha(.8f), 12.0f);
+    }
     // The edit button covers the selected row's end.
     const auto hovered = row == hoveredRow && addable(row);
     if (row == hoveredRow && editLabel(row).isNotEmpty()) { bounds.setRight(width - 72); }
@@ -302,6 +320,15 @@ void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce:
     auto path = found->path;
     path.applyTransform(juce::AffineTransform::scale(area.getWidth(), area.getHeight()).translated(area.getX(), area.getY()));
     graphics.strokePath(path, juce::PathStrokeType(1.0f));
+}
+
+// The + under the pointer is a button: it points.
+void MotionAssetLibrary::mouseMove(const juce::MouseEvent& event) {
+    hover(event.getEventRelativeTo(&list).getPosition());
+    auto* under = event.eventComponent;
+    if (under == nullptr || !list.isParentOf(under)) { return; }
+    const auto onAdd = addable(hoveredRow) && addArea(under->getWidth(), under->getHeight()).contains(event.getPosition());
+    under->setMouseCursor(onAdd ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
 }
 
 void MotionAssetLibrary::hover(juce::Point<int> inList) {

@@ -21,7 +21,6 @@ public:
         lookAt.setTooltip("Aim this camera at an object or group; its Z rotation becomes roll");
         parent.setName("Camera parent");
         parent.setTitle("Camera parent");
-        parent.setTooltip("Carry this camera with a group's transform");
         lookAt.onChange = [this] { applyRig(); };
         parent.onChange = [this] { applyRig(); };
         motion::style::inspector::styleHeading(title, "Rig");
@@ -37,7 +36,6 @@ public:
         showing.setText("On screen at the playhead", juce::dontSendNotification);
         addChildComponent(showing);
         cutButton.setName("Cut to camera here");
-        cutButton.setTooltip("Show this camera from the playhead until the next cut");
         cutButton.onClick = [this] {
             motion::Id cut = 0;
             processor.document.cutToCamera(camera, frameTime(), cut);
@@ -89,7 +87,7 @@ public:
         });
         keyButton.setEnabled(found != nullptr);
         keyButton.setState(keyed ? osci::KeyframeButton::State::keyed : animated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated);
-        keyButton.setTooltip(keyed ? "Remove the shot's keys at the playhead: position, rotation and field of view" : "Key the shot at the playhead: position, rotation and field of view together");
+        keyButton.setTooltip(keyed ? "Remove the shot's keys at the playhead" : "Key position, rotation and field of view at the playhead");
         previousKey.setVisible(animated);
         nextKey.setVisible(animated);
         previousKey.setEnabled(earlier);

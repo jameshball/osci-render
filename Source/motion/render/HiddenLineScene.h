@@ -38,6 +38,9 @@ struct SceneItem {
     bool bent;
     // How much it mirrors this frame (0 to 1): its own lines show the rest.
     double mirrors = 0;
+    // How far its faces hide what is behind them this frame (0 to 1): what
+    // they hide is drawn as bright as is left of 1.
+    double solid = 0;
     // How it draws itself this frame, when not by its edges alone (see
     // LineStyle); `drawing` is then the one it draws instead.
     const Styled* styled = nullptr;

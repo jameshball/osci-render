@@ -27,7 +27,7 @@ private:
     void buildDocumentation();
     void layoutContent(int width);
 
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     juce::Component contentComponent;
 
     // Owned elements inside contentComponent

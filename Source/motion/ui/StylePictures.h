@@ -2,12 +2,13 @@
 
 #include <JuceHeader.h>
 #include "../model/LightPresets.h"
+#include "../model/MirrorPresets.h"
 #include "../render/HiddenLineHatching.h"
 #include "../render/SurfaceLines.h"
 #include "GeneratorIcons.h"
 
-// Pictures of how a surface can draw itself, and of a light's presets, for
-// tiles to choose them by. A surface's are a ball drawn that way by the same
+// Pictures of how a surface can draw itself, of a light's presets and of
+// mirrors, for tiles and menus to choose them by. A surface's are a ball drawn that way by the same
 // geometry the Scope's lines come from, seen from a little above and to the
 // side. Each is in a square from -1 to 1 (y down), so they share one scale.
 namespace motion::ui::pictures {
@@ -281,4 +282,60 @@ inline juce::Path lightPresetPicture(std::optional<LightPreset> preset) {
     }
     return path;
 }
+
+// A box drawn as a wireframe (every edge, seen through it) or solid (its
+// far edges hidden by its faces), for choosing whether a surface hides what
+// is behind it.
+inline Picture solidityPicture(bool solid) {
+    // Its front, and its back up and to the right.
+    const std::array<juce::Point<float>, 4> front {{{-.85f, -.3f}, {.35f, -.3f}, {.35f, .9f}, {-.85f, .9f}}};
+    const juce::Point<float> back {.5f, -.6f};
+    Picture picture;
+    const auto edge = [&](juce::Point<float> from, juce::Point<float> to) {
+        picture.lines.startNewSubPath(from);
+        picture.lines.lineTo(to);
+    };
+    for (std::size_t corner = 0; corner < 4; ++corner) { edge(front[corner], front[(corner + 1) % 4]); }
+    // The back's top and right edges, and the three edges joining them to
+    // the front, show either way; its bottom-left corner's three only when
+    // seen through.
+    edge(front[0] + back, front[1] + back);
+    edge(front[1] + back, front[2] + back);
+    for (std::size_t corner = 0; corner < 3; ++corner) { edge(front[corner], front[corner] + back); }
+    if (!solid) {
+        edge(front[2] + back, front[3] + back);
+        edge(front[3] + back, front[0] + back);
+        edge(front[3], front[3] + back);
+    }
+    return picture;
+}
+
+// A mirror ball, small: round, a horizon across it and a glint.
+inline Picture mirrorBall() {
+    juce::Path path;
+    path.addEllipse(-.9f, -.9f, 1.8f, 1.8f);
+    path.startNewSubPath(-.88f, .12f);
+    path.quadraticTo(0, .5f, .88f, .12f);
+    path.startNewSubPath(-.42f, -.5f);
+    path.quadraticTo(-.5f, -.2f, -.3f, -.06f);
+    return {path, {}};
+}
+// A flat mirror: a pane turned to show its face, glints across it.
+inline Picture flatMirror() {
+    juce::Path pane;
+    pane.startNewSubPath(-.72f, -.62f);
+    pane.lineTo(.5f, -.86f);
+    pane.lineTo(.72f, .62f);
+    pane.lineTo(-.5f, .86f);
+    pane.closeSubPath();
+    juce::Path glints;
+    glints.startNewSubPath(-.36f, .08f);
+    glints.lineTo(.02f, -.42f);
+    glints.startNewSubPath(-.18f, .36f);
+    glints.lineTo(.34f, -.32f);
+    pane.addPath(glints);
+    return {pane, {}};
+}
+// A mirror preset's picture: a ball for a round one, else a pane.
+inline Picture ofMirror(const MirrorPreset& preset) { return preset.generator == "sphere" ? mirrorBall() : flatMirror(); }
 }

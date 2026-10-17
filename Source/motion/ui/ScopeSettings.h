@@ -46,6 +46,8 @@ private:
 // undo step each; drags preview live and commit once.
 class MotionScopePanel final : public juce::Component, private juce::ChangeListener, private juce::AudioProcessorParameter::Listener, private juce::AsyncUpdater {
 public:
+    // The scope has just been set to XY only.
+    std::function<void()> onXYOnly;
     explicit MotionScopePanel(MotionProcessor& owner) : processor(owner) {
         setName("Scope options");
         for (auto [label, text] : {std::pair {&displayTitle, "Display"}, std::pair {&timingTitle, "Timing"}}) {
@@ -55,14 +57,12 @@ public:
         for (auto [label, text] : {std::pair {&overlayCaption, "Overlay"}, std::pair {&upsampleCaption, "Upsample"}, std::pair {&xyCaption, "XY only"}}) { caption(*label, text); }
         xyOnly.setName("Scope XY only");
         xyOnly.setTitle("Scope XY only");
-        xyOnly.setTooltip("The scope has no brightness input, only X and Y: the beam never waits dark (it would draw dots), "
-            "and how bright a line is shows by how long the beam takes over it");
+        xyOnly.setTooltip("For a scope with no brightness input: the beam never waits dark, and brightness shows by how slowly a line is drawn");
         xyOnly.onClick = [this] { setXYOnly(xyOnly.getToggleState()); };
         addAndMakeVisible(xyOnly);
         auto& parameters = processor.visualiserParameters;
         overlay.setName("Scope overlay");
         overlay.setTitle("Scope overlay");
-        overlay.setTooltip("Graticule or screen drawn over the beam");
         auto* screen = parameters.screenOverlay;
         // The shared parameter calls no overlay "Empty"; here it is "None".
         for (int id = 1; id <= screen->max.load(); ++id) { overlay.addItem(id == static_cast<int>(ScreenOverlay::Empty) ? juce::String("None") : screen->getText(screen->getNormalisedValue(static_cast<float>(id))), id); }
@@ -102,7 +102,6 @@ public:
         }
         presets.setName("Scope presets");
         presets.setTitle("Scope presets");
-        presets.setTooltip("Apply timing suited to a kind of display");
         presets.onClick = [this] { showPresets(); };
         addAndMakeVisible(presets);
         processor.document.addChangeListener(this);
@@ -144,9 +143,9 @@ public:
         overlay.setSelectedId(static_cast<int>(parameters.screenOverlay->getValueUnnormalised()), juce::dontSendNotification);
         upsample.setToggleState(parameters.upsamplingEnabled->getBoolValue(), juce::dontSendNotification);
         xyOnly.setToggleState(scope.xyOnly, juce::dontSendNotification);
-        // With no brightness input the beam never waits dark: only its
-        // travel between strokes means anything.
-        for (const auto index : {std::size_t {0}, std::size_t {2}}) {
+        // With no brightness input the beam never waits dark and jumps in a
+        // sample: none of its timing means anything.
+        for (const auto index : {std::size_t {0}, std::size_t {1}, std::size_t {2}}) {
             fields[index].editor.setEnabled(!scope.xyOnly);
             fields[index].caption.setAlpha(scope.xyOnly ? .4f : 1.0f);
         }
@@ -244,6 +243,7 @@ private:
     void setXYOnly(bool on) {
         if (processor.document.project().scope.xyOnly == on) { return; }
         processor.document.edit(on ? "Set the scope to XY only" : "Give the scope brightness", [on](motion::Project& project) { project.scope.xyOnly = on; });
+        if (on && onXYOnly) { onXYOnly(); }
     }
     void applyPreset(const motion::ScopeProfilePreset& preset) {
         // Timing alone: whether the display is XY only stays as it is.

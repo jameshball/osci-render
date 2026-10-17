@@ -28,7 +28,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 23> sectionO
     {"Colour", "Appearance"}, {"Opacity", "Appearance"}, {"Lit by lights", "Appearance"}, {"Beam", "Appearance"},
     {"Edges", "Surface"}, {"Outline", "Surface"}, {"Spiral", "Surface"}, {"Noise", "Surface"}, {"Slices", "Surface"}, {"Rings", "Surface"},
     {"Fill detail", "Surface"}, {"Noise phase", "Surface"}, {"Noise flow", "Surface"}, {"Mirror", "Surface"},
-    {"Hide lines", "Hidden lines"}, {"Hatching", "Shading"}, {"Hatch detail", "Shading"},
+    {"Solid", "Surface"}, {"Hatching", "Shading"}, {"Hatch detail", "Shading"},
     {"Gain", "Audio"}, {"Pan", "Audio"},
 }};
 }
@@ -36,9 +36,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 23> sectionO
 MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : processor(owner) {
     setName("Property inspector");
     viewport.setViewedComponent(&content, false);
-    viewport.setScrollBarsShown(true, false);
-    viewport.setScrollBarThickness(6);
-    viewport.getVerticalScrollBar().addListener(this);
+    motion::style::fadeScrolling(viewport);
     addAndMakeVisible(viewport);
     title.setFont(motion::style::title());
     title.setColour(juce::Label::textColourId, osci::Colours::text());
@@ -155,9 +153,8 @@ void MotionPropertyInspector::refresh() {
         row->misaligned = on && keyed && (times(*x) != times(*y) || times(*x) != times(*z));
         row->mode->setToggleState(on, juce::dontSendNotification);
         row->mode->setOnColour(row->misaligned ? osci::Colours::warning().withAlpha(.6f) : motion::style::onFill());
-        const juce::String base = path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out)."
-                                       : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock.";
-        row->mode->setTooltip(row->misaligned ? "X, Y and Z no longer share key times, so this is paused. Click to key every axis at each key time." : base + " Keys all three axes together.");
+        const juce::String base = path ? "One smooth path through the keyed positions, at constant speed." : "Rotate along the shortest arc, free of gimbal lock.";
+        row->mode->setTooltip(row->misaligned ? "Paused: X, Y and Z no longer share key times. Click to key every axis at each key time." : base + " Keys all three axes together.");
     }
     title.setEditable(false, editable && found->camera);
     title.setTooltip(editable && found->camera ? "Double-click to rename" : juce::String());
@@ -166,7 +163,6 @@ void MotionPropertyInspector::refresh() {
     // one named.
     const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->beam ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : sourceKind(target);
     kind.setText(editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText, juce::dontSendNotification);
-    kind.setTooltip(editable && selectionCount > 1 ? juce::String(selectionCount) + " clips are selected; these fields edit only " + juce::String(found->name.data(), found->name.size()) + "." : juce::String());
     // Children repaint their own changes; only the empty message is painted here.
     const auto wasEmpty = std::exchange(empty, !editable && !heading.has_value());
     if (empty != wasEmpty) { repaint(); }
@@ -276,10 +272,6 @@ void MotionPropertyInspector::itemDropped(const SourceDetails& details) {
 }
 
 void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
-    if (viewport.getViewPositionY() > 0) {
-        g.setColour(motion::style::hairline());
-        g.fillRect(0, viewport.getY(), getWidth(), 1);
-    }
     if (!modulatorDrag) { return; }
     g.reduceClipRegion(viewport.getBounds());
     std::function<void(juce::Component&)> outline = [&](juce::Component& parent) {
@@ -320,7 +312,6 @@ void MotionPropertyInspector::resized() {
 
 MotionPropertyInspector::Swatch::Swatch() : juce::Button("Colour swatch") {
     setTitle("Colour swatch");
-    setTooltip("Pick a colour");
     setWantsKeyboardFocus(false);
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
 }
@@ -492,7 +483,6 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             // Keys are neutral: filled on a key, outlined off one.
             row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
             row->key.setTitle(row->key.getName());
-            row->key.setTooltip("Key " + row->group.toLowerCase() + " at the playhead, to animate it; again to remove the key");
             row->key.addMouseListener(row.get(), false);
             row->previous.setName("Previous " + row->group.toLowerCase() + " key");
             row->next.setName("Next " + row->group.toLowerCase() + " key");
@@ -506,7 +496,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             row->modulate.onContent = motion::style::result();
             row->modulate.setName("Modulate " + row->group.toLowerCase());
             row->modulate.setTitle(row->modulate.getName());
-            row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + ": open it in the Graph to route modulators to it or link it. Lit when something drives it.");
+            row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + " in the Graph");
             row->addAndMakeVisible(row->modulate);
             auto* raw = row.get();
             row->modulate.onClick = [this, raw] {
@@ -538,7 +528,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
                 row->mode = std::make_unique<motion::ui::Chip>("Centre anchor", motion::icons::Icon::centre);
                 row->mode->setName("Centre anchor");
                 row->mode->setTitle("Centre anchor");
-                row->mode->setTooltip("Centre the anchor on the object, keeping it in place");
+                row->mode->setTooltip("Centre the anchor, keeping the object in place");
                 row->mode->quiet = true;
                 row->mode->setClickingTogglesState(false);
                 row->mode->onClick = [this] { onCentreAnchor(target); };
@@ -561,12 +551,8 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         editor.setName(juce::String(spec.id.data(), spec.id.size()));
         editor.setTitle(juce::String(spec.label.data(), spec.label.size()));
         editor.setComponentID("motion." + juce::String(spec.id.data(), spec.id.size()));
-        editor.setTooltip(juce::String(spec.label.data(), spec.label.size()) + ": drag to scrub (Shift fine, Cmd coarse), double-click to type.");
-        if (spec.id == "hideLines") {
-            editor.setTooltip("Hide lines: how far the lines this camera can't see, behind the faces of 3D meshes, fade from view. At 100% they're removed, as a solid object hides them; part-way they're dimmed. Baked in the background as you edit.");
-        }
         if (spec.id == "beam") {
-            editor.setTooltip("Beam: this object's share of the beam's time, as a multiple of its even share. More draws it slower and brighter on a scope, taking the time from the others; 0 leaves it out. Its level in the timeline can be dragged too.");
+            editor.setTooltip("This object's share of the beam's time, as a multiple of its even share: more draws it slower and brighter; 0 leaves it out");
         }
         if (spec.axis.size() == 1) {
             editor.setPrefix(juce::String(spec.axis.data(), spec.axis.size()));
@@ -600,6 +586,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
     };
     content.addChildComponent(advanced);
     surfaceTiles.reset();
+    solidTiles.reset();
     presetTiles.reset();
     shadingTiles.reset();
     if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return spec.id == "hatching"; })) {
@@ -618,24 +605,61 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         };
         content.addAndMakeVisible(*shadingTiles);
     }
+    if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return spec.id == "solid"; })) {
+        using motion::ui::pictures::solidityPicture;
+        solidTiles = std::make_unique<motion::ui::TileGrid>("Solidity", std::vector<motion::ui::TileGrid::Choice> {
+            {"Wireframe", "Seen through: everything behind it shows", solidityPicture(false)},
+            {"Solid", "Its faces hide what's behind them, its own far side too", solidityPicture(true)}},
+            2, motion::ui::TileGrid::Look::chips, true);
+        solidTiles->onClick = [this](std::size_t index) {
+            if (solidTiles->tile(index).getToggleState()) { return; }
+            const auto found = motion::findPropertyTarget(processor.document.project(), target);
+            if (!found.has_value() || found->locked) { return; }
+            const auto time = keyTime(*found);
+            processor.document.edit(index == 0 ? "Make wireframe" : "Make solid", [&](motion::Project& project) { apply(project, "solid", index == 0 ? 0.0 : 100.0, time); });
+            if (onKeyTimeEdited) { onKeyTimeEdited(); }
+        };
+        content.addAndMakeVisible(*solidTiles);
+    }
     if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return motion::isLinesProperty(spec.id); })) {
         std::vector<motion::ui::TileGrid::Choice> choices;
         for (const auto& style : surfaceStyles) {
-            choices.push_back({juce::String(style.name.data(), style.name.size()), juce::String(style.tooltip.data(), style.tooltip.size()), motion::ui::pictures::surfacePicture(style.look)});
+            choices.push_back({juce::String(style.name.data(), style.name.size()), juce::String(style.tooltip.data(), style.tooltip.size()) + ". Shift-click to combine styles", motion::ui::pictures::surfacePicture(style.look)});
         }
         surfaceTiles = std::make_unique<motion::ui::TileGrid>("Surface styles", std::move(choices), 3);
         surfaceTiles->onClick = [this](std::size_t index) {
             const auto found = motion::findPropertyTarget(processor.document.project(), target);
             if (!found.has_value() || found->locked) { return; }
             // A click is a step of its own; on a keyed style it keys it on
-            // or off at the playhead.
+            // or off at the playhead. A click picks one style, as a choice
+            // reads; Shift-click (or Advanced's rows) combines them.
             const std::string property(surfaceStyles[index].property);
             const auto on = surfaceTiles->tile(index).getToggleState();
-            const auto* curve = found->curve(property);
-            const auto name = surfaceTiles->nameOf(index);
-            const auto label = curve != nullptr && curve->animated() ? "Key " + name + (on ? " off" : " on") : (on ? "Turn off " : "Turn on ") + name;
             const auto time = keyTime(*found);
-            processor.document.edit(label, [&](motion::Project& project) { apply(project, property, on ? 0.0 : 100.0, time); });
+            const auto name = surfaceTiles->nameOf(index);
+            const auto combining = juce::ModifierKeys::currentModifiers.isShiftDown();
+            std::vector<std::string> others;
+            for (std::size_t other = 0; other < surfaceStyles.size() && !combining; ++other) {
+                const std::string id(surfaceStyles[other].property);
+                if (other != index && baseValue(*found, id, time) > 0) { others.push_back(id); }
+            }
+            const auto* curve = found->curve(property);
+            const auto keyed = curve != nullptr && curve->animated();
+            juce::String label;
+            if (combining) {
+                label = keyed ? "Key " + name + (on ? " off" : " on") : (on ? "Turn off " : "Turn on ") + name;
+            } else if (on && others.empty()) {
+                // Already its only style: the click just shows its curve.
+                if (onPropertySelected) { onPropertySelected(target, property); }
+                return;
+            } else {
+                label = "Draw as " + name;
+            }
+            const auto value = combining && on ? 0.0 : 100.0;
+            processor.document.edit(label, [&](motion::Project& project) {
+                apply(project, property, value, time);
+                for (const auto& other : others) { apply(project, other, 0.0, time); }
+            });
             if (onPropertySelected) { onPropertySelected(target, property); }
             if (onKeyTimeEdited) { onKeyTimeEdited(); }
         };
@@ -661,18 +685,20 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
     layoutContent();
 }
 
+double MotionPropertyInspector::baseValue(const motion::PropertyTarget& found, std::string_view property, double time) const {
+    const auto* curve = found.curve(std::string(property));
+    if (curve != nullptr) { return curve->evaluateBase(time); }
+    const auto spec = std::find_if(specList.begin(), specList.end(), [&](const auto& candidate) { return candidate.id == property; });
+    return spec != specList.end() ? spec->defaultValue : 0.0;
+}
+
 bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, double time) {
     bool changed = false;
     const auto wasAvailable = advancedAvailable;
     advancedAvailable = false;
     const auto& project = processor.document.project();
     const auto routed = routedProperties();
-    const auto valueOf = [&](std::string_view property) {
-        const auto* curve = found.curve(std::string(property));
-        if (curve != nullptr) { return curve->evaluateBase(time); }
-        const auto spec = std::find_if(specList.begin(), specList.end(), [&](const auto& candidate) { return candidate.id == property; });
-        return spec != specList.end() ? spec->defaultValue : 0.0;
-    };
+    const auto valueOf = [&](std::string_view property) { return baseValue(found, property, time); };
     // How a property's value moves: driven by a modulator or a link, keyed, or neither.
     const auto movesOf = [&](std::string_view property) {
         using Moves = motion::ui::TileGrid::Moves;
@@ -702,6 +728,12 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
             changed = true;
         }
     }
+    if (solidTiles != nullptr) {
+        const auto amount = valueOf("solid");
+        solidTiles->setState(0, !(amount > 0));
+        solidTiles->setState(1, amount > 0, partly(amount), movesOf("solid"));
+        solidTiles->setLocked(found.locked);
+    }
     if (presetTiles != nullptr) {
         const auto current = motion::currentLightPreset(project, target);
         presetTiles->setState(0, !current.has_value());
@@ -723,7 +755,10 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         // Mirror always shows: it is no style, but how much it reflects.
         const auto property = row->fields.front()->spec.id;
         const auto noiseMotion = property == "noisePhase" || property == "noiseFlow";
-        const auto inPlay = property == "fillDetail" ? patterned : noiseMotion ? live("noise") || valueOf(property) != 0 : live(property);
+        // Every style's amount is there to mix styles, the tiles picking one,
+        // and how solid it is, to fade between wireframe and solid.
+        const auto style = property == "solid" || std::any_of(surfaceStyles.begin(), surfaceStyles.end(), [&](const auto& candidate) { return candidate.property == property; });
+        const auto inPlay = style || (property == "fillDetail" ? patterned : noiseMotion ? live("noise") || valueOf(property) != 0 : live(property));
         if (isAdvanced(*row)) { advancedAvailable = advancedAvailable || inPlay; }
         const auto shown = !isAdvanced(*row) || (inPlay && advanced.getToggleState());
         if (row->isVisible() != shown) {
@@ -748,13 +783,19 @@ void MotionPropertyInspector::layoutContent() {
                 if (index > from || after) { y += motion::style::gap; }
                 content.sections.emplace_back(y, row->section);
                 y += sectionHeading + motion::style::gap;
-                // Surface and Shading open with their tiles; their rows below
-                // are those on.
-                auto* tiles = row->section == "Surface" ? surfaceTiles.get() : row->section == "Shading" ? shadingTiles.get() : nullptr;
-                if (tiles != nullptr) {
+                // Surface (whether it is solid, then how it draws itself) and
+                // Shading open with their tiles; their rows below are those on.
+                const auto openWith = [&](motion::ui::TileGrid* tiles) {
+                    if (tiles == nullptr) { return; }
                     const auto height = tiles->heightFor(inner);
                     tiles->setBounds(motion::style::padding, y, inner, height);
                     y += height + motion::style::padding;
+                };
+                if (row->section == "Surface") {
+                    openWith(solidTiles.get());
+                    openWith(surfaceTiles.get());
+                } else if (row->section == "Shading") {
+                    openWith(shadingTiles.get());
                 }
             }
             // Before a tiled section's first advanced row, the fold that shows them.

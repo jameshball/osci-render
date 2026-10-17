@@ -32,7 +32,6 @@ RouteRow::RouteRow(Document& document, std::function<void(const juce::Result&)> 
     mode.setTooltip(juce::String::fromUTF8("Add: amount \xc3\x97 modulator is added to the value. Scale: the value is multiplied by 1 + amount \xc3\x97 modulator."));
     mode.compact = true;
     mode.onChange = [this](int index) { apply(amount.getValue(), index == 1 ? ModulationMode::multiply : ModulationMode::add); };
-    remove.setTooltip("Stop driving this property");
     // A quiet mark beside the mode toggle, not the heaviest thing in the column.
     remove.setIconPadding(7);
     remove.setColours(osci::Colours::textMuted().withAlpha(.8f), osci::Colours::text());
@@ -82,8 +81,7 @@ void RouteRow::apply(double value, ModulationMode next) {
 MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : processor(owner) {
     setName("Modulator library");
     viewport.setViewedComponent(&content, false);
-    viewport.setScrollBarsShown(true, false);
-    viewport.setScrollBarThickness(6);
+    motion::style::fadeScrolling(viewport);
     addAndMakeVisible(viewport);
     addButton.setButtonText("Add modulator");
     addButton.setName("Add modulator");
@@ -113,7 +111,6 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
     };
     content.addAndMakeVisible(name);
     remove.setName("Delete modulator");
-    remove.setTooltip("Delete this modulator and its routes");
     remove.iconSize = 16.0f;
     remove.onClick = [this] {
         if (selected == 0) { return; }
@@ -141,7 +138,6 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
         chip->onClick = [this, beats = beats] { change([beats](auto& modulator) { modulator.shape.tempoSync = beats; }); };
         content.addAndMakeVisible(chip);
     }
-    hertz.setTooltip("Cycles per second");
     beatsChip.setTooltip("Beats per cycle, following the tempo");
     rate.setup(content, "Rate", "Modulator rate", motion::ui::rateHzSpec);
     phase.setup(content, "Phase", "Modulator phase", motion::ui::phaseSpec);

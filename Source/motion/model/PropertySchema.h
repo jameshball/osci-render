@@ -23,7 +23,7 @@ inline std::span<const PropertySpec> propertySpecs(const PropertyTarget& target)
 // reflect with or draw lines on.
 inline bool hasProperty(const GeneratorDefinition* generator, std::string_view id, bool surface = true) {
     const auto category = generator != nullptr ? std::optional(generator->category) : std::nullopt;
-    const auto onSurface = id == "reflects" || isLinesProperty(id);
+    const auto onSurface = id == "reflects" || id == "solid" || isLinesProperty(id);
     if (onSurface && !surface) { return false; }
     if (category == GeneratorCategory::curve) { return !onSurface; }
     if (category != GeneratorCategory::light) { return true; }

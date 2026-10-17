@@ -9,17 +9,19 @@
 namespace motion::cli {
 // A project described in JSON, built as it would be built by hand in the app:
 // each object a clip on its own track, from a generator (a box, a sphere, a
-// light) or a file, with its properties set and keyed. Kept as text, a scene
-// is made again exactly whatever the project format comes to be.
+// light) or a file, with its properties set and keyed ("solid": 0 makes a
+// solid or a grid a wireframe; "solid": 100 makes a flat shape hide what is
+// behind it). Kept as text, a scene is made again exactly whatever the
+// project format comes to be.
 // "description": what it is, shown under its name on the start screen;
 // "picture": a time whose frame `make` has the app draw as its picture.
 //
 //   {
 //     "name": "Ball", "duration": 8, "fps": 60, "bpm": 120, "sampleRate": 192000, "beam": {"intensity": 20},
 //     "camera": {"lookAt": "Ball",
-//                "properties": {"position.z": 4, "hideLines": 100}, "keys": {"position.x": [[0, -1], [8, 1, "linear"]]}},
+//                "properties": {"position.z": 4}, "keys": {"position.x": [[0, -1], [8, 1, "linear"]]}},
 //     "objects": [
-//       {"name": "Ball", "generator": "sphere", "properties": {"generator.radius": 0.3}},
+//       {"name": "Ball", "generator": "sphere", "properties": {"generator.radius": 0.3, "solid": 0}},
 //       {"name": "Teapot", "file": "teapot.obj", "start": 2, "duration": 4},
 //       {"name": "Flame", "generator": "pointLight", "preset": "fire", "properties": {"position.y": 1}}
 //     ]
@@ -194,7 +196,11 @@ private:
             asset->data.append(definition->id.data(), definition->id.size());
         } else if (file.isNotEmpty()) {
             const auto source = folder.getChildFile(file);
-            if (!source.loadFileAsData(asset->data)) { return juce::Result::fail("Couldn't read " + source.getFullPathName() + "."); }
+            if (linksFromDisk(source)) {
+                asset->linked = source;
+            } else if (!source.loadFileAsData(asset->data)) {
+                return juce::Result::fail("Couldn't read " + source.getFullPathName() + ".");
+            }
             asset->name = source.getFileName();
             asset->extension = source.getFileExtension().toLowerCase();
         } else {

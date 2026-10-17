@@ -221,7 +221,7 @@ public:
     }
 
 private:
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     VisualiserSettings& component;
 };
 
@@ -248,6 +248,6 @@ public:
     }
 
 private:
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     VisualiserSettings& component;
 };

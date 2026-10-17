@@ -20,8 +20,7 @@ public:
         filter.onEscapeKey = [this] { if (filter.isEmpty()) { close(); } else { filter.clear(); } };
         list.sections = &sections;
         viewport.setViewedComponent(&list, false);
-        viewport.setScrollBarsShown(true, false);
-        viewport.setScrollBarThickness(6);
+        motion::style::fadeScrolling(viewport, osci::OverlayComponent::panelColour());
         addAndMakeVisible(filter);
         addAndMakeVisible(viewport);
         setSize(560, 600);
@@ -114,6 +113,6 @@ private:
     };
     std::vector<Section> sections;
     juce::TextEditor filter;
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     List list;
 };

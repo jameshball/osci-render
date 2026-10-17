@@ -28,8 +28,8 @@ namespace motion {
 // does the last layer in the tour drop.
 //
 // A display with no brightness input (the scope profile's XY only) shows
-// every sample: the beam never waits, its samples are all drawn at full
-// brightness, and opacity takes beam time instead of dimming.
+// every sample: the beam never waits nor travels slowly, its samples are all
+// drawn at full brightness, and opacity takes beam time instead of dimming.
 class BeamRenderer {
 public:
     static constexpr std::size_t maximumLayers = 256;
@@ -151,8 +151,9 @@ private:
         profile.xyOnly = requested.xyOnly;
         const auto samples = [rate](double micros) { return static_cast<std::int64_t>(std::llround(micros / 1.0e6 * rate)); };
         // A beam that can't go dark has nothing to wait for: holding still
-        // would only draw a dot.
-        if (profile.xyOnly) { return {0, 0, profile.travelMicrosPerUnit / 1.0e6, rate}; }
+        // would only draw a dot. Its jumps are drawn, so it jumps in a single
+        // sample, as faint as it can, as between a drawing's strokes.
+        if (profile.xyOnly) { return {0, 0, 0, rate}; }
         return {std::max<std::int64_t>(1, samples(profile.dwellMicros)), std::max<std::int64_t>(0, samples(profile.settleMicros)), profile.travelMicrosPerUnit / 1.0e6, rate};
     }
 
@@ -246,10 +247,12 @@ private:
         const auto [drawing, shown] = shownDrawing(composition, baked, clip, *source, frame);
         // Wholly hidden behind meshes.
         if (drawing != nullptr && drawing->empty()) { return std::nullopt; }
-        // A point source's runs keep its own budget: no floor per corner.
+        // A point source's runs keep its own budget: no floor per corner. On
+        // an XY-only display, strokes have no dark ends (see sampleTraversal).
         const auto floored = drawing != nullptr && source->drawingAt(frame) != nullptr;
-        return Visible {source, frame, std::max<std::int64_t>(2, floored ? drawing->minimumTraversalSamples() : 2), share, drawing, shown,
-            std::max<std::int64_t>(2, floored ? drawing->coarseTraversalSamples() : 2), floored};
+        const auto blanking = !composition.scope.xyOnly;
+        return Visible {source, frame, std::max<std::int64_t>(2, floored ? drawing->minimumTraversalSamples(blanking) : 2), share, drawing, shown,
+            std::max<std::int64_t>(2, floored ? drawing->coarseTraversalSamples(blanking) : 2), floored};
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
@@ -273,8 +276,9 @@ private:
                 if (!(share > 0)) { continue; }
                 const auto& clip = composition.clips[entry.clip];
                 const auto& drawing = *entry.drawing;
-                measure(composition, {.clip = &clip, .source = nullptr, .frame = 0, .length = 0, .start = {}, .end = {}, .minimum = std::max<std::int64_t>(2, drawing.minimumTraversalSamples()), .share = share,
-                    .drawing = &drawing, .shown = 1, .coarse = std::max<std::int64_t>(2, drawing.coarseTraversalSamples()), .world = true});
+                const auto blanking = !composition.scope.xyOnly;
+                measure(composition, {.clip = &clip, .source = nullptr, .frame = 0, .length = 0, .start = {}, .end = {}, .minimum = std::max<std::int64_t>(2, drawing.minimumTraversalSamples(blanking)), .share = share,
+                    .drawing = &drawing, .shown = 1, .coarse = std::max<std::int64_t>(2, drawing.coarseTraversalSamples(blanking)), .world = true});
             }
         }
         finishPlan(composition, first, end, rate);
@@ -724,7 +728,7 @@ private:
                 const auto* drawing = segment.drawing;
                 osci::Point raw;
                 if (drawing != nullptr && segment.floored && drawing->coarseTraversalSamples() > 0 && n >= 3) {
-                    raw = drawing->sampleTraversal(step, n, segment.world, &segment.cursor);
+                    raw = drawing->sampleTraversal(step, n, segment.world, &segment.cursor, !composition.scope.xyOnly);
                 } else {
                     const auto span = n > 1 ? 1.0 / static_cast<double>(n - 1) : 1.0;
                     raw = drawing != nullptr ? drawing->sample(static_cast<double>(step) * span, span) : segment.source->sampleFrame(segment.frame, static_cast<double>(step) * span, span);

@@ -9,6 +9,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     motionLookAndFeel.setControlCornerRadius(3.0f);
     setLookAndFeel(&motionLookAndFeel);
     visualiserSettings.setSurfaceColours(osci::Colours::veryDark(), osci::Colours::surface());
+    scopePanel.onXYOnly = [this] { offerHatchingForXY(); };
     // The Scope's cog selects the Scope, whose beam and display properties
     // animate in Properties and the Graph like any other; keeping
     // openSettings set also keeps the cog in the strip.
@@ -23,7 +24,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     for (auto* header : { &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
     }
-    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &addLightButton, &addMirrorButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
+    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
         addAndMakeVisible(component);
     }
     addChildComponent(scopeBack);
@@ -231,7 +232,7 @@ void MotionEditor::setUpCompositionNavigation() {
     scopeBack.onClick = [this] { leaveComposition(); };
     scopeLabel.setName("Composition name");
     scopeLabel.setEditable(false, true);
-    scopeLabel.setTooltip("Shared composition: changes affect every instance. Double-click to rename.");
+    scopeLabel.setTooltip("Double-click to rename");
     scopeLabel.onEditorShow = [this] { scopeNameGeneration = processor.document.scopeGeneration(); };
     scopeLabel.onTextChange = [this] {
         const auto name = scopeLabel.getText().trim();
@@ -255,7 +256,7 @@ void MotionEditor::setUpTransport() {
     monitorOutput.addItem("Beam XYRGB (5 ch)", 3);
     refreshOutputChoices();
     monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
-    monitorOutput.setTooltip("What your audio interface plays: the project's audio, or the beam itself to drive a real oscilloscope. XYZ sends the beam's brightness on a third channel for a scope's Z input (inverted Z for one that blanks on a positive voltage); it needs a DC-coupled output. XYRGB needs five output channels. The Scope always shows the beam.");
+    monitorOutput.setTooltip("What your audio interface plays: the project's audio, or the beam to drive a real oscilloscope. XYZ adds the beam's brightness for a scope's Z input (inverted Z if it blanks on a positive voltage) and needs a DC-coupled output.");
     monitorOutput.onChange = [this] {
         const auto mode = static_cast<MotionProcessor::OutputMode>(monitorOutput.getSelectedId() - 1);
         const auto channels = motion::beamOutputChannels(mode);
@@ -278,6 +279,7 @@ void MotionEditor::setUpTransport() {
                 if (processor.document.project().scope.xyOnly == on) { return; }
                 processor.document.edit(on ? "Set the scope to XY only" : "Give the scope brightness", [on](motion::Project& project) { project.scope.xyOnly = on; });
                 statusBar.show(done, MotionStatusBar::Kind::notice);
+                if (on) { offerHatchingForXY(); }
             });
         };
         if (mode == MotionProcessor::OutputMode::xy && !xyOnly) {
@@ -291,7 +293,7 @@ void MotionEditor::setUpTransport() {
     startButton.setTooltip("Go to start (Home)");
     endButton.setTooltip("Go to end (End)");
     loopButton.setTitle("Loop playback");
-    loopButton.setTooltip("Loop playback (L). I and O set the loop at the playhead; drag the brace in the ruler.");
+    loopButton.setTooltip("Loop playback (L). I and O set the loop at the playhead.");
     loopButton.onClick = [this] { toggleLoop(); };
     addAndMakeVisible(autoKeyButton);
     autoKeyButton.setClickingTogglesState(false);
@@ -311,7 +313,7 @@ void MotionEditor::setUpTransport() {
     timeLabel.setName("Timeline position");
     timeLabel.setEditable(false, true);
     timeLabel.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
-    timeLabel.setTooltip("Double-click to go to a time. Type it as the ruler shows it, or add s for seconds or f for frames. Bars read bar.beat.tick (960 ticks a beat).");
+    timeLabel.setTooltip("Double-click to go to a time: as the ruler shows it, or with s for seconds or f for frames");
     timeLabel.onEditorShow = [this] {
         positionEditGrid = processor.document.project().timeGrid();
         positionEditGeneration = processor.document.scopeGeneration();
@@ -332,7 +334,7 @@ void MotionEditor::setUpTransport() {
     };
     tapButton.setName("Tap tempo");
     tapButton.setTitle("Tap tempo");
-    tapButton.setTooltip("Tap on the beat (four taps or more). The tempo is set when you stop tapping. Detect it from the audio in the Timing menu.");
+    tapButton.setTooltip("Tap on the beat, four times or more, to set the tempo");
     tapButton.setWantsKeyboardFocus(false);
     tapButton.onClick = [this] { tap(); };
     tempoValue.setName("Project tempo");
@@ -487,7 +489,7 @@ void MotionEditor::refreshUndo() {
     undoButton.setTooltip((undo.isNotEmpty() ? "Undo " + undo : juce::String("Undo")) + undoKeys);
     redoButton.setTooltip((redo.isNotEmpty() ? "Redo " + redo : juce::String("Redo")) + redoKeys);
     undoDescription.setText(undo.isNotEmpty() ? "Undo " + undo : juce::String(), juce::dontSendNotification);
-    undoDescription.setTooltip(undoDescription.getText());
+    motion::style::tooltipWhenCut(undoDescription);
 }
 
 void MotionEditor::timerCallback() {
@@ -928,6 +930,34 @@ void MotionEditor::refreshInspector() {
     propertyInspector.setHeading(heading);
     propertyInspector.setTarget(editable ? selection : 0);
     effectStack.setOwner(owner, selection);
+}
+
+// Light on an XY-only scope shows only as how slowly each line is drawn,
+// which a busy frame has little time to spare for. Hatching shows it by how
+// densely lines cover what is lit, which X and Y alone draw well.
+void MotionEditor::offerHatchingForXY() {
+    const auto& project = processor.document.mainProject();
+    if (!project.scope.xyOnly || processor.document.editingComposition() != 0 || project.cameras.empty()) { return; }
+    const auto lit = std::any_of(project.tracks.begin(), project.tracks.end(), [&](const auto& track) {
+        return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {
+            const auto asset = motion::findAsset(project.assets, clip.asset);
+            const auto* generator = asset != nullptr ? motion::generatorOf(*asset) : nullptr;
+            return generator != nullptr && generator->category == motion::GeneratorCategory::light;
+        });
+    });
+    const auto hatches = std::any_of(project.cameras.begin(), project.cameras.end(), [](const auto& camera) {
+        const auto found = camera.properties.find("hatching");
+        return found != camera.properties.end() && (found->second.animated() || found->second.base > 0);
+    });
+    if (!lit || hatches) { return; }
+    statusBar.show("On an XY-only scope, light shows only by how slowly each line is drawn. Hatching shows it by how densely lines cover what's lit.", MotionStatusBar::Kind::notice, "Shade by hatching", [this] {
+        processor.document.edit("Shade by hatching", [](motion::Project& project) {
+            for (auto& camera : project.cameras) {
+                auto found = camera.properties.find("hatching");
+                if (found != camera.properties.end() && !found->second.animated()) { found->second.base = 100; }
+            }
+        });
+    });
 }
 
 bool MotionEditor::keyPressed(const juce::KeyPress& key) {

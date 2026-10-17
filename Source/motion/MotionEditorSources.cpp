@@ -525,7 +525,7 @@ void MotionEditor::showNextPreparationSettings() {
         // A video's frame is traced from the file, or the bytes of the source
         // it replaces, when FFmpeg is already here.
         auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video, name,
-            std::move(data), processor.document.project().scope.xyOnly, request.replacement != nullptr ? juce::File() : request.file,
+            std::move(data), processor.document.project().scope.xyOnly, request.replacement != nullptr ? request.replacement->linked : request.file,
             processor.getFFmpegFile().existsAsFile() ? processor.getFFmpegFile() : juce::File());
         imagePanel = panel.get();
         content = std::move(panel);
@@ -615,9 +615,15 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                         asset->data.replaceAll(text.toRawUTF8(), text.getNumBytesAsUTF8());
                     } else {
                         asset->data = request.replacement->data;
+                        asset->linked = request.replacement->linked;
                         keepPrepared();
                     }
                     result = request.uniqueClip != 0 ? juce::Result::ok() : motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder);
+                } else if (motion::linksFromDisk(request.file)) {
+                    // Large sound or video: linked where it is, not read in.
+                    asset->linked = request.file;
+                    keepPrepared();
+                    result = motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder);
                 } else if (request.file.getSize() > static_cast<juce::int64>(motion::maximumSourceBytes)) {
                     result = juce::Result::fail("This source exceeds the 64 MiB preparation limit.");
                 } else {

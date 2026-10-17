@@ -192,10 +192,8 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
     setName(name + " effect");
     setRepaintsOnMouseActivity(true);
     close.iconSize = 14.0f;
-    close.setTooltip("Remove this effect");
     close.onClick = [this] { juce::MessageManager::callAsync([safe = juce::Component::SafePointer<Card>(this)] { if (safe != nullptr) { safe->stack.remove(safe->id); } }); };
     addAndMakeVisible(close);
-    power.setTooltip("Turn this effect on or off");
     power.onClick = [this] { stack.setEnabled(id, power.getToggleState()); };
     addAndMakeVisible(power);
     if (definition == nullptr) { return; }
@@ -217,7 +215,7 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->modulate.setOnColour(motion::style::result().withAlpha(.16f));
         row->modulate.onContent = motion::style::result();
         row->modulate.setName("Modulate effect " + juce::String(parameter.id));
-        row->modulate.setTooltip("Modulate " + juce::String(parameter.name).toLowerCase() + ": open it in the Graph to route modulators to it or link it. Lit when something drives it.");
+        row->modulate.setTooltip("Modulate " + juce::String(parameter.name).toLowerCase() + " in the Graph");
         const auto property = parameter.id;
         row->field.onBegin = [this, property] { stack.beginGesture(id, property); };
         row->field.onChange = [this, property](double value) { stack.setValue(id, property, value); };

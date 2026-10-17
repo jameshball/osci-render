@@ -27,9 +27,6 @@
         "-0.5 + (-0.1 - 0.1 * cos(2 * pi * t / 4) + 0.5) * aim",
         "1.3 * aim"
       ]
-    },
-    "properties": {
-      "hideLines": 100
     }
   },
   "objects": [
@@ -134,8 +131,7 @@
         "generator.segments": 24,
         "generator.sides": 10,
         "edges": 0,
-        "outline": 100,
-        "slices": 100,
+        "spiral": 100,
         "fillDetail": 8
       }
     },

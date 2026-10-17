@@ -21,21 +21,33 @@ public:
     }
     static PreparedPointFrames::Result prepare(const juce::MemoryBlock& data, const juce::File& executable, const RasterSettings& settings,
         const std::atomic<bool>* cancel, std::atomic<double>* progress, Limits limits) {
+        if (data.getSize() == 0 || data.getSize() > 64 * 1024 * 1024) { return {nullptr, "Video source must contain 1 byte to 64 MiB."}; }
+        juce::TemporaryFile input(".mov");
+        if (!input.getFile().replaceWithData(data.getData(), data.getSize())) { return {nullptr, "Cannot create the temporary video source."}; }
+        return prepare(input.getFile(), executable, settings, cancel, progress, limits);
+    }
+    // A video read where it is on disk: one linked rather than held, however
+    // large.
+    static PreparedPointFrames::Result prepare(const juce::File& input, const juce::File& executable, const RasterSettings& settings,
+        const std::atomic<bool>* cancel = nullptr, std::atomic<double>* progress = nullptr) {
+        return prepare(input, executable, settings, cancel, progress, Limits{});
+    }
+    static PreparedPointFrames::Result prepare(const juce::File& input, const juce::File& executable, const RasterSettings& settings,
+        const std::atomic<bool>* cancel, std::atomic<double>* progress, Limits limits) {
         const auto invalid = settings.validate();
         if (!invalid.empty()) { return {nullptr, invalid}; }
         if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
         if (!executable.existsAsFile()) { return {nullptr, "Video decoding requires FFmpeg. Install it and prepare the source again."}; }
-        if (data.getSize() == 0 || data.getSize() > 64 * 1024 * 1024) { return {nullptr, "Video source must contain 1 byte to 64 MiB."}; }
+        if (!input.existsAsFile() || input.getSize() == 0) { return {nullptr, "The video file is missing or empty."}; }
         const auto dimension = settings.resolution;
         const auto frameBytes = static_cast<std::uint64_t>(dimension) * dimension * 4;
         const auto maximumFrames = std::min({PreparedPointFrames::maximumFrames,
             static_cast<std::uint64_t>(PreparedPointFrames::maximumBytes / sizeof(PointSample) / settings.pointsPerFrame), limits.rawBytes / frameBytes});
         if (maximumFrames == 0 || limits.decodeMilliseconds <= 0) { return {nullptr, "Video preparation limits are invalid."}; }
-        juce::TemporaryFile input(".mov"), output(".rgba");
-        if (!input.getFile().replaceWithData(data.getData(), data.getSize())) { return {nullptr, "Cannot create the temporary video source."}; }
+        juce::TemporaryFile output(".rgba");
         const auto filter = "setpts=PTS-STARTPTS,fps=" + juce::String(settings.videoFrameRate, 8) + ":start_time=0," + fitFilter(dimension);
         juce::StringArray args {executable.getFullPathName(), "-nostdin", "-hide_banner", "-loglevel", "error", "-xerror", "-y",
-            "-protocol_whitelist", "file,pipe", "-i", input.getFile().getFullPathName(), "-map", "0:v:0", "-an", "-sn", "-dn",
+            "-protocol_whitelist", "file,pipe", "-i", input.getFullPathName(), "-map", "0:v:0", "-an", "-sn", "-dn",
             "-vf", filter, "-frames:v", juce::String(static_cast<juce::int64>(maximumFrames + 1)), "-pix_fmt", "rgba", "-f", "rawvideo", output.getFile().getFullPathName()};
         VideoDecoderProcess decoder;
         if (!decoder.start(args)) { return {nullptr, "Cannot start the video decoder."}; }

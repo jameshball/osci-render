@@ -87,11 +87,12 @@ public:
     // The fewest samples that draw every stroke completely: each stroke a dark
     // start, a lit start and a dark end, and a sample at each of its corners
     // (where it turns sharply), smooth runs between them walked by length.
-    // Zero means there is no usable traversal.
-    std::int64_t minimumTraversalSamples() const { return detailed.minimum; }
+    // Without `blanking` (see sampleTraversal) no dark ones. Zero means there
+    // is no usable traversal.
+    std::int64_t minimumTraversalSamples(bool blanking = true) const { return least(detailed, blanking); }
     // Fewer still, when even those do not fit: each stroke's ends alone, its
     // corners cut by however few samples it gets.
-    std::int64_t coarseTraversalSamples() const { return coarse.minimum; }
+    std::int64_t coarseTraversalSamples(bool blanking = true) const { return least(coarse, blanking); }
 
     // Where a traversal's last sample landed: its stroke, run of shapes and
     // shape, and where their samples start and end. Kept by whoever samples
@@ -100,6 +101,7 @@ public:
     struct TraversalCursor {
         const void* traversal = nullptr;
         std::int64_t count = -1;
+        bool blanking = true;
         std::size_t stroke = 0, segment = 0, shape = 0;
         std::int64_t strokeStart = 0, strokeEnd = -1, segmentFrom = 0, segmentEnd = -1, segmentBefore = 0;
     };
@@ -111,30 +113,38 @@ public:
     // reparameterization within a curved shape. `even`: its strokes' ends
     // alone however many samples it gets, the rest by length, so it is as
     // bright all along (for an approximation, a mirror's view, whose corners
-    // need not be exact).
-    osci::Point sampleTraversal(std::int64_t index, std::int64_t count, bool even = false, TraversalCursor* cursor = nullptr) const {
-        if (coarse.minimum > 0 && count < coarse.minimum) { return sampleLongest(index, count); }
-        const auto& traversal = count >= detailed.minimum && !even ? detailed : coarse;
-        if (traversal.minimum == 0 || count < traversal.minimum || index < 0 || index >= count) {
+    // need not be exact). Without `blanking`, for a display with no brightness
+    // input where a dark sample would still be drawn, a stroke has no dark
+    // samples at its ends: the beam goes from one stroke's last lit sample to
+    // the next's first in a single step, as faint as a crossing can be.
+    osci::Point sampleTraversal(std::int64_t index, std::int64_t count, bool even = false, TraversalCursor* cursor = nullptr, bool blanking = true) const {
+        if (coarse.minimum > 0 && count < least(coarse, blanking)) { return sampleLongest(index, count); }
+        const auto& traversal = count >= least(detailed, blanking) && !even ? detailed : coarse;
+        if (traversal.minimum == 0 || count < least(traversal, blanking) || index < 0 || index >= count) {
             return osci::Point(0, 0, 0, 0, 0, 0);
         }
         const auto& segments = traversal.segments;
         const auto& strokes = traversal.strokes;
-        const auto extra = count - traversal.minimum;
+        const auto extra = count - least(traversal, blanking);
+        // How much earlier a stroke's samples are without blanking: every
+        // stroke before it has no dark start or end, nor has it a dark start.
+        const auto shift = [blanking](std::size_t stroke) { return blanking ? std::int64_t {0} : 2 * static_cast<std::int64_t>(stroke) + 1; };
+        const std::int64_t darkEnd = blanking ? 1 : 0;
         TraversalCursor unkept;
         auto& at = cursor != nullptr ? *cursor : unkept;
-        if (at.traversal != &traversal || at.count != count) { at = {&traversal, count}; }
+        if (at.traversal != &traversal || at.count != count || at.blanking != blanking) { at = {&traversal, count, blanking}; }
         // The stroke the sample is in, and where its samples start and end.
         if (index < at.strokeStart || index > at.strokeEnd) {
             const auto found = std::lower_bound(strokes.begin(), strokes.end(), index, [&](const TraversalStroke& item, std::int64_t value) {
                 const auto& last = segments[item.last];
-                return last.baseEnd + 1 + extraThrough(last, extra) < value;
+                return last.baseEnd + darkEnd - shift(static_cast<std::size_t>(&item - strokes.data())) + extraThrough(last, extra) < value;
             });
             if (found == strokes.end()) { return osci::Point(0, 0, 0, 0, 0, 0); }
             const auto beforeExtra = found->first == 0 ? 0 : extraThrough(segments[found->first - 1], extra);
             at.stroke = static_cast<std::size_t>(found - strokes.begin());
-            at.strokeStart = segments[found->first].baseEnd - 2 + beforeExtra;
-            at.strokeEnd = segments[found->last].baseEnd + 1 + extraThrough(segments[found->last], extra);
+            // Its dark start, or without blanking its first lit sample.
+            at.strokeStart = segments[found->first].baseEnd - shift(at.stroke) - (blanking ? 2 : 1) + beforeExtra;
+            at.strokeEnd = segments[found->last].baseEnd + darkEnd - shift(at.stroke) + extraThrough(segments[found->last], extra);
             at.segmentEnd = -1;
         }
         const auto& stroke = strokes[at.stroke];
@@ -149,18 +159,19 @@ public:
         // draw a bead, and however few samples it gets it is never lost.
         // Other strokes dwell lit at their ends, so a closed one's seam (a
         // corner) shows like any corner.
-        if (index == at.strokeStart) { return dark(shapes[segments[stroke.first].firstShape]->nextVector(0)); }
-        if (index == at.strokeEnd) { return dark(shapes[segments[stroke.last].lastShape]->nextVector(1)); }
+        if (blanking && index == at.strokeStart) { return dark(shapes[segments[stroke.first].firstShape]->nextVector(0)); }
+        if (blanking && index == at.strokeEnd) { return dark(shapes[segments[stroke.last].lastShape]->nextVector(1)); }
         // The run of shapes it is in: its samples run on from the one before's
         // last (the first run's from the stroke's first lit sample).
         if (index < at.segmentFrom || index > at.segmentEnd) {
+            const auto before = shift(at.stroke);
             const auto found = std::lower_bound(segments.begin() + stroke.first, segments.begin() + stroke.last + 1, index,
-                [&](const TraversalSegment& item, std::int64_t value) { return item.baseEnd + extraThrough(item, extra) < value; });
+                [&](const TraversalSegment& item, std::int64_t value) { return item.baseEnd - before + extraThrough(item, extra) < value; });
             at.segment = static_cast<std::size_t>(found - segments.begin());
             const auto opens = at.segment == stroke.first;
-            at.segmentBefore = opens ? at.strokeStart + 1 : segments[at.segment - 1].baseEnd + extraThrough(segments[at.segment - 1], extra);
+            at.segmentBefore = opens ? at.strokeStart + darkEnd : segments[at.segment - 1].baseEnd - before + extraThrough(segments[at.segment - 1], extra);
             at.segmentFrom = opens ? at.segmentBefore : at.segmentBefore + 1;
-            at.segmentEnd = found->baseEnd + extraThrough(*found, extra);
+            at.segmentEnd = found->baseEnd - before + extraThrough(*found, extra);
             at.shape = found->firstShape;
         }
         const auto& segment = segments[at.segment];
@@ -230,6 +241,10 @@ private:
         std::int64_t minimum = 0;
     };
 
+    // A traversal's fewest samples, with or without each stroke's dark ends.
+    static std::int64_t least(const Traversal& traversal, bool blanking) {
+        return traversal.minimum == 0 || blanking ? traversal.minimum : traversal.minimum - 2 * static_cast<std::int64_t>(traversal.strokes.size());
+    }
     std::int64_t extraThrough(const TraversalSegment& segment, std::int64_t extra) const {
         if (segment.lengthEnd == total) { return extra; }
         const auto apportioned = (static_cast<long double>(segment.lengthEnd) * static_cast<long double>(extra)) / static_cast<long double>(total);

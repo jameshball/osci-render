@@ -15,7 +15,7 @@
 // group, audio clip or camera). Rows group related axes; each row keys all of
 // its axes at once and navigates between its keys. Values edit at the key
 // under the playhead (frame-aligned) or, for animated curves, create one.
-class MotionPropertyInspector final : public juce::Component, public juce::DragAndDropTarget, private juce::ScrollBar::Listener {
+class MotionPropertyInspector final : public juce::Component, public juce::DragAndDropTarget {
 public:
     explicit MotionPropertyInspector(MotionProcessor& owner);
 
@@ -71,7 +71,6 @@ public:
     void itemDragExit(const SourceDetails&) override;
     void itemDropped(const SourceDetails& details) override;
     void paintOverChildren(juce::Graphics& g) override;
-    ~MotionPropertyInspector() override { viewport.getVerticalScrollBar().removeListener(this); }
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -140,6 +139,8 @@ private:
     // How a surface draws itself, as tiles: its edges, outline and patterns,
     // each on or off at a click, its rows below only for those on.
     std::unique_ptr<motion::ui::TileGrid> surfaceTiles;
+    // Wireframe or solid: whether its faces hide what is behind them.
+    std::unique_ptr<motion::ui::TileGrid> solidTiles;
     // A light's presets, as tiles: steady, or moving on its own.
     std::unique_ptr<motion::ui::TileGrid> presetTiles;
     // How a camera shades: by brightness, or by hatching.
@@ -169,6 +170,8 @@ private:
 
     // Keys land on frames so they align with the timeline grid and exports.
     double keyTime(const motion::PropertyTarget& found) const;
+    // A property's value at `time` before its drivers: its curve's, or its default.
+    double baseValue(const motion::PropertyTarget& found, std::string_view property, double time) const;
     void apply(motion::Project& project, const std::string& property, double value, double time) const;
     void beginGesture(const std::string& property);
     void previewValue(const std::string& property, double value);
@@ -207,9 +210,8 @@ private:
     void setMotionMode(bool path, bool enabled);
 
     MotionProcessor& processor;
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     // Scrolled, the rows slide under the heading: a rule marks where.
-    void scrollBarMoved(juce::ScrollBar*, double) override { repaint(0, viewport.getY(), getWidth(), 1); }
     Content content;
     juce::Label title, kind;
     std::vector<std::unique_ptr<Row>> rows;

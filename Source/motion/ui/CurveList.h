@@ -20,8 +20,7 @@ public:
     MotionCurveList() {
         setName("Graph channels");
         viewport.setViewedComponent(&content, false);
-        viewport.setScrollBarsShown(true, false);
-        viewport.setScrollBarThickness(6);
+        motion::style::fadeScrolling(viewport);
         addAndMakeVisible(viewport);
         animatedOnly.setName("Animated channels only");
         animatedOnly.setTitle(animatedOnly.getName());
@@ -110,7 +109,7 @@ public:
     }
 
 private:
-    struct Row final : juce::Component, juce::SettableTooltipClient {
+    struct Row final : juce::Component {
         Channel channel;
         juce::String shortLabel;
         bool selected = false, hovered = false;
@@ -127,7 +126,6 @@ private:
         explicit Row(Channel value) : channel(std::move(value)) {
             setName("Curve " + channel.label);
             setTitle(getName());
-            setTooltip(channel.label + (channel.keyed ? " - keyed" : "") + (channel.driven ? " - modulated" : "") + ". Click to edit its curve.");
             // Under its group's caption, "Position X" reads as "X".
             shortLabel = channel.group.isNotEmpty() && channel.label.startsWith(channel.group + " ") ? channel.label.substring(channel.group.length() + 1) : channel.label;
             eye.setName("Show curve " + channel.label);
@@ -279,6 +277,6 @@ private:
     std::string selected;
     std::set<std::string> visible;
     juce::String ownerKind, ownerName;
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     juce::Component content;
 };

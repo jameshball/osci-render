@@ -11,7 +11,7 @@ MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : proces
     };
     snapButton.setName("Snapping");
     snapButton.setTitle("Snapping");
-    snapButton.setTooltip("Snapping to the grid, clip edges, markers and the playhead. Hold Alt while dragging to bypass it.");
+    snapButton.setTooltip("Snapping: hold Alt while dragging to bypass it");
     snapButton.onClick = [this] {
         processor.document.changeView([](motion::Composition& state) { state.gridSnap = !state.gridSnap; });
     };
@@ -707,7 +707,7 @@ void MotionTimelineView::updateBake() {
     if (finished && bakeFinishedAt == 0) { bakeFinishedAt = now; }
     // Faded out: nothing more to paint.
     if (bakeShown && bakeFinishedAt > 0 && now - bakeFinishedAt > bakeFadeMs + 100) { bakeShown = false; }
-    if (bakeShown || wasShown) { repaint(bakeStrip()); }
+    if (bakeShown || wasShown) { repaint(bakeStrip().expanded(0, 1)); }
 }
 
 void MotionTimelineView::paintBake(juce::Graphics& g) const {
@@ -718,6 +718,13 @@ void MotionTimelineView::paintBake(juce::Graphics& g) const {
     const auto opacity = bakeFinishedAt > 0 ? 1.0 - (juce::Time::getMillisecondCounterHiRes() - bakeFinishedAt) / bakeFadeMs : 1.0;
     if (opacity <= 0) { return; }
     const auto strip = bakeStrip();
+    // Over the loop's brace, the strip cuts through it, so the progress
+    // reads the same along the whole ruler.
+    const auto loop = loopBounds();
+    if (!loop.isEmpty()) {
+        g.setColour(osci::Colours::surfaceRaised().withMultipliedAlpha(static_cast<float>(opacity)));
+        g.fillRect(juce::Rectangle<int>(loop.getX(), strip.getY() - 1, loop.getWidth(), strip.getHeight() + 2).getIntersection(strip.expanded(0, 1)));
+    }
     const auto first = std::max(strip.getX(), timeX(0));
     const auto last = std::min(strip.getRight(), timeX(bake->timeOf(bake->frameCount())));
     using State = motion::hidden::Bake::State;
@@ -773,8 +780,8 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     g.setColour(motion::style::gridMajor());
     grid.forEachTick(scrollTime, viewEnd, step, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
     motion::ui::paintRulerLabels(g, grid, scrollTime, viewEnd, step, {0, 0, getWidth(), 26}, [this](double time) { return timeX(time); });
-    paintBake(g);
     paintLoop(g);
+    paintBake(g);
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(0, 0, namesWidth, toolsHeight);
     g.setColour(motion::style::hairline());
@@ -1087,7 +1094,7 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
     if (bar != 0) {
         const auto thumb = horizontalThumb();
         setMouseCursor(bar == 1 && (std::abs(event.x - thumb.getX()) <= 5 || std::abs(event.x - thumb.getRight()) <= 5) ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
-        setTooltip(bar == 1 ? "Drag to scroll; drag either end to zoom" : "Drag to scroll tracks");
+        setTooltip(bar == 1 ? "Drag either end to zoom" : juce::String());
         return;
     }
     const auto edgeRow = rowEdgeAt(event.getPosition());
@@ -1096,12 +1103,12 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
     if (!loop.isEmpty() && event.y >= loopTop - 4 && event.y < loopTop + loopHeight && event.x >= loop.getX() - 5 && event.x <= loop.getRight() + 5) {
         const auto edge = std::abs(event.x - loop.getX()) <= 5 || std::abs(event.x - loop.getRight()) <= 5;
         setMouseCursor(edge ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor);
-        setTooltip("Loop: drag to move, drag an end to resize, double-click to switch looping on or off");
+        setTooltip("Double-click to switch looping on or off");
         return;
     }
     if (edgeRow >= 0) {
         setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
-        setTooltip("Drag to resize this track; double-click for the default height. Alt+wheel resizes every track.");
+        setTooltip("Double-click for the default height; Alt+wheel resizes every track");
         return;
     }
     const auto beamTarget = beamEdgeAt(event.getPosition());
@@ -1113,7 +1120,7 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
     }
     if (beamTarget.has_value()) {
         setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
-        setTooltip("Beam: drag up to give this object more of the beam's time, down to give it less. " + motion::style::shortcutText("Cmd-click") + " adds a key.");
+        setTooltip("Beam: drag up to give this object more of the beam's time; " + motion::style::shortcutText("Cmd-click") + " adds a key");
         return;
     }
     int row = 0;
@@ -1134,16 +1141,15 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
         setMouseCursor(juce::MouseCursor::PointingHandCursor);
     } else if (inBand && cameraKeyAt(event.x).has_value()) {
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
-        setTooltip("Camera key: drag to move, Delete to remove");
     } else if (hoveredCut != nullptr) {
         // As cameraBandDown takes it: an end resizes the shot, the middle moves it.
         const auto bounds = cutBounds(*hoveredCut);
         const auto edge = std::abs(event.x - bounds.getX()) <= 5 || std::abs(event.x - bounds.getRight()) <= 5;
         setMouseCursor(edge ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor);
-        setTooltip(cameraName(hoveredCut->camera) + ": drag to move this shot, drag an end to change when it cuts; right-click for more");
+        setTooltip(cameraName(hoveredCut->camera));
     } else if (hoveredMarker != nullptr) {
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
-        setTooltip(hoveredMarker->name + ": drag to move, double-click to edit, right-click for more");
+        setTooltip(hoveredMarker->name + ": double-click to edit");
     } else if (clip != nullptr) {
         const auto bounds = clipBounds(*clip, row);
         const bool edge = event.x < bounds.getX() + 8 || event.x > bounds.getRight() - 8;

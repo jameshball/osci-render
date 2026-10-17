@@ -21,7 +21,6 @@ public:
         const std::array<const char*, 6> kindNames {"None", "Typewriter", "Rise in", "Pop in", "Wave", "Scatter in"};
         for (std::size_t index = 0; index < kindNames.size(); ++index) { kinds.addItem(kindNames[index], static_cast<int>(index) + 1); }
         kinds.setJustificationType(juce::Justification::centredRight);
-        kinds.setTooltip("How the letters come in, one after another: Typewriter shows each in turn, Rise in lifts them into place, Pop in grows them with a bounce, Scatter in flies them in from all around. Wave bobs them up and down, over and over.");
         motion::style::styleField(kinds);
         kinds.onChange = [this] {
             if (kinds.getSelectedId() <= 0) { return; }
@@ -157,10 +156,10 @@ private:
     static constexpr std::array<std::array<Naming, 4>, 6> namings {{
         {{{nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr}}},
         {{{"Stagger", "Seconds between one letter appearing and the next"}, {nullptr, nullptr}, {"Pause", pauseTip}, {nullptr, nullptr}}},
-        {{{"Stagger", staggerTip}, {"Rise time", "Seconds each letter takes to rise into place"}, {"Pause", pauseTip}, {"Distance", "How far below its place each letter starts (1 is a letter's height)"}}},
-        {{{"Stagger", staggerTip}, {"Pop time", "Seconds each letter takes to grow to size"}, {"Pause", pauseTip}, {"Bounce", "How far each letter overshoots its size before settling (0 for none)"}}},
+        {{{"Stagger", staggerTip}, {"Rise time", ""}, {"Pause", pauseTip}, {"Distance", "How far below its place each letter starts (1 is a letter's height)"}}},
+        {{{"Stagger", staggerTip}, {"Pop time", ""}, {"Pause", pauseTip}, {"Bounce", "How far each letter overshoots its size before settling (0 for none)"}}},
         {{{"Stagger", "Seconds each letter's bob trails the one before"}, {"Period", "Seconds for one bob up and down"}, {nullptr, nullptr}, {"Height", "How high the letters bob (1 is a quarter of a letter's height)"}}},
-        {{{"Stagger", staggerTip}, {"Fly-in time", "Seconds each letter takes to fly into place"}, {"Pause", pauseTip}, {"Spread", "How far away, and how far turned, each letter starts (1 is two letters' heights and half a turn)"}}},
+        {{{"Stagger", staggerTip}, {"Fly-in time", ""}, {"Pause", pauseTip}, {"Spread", "How far away, and how far turned, each letter starts (1 is two letters' heights and half a turn)"}}},
     }};
     std::size_t kindIndex() const { return static_cast<std::size_t>(std::clamp(static_cast<int>(current().animation), 0, 5)); }
 

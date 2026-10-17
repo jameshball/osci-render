@@ -25,9 +25,7 @@ public:
         duration.setValue(initial.duration);
         bpm.setValue(initial.bpm);
         seed.setValue(initial.seed);
-        duration.setTooltip("Length of the prepared source. Rounded up to complete frames.");
-        frameRate.setTooltip("Frames of source animation prepared each second.");
-        samples.setTooltip("Samples retained per frame, preserving the source's point density.");
+        samples.setTooltip("Samples per frame");
         seed.setTooltip("Keeps random source generation repeatable.");
         bpm.setTooltip("Fixed tempo used while evaluating the source.");
         rates = { 24, 25, 30, 50, 60, 120 };

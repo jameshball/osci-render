@@ -140,7 +140,7 @@ public:
             // drawing none of its own lines.
             auto project = scene(0);
             project.tracks.change(0).clips[0].properties["reflects"] = motion::Curve(100);
-            addClip(project, generatorAsset(8, "box"), 80, {{"position.x", .3}, {"position.y", .1}, {"position.z", .3}, {"generator.width", .3}, {"generator.height", .3}, {"generator.depth", .3}});
+            addClip(project, generatorAsset(8, "box"), 80, {{"position.x", .3}, {"position.y", .1}, {"position.z", .3}, {"generator.width", .3}, {"generator.height", .3}, {"generator.depth", .3}, {"solid", 100}});
             const motion::PreparedComposition prepared(project);
             motion::hidden::Workspace workspace;
             const auto frame = motion::hidden::cull(prepared, 1, workspace);
@@ -198,14 +198,13 @@ private:
         motion::Project project;
         project.duration = 3;
         if (withBox) {
-            addClip(project, generatorAsset(1, "box"), 10, {{"position.y", boxHeight}, {"generator.width", boxSize}, {"generator.height", boxSize}, {"generator.depth", boxSize}});
+            addClip(project, generatorAsset(1, "box"), 10, {{"position.y", boxHeight}, {"generator.width", boxSize}, {"generator.height", boxSize}, {"generator.depth", boxSize}, {"solid", 100}});
         } else {
-            addClip(project, generatorAsset(1, "box"), 10, {{"position.x", 9}});
+            addClip(project, generatorAsset(1, "box"), 10, {{"position.x", 9}, {"solid", 100}});
         }
-        addClip(project, generatorAsset(2, "grid"), 20, {{"rotation.x", -90}, {"position.y", floorHeight}, {"generator.width", 3}, {"generator.height", 3}, {"reflects", reflects}});
+        addClip(project, generatorAsset(2, "grid"), 20, {{"rotation.x", -90}, {"position.y", floorHeight}, {"generator.width", 3}, {"generator.height", 3}, {"reflects", reflects}, {"solid", 100}});
         motion::Camera camera;
         camera.id = 40;
-        camera.properties["hideLines"] = motion::Curve(100.0);
         camera.properties["position.y"] = motion::Curve(1.5);
         camera.properties["position.z"] = motion::Curve(4);
         camera.properties["rotation.x"] = motion::Curve(-25);

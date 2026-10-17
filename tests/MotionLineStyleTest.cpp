@@ -265,7 +265,7 @@ public:
         {
             motion::Project project;
             project.duration = 3;
-            addClip(project, generatorAsset(1, "cone"), 10, {{"edges", 0}, {"slices", 100}});
+            addClip(project, generatorAsset(1, "cone"), 10, {{"edges", 0}, {"slices", 100}, {"solid", 0}});
             const motion::PreparedComposition prepared(project);
             motion::hidden::Workspace workspace;
             const auto frame = motion::hidden::cull(prepared, 1, workspace);
@@ -337,13 +337,13 @@ private:
     static motion::Project scene(std::initializer_list<std::pair<const char*, double>> style, bool withFloor = false, bool hiding = false) {
         motion::Project project;
         project.duration = 3;
-        std::vector<std::pair<const char*, double>> ball {{"generator.radius", radius}};
+        const auto solid = hiding ? 100.0 : 0.0;
+        std::vector<std::pair<const char*, double>> ball {{"generator.radius", radius}, {"solid", solid}};
         ball.insert(ball.end(), style.begin(), style.end());
         addClip(project, generatorAsset(1, "sphere"), 10, ball);
-        if (withFloor) { addClip(project, generatorAsset(2, "grid"), 20, {{"rotation.x", -90}, {"position.y", -.8}, {"generator.width", 3}, {"generator.height", 3}, {"reflects", 100}}); }
+        if (withFloor) { addClip(project, generatorAsset(2, "grid"), 20, {{"rotation.x", -90}, {"position.y", -.8}, {"generator.width", 3}, {"generator.height", 3}, {"reflects", 100}, {"solid", solid}}); }
         motion::Camera camera;
         camera.id = 40;
-        camera.properties["hideLines"] = motion::Curve(hiding ? 100.0 : 0.0);
         camera.properties["position.y"] = motion::Curve(1.5);
         camera.properties["position.z"] = motion::Curve(4);
         camera.properties["rotation.x"] = motion::Curve(-20);

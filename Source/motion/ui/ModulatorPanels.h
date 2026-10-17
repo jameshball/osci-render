@@ -175,7 +175,7 @@ private:
 
     MotionProcessor& processor;
     motion::Id selected = 0;
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     Content content {*this};
     juce::TextButton addButton;
     juce::Label emptyHint;

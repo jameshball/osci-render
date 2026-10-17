@@ -17,7 +17,7 @@ public:
         const auto rate = juce::String(config.frameRate, config.frameRate == std::round(config.frameRate) ? 0 : 3);
         frame.setName("Export frame");
         frame.setText(juce::String(config.renderSize.width) + juce::String::fromUTF8(" \xc3\x97 ") + juce::String(config.renderSize.height) + " px" + motion::style::dot() + rate + " fps", juce::dontSendNotification);
-        frame.setTooltip("The output canvas (the Scope's canvas button) at the composition's frame rate.");
+        frame.setTooltip("Set by the Scope's canvas button and the composition's frame rate");
         frame.setFont(motion::style::body());
         frame.setBorderSize({});
         codec.setName("Video codec");
@@ -33,7 +33,6 @@ public:
         quality.setValue(std::clamp(100.0 - (config.crf - 1) * 2.0, 1.0, 100.0));
         quality.setFill(fieldFill());
         soundtrack.setToggleState(config.includeAudio, juce::dontSendNotification);
-        soundtrack.setTooltip("Include the project's audio");
         for (auto* label : { &frameLabel, &codecLabel, &qualityLabel, &soundtrackLabel, &note }) { styleCaption(*label); }
         note.setText(config.preserveAlpha ? "Transparent background: ProRes 4444 with alpha." : juce::String(), juce::dontSendNotification);
         primary.onClick = [this] {

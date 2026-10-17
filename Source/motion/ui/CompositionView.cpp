@@ -1,4 +1,5 @@
 #include "CompositionView.h"
+#include "../render/HiddenLineDepth.h"
 #include "../model/SourceParts.h"
 #include "../model/AnchorEdit.h"
 
@@ -48,6 +49,12 @@ void MotionCompositionView::setTool(MotionTransformTool value) {
 std::optional<double> MotionCompositionView::selectedKeyContentTime(motion::Id id) const {
     editingTime();
     return pathKey.has_value() && pathKey->selection == id ? std::optional<double>(pathKey->contentTime) : std::nullopt;
+}
+
+void MotionCompositionView::setSolidView(bool on) {
+    if (solidView == on) { return; }
+    solidView = on;
+    repaint();
 }
 
 void MotionCompositionView::setMotionPathVisible(bool visible) {
@@ -292,7 +299,7 @@ const std::vector<MotionCompositionView::ScreenPiece>& MotionCompositionView::sc
     // moves and as edits are made.
     auto latest = askForLighting(time) && scenePreview != nullptr ? scenePreview->latest() : nullptr;
     if (latest != nullptr && latest->revision < lightingSince) { latest.reset(); }
-    const PiecesKey key {preparedSerial, live.get(), latest.get(), time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, selected, getWidth(), getHeight()};
+    const PiecesKey key {preparedSerial, live.get(), latest.get(), time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, selected, getWidth(), getHeight(), solidView};
     if (pieceKey == key) { return pieceCache; }
     pieceKey = key;
     // Held so a later set of live frames cannot reuse this one's address.
@@ -350,7 +357,126 @@ const std::vector<MotionCompositionView::ScreenPiece>& MotionCompositionView::sc
             }
         }
     }
+    if (solidView) { keepUnhidden(view, time); }
     return pieceCache;
+}
+
+void MotionCompositionView::keepUnhidden(const CameraView& view, double time) const {
+    if (!view.has_value() || prepared == nullptr || getHeight() <= 0) { return; }
+    // Where a point is for the depth buffer: as the Scene projects it, -1 to
+    // 1 across the square output frame, and its inverse depth.
+    const auto tangent = std::max(1.0e-9, view->tangent);
+    // Faces this near the eye are cut there: nearer, inverse depth runs away.
+    constexpr double near = .01;
+    const auto onScreen = [&](motion::Vec3 eye) { return motion::hidden::Screen {eye.x / (eye.z * tangent), eye.y / (eye.z * tangent), 1 / eye.z}; };
+    // The buffer covers the whole Scene, past the frame on every side, at
+    // about a cell to every pixel and a half: fine enough to cut lines where
+    // they pass behind, cheap enough to draw every frame of a drag.
+    const auto frame = outputFrame();
+    const auto across = std::clamp(static_cast<int>(frame.getWidth() / 1.5f), 64, 768);
+    motion::hidden::DepthBuffer depth(motion::hidden::Reach {getWidth() / frame.getWidth(), getHeight() / frame.getHeight()}, across);
+    // A face in eye space, cut where it crosses the near plane.
+    const auto fill = [&](const std::array<motion::Vec3, 3>& corners) {
+        std::array<motion::Vec3, 4> kept {};
+        std::size_t count = 0;
+        for (std::size_t index = 0; index < 3; ++index) {
+            const auto& current = corners[index];
+            const auto& next = corners[(index + 1) % 3];
+            if (current.z > near) { kept[count++] = current; }
+            if ((current.z > near) != (next.z > near)) { kept[count++] = current + (next - current) * ((near - current.z) / (next.z - current.z)); }
+        }
+        for (std::size_t piece = 2; piece < count; ++piece) { depth.triangle(onScreen(kept[0]), onScreen(kept[piece - 1]), onScreen(kept[piece])); }
+    };
+    for (const auto& clip : prepared->clips) {
+        const auto sampleTime = clipTime(clip, time);
+        if (clip.light || !clip.active(sampleTime) || !clip.visible(sampleTime) || clip.source == nullptr) { continue; }
+        const auto* drawing = clip.source->drawingAt(clip.source->frameIndex(clip.localTime(sampleTime)));
+        if (drawing == nullptr || drawing->faces().empty()) { continue; }
+        const auto& mesh = drawing->faces();
+        const auto eyeOf = [&](const osci::Point& point) -> std::optional<motion::Vec3> {
+            const auto world = prepared->worldPoint(clip, point, sampleTime);
+            return world.has_value() ? std::optional(view->toEye(*world)) : std::nullopt;
+        };
+        std::vector<std::optional<motion::Vec3>> corners;
+        corners.reserve(mesh.vertices.size());
+        for (const auto& vertex : mesh.vertices) { corners.push_back(eyeOf(vertex)); }
+        // What an effect bends is no longer flat between its corners: its
+        // faces are cut finer, about every 16 pixels, to follow the lines on it.
+        const auto bent = warps(clip);
+        for (const auto& triangle : mesh.triangles) {
+            const auto& a = corners[triangle[0]], & b = corners[triangle[1]], & c = corners[triangle[2]];
+            if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
+            if (!bent) {
+                fill({*a, *b, *c});
+                continue;
+            }
+            // How long an edge is on screen; one reaching behind the eye is
+            // cut as finely as any.
+            const auto pixels = [&](const motion::Vec3& from, const motion::Vec3& to) {
+                if (!(from.z > near) || !(to.z > near)) { return 256.0; }
+                const auto p = onScreen(from), q = onScreen(to);
+                return std::hypot(p.x - q.x, p.y - q.y) * frame.getWidth() * .5;
+            };
+            const auto steps = std::clamp(static_cast<int>(std::ceil(std::max({pixels(*a, *b), pixels(*b, *c), pixels(*c, *a)}) / 16)), 1, 16);
+            const auto& pa = mesh.vertices[triangle[0]], & pb = mesh.vertices[triangle[1]], & pc = mesh.vertices[triangle[2]];
+            const auto at = [&](int i, int j) {
+                const auto u = static_cast<float>(i) / static_cast<float>(steps), v = static_cast<float>(j) / static_cast<float>(steps), w = 1 - u - v;
+                return eyeOf(osci::Point(pa.x * w + pb.x * u + pc.x * v, pa.y * w + pb.y * u + pc.y * v, pa.z * w + pb.z * u + pc.z * v));
+            };
+            // The face's points on a triangular lattice, row by row.
+            std::vector<std::optional<motion::Vec3>> lattice;
+            for (int i = 0; i <= steps; ++i) {
+                for (int j = 0; j <= steps - i; ++j) { lattice.push_back(at(i, j)); }
+            }
+            const auto point = [&](int i, int j) -> const std::optional<motion::Vec3>& {
+                // Row i starts after rows 0..i-1, of steps + 1 - row points each.
+                return lattice[static_cast<std::size_t>(i * (steps + 1) - i * (i - 1) / 2 + j)];
+            };
+            for (int i = 0; i < steps; ++i) {
+                for (int j = 0; j < steps - i; ++j) {
+                    const auto& p = point(i, j), & q = point(i + 1, j), & r = point(i, j + 1);
+                    if (p.has_value() && q.has_value() && r.has_value()) { fill({*p, *q, *r}); }
+                    if (j + 1 < steps - i) {
+                        const auto& t = point(i + 1, j + 1);
+                        if (q.has_value() && t.has_value() && r.has_value()) { fill({*q, *t, *r}); }
+                    }
+                }
+            }
+        }
+    }
+    if (depth.isEmpty()) { return; }
+    std::vector<ScreenPiece> kept;
+    kept.reserve(pieceCache.size());
+    for (const auto& piece : pieceCache) {
+        // Tested every few pixels along it on screen.
+        const auto steps = std::clamp(static_cast<int>(piece.line.getLength() / 3.0f), 1, 256);
+        const auto shows = [&](int step) {
+            const auto eye = view->toEye(piece.a + (piece.b - piece.a) * (static_cast<double>(step) / steps));
+            return !(eye.z > near) || depth.shows(onScreen(eye));
+        };
+        int from = -1;
+        const auto keep = [&](int start, int end) {
+            if (start == 0 && end == steps) {
+                kept.push_back(piece);
+                return;
+            }
+            // Cut where it passes behind, half a step either side.
+            const auto t0 = start == 0 ? 0.0 : (start - .5) / steps, t1 = end == steps ? 1.0 : (end + .5) / steps;
+            const auto a = piece.a + (piece.b - piece.a) * t0, b = piece.a + (piece.b - piece.a) * t1;
+            const auto line = screenLine(view, a, b);
+            if (line.has_value()) { kept.push_back({*line, a, b, piece.colour, piece.clip, piece.shape, piece.depth}); }
+        };
+        for (int step = 0; step <= steps; ++step) {
+            const auto seen = shows(step);
+            if (seen && from < 0) { from = step; }
+            if (!seen && from >= 0) {
+                keep(from, step - 1);
+                from = -1;
+            }
+        }
+        if (from >= 0) { keep(from, steps); }
+    }
+    pieceCache = std::move(kept);
 }
 
 float MotionCompositionView::depthFade(double depth) const {

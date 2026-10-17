@@ -18,7 +18,7 @@ public:
         depth.setSpec(depthSpec);
         depth.setValue(std::clamp(initialDepth, 0, 15));
         depth.setFill(fieldFill());
-        depth.setTooltip("Higher values add L-system detail and increase preparation time.");
+        depth.setTooltip("Higher adds detail and takes longer to prepare");
         depth.onChange = [this](double) { refresh(); };
         depth.onCommit = depth.onChange;
         styleCaption(depthLabel);

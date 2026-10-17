@@ -119,6 +119,11 @@ struct TransformPose {
         const auto value = curves[reflectsIndex].evaluate(time) / 100;
         return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
     }
+    // How far its faces hide what is behind them, 0..1.
+    static double solidAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
+        const auto value = curves[solidIndex].evaluate(time) / 100;
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
+    }
     // Whether a property may be other than its default at some time: keys,
     // a link or modulators can move it.
     static bool mayDifferCurve(const Curve& curve, double usual) {
@@ -126,6 +131,8 @@ struct TransformPose {
     }
     static bool mayDiffer(const std::array<Curve, objectPropertySpecs.size()>& curves, std::size_t index) { return mayDifferCurve(curves[index], objectPropertySpecs[index].defaultValue); }
     static bool mayReflect(const std::array<Curve, objectPropertySpecs.size()>& curves) { return mayDiffer(curves, reflectsIndex); }
+    // Solid unless it is a wireframe throughout.
+    static bool mayBeSolid(const std::array<Curve, objectPropertySpecs.size()>& curves) { return mayDifferCurve(curves[solidIndex], 0); }
     // Whether it may draw itself other than by its edges alone.
     static bool mayRestyle(const std::array<Curve, objectPropertySpecs.size()>& curves) {
         for (auto index = edgesIndex; index < patternsIndex + patternCount; ++index) {
@@ -304,6 +311,15 @@ struct PreparedClipStage {
     bool stageMayReflect() const {
         return TransformPose::mayReflect(curves) || std::any_of(groups.begin(), groups.end(), [](const auto& group) { return TransformPose::mayReflect(group.curves); });
     }
+    // Its own Solid times its groups'.
+    double stageSolid(double time) const {
+        auto value = TransformPose::solidAt(curves, localTime(time));
+        for (const auto& group : groups) { value *= TransformPose::solidAt(group.curves, scopeTime(time)); }
+        return value;
+    }
+    bool stageMayBeSolid() const {
+        return TransformPose::mayBeSolid(curves) && std::all_of(groups.begin(), groups.end(), [](const auto& group) { return TransformPose::mayBeSolid(group.curves); });
+    }
     double stageBeam(double time) const {
         auto value = TransformPose::beamAt(curves, localTime(time));
         for (const auto& group : groups) { value *= group.beam(scopeTime(time)); }
@@ -383,6 +399,17 @@ struct PreparedClip : PreparedClipStage {
     bool mayReflect() const {
         return stageMayReflect() || std::any_of(ancestors.begin(), ancestors.end(), [](const auto& ancestor) { return ancestor.stageMayReflect(); });
     }
+    // How far its faces hide what is behind them: its own Solid times its
+    // groups' and its nested placements', so any of them made a wireframe
+    // makes it one.
+    double solid(double time) const {
+        auto value = stageSolid(time);
+        for (const auto& ancestor : ancestors) { value *= ancestor.stageSolid(time); }
+        return value;
+    }
+    bool mayBeSolid() const {
+        return stageMayBeSolid() && std::all_of(ancestors.begin(), ancestors.end(), [](const auto& ancestor) { return ancestor.stageMayBeSolid(); });
+    }
     const PreparedSource* resolveSource(const LiveSourceFrames* liveFrames = nullptr) const noexcept {
         if (liveIdentity != nullptr) { return liveFrames != nullptr ? liveFrames->resolve(liveIdentity.get()) : nullptr; }
         return source.get();
@@ -455,14 +482,6 @@ struct PreparedCamera {
     std::array<Curve, cameraPropertySpecs.size()> curves;
     PreparedChain target, parent;
 
-    // How far lines behind faces fade from view (0..1).
-    double hidesLines(double time) const {
-        const auto value = curves[cameraHideLinesIndex].evaluate(time) / 100;
-        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
-    }
-    // Whether it may hide any.
-    bool mayHide() const { return TransformPose::mayDifferCurve(curves[cameraHideLinesIndex], cameraPropertySpecs[cameraHideLinesIndex].defaultValue); }
-
     // How much it shades by hatching (0..1), and how many cells across.
     double hatching(double time) const {
         const auto value = curves[cameraHatchingIndex].evaluate(time) / 100;
@@ -480,6 +499,9 @@ struct PreparedCamera {
         Vec3 position, right, up, forward;
         double focalLength = 1;
     };
+    // The fixed framing with no camera: four units in front of the middle,
+    // looking back at it.
+    static Frame fixedFrame() { return {{0, 0, 4}, {1, 0, 0}, {0, 1, 0}, {0, 0, -1}, 4}; }
     // The camera's world position and orthonormal basis at `time`: authored
     // position/rotation (X, then Y, then Z), carried by the parent group,
     // then aimed at the target's anchor with Z rotation kept as roll.
@@ -758,10 +780,10 @@ struct PreparedComposition {
             clips.clear();
             lights.clear();
         }
-        // Frames whose hidden lines a camera removes, that lights light, in
+        // Frames in which something solid hides lines, that lights light, in
         // which something reflects, a surface draws itself other than by its
         // edges, or a camera hatches, are baked off the render thread.
-        const auto hides = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.mayHide(); });
+        const auto hides = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayBeSolid(); });
         const auto reflective = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayReflect(); });
         const auto restyled = std::any_of(clips.begin(), clips.end(), [](const auto& clip) { return !clip.light && clip.mayRestyle(); });
         const auto hatches = std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.mayHatch(); });
@@ -846,7 +868,7 @@ struct PreparedComposition {
         }
         const auto& view = views.at(time, [&] {
             const auto* camera = activeCamera(time);
-            return View {camera != nullptr, camera != nullptr ? camera->frame(time) : std::nullopt};
+            return View {camera != nullptr, camera != nullptr ? camera->frame(time) : std::optional(PreparedCamera::fixedFrame())};
         });
         if (view.camera) {
             const auto projected = view.frame.has_value() ? PreparedCamera::project(*view.frame, point) : std::nullopt;
@@ -908,6 +930,10 @@ struct PreparedComposition {
     bool restyles(double time) const {
         return std::any_of(clips.begin(), clips.end(), [&](const PreparedClip& clip) { return !clip.light && clip.active(time) && clip.visible(time) && !clip.lines(time).plain(); });
     }
+    // Whether anything shown at a time is solid.
+    bool solids(double time) const {
+        return std::any_of(clips.begin(), clips.end(), [&](const PreparedClip& clip) { return !clip.light && clip.active(time) && clip.visible(time) && clip.solid(time) > 0; });
+    }
     // Whether anything shown at a time reflects.
     bool reflects(double time) const {
         return std::any_of(clips.begin(), clips.end(), [&](const PreparedClip& clip) { return !clip.light && clip.active(time) && clip.visible(time) && clip.reflects(time) > 0; });
@@ -921,20 +947,23 @@ struct PreparedComposition {
     };
     std::optional<Viewpoint> viewpoint(double time) const {
         const auto* camera = activeCamera(time);
-        if (camera == nullptr) { return Viewpoint {{0, 0, 4}, {1, 0, 0}, {0, 1, 0}, {0, 0, -1}, 4}; }
+        if (camera == nullptr) {
+            const auto fixed = PreparedCamera::fixedFrame();
+            return Viewpoint {fixed.position, fixed.right, fixed.up, fixed.forward, fixed.focalLength};
+        }
         const auto frame = camera->frame(time);
         if (!frame.has_value()) { return std::nullopt; }
         return Viewpoint {frame->position, frame->right, frame->up, frame->forward, frame->focalLength};
     }
     // A world point in the active camera's eye space (x right, y up, z along
-    // its view), as projectVisible sees it before dividing by depth; none
-    // without a camera.
+    // its view), or the fixed framing's without cameras, as projectVisible
+    // sees it before dividing by depth.
     std::optional<Vec3> eyePoint(osci::Point point, double time) const {
         if (!std::isfinite(time) || !point.hasFinitePosition()) { return std::nullopt; }
         point = applyCompositionEffects(point, time);
         const auto& view = views.at(time, [&] {
             const auto* camera = activeCamera(time);
-            return View {camera != nullptr, camera != nullptr ? camera->frame(time) : std::nullopt};
+            return View {camera != nullptr, camera != nullptr ? camera->frame(time) : std::optional(PreparedCamera::fixedFrame())};
         });
         if (!view.frame.has_value()) { return std::nullopt; }
         const auto offset = Vec3 {point.x, point.y, point.z} - view.frame->position;
@@ -942,7 +971,8 @@ struct PreparedComposition {
     }
 
 private:
-    // The camera shown at a time and its frame (none without cameras).
+    // The camera shown at a time and its frame (the fixed framing's without
+    // cameras).
     struct View {
         bool camera = false;
         std::optional<PreparedCamera::Frame> frame;
@@ -963,7 +993,7 @@ public:
     std::vector<PreparedCamera> cameras;
     // What the Scope shows (wider than the frame on a wide canvas), which
     // hidden lines are removed across, and the frames with them removed, when
-    // a camera hides them.
+    // something solid hides them.
     hidden::Reach hiddenLineReach;
     std::shared_ptr<hidden::Bake> hiddenLines;
     PreparedBeam beam;

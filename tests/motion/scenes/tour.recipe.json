@@ -26,9 +26,6 @@
         "-0.5 + (ball + 0.5) * aim",
         "1.3 * aim"
       ]
-    },
-    "properties": {
-      "hideLines": 100
     }
   },
   "objects": [

@@ -21,8 +21,8 @@ public:
             motion::style::inspector::styleCaption(captions[index], labels[index]);
             addAndMakeVisible(captions[index]);
         }
-        for (auto [field, name, tip] : {std::tuple {&length, "Composition duration", "How long the composition runs, in seconds; it is never shorter than its last clip"},
-                                        std::tuple {&tempo, "Composition tempo", "Beats per minute at the start; tempo changes on the ruler take over from there"}}) {
+        for (auto [field, name, tip] : {std::tuple {&length, "Composition duration", "Never shorter than its last clip"},
+                                        std::tuple {&tempo, "Composition tempo", "Tempo at the start; changes on the ruler take over from there"}}) {
             field->setName(name);
             field->setTitle(name);
             field->setTooltip(tip);
@@ -35,11 +35,9 @@ public:
         length.onTextChange = [this] { if (!updating) { applyLength(); } };
         tempo.onTextChange = [this] { if (!updating) { applyTempo(); } };
         frameRate.setName("Composition frame rate");
-        frameRate.setTooltip("Frames per second for the timeline grid and video export");
         const std::array<const char*, 8> rateNames {"23.976 fps", "24 fps", "25 fps", "29.97 fps", "30 fps", "50 fps", "60 fps", "120 fps"};
         for (std::size_t index = 0; index < rateNames.size(); ++index) { frameRate.addItem(rateNames[index], 500 + static_cast<int>(index)); }
         meter.setName("Composition meter");
-        meter.setTooltip("Beats in a bar");
         for (const auto beats : {2, 3, 4, 5, 6, 7}) { meter.addItem(juce::String(beats) + "/4", 400 + beats); }
         for (auto* combo : {&frameRate, &meter}) {
             motion::style::styleField(*combo);
@@ -50,7 +48,6 @@ public:
         addChildComponent(aboutTitle);
         about.setName("Project description");
         about.setTitle("Project description");
-        about.setTooltip("What this project is: shown under its name on the start screen");
         about.setMultiLine(true, true);
         about.setReturnKeyStartsNewLine(false);
         about.setScrollbarsShown(false);

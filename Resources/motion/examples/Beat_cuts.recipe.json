@@ -35,10 +35,10 @@
     }
   ],
   "cameras": [
-    {"name": "Wide", "lookAt": "Torus", "properties": {"position.x": 0, "position.y": 1.4, "position.z": 5, "hideLines": 100}},
-    {"name": "Close", "lookAt": "Torus", "properties": {"position.x": 1.5, "position.y": 0.6, "position.z": 2.5, "hideLines": 100}},
-    {"name": "Low", "lookAt": "Torus", "properties": {"position.x": -1.8, "position.y": -0.5, "position.z": 3.2, "hideLines": 100}},
-    {"name": "Top", "lookAt": "Torus", "properties": {"position.x": 0, "position.y": 5, "position.z": 0.5, "hideLines": 100}}
+    {"name": "Wide", "lookAt": "Torus", "properties": {"position.x": 0, "position.y": 1.4, "position.z": 5}},
+    {"name": "Close", "lookAt": "Torus", "properties": {"position.x": 1.5, "position.y": 0.6, "position.z": 2.5}},
+    {"name": "Low", "lookAt": "Torus", "properties": {"position.x": -1.8, "position.y": -0.5, "position.z": 3.2}},
+    {"name": "Top", "lookAt": "Torus", "properties": {"position.x": 0, "position.y": 5, "position.z": 0.5}}
   ],
   "cuts": [
     {"camera": "Wide", "start": 0, "duration": 2},

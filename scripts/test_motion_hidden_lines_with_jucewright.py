@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A camera hides the lines it can't see: a turned cube loses its far edges on the Scope, and the setting saves."""
+"""A solid cube hides the lines behind its faces: turned, it loses its far edges on the Scope, and the setting saves."""
 import json
 import struct
 import subprocess
@@ -100,34 +100,30 @@ try:
     scope = next(n["bounds"] for n in nodes(tree) if n.get("class") == "VisualiserComponent")
     time.sleep(1.5)
     whole = lit_on_scope("whole.png")
-    # The Cameras band shows the camera; clicking it selects it.
-    step("select camera", "click", "--class", "MotionTimelineView", "--position", "400,39")
-    # Hide lines is a camera property in Properties: 100% removes them.
-    hide = None
+    # The cube's clip, on the first track under the Cameras band.
+    step("select cube", "click", "--class", "MotionTimelineView", "--position", "400,65")
+    # Solid is a choice in its Surface: its faces then hide what is behind them.
+    solid = None
     for _ in range(25):
-        hide = next((n for n in nodes(json.loads(command("snapshot", "--json", "--full"))) if n.get("componentName") == "hideLines" and "ScrubField" in n.get("class", "") and n.get("visible")), None)
-        if hide is not None:
+        solid = find(lambda n: n.get("name") == "Solidity: Solid" and n.get("visible"))
+        if solid is not None:
             break
         time.sleep(.2)
-    if hide is None:
-        raise RuntimeError("The camera's Properties should have Hide lines")
-    step("open hide lines", "click", hide["ref"], "--click-count", "2")
-    editor = next((n for n in nodes(next(n for n in nodes(json.loads(command("snapshot", "--json", "--full"))) if n.get("componentName") == "hideLines" and "ScrubField" in n.get("class", ""))) if n.get("class") == "juce::TextEditor"), None)
-    if editor is None:
-        raise RuntimeError("Hide lines should open for typing")
-    step("hide them", "fill", editor["ref"], "100")
-    step("commit hide lines", "press", "Return")
+    if solid is None:
+        raise RuntimeError("The cube's Properties should offer Solid")
+    step("make it solid", "click", solid["ref"])
+    session.wait_for_undo("Make solid")
     # Baked in the background: the lines behind the faces leave the Scope.
     hidden = lit_once_baked("hidden.png", lambda lit: lit < whole * .95)
     if hidden >= whole * .95:
-        raise RuntimeError(f"Hiding lines should leave fewer lines on the Scope ({hidden} lit of {whole})")
+        raise RuntimeError(f"A solid cube should leave fewer lines on the Scope ({hidden} lit of {whole})")
     step("save", "press", "command + s", "--class", "MotionEditor")
     data = project.read_bytes()
     saved = ET.fromstring(data[8:8 + struct.unpack("<I", data[4:8])[0]]).find("composition")
-    camera = next(c for c in saved.iter("camera") if c.get("id") == "9")
-    hide_lines = next((p for p in camera.iter("property") if p.get("name") == "hideLines"), None)
-    if hide_lines is None or float(hide_lines.get("base")) != 100:
-        raise RuntimeError("The camera's Hide lines should save with the project")
+    cube = next(c for c in saved.iter("clip") if c.get("id") == "3")
+    solidity = next((p for p in cube.iter("property") if p.get("name") == "solid"), None)
+    if solidity is None or float(solidity.get("base")) != 100:
+        raise RuntimeError("The cube's Solid should save with the project")
     step("undo", "click", "--name", "Undo", "--exact")
     restored = lit_once_baked("restored.png", lambda lit: lit > whole * .95)
     if restored <= whole * .95:

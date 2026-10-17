@@ -12,6 +12,7 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
 
     viewport.setViewedComponent(&content, false);
     viewport.setScrollBarsShown(true, false);
+    viewport.setColour(osci::scrollFadeOverlayBackgroundColourId, osci::Colours::veryDark().brighter(0.08f));
     viewport.getVerticalScrollBar().setColour(juce::ScrollBar::thumbColourId,
                                                 juce::Colours::white.withAlpha(0.3f));
     browserPanel.addAndMakeVisible(viewport);

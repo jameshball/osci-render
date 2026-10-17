@@ -754,6 +754,7 @@ public:
         testGroups(document.project());
         testModulation(document.project());
         testAudioImports(document.project());
+        testLinkedSources();
         testAudioExports(document.project());
         testTiming(document.project());
         testScopeProfile(document.project());
@@ -996,6 +997,56 @@ private:
         asset.extension = ".wav";
         asset.data = wav.getMemoryBlock();
         return asset;
+    }
+
+    // A sound linked rather than held: read from its file, saved as where it
+    // is, found beside a project moved with it, and missing said plainly.
+    void testLinkedSources() {
+        beginTest("A linked sound is read from its file, saved by where it is, and found beside a moved project");
+        const auto root = juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile("motion-linked", "");
+        const auto first = root.getChildFile("first"), moved = root.getChildFile("moved");
+        expect(first.createDirectory().wasOk() && moved.createDirectory().wasOk());
+        const auto embedded = wavAsset(2);
+        const auto sound = first.getChildFile("Sound.wav");
+        expect(sound.replaceWithData(embedded.data.getData(), embedded.data.getSize()));
+        auto linked = std::make_shared<motion::Asset>();
+        linked->id = 9100;
+        linked->name = "Sound.wav";
+        linked->extension = ".wav";
+        linked->linked = sound;
+        const auto decoded = motion::decodeAsset(*linked);
+        expect(decoded.wasOk(), decoded.getErrorMessage());
+        expect(linked->audio != nullptr && linked->audio->frameCount() == 4, "it decodes from its file");
+        motion::Project project;
+        project.assets.push_back(linked);
+        const auto xml = motion::Document::save(project);
+        const auto* saved = xml.getChildByName("asset");
+        expect(saved != nullptr && saved->getStringAttribute("file") == sound.getFullPathName(), "it saves where its file is");
+        expect(saved != nullptr && saved->getAllSubText().isEmpty(), "and none of the file itself");
+        const auto projectFile = first.getChildFile("Linked.osci-motion");
+        expect(motion::ProjectFile::write(project, projectFile).wasOk());
+        {
+            motion::ProjectFile reopened;
+            const auto read = motion::ProjectFile::read(projectFile, reopened);
+            expect(read.wasOk(), read.getErrorMessage());
+            expect(reopened.project.assets.size() == 1 && reopened.project.assets[0]->isLinked() && reopened.project.assets[0]->audio != nullptr, "it opens linked to its file");
+        }
+        // Moved together: found beside the project.
+        expect(projectFile.copyFileTo(moved.getChildFile(projectFile.getFileName())) && sound.moveFileTo(moved.getChildFile(sound.getFileName())));
+        {
+            motion::ProjectFile reopened;
+            const auto read = motion::ProjectFile::read(moved.getChildFile(projectFile.getFileName()), reopened);
+            expect(read.wasOk(), read.getErrorMessage());
+            expect(reopened.project.assets.size() == 1 && reopened.project.assets[0]->linked == moved.getChildFile("Sound.wav"), "a moved project finds its file beside it");
+        }
+        // Gone: left out, and said where it was looked for.
+        {
+            motion::ProjectFile reopened;
+            const auto read = motion::ProjectFile::read(projectFile, reopened);
+            expect(read.wasOk(), read.getErrorMessage());
+            expect(reopened.project.assets.empty() && reopened.notes.lines().joinIntoString(" ").contains(sound.getFullPathName()), "a missing file says where it was");
+        }
+        root.deleteRecursively();
     }
 
     void testAudioImports(const motion::Project& sourceProject) {
@@ -1912,7 +1963,8 @@ private:
         expect(motion::findEffect(project, global.id) == &project.effects[0]);
 
         beginTest("Effect order, curves and time ranges round trip, sharing assets through undo");
-        clip.effects[0].range = motion::EffectRange { -0.5, 6 };
+        // Changed afresh: preparing the composition shared the project's tracks.
+        project.tracks.change(0).clips[0].effects[0].range = motion::EffectRange { -0.5, 6 };
         juce::UndoManager undo;
         motion::Document document(undo);
         document.reset(sourceProject);

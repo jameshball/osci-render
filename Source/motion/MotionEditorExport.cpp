@@ -401,14 +401,11 @@ void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutL
     auto state = std::make_shared<ExportState>();
     exportState = state;
     state->sampleRate = processor.exportSampleRate();
-    chooser = std::make_unique<juce::FileChooser>("Export " + exportedAs(mode) + motion::style::dot() + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
-        defaultExportFile("wav"), "*.wav");
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-        | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state, leaveOutLive, mode, beam](const juce::FileChooser& selected) {
+    const auto exportTo = [owner, state, leaveOutLive, mode, beam](const juce::File& chosen) {
         if (owner == nullptr) { return; }
-        if (selected.getResult() == juce::File()) { owner->exportState.reset(); return; }
-        const auto destination = withExtension(selected.getResult(), "wav");
+        if (chosen == juce::File()) { owner->exportState.reset(); return; }
+        const auto destination = withExtension(chosen, "wav");
         if (!destination.getFileExtension().equalsIgnoreCase(".wav")) {
             owner->exportState.reset();
             owner->statusBar.show("Audio exports as a .wav file. Choose Export audio again and use that extension.");
@@ -438,5 +435,15 @@ void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutL
                 }
             });
         });
-    });
+    };
+    // Automation names the file itself: a native save panel can't be driven.
+    const auto automated = osci::isJucewrightAutomationLaunch() ? juce::SystemStats::getEnvironmentVariable("OSCI_MOTION_EXPORT_FILE", {}) : juce::String();
+    if (automated.isNotEmpty()) {
+        exportTo(juce::File(automated));
+        return;
+    }
+    chooser = std::make_unique<juce::FileChooser>("Export " + exportedAs(mode) + motion::style::dot() + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
+        defaultExportFile("wav"), "*.wav");
+    chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+        | juce::FileBrowserComponent::warnAboutOverwriting, [exportTo](const juce::FileChooser& selected) { exportTo(selected.getResult()); });
 }

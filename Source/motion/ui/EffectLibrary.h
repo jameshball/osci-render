@@ -28,8 +28,7 @@ public:
         search.onEscapeKey = [this] { search.clear(); resized(); };
         addAndMakeVisible(search);
         viewport.setViewedComponent(&content, false);
-        viewport.setScrollBarsShown(true, false);
-        viewport.setScrollBarThickness(6);
+        motion::style::fadeScrolling(viewport);
         addAndMakeVisible(viewport);
     }
     std::function<void(const std::string&)> onInsert;
@@ -55,13 +54,12 @@ public:
 
 private:
     static constexpr int tileHeight = 44;
-    class Tile final : public juce::Component, public juce::SettableTooltipClient {
+    class Tile final : public juce::Component {
     public:
         Tile(MotionEffectLibrary& library, const motion::EffectDefinition& effect) : owner(library), definition(effect) {
             setName(juce::String(definition.name));
             setTitle(juce::String(definition.name) + " effect");
             setDescription("Drag onto an object, a track or the Scene. Double-click adds it to what Properties shows.");
-            setTooltip(getDescription());
             setMouseCursor(juce::MouseCursor::DraggingHandCursor);
             buildThumbnail();
         }
@@ -168,7 +166,7 @@ private:
         juce::Colour tint;
         motion::style::Fade fade {*this};
     };
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     juce::Component content;
     std::vector<std::unique_ptr<Tile>> tiles;
     juce::StringArray names;

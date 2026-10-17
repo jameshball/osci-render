@@ -53,7 +53,6 @@ public:
         rows.getLast()->onClick = [this] { finish(actions.showShortcuts); };
         for (auto* row : rows) { addAndMakeVisible(row); }
         startup.setToggleState(atStartup, juce::dontSendNotification);
-        startup.setTooltip("Show this screen when osci-motion opens");
         startup.onClick = [this] {
             if (actions.showAtStartup != nullptr) { actions.showAtStartup(startup.getToggleState()); }
         };
@@ -87,8 +86,7 @@ public:
         addAndMakeVisible(search);
 
         viewport.setViewedComponent(&grid, false);
-        viewport.setScrollBarsShown(true, false);
-        viewport.setScrollBarThickness(6);
+        motion::style::fadeScrolling(viewport, osci::OverlayComponent::panelColour());
         addAndMakeVisible(viewport);
         addAndMakeVisible(mark);
         setSize(width, height);
@@ -719,7 +717,7 @@ private:
     Switch startup {"Show at startup"};
     juce::Label startupLabel;
     juce::TextEditor search;
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     Mark mark;
     Grid grid;
     osci::OverlayComponent* host = nullptr;

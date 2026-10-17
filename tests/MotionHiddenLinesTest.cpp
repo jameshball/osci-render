@@ -8,14 +8,14 @@
 #include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/model/MeshFaces.h"
 
-// A camera that hides hidden lines removes the lines behind a mesh's faces,
-// baked frame by frame, and the beam draws what remains.
+// A solid mesh hides the lines behind its faces, baked frame by frame, and
+// the beam draws what remains.
 class MotionHiddenLinesTest : public juce::UnitTest {
 public:
     MotionHiddenLinesTest() : juce::UnitTest("Motion hidden lines", "Motion") {}
 
     void runTest() override {
-        beginTest("A camera hiding hidden lines removes a cube's far edges");
+        beginTest("A solid cube hides its far edges");
         auto project = cubeProject(true);
         const motion::PreparedComposition composition(project);
         expect(composition.hiddenLines != nullptr, "the composition bakes hidden lines");
@@ -31,23 +31,60 @@ public:
         const auto shown = culled->length() / whole->length();
         expect(shown > .55 && shown < .9, "about three quarters of its length shows: " + juce::String(shown));
 
-        beginTest("Hiding lines part-way keeps the far edges, dimmed, and the amount can be keyed");
+        beginTest("Part solid keeps the far edges, dimmed, and the amount can be keyed");
         {
             auto halfway = cubeProject(true);
-            halfway.cameras.front().properties["hideLines"] = motion::Curve(50.0);
+            halfway.tracks.change(0).clips.front().properties["solid"] = motion::Curve(50.0);
             const motion::PreparedComposition faded(halfway);
             motion::hidden::Workspace fadeSolver;
             const auto fadedFrame = motion::hidden::cull(faded, 1, fadeSolver);
             const auto* kept = fadedFrame != nullptr ? fadedFrame->drawing(0) : nullptr;
             expect(kept != nullptr && whole != nullptr && kept->length() > whole->length() * .95, "every edge is still drawn");
             auto keyed = cubeProject(true);
-            auto& hide = keyed.cameras.front().properties["hideLines"];
-            hide = motion::Curve(0.0);
-            hide.setKey({0, 0, motion::Interpolation::linear});
-            hide.setKey({2, 100, motion::Interpolation::linear});
+            auto& solid = keyed.tracks.change(0).clips.front().properties["solid"];
+            solid = motion::Curve(0.0);
+            solid.setKey({0, 0, motion::Interpolation::linear});
+            solid.setKey({2, 100, motion::Interpolation::linear});
             const motion::PreparedComposition rising(keyed);
-            expect(rising.hiddenLines != nullptr, "a camera keyed to hide lines bakes them");
-            expectWithinAbsoluteError(rising.cameras.front().hidesLines(1), .5, 1.0e-9);
+            expect(rising.hiddenLines != nullptr, "a mesh keyed to become solid bakes its hidden lines");
+            expectWithinAbsoluteError(rising.clips.front().solid(1), .5, 1.0e-9);
+        }
+
+        beginTest("Only what is solid hides: beside a solid cube, a wireframe one is seen through whole");
+        {
+            auto pair = cubeProject(true);
+            auto& solidCube = pair.tracks.change(0).clips.front();
+            solidCube.properties["position.x"] = motion::Curve(-.5);
+            solidCube.properties["scale.x"] = solidCube.properties["scale.y"] = solidCube.properties["scale.z"] = motion::Curve(.35);
+            auto wireCube = solidCube;
+            wireCube.id = 21;
+            wireCube.properties["position.x"] = motion::Curve(.5);
+            wireCube.properties["solid"] = motion::Curve(0.0);
+            motion::Track wireTrack;
+            wireTrack.id = 11;
+            wireTrack.insert(wireCube, pair.tempo());
+            pair.tracks.push_back(wireTrack);
+            const motion::PreparedComposition prepared(pair);
+            motion::hidden::Workspace pairSolver;
+            const auto pairFrame = motion::hidden::cull(prepared, 1, pairSolver);
+            const auto* solidDrawn = pairFrame != nullptr ? pairFrame->drawing(0) : nullptr;
+            const auto* solidWhole = prepared.clips[0].source->drawingAt(0);
+            expect(solidDrawn != nullptr && solidDrawn->length() < solidWhole->length() * .9, "the solid cube hides its own far edges");
+            expect(pairFrame != nullptr && pairFrame->drawing(1) == nullptr, "the wireframe cube is drawn whole");
+        }
+
+        beginTest("With no camera, what is solid still hides, seen as the Scope's fixed framing sees it");
+        {
+            auto unframed = cubeProject(true);
+            unframed.cameras.clear();
+            const motion::PreparedComposition prepared(unframed);
+            expect(prepared.hiddenLines != nullptr, "it bakes its hidden lines");
+            motion::hidden::Workspace unframedSolver;
+            const auto unframedFrame = motion::hidden::cull(prepared, 1, unframedSolver);
+            const auto* drawn = unframedFrame != nullptr ? unframedFrame->drawing(0) : nullptr;
+            const auto* all = prepared.clips[0].source->drawingAt(0);
+            const auto shown = drawn != nullptr ? drawn->length() / all->length() : 1.0;
+            expect(shown > .55 && shown < .9, "about three quarters of its length shows: " + juce::String(shown));
         }
 
         beginTest("A mesh known only by its lines gets the faces they enclose");
@@ -149,6 +186,7 @@ public:
             squareClip.properties["position.z"] = motion::Curve(1);
             squareClip.properties["scale.x"] = motion::Curve(.9);
             squareClip.properties["scale.y"] = motion::Curve(.9);
+            squareClip.properties["solid"] = motion::Curve(100.0);
             motion::Track squareTrack;
             squareTrack.id = 12;
             squareTrack.insert(squareClip, behind.tempo());
@@ -238,6 +276,7 @@ public:
             standing.assets.push_back(floor);
             auto floorClip = motion::Document::makeClip(21, *floor, 0);
             floorClip.duration = 2;
+            floorClip.properties["solid"] = motion::Curve(100.0);
             floorClip.properties["scale.x"] = motion::Curve(100);
             floorClip.properties["scale.z"] = motion::Curve(100);
             floorClip.properties["position.y"] = motion::Curve(-.4);
@@ -452,6 +491,41 @@ public:
             expect(a.getSize() > 0 && a == b, "the signal is the same sample for sample");
         }
 
+        beginTest("On an XY-only scope a line cut in two is not joined again across its gap");
+        {
+            using motion::hidden::Screen;
+            // Two lines, each cut in two around x = 0, then one more stroke.
+            const auto stroke = [](double ax, double ay, double bx, double by) { return motion::hidden::TourStroke {Screen {ax, ay, 1}, Screen {bx, by, 1}}; };
+            const std::vector<motion::hidden::TourStroke> strokes {stroke(-1, 0, -.2, 0), stroke(.2, 0, 1, 0), stroke(-1, .1, -.2, .1), stroke(.2, .1, 1, .1), stroke(1, .5, 1, .6)};
+            const auto order = motion::hidden::tour(strokes);
+            expectEquals(static_cast<int>(order.size()), 5);
+            expect(order.front().stroke == 0 && !order.front().reversed && order.back().stroke == 4 && !order.back().reversed, "the first and last strokes stay where they were");
+            for (std::size_t index = 1; index < order.size(); ++index) {
+                const auto& from = order[index - 1].reversed ? strokes[order[index - 1].stroke].start : strokes[order[index - 1].stroke].end;
+                const auto& to = order[index].reversed ? strokes[order[index].stroke].end : strokes[order[index].stroke].start;
+                expect(!(std::abs(from->x) == .2 && std::abs(to->x) == .2 && from->y == to->y), "no jump joins a line up again across its gap");
+            }
+            std::vector<int> seen(strokes.size(), 0);
+            for (const auto& step : order) { ++seen[step.stroke]; }
+            expect(std::all_of(seen.begin(), seen.end(), [](int count) { return count == 1; }), "every stroke drawn once");
+
+            auto lit = cubeProject(true);
+            auto xyOnly = cubeProject(true);
+            xyOnly.scope.xyOnly = true;
+            const motion::PreparedComposition withBrightness(lit), without(xyOnly);
+            motion::hidden::Workspace a, b;
+            const auto litFrame = motion::hidden::cull(withBrightness, 1, a), xyFrame = motion::hidden::cull(without, 1, b);
+            const auto* drawn = litFrame->drawing(0);
+            const auto* ordered = xyFrame->drawing(0);
+            expect(drawn != nullptr && ordered != nullptr);
+            if (drawn != nullptr && ordered != nullptr) {
+                expectWithinAbsoluteError(ordered->length(), drawn->length(), 1.0e-6 * drawn->length());
+                const auto same = [](osci::Point p, osci::Point q) { return std::abs(p.x - q.x) < 1.0e-6f && std::abs(p.y - q.y) < 1.0e-6f && std::abs(p.z - q.z) < 1.0e-6f; };
+                expect(same(ordered->sample(0), drawn->sample(0)) && same(ordered->sample(1), drawn->sample(1)), "the beam enters and leaves the cube where it did");
+                expect(ordered->minimumTraversalSamples(false) <= drawn->minimumTraversalSamples(false), "no more strokes than before");
+            }
+        }
+
         beginTest("Profile: a frame of real meshes, and baking them");
         for (const auto& [model, bulge] : {std::pair {"teapot.obj", false}, std::pair {"lamp.obj", false}, std::pair {"teapot.obj", true}}) {
             const auto file = repositoryRoot().getChildFile("Resources/models").getChildFile(model);
@@ -560,13 +634,13 @@ private:
         clip.duration = 2;
         clip.properties["rotation.x"] = motion::Curve(30);
         clip.properties["rotation.y"] = motion::Curve(40);
+        clip.properties["solid"] = motion::Curve(hide ? 100.0 : 0.0);
         motion::Track track;
         track.id = 10;
         track.insert(clip, project.tempo());
         project.tracks.push_back(track);
         motion::Camera camera;
         camera.id = 30;
-        camera.properties["hideLines"] = motion::Curve(hide ? 100.0 : 0.0);
         project.cameras.push_back(camera);
         return project;
     }

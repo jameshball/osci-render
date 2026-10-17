@@ -58,6 +58,16 @@ inline const juce::Identifier captionButton {"motionCaptionButton"};
 // keeps clear of it.
 inline const juce::Identifier captionWidth {"motionCaptionWidth"};
 inline juce::Font buttonFont(const juce::Button& button) { return button.getProperties()[captionButton] ? caption() : body(); }
+// A label's whole text as its tooltip, only while its bounds cut it short
+// (roughly, for a label tall enough to wrap onto more lines).
+inline void tooltipWhenCut(juce::Label& label) {
+    auto& look = label.getLookAndFeel();
+    const auto font = look.getLabelFont(label);
+    const auto area = look.getLabelBorderSize(label).subtractedFrom(label.getLocalBounds());
+    const auto lines = std::max(1, static_cast<int>(static_cast<float>(area.getHeight()) / font.getHeight()));
+    const auto cut = juce::TextLayout::getStringWidth(font, label.getText()) > static_cast<float>(area.getWidth() * lines);
+    label.setTooltip(cut ? label.getText() : juce::String());
+}
 inline juce::Font heading() { return juce::Font(juce::FontOptions(11.0f, juce::Font::bold)); }
 inline juce::Font display() { return juce::Font(juce::FontOptions(19.0f, juce::Font::bold)); }
 inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)); }
@@ -253,6 +263,14 @@ inline void fillFloatingPanel(juce::Graphics& g, juce::Rectangle<float> bounds, 
 inline void fillWell(juce::Graphics& g, juce::Rectangle<float> bounds) {
     g.setColour(juce::Colours::black.withAlpha(.35f));
     g.fillRoundedRectangle(bounds, radius);
+}
+// Every scrolling view: a thin quiet scrollbar, and its content fading out
+// into the surface behind it at an edge with more beyond it.
+inline void fadeScrolling(osci::ScrollFadeViewport& viewport, juce::Colour behind = osci::Colours::surface()) {
+    viewport.setScrollBarsShown(true, false);
+    viewport.setScrollBarThickness(6);
+    viewport.setFadeHeight(32);
+    viewport.setColour(osci::scrollFadeOverlayBackgroundColourId, behind);
 }
 // A library card's fill as the pointer fades over it.
 // Popovers sit a step above the panel they point at.

@@ -147,6 +147,21 @@ private:
     float factor;
 };
 
+// A shape drawn from its end to its start.
+class ReversedShape final : public osci::Shape {
+public:
+    explicit ReversedShape(std::unique_ptr<osci::Shape> whole) : shape(std::move(whole)) {}
+    osci::Point nextVector(float progress) override { return shape->nextVector(1 - progress); }
+    void scale(float, float, float) override {}
+    void translate(float, float, float) override {}
+    float length() override { return shape->length(); }
+    std::unique_ptr<osci::Shape> clone() override { return std::make_unique<ReversedShape>(shape->clone()); }
+    std::string type() override { return "Reversed"; }
+
+private:
+    std::unique_ptr<osci::Shape> shape;
+};
+
 // How bright a shape's style draws it: as dimmed as it is, else fully.
 inline float gainOf(const osci::Shape& shape) {
     const auto* dimmed = dynamic_cast<const DimmedShape*>(&shape);

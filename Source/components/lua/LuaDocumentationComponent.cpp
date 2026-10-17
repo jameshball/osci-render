@@ -5,6 +5,7 @@ LuaDocumentationComponent::LuaDocumentationComponent() {
 
     viewport.setViewedComponent(&contentComponent, false);
     viewport.setScrollBarsShown(true, false);
+    viewport.setColour(osci::scrollFadeOverlayBackgroundColourId, panelColour());
     viewport.setColour(juce::ScrollBar::thumbColourId, osci::Colours::grey());
     viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::transparentBlack);
     addPanelContentAndMakeVisible(viewport);

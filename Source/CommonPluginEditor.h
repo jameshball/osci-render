@@ -140,6 +140,8 @@ public:
     };
 
     bool usingNativeMenuBar = false;
+    // A click away from a text field ends the typing in it.
+    osci::ClickAwayUnfocuser clickAway {*this};
 
 #if JUCE_LINUX
     juce::OpenGLContext openGlContext;

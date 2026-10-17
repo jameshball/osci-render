@@ -777,12 +777,14 @@ juce::XmlElement Document::save(const Project& project) {
             // Keep mixed-content payloads last. JUCE's single-line binary XML
             // writer can attempt a null newline when wrapping attributes on an
             // element following a text node.
+            // A linked file is kept where it is: the project says where.
+            if (asset->isLinked()) { item->setAttribute("file", asset->linked.getFullPathName()); }
             if (osci::files::isVideo(asset->extension)) {
-                item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
+                if (!asset->isLinked()) { item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding()); }
                 auto* cache = item->createNewChildElement("video-cache");
                 cache->setAttribute("key", asset->bakeKey);
                 cache->addTextElement(asset->bakedData.toBase64Encoding());
-            } else {
+            } else if (!asset->isLinked()) {
                 item->addTextElement(asset->data.toBase64Encoding());
             }
         }
@@ -907,10 +909,15 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         }
         const bool luaSource = asset->extension.equalsIgnoreCase(".lua");
         const bool videoSource = osci::files::isVideo(asset->extension);
-        auto* source = luaSource || videoSource ? item->getChildByName("source") : item;
-        if (source == nullptr || !readBase64(source->getAllSubText(), asset->data, maximumSourceBytes)) {
-            leaveOut("Source whose file is damaged, or larger than the 64 MiB limit");
-            continue;
+        const auto linkedPath = item->getStringAttribute("file");
+        if (linkedPath.isNotEmpty() && (osci::files::isAudio(asset->extension) || videoSource) && juce::File::isAbsolutePath(linkedPath)) {
+            asset->linked = juce::File(linkedPath);
+        } else {
+            auto* source = luaSource || videoSource ? item->getChildByName("source") : item;
+            if (source == nullptr || !readBase64(source->getAllSubText(), asset->data, maximumSourceBytes)) {
+                leaveOut("Source whose file is damaged, or larger than the 64 MiB limit");
+                continue;
+            }
         }
         if (osci::files::isImage(asset->extension) || texture::isSource(asset->extension)) {
             // Settings this version doesn't have are its defaults.

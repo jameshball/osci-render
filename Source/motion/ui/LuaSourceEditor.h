@@ -46,7 +46,6 @@ public:
         problem.setColour(juce::Label::textColourId, osci::Colours::text());
         problem.setBorderSize({});
         problem.setText(preparationError, juce::dontSendNotification);
-        problem.setTooltip(preparationError);
         problem.setMouseCursor(juce::MouseCursor::PointingHandCursor);
         problem.addMouseListener(this, false);
         addChildComponent(problem);
@@ -75,7 +74,7 @@ public:
         if (problemLine > 0) { static_cast<ErrorListener&>(model).onError(problemLine, message.fromFirstOccurrenceOf(":", false, false).trim()); }
         problem.setColour(juce::Label::textColourId, osci::Colours::text());
         problem.setText(message, juce::dontSendNotification);
-        problem.setTooltip(message);
+        motion::style::tooltipWhenCut(problem);
         if (problem.isVisible() != message.isNotEmpty()) {
             problem.setVisible(message.isNotEmpty());
             resized();
@@ -91,6 +90,7 @@ public:
         baking.setBounds(footer.reduced(inset, 0).withTrimmedBottom(motion::style::padding));
         strip = problem.isVisible() ? page.removeFromBottom(problemHeight) : juce::Rectangle<int>();
         problem.setBounds(strip.withTrimmedLeft(inset + 14).withTrimmedRight(inset));
+        motion::style::tooltipWhenCut(problem);
         // The first line breathes below the header.
         codeFrame.setBounds(page.withTrimmedTop(motion::style::padding));
         page = codeFrame.getLocalBounds();
@@ -154,6 +154,7 @@ private:
         stale = true;
         problem.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         problem.setText(problem.getText() + "  (last bake)", juce::dontSendNotification);
+        motion::style::tooltipWhenCut(problem);
         repaint();
     }
     static constexpr int problemHeight = 28;

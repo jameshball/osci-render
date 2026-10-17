@@ -133,10 +133,7 @@ try:
     if find(lambda n: str(n.get("name", "")).startswith("Surface styles: ") and n.get("visible")) is not None:
         raise RuntimeError("A curve has no Surface styles")
     # A flat mirror, ready to place.
-    # The quick way: + Mirror, then its picture.
-    step("open mirrors", "click", "--name", "+ Mirror", "--exact")
-    step("add flat mirror", "click", "--name", "Add a mirror: Flat mirror", "--exact")
-    session.wait_for_undo("Add flat mirror")
+    add("Mirror", "Flat mirror")
     if not str(field("reflects").get("value", "")).startswith("100"):
         raise RuntimeError("A flat mirror reflects wholly")
     command("screenshot", "--file", session.artifact_dir / "mirrors.png")

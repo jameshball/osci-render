@@ -229,16 +229,14 @@ public:
             expect(floorAfter(2.5, "a surface that moves casts its shadow anew") != lightMoved, "where it now falls");
         }
 
-        beginTest("Lit with a camera hiding lines, what is hidden stays hidden");
+        beginTest("Lit, what something solid hides stays hidden");
         {
-            auto project = scene();
-            project.cameras.front().properties["hideLines"] = motion::Curve(100.0);
+            auto project = scene(true);
             addLight(project, "ambientLight", 30, {});
             const motion::PreparedComposition prepared(project);
             motion::hidden::Workspace workspace;
             const auto lit = cull(prepared, 1, workspace);
-            auto unlit = scene();
-            unlit.cameras.front().properties["hideLines"] = motion::Curve(100.0);
+            auto unlit = scene(true);
             const motion::PreparedComposition plain(unlit);
             const auto hidden = cull(plain, 1, workspace);
             const auto* litBox = lit->drawing(0);
@@ -304,13 +302,12 @@ public:
             const auto litAt = [this](double degrees) {
                 motion::Project project;
                 project.duration = 1;
-                addClip(project, generatorAsset(1, "torus"), 10, {{"position.x", 1}, {"position.y", .72}, {"rotation.x", 90}, {"generator.radius", .3}, {"generator.thickness", .07}});
+                addClip(project, generatorAsset(1, "torus"), 10, {{"position.x", 1}, {"position.y", .72}, {"rotation.x", 90}, {"generator.radius", .3}, {"generator.thickness", .07}, {"solid", 100}});
                 const auto angle = degrees * juce::MathConstants<double>::pi / 180;
                 addLight(project, "pointLight", 30, {{"position.x", std::cos(angle)}, {"position.y", .72}, {"position.z", std::sin(angle)}, {"light.range", 3.2}, {"light.intensity", 1.6}});
                 motion::Camera camera;
                 camera.id = 40;
                 camera.target = 10;
-                camera.properties["hideLines"] = motion::Curve(100.0);
                 camera.properties["position.x"] = motion::Curve(2.2);
                 camera.properties["position.y"] = motion::Curve(1.3);
                 camera.properties["position.z"] = motion::Curve(1.6);
@@ -388,11 +385,12 @@ private:
     }
 
     // A unit box standing over a floor of grid, as a camera looking at it sees.
-    static motion::Project scene() {
+    static motion::Project scene(bool solid = false) {
         motion::Project project;
         project.duration = 3;
-        addClip(project, generatorAsset(1, "box"), 10, {{"rotation.x", 0}, {"rotation.y", 0}});
-        addClip(project, generatorAsset(2, "grid"), 20, {{"rotation.x", -90}, {"position.y", -.8}, {"scale.x", 3}, {"scale.y", 3}});
+        const auto solidity = solid ? 100.0 : 0.0;
+        addClip(project, generatorAsset(1, "box"), 10, {{"rotation.x", 0}, {"rotation.y", 0}, {"solid", solidity}});
+        addClip(project, generatorAsset(2, "grid"), 20, {{"rotation.x", -90}, {"position.y", -.8}, {"scale.x", 3}, {"scale.y", 3}, {"solid", solidity}});
         motion::Camera camera;
         camera.id = 40;
         camera.properties["position.y"] = motion::Curve(1.5);

@@ -8,7 +8,7 @@
 // drawn at 18 px so their 2 px strokes land on whole device pixels on
 // high-density displays. One button draws them all, so toolbars match.
 namespace motion::icons {
-enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, autoKey, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search };
+enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, autoKey, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search, solidView, link };
 
 inline const juce::Path& path(Icon icon) {
     static const auto paths = [] {
@@ -36,6 +36,25 @@ inline const juce::Path& path(Icon icon) {
             glyph.addPolygon({12.0f, 12.0f}, 4, 5.0f, 0.0f);
             result[Icon::autoKey] = glyph;
         }
+        {
+            // Solid view: a box with only its near edges, its faces hiding
+            // the rest.
+            juce::Path edges, solid;
+            edges.startNewSubPath(12.0f, 3.0f);
+            edges.lineTo(20.0f, 7.5f);
+            edges.lineTo(20.0f, 16.5f);
+            edges.lineTo(12.0f, 21.0f);
+            edges.lineTo(4.0f, 16.5f);
+            edges.lineTo(4.0f, 7.5f);
+            edges.closeSubPath();
+            edges.startNewSubPath(4.0f, 7.5f);
+            edges.lineTo(12.0f, 12.0f);
+            edges.lineTo(20.0f, 7.5f);
+            edges.startNewSubPath(12.0f, 12.0f);
+            edges.lineTo(12.0f, 21.0f);
+            juce::PathStrokeType(1.8f, juce::PathStrokeType::mitered, juce::PathStrokeType::square).createStrokedPath(solid, edges);
+            result[Icon::solidView] = solid;
+        }
         // The anchor: a crosshair in a ring; centring it: a dot in frame corners.
         add(Icon::anchor, "M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z");
         add(Icon::centre, "M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-7 7H3v4c0 1.1.9 2 2 2h4v-2H5v-4zM5 5h4V3H5c-1.1 0-2 .9-2 2v4h2V5zm14-2h-4v2h4v4h2V5c0-1.1-.9-2-2-2zm0 16h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4z");
@@ -48,6 +67,8 @@ inline const juce::Path& path(Icon icon) {
         add(Icon::keyboard, "M20 7v10H4V7h16m0-2H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2zm0 3h2v2h-2zM8 8h2v2H8zm0 3h2v2H8zm-3 0h2v2H5zm0-3h2v2H5zm3 6h8v2H8zm6-3h2v2h-2zm0-3h2v2h-2zm3 3h2v2h-2zm0-3h2v2h-2z");
         add(Icon::search, "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z");
         add(Icon::close, "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z");
+        // A chain link: a source read from a file on disk.
+        add(Icon::link, "M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z");
         add(Icon::move, "M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z");
         add(Icon::rotate, "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z");
         add(Icon::scale, "M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z");
@@ -136,6 +157,7 @@ class Button final : public juce::Button {
 public:
     Button(const juce::String& name, Icon glyph) : juce::Button(name), icon(glyph) {
         setTitle(name);
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
         setWantsKeyboardFocus(false);
         setMouseClickGrabsKeyboardFocus(false);
     }

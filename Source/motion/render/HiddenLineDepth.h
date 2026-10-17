@@ -194,18 +194,20 @@ public:
     }
 
     // Whether a point shows: nothing drawn in front of it in its pixel.
-    bool shows(Screen point) const {
-        if (empty) { return true; }
+    bool shows(Screen point) const { return !hiddenBy(point).has_value(); }
+    // What hides a point, by its tag (see tagNext): none where it shows.
+    std::optional<std::uint64_t> hiddenBy(Screen point) const {
+        if (empty) { return std::nullopt; }
         const auto px = toPixelX(point.x), py = toPixelY(point.y);
         const auto x = static_cast<int>(std::floor(px)), y = static_cast<int>(std::floor(py));
-        if (x < 0 || y < 0 || x >= width || y >= height) { return true; }
+        if (x < 0 || y < 0 || x >= width || y >= height) { return std::nullopt; }
         const auto cell = static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
         const auto& here = pixels[cell];
-        if (here.w == 0) { return true; }
+        if (here.w == 0) { return std::nullopt; }
         const auto& plane = planes[static_cast<std::size_t>(here.owner)];
         const auto outside = plane.outside(px, py);
         // Inside the triangle nearest at the pixel's centre: its depth there.
-        if (outside <= 0) { return inFront(point, plane.at(px, py)); }
+        if (outside <= 0) { return inFront(point, plane.at(px, py)) ? std::nullopt : std::optional(plane.tag); }
         // Past its edge (a pixel its edge crosses): any triangle nearest at a
         // pixel around this one that covers the point decides. A triangle
         // seen edge on can have the centre of a pixel its edge just crosses;
@@ -219,13 +221,13 @@ public:
                 const auto& other = planes[static_cast<std::size_t>(nearby.owner)];
                 if (other.outside(px, py) > 0) { continue; }
                 covered = true;
-                if (!inFront(point, other.at(px, py))) { return false; }
+                if (!inFront(point, other.at(px, py))) { return other.tag; }
             }
         }
-        if (covered) { return true; }
+        if (covered) { return std::nullopt; }
         // None does: the nearest triangle carried past its edge, pushed back
         // by its slope across as far as the point is outside.
-        return inFront(point, plane.at(px, py) - plane.slope * outside);
+        return inFront(point, plane.at(px, py) - plane.slope * outside) ? std::nullopt : std::optional(plane.tag);
     }
 
     // How much of a point the surfaces round it leave in view, from 0 to 1:

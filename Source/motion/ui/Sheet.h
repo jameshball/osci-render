@@ -22,8 +22,7 @@ public:
         cancel.setButtonText("Cancel");
         cancel.setName("Cancel");
         cancel.onClick = [this] { close(); };
-        closeButton.iconSize = 16.0f;
-        closeButton.setTooltip("Close (Esc)");
+        closeButton.setIconPadding(4);
         closeButton.onClick = [this] { close(); };
         addAndMakeVisible(closeButton);
         addAndMakeVisible(cancel);
@@ -57,7 +56,8 @@ public:
     static int widthFor(int preview = 0) { return (preview > 0 ? preview + 24 : 0) + caption + control; }
 
     // The sheet closes itself (its own close button, Cancel and Escape), so
-    // the overlay's larger close button and click-outside dismissal go.
+    // the overlay's larger close button goes. A form keeps what's typed in
+    // it from a stray click outside; a reference (no footer) closes on one.
     // The overlay holds the keyboard while it animates in, so the sheet
     // listens to its keys too.
     void parentHierarchyChanged() override {
@@ -67,6 +67,8 @@ public:
         host = overlay;
         if (host == nullptr) { return; }
         host->setDismissible(false);
+        host->setDismissedByClickOutside(!footer);
+        host->setDismissedByClickWhileTyping(!footer);
         host->addKeyListener(this);
     }
     ~Sheet() override {
@@ -91,7 +93,7 @@ public:
     }
     void resized() override {
         auto area = getLocalBounds();
-        closeButton.setBounds(area.withHeight(headerHeight).removeFromRight(24).withSizeKeepingCentre(24, 24).translated(4, 0));
+        closeButton.setBounds(area.withHeight(headerHeight).removeFromRight(24).withSizeKeepingCentre(24, 24));
         if (footer) {
             auto line = area.removeFromBottom(footerHeight);
             primary.setBounds(line.removeFromRight(std::max(96, primary.getBestWidthForHeight(footerHeight) + 16)));
@@ -154,7 +156,7 @@ protected:
     juce::Rectangle<int> footerLeft;
     bool footer = true;
     juce::Component::SafePointer<osci::OverlayComponent> host;
-    icons::Button closeButton {"Close", icons::Icon::close};
+    osci::CloseButton closeButton {"Close"};
 
 private:
     juce::String title, subtitle;

@@ -23,8 +23,10 @@ struct ProjectFile {
     static constexpr juce::uint32 magic = 0x21324356;
 
     // The project in `data`, its sources prepared; when it isn't one, why,
-    // and what can be done about it.
-    static juce::Result read(const void* data, std::size_t size, ProjectFile& file, const std::atomic<bool>* cancel = nullptr) {
+    // and what can be done about it. `folder`, when known, is where the
+    // project is: a linked file no longer where it was is looked for there,
+    // as a project and its media moved together keep each other.
+    static juce::Result read(const void* data, std::size_t size, ProjectFile& file, const std::atomic<bool>* cancel = nullptr, const juce::File& folder = {}) {
         // The header every saved project starts with (and every saved state).
         const auto headed = size >= 8 && juce::ByteOrder::littleEndianInt(data) == magic;
         if (!headed || size > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
@@ -41,6 +43,7 @@ struct ProjectFile {
             file.problem = Problem::damaged;
             return damaged({});
         }
+        if (folder.isDirectory()) { findMovedLinks(*file.xml, folder); }
         const auto prepared = Document::prepareLoad(*composition, file.project, cancel, &file.notes);
         if (prepared.failed() && !(cancel != nullptr && cancel->load())) {
             file.problem = Problem::damaged;
@@ -54,7 +57,19 @@ struct ProjectFile {
             file.problem = Problem::unreadable;
             return juce::Result::fail("osci-motion couldn't read the file. Check that it is still there and that you can open it: a file kept in the cloud may need downloading first.");
         }
-        return read(bytes.getData(), bytes.getSize(), file, cancel);
+        return read(bytes.getData(), bytes.getSize(), file, cancel, source.getParentDirectory());
+    }
+    // Each linked file not where the project says, but beside the project
+    // under its own name: there instead.
+    static void findMovedLinks(juce::XmlElement& xml, const juce::File& folder) {
+        for (auto* child : xml.getChildIterator()) {
+            const auto path = child->hasTagName("asset") ? child->getStringAttribute("file") : juce::String();
+            if (path.isNotEmpty() && juce::File::isAbsolutePath(path) && !juce::File(path).existsAsFile()) {
+                const auto beside = folder.getChildFile(juce::File(path).getFileName());
+                if (beside.existsAsFile()) { child->setAttribute("file", beside.getFullPathName()); }
+            }
+            findMovedLinks(*child, folder);
+        }
     }
     // Damaged past what loading leaves out (see LoadNotes): `reason` says how.
     static juce::Result damaged(const juce::String& reason) {

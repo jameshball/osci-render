@@ -9,8 +9,8 @@
 
 namespace motion::generator {
 // A generator's geometry as a drawing: its strokes as lines and curves, and
-// what hides behind it on a camera that hides hidden lines (a solid's faces,
-// or a filled shape's inside).
+// what hides behind it when it is solid (a solid's faces, or a filled
+// shape's inside).
 inline std::shared_ptr<const PreparedDrawing> drawingOf(const Geometry& geometry) {
     std::vector<std::unique_ptr<osci::Shape>> shapes;
     const auto point = [](const Vec3& value) { return osci::Point(static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z)); };

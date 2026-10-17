@@ -36,7 +36,6 @@ MotionDrawingEditor::MotionDrawingEditor(motion::drawing::Drawing initial, const
     name.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
     name.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     name.setColour(juce::TextEditor::focusedOutlineColourId, motion::style::accent().withAlpha(.6f));
-    name.setTooltip("Name");
     addAndMakeVisible(name);
     cancelButton.setButtonText("Cancel");
     cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };

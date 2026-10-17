@@ -17,6 +17,7 @@ private:
 
 	LuaListBoxModel slidersModel;
 	juce::ListBox sliders;
+	osci::ListBoxScrollFades slidersFades {sliders};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LuaComponent)
 };

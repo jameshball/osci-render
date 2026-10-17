@@ -27,7 +27,11 @@ struct Asset {
     BlenderSourceSettings blenderSettings;
     juce::String name;
     juce::String extension;
+    // Its file's contents, or (when it is linked: see linksFromDisk) nothing,
+    // and `linked` the file it is read from.
     juce::MemoryBlock data;
+    juce::File linked;
+    bool isLinked() const { return linked != juce::File(); }
     BakeSettings bakeSettings;
     RasterSettings rasterSettings;
     TextSettings textSettings;

@@ -26,12 +26,19 @@ namespace {
 using ImportShapes = std::vector<std::unique_ptr<osci::Shape>>;
 
 // What a baked cache was made from: the settings `write` records, then the
-// source bytes, hashed. A cache with another key is stale.
+// source bytes (a linked file's place, size and time instead: it may be too
+// large to read through each time), hashed. A cache with another key is stale.
 juce::String bakeKey(const Asset& asset, const std::function<void(juce::MemoryOutputStream&)>& write) {
     juce::MemoryOutputStream metadata;
     metadata.writeInt(1); // Bake algorithm/context version, separate from cache wire version.
     write(metadata);
-    metadata.write(asset.data.getData(), asset.data.getSize());
+    if (asset.isLinked()) {
+        metadata.writeString(asset.linked.getFullPathName());
+        metadata.writeInt64(asset.linked.getSize());
+        metadata.writeInt64(asset.linked.getLastModificationTime().toMilliseconds());
+    } else {
+        metadata.write(asset.data.getData(), asset.data.getSize());
+    }
     return juce::SHA256(metadata.getData(), metadata.getDataSize()).toHexString();
 }
 
@@ -473,7 +480,9 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
     }
-    if (asset.data.getSize() == 0 || asset.data.getSize() > maximumSourceBytes) {
+    if (asset.isLinked()) {
+        if (!asset.linked.existsAsFile()) { return juce::Result::fail("Its file isn't at " + asset.linked.getFullPathName() + " any more: put it back, or beside the project, and open the project again"); }
+    } else if (asset.data.getSize() == 0 || asset.data.getSize() > maximumSourceBytes) {
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
     }
     if (asset.extension.equalsIgnoreCase(texture::captureExtension)) {
@@ -522,7 +531,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         const auto invalid = asset.rasterSettings.validate();
         if (!invalid.empty()) { return juce::Result::fail(invalid); }
         const auto& settings = asset.rasterSettings;
-        return prepareBaked(asset, videoBakeKey(asset), [&] { return VideoSourcePreparer::prepare(asset.data, videoDecoder, settings, cancel, progress); },
+        return prepareBaked(asset, videoBakeKey(asset), [&] { return asset.isLinked() ? VideoSourcePreparer::prepare(asset.linked, videoDecoder, settings, cancel, progress) : VideoSourcePreparer::prepare(asset.data, videoDecoder, settings, cancel, progress); },
             [&settings](const PreparedPointFrames& frames) { return frames.frameRate() == settings.videoFrameRate && frames.pointsPerFrame() == settings.pointsPerFrame; }, cancel, progress);
     }
     if (osci::files::isImage(extension)) {
@@ -547,8 +556,8 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (osci::files::isAudio(extension)) {
         juce::AudioFormatManager formats;
         formats.registerBasicFormats();
-        auto input = std::make_unique<juce::MemoryInputStream>(asset.data, false);
-        std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(std::move(input)));
+        // A linked file is read where it is, never all in memory at once.
+        std::unique_ptr<juce::AudioFormatReader> reader(asset.isLinked() ? formats.createReaderFor(asset.linked) : formats.createReaderFor(std::make_unique<juce::MemoryInputStream>(asset.data, false)));
         if (reader == nullptr || reader->lengthInSamples <= 0) {
             return juce::Result::fail("Cannot decode this audio file. Check its contents and whether its codec is enabled in this build.");
         }

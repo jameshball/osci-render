@@ -356,7 +356,7 @@ private:
     MotionRoutingPanel routingPanel;
     MotionKeyPanel keyPanel;
     // The graph's side column scrolls: oscillator settings, then routing.
-    juce::Viewport graphSideViewport;
+    osci::ScrollFadeViewport graphSideViewport;
     juce::Component graphSide;
     void layoutGraphSide();
     void refreshKeyPanel();
@@ -389,14 +389,12 @@ private:
     // The Scope filling the window (its full-screen control or Escape).
     bool scopeFullScreen = false;
     void setScopeFullScreen(bool value);
+    // On an XY-only scope in a lit scene, offers to shade by hatching.
+    void offerHatchingForXY();
     // The Scene's right-click menu: framing, views along an axis, keys.
     void showSceneMenu();
 
     juce::TextButton importButton { "Add source" };
-    // Lights and mirrors, a click away: each opens its pictures to choose from.
-    juce::TextButton addLightButton { "+ Light" }, addMirrorButton { "+ Mirror" };
-    void showAddLight();
-    void showAddMirror();
     motion::icons::Button playButton { "Play", motion::icons::Icon::play };
     motion::icons::Button startButton { "Go to start", motion::icons::Icon::start };
     motion::icons::Button endButton { "Go to end", motion::icons::Icon::end };

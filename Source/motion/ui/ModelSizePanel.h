@@ -23,7 +23,6 @@ public:
         note.setBorderSize({});
         note.setJustificationType(juce::Justification::topLeft);
         size.setSelected(original ? 1 : 0);
-        size.setTooltip("Fit to screen centres the model and scales it to fill the screen. Original keeps the size and place its file gives it.");
         size.onChange = [this](int index) {
             describe();
             if (onChange) { onChange(index == 1); }

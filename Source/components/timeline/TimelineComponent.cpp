@@ -18,9 +18,6 @@ TimelineComponent::TimelineComponent()
     addAndMakeVisible(repeatButton);
 
     // Configure button tooltips and colors
-    playButton.setTooltip("Play");
-    pauseButton.setTooltip("Pause");
-    stopButton.setTooltip("Stop");
     repeatButton.setTooltip("Loop");
 
     slider.setMouseDragSensitivity(150); // Make slider more responsive

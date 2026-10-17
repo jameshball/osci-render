@@ -14,7 +14,6 @@ public:
     MotionStatusBar() {
         setName("Status bar");
         dismiss.setIconPadding(2);
-        dismiss.setTooltip("Dismiss");
         dismiss.onClick = [this] { clear(); };
         addChildComponent(dismiss);
         message.setName("Status message");
@@ -69,7 +68,6 @@ public:
         action.setTitle(actionLabel);
         action.setVisible(actionLabel.isNotEmpty() && onAction != nullptr);
         message.setText(text, juce::dontSendNotification);
-        message.setTooltip(text);
         message.setColour(juce::Label::textColourId, kind == Kind::notice ? osci::Colours::textMuted() : osci::Colours::text().withAlpha(.9f));
         dismiss.setVisible(true);
         // A notice with something to do waits longer for it.
@@ -87,6 +85,7 @@ public:
     void clear() {
         stopTimer();
         message.setText({}, juce::dontSendNotification);
+        message.setTooltip({});
         dismiss.setVisible(false);
         action.setVisible(false);
         onAction = nullptr;
@@ -94,10 +93,10 @@ public:
     }
     juce::String text() const { return message.getText(); }
     // Shown whole while it fits in half the bar; its tooltip has `details`
-    // (or the text itself, whole).
+    // (or, when cut short, the text itself, whole).
     void setStatistics(const juce::String& text, const juce::String& details = {}) {
-        stats.setTooltip(details.isNotEmpty() ? details : text);
-        if (stats.getText() == text) { return; }
+        if (stats.getText() == text && statsDetails == details) { return; }
+        statsDetails = details;
         stats.setText(text, juce::dontSendNotification);
         resized();
     }
@@ -144,12 +143,19 @@ public:
         message.setBounds(inside.withY(area.getY()).withHeight(area.getHeight()));
         if (action.isVisible()) { action.setBounds(pill.getRight() + motion::style::gap, area.getY() + (area.getHeight() - actionHeight) / 2, actionWidth, actionHeight); }
         if (closeAtEnd) { dismiss.setBounds(juce::Rectangle<int>(action.getRight() + 4, area.getY(), 22, area.getHeight()).withSizeKeepingCentre(14, 14)); }
+        motion::style::tooltipWhenCut(message);
+        if (statsDetails.isNotEmpty()) {
+            stats.setTooltip(statsDetails);
+        } else {
+            motion::style::tooltipWhenCut(stats);
+        }
     }
 
 private:
     void timerCallback() override { clear(); }
 
     juce::Label message, stats;
+    juce::String statsDetails;
     juce::TextButton action, overload;
     std::function<void()> onAction;
     juce::Rectangle<int> pill;
