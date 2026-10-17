@@ -699,4 +699,8 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
 } catch (...) {
     return juce::Result::fail("Source preparation failed. Check that the file is valid and try a simpler source.");
 }
+
+juce::String videoCacheKey(const Asset& asset) {
+    return videoBakeKey(asset);
+}
 }

@@ -545,7 +545,8 @@ void MotionEditor::showNextPreparationSettings() {
             owner->showNextPreparationSettings();
         }
     };
-    auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings, std::optional<juce::String> editedText = {}, std::optional<motion::TextSettings> textSettings = {}, std::optional<int> fractalDepth = {}) mutable {
+    auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings, std::optional<juce::String> editedText = {}, std::optional<motion::TextSettings> textSettings = {}, std::optional<int> fractalDepth = {}, std::shared_ptr<const juce::MemoryBlock> preparedVideo = {}) mutable {
+        request.preparedVideo = std::move(preparedVideo);
         request.textSettings = std::move(textSettings);
         request.editedText = std::move(editedText);
         request.fractalDepth = fractalDepth;
@@ -561,7 +562,9 @@ void MotionEditor::showNextPreparationSettings() {
             });
         });
     };
-    if (imagePanel != nullptr) { imagePanel->onPrepare = [submit](motion::RasterSettings settings) mutable { submit({}, settings); }; }
+    if (imagePanel != nullptr) {
+        imagePanel->onPrepare = [submit, imagePanel](motion::RasterSettings settings) mutable { submit({}, settings, {}, {}, {}, imagePanel->preparedFor(settings)); };
+    }
     if (fractalPanel != nullptr) { fractalPanel->onPrepare = [submit](int depth) mutable { submit({}, {}, {}, {}, depth); }; }
     showOverlay(std::move(overlay));
 }
@@ -594,6 +597,13 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     const auto videoDecoder = processor.getFFmpegFile();
     imports.addJob([owner, request, asset, time, generation, task, videoDecoder] {
         auto result = juce::Result::fail("Import cancelled.");
+        // A video its settings sheet already prepared keeps those frames as
+        // its cache, so decoding it doesn't prepare it again.
+        const auto keepPrepared = [&] {
+            if (request.preparedVideo == nullptr || !osci::files::isVideo(asset->extension)) { return; }
+            asset->bakedData = *request.preparedVideo;
+            asset->bakeKey = motion::videoCacheKey(*asset);
+        };
         if (!task->cancelled.load()) {
             try {
                 if (request.replacement != nullptr) {
@@ -604,12 +614,18 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                         asset->data.replaceAll(text.toRawUTF8(), text.getNumBytesAsUTF8());
                     } else {
                         asset->data = request.replacement->data;
+                        keepPrepared();
                     }
                     result = request.uniqueClip != 0 ? juce::Result::ok() : motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder);
                 } else if (request.file.getSize() > static_cast<juce::int64>(motion::maximumSourceBytes)) {
                     result = juce::Result::fail("This source exceeds the 64 MiB preparation limit.");
                 } else {
-                    result = request.file.loadFileAsData(asset->data) ? motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder) : juce::Result::fail("Couldn't read the source file.");
+                    if (request.file.loadFileAsData(asset->data)) {
+                        keepPrepared();
+                        result = motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder);
+                    } else {
+                        result = juce::Result::fail("Couldn't read the source file.");
+                    }
                 }
             } catch (const std::exception& error) {
                 result = juce::Result::fail("Couldn't import this source: " + juce::String(error.what()));

@@ -77,9 +77,8 @@ private:
     void mouseExit(const juce::MouseEvent& event) override { hover(event); }
     void hover(const juce::MouseEvent& event);
     bool addable(int row) const { return validRow(row) && (!definitionRow(row) || document.canReferenceComposition(assetId(row))); }
-    // The + sits at the row's end, or beside the edit button on the row
-    // that has one.
-    juce::Rectangle<int> addArea(int row, int width, int height) const { return {width - (editLabel(row).isNotEmpty() && row == list.getSelectedRow() ? 68 : 36), (height - 28) / 2, 28, 28}; }
+    // The + sits at the row's end; the selected row's edit button to its left.
+    static juce::Rectangle<int> addArea(int width, int height) { return {width - 36, (height - 28) / 2, 28, 28}; }
     // The selected source's edit button, over its row: what it edits or
     // sets up, by kind ("Edit Lua...", "Image settings..."); empty for a
     // source with nothing to change after the fact.

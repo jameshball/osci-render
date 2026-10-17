@@ -162,7 +162,7 @@ void MotionAssetLibrary::placeEdit() {
     edit.setName(label);
     edit.setTitle(label);
     edit.setTooltip(label.trimCharactersAtEnd("."));
-    edit.setBounds(bounds.getRight() - 4 - 32, bounds.getCentreY() - 14, 28, 28);
+    edit.setBounds(bounds.getRight() - 4 - 64, bounds.getCentreY() - 14, 28, 28);
     edit.toFront(false);
 }
 
@@ -213,11 +213,11 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     paintThumbnail(graphics, row, bounds.removeFromLeft(36).withSizeKeepingCentre(34, 34));
     bounds.removeFromLeft(8);
     // The edit button covers the selected row's end.
-    if (selected && editLabel(row).isNotEmpty()) { bounds.setRight(width - 40); }
+    if (selected && editLabel(row).isNotEmpty()) { bounds.setRight(width - 72); }
     const auto hovered = row == hoveredRow && addable(row);
     if (hovered) {
-        const auto add = addArea(row, width, height).toFloat();
-        bounds.setRight(juce::roundToInt(add.getX()) - 4);
+        const auto add = addArea(width, height).toFloat();
+        bounds.setRight(std::min(bounds.getRight(), juce::roundToInt(add.getX()) - 4));
         // Drawn as the edit button beside it is drawn when hovered.
         graphics.setColour(juce::Colours::white.withAlpha(.08f));
         graphics.fillRoundedRectangle(add.reduced(1.0f), motion::style::radius + 1);
@@ -309,7 +309,7 @@ void MotionAssetLibrary::hover(const juce::MouseEvent& event) {
 }
 
 void MotionAssetLibrary::listBoxItemClicked(int row, const juce::MouseEvent& event) {
-    if (!event.mods.isPopupMenu() && addable(row) && event.eventComponent != nullptr && addArea(row, event.eventComponent->getWidth(), event.eventComponent->getHeight()).contains(event.getPosition())) {
+    if (!event.mods.isPopupMenu() && addable(row) && event.eventComponent != nullptr && addArea(event.eventComponent->getWidth(), event.eventComponent->getHeight()).contains(event.getPosition())) {
         insert(row);
         return;
     }

@@ -4,6 +4,7 @@
 #include "../import/RasterSourcePreparer.h"
 #include "../import/VideoSourcePreparer.h"
 #include "../live/TextureSource.h"
+#include "../import/BakedSourceArchive.h"
 #include "Sheet.h"
 #include "ScrubField.h"
 #include "SourcePreview.h"
@@ -141,6 +142,15 @@ public:
     }
 
     std::function<void(motion::RasterSettings)> onPrepare;
+    // A video already prepared here with these settings, as the cache it
+    // is saved with, if one is.
+    std::shared_ptr<const juce::MemoryBlock> preparedFor(const motion::RasterSettings& chosen) const {
+        return bakedArchive != nullptr && same(bakedSettings, chosen) ? bakedArchive : nullptr;
+    }
+    ~MotionRasterSettingsPanel() override {
+        if (bake != nullptr) { bake->cancel.store(true); }
+        bakes.removeAllJobs(true, 10000);
+    }
 
 protected:
     void layoutBody(juce::Rectangle<int> area) override {
@@ -211,6 +221,81 @@ private:
         }
     };
     std::shared_ptr<VideoStill> still;
+
+    // The whole video prepared with the settings shown, played behind the
+    // settings once it is; Prepare keeps it when its settings are still these.
+    struct Bake {
+        motion::RasterSettings settings;
+        std::atomic<bool> cancel {false};
+        std::atomic<double> progress {0};
+    };
+    std::shared_ptr<Bake> bake;
+    std::shared_ptr<const motion::PreparedPointFrames> baked;
+    std::shared_ptr<const juce::MemoryBlock> bakedArchive;
+    std::optional<motion::RasterSettings> videoShown;
+    motion::RasterSettings bakedSettings;
+    static bool same(const motion::RasterSettings& a, const motion::RasterSettings& b) {
+        return a.mode == b.mode && a.shading == b.shading && a.threshold == b.threshold && a.invert == b.invert && a.resolution == b.resolution
+            && a.videoFrameRate == b.videoFrameRate && a.pointsPerFrame == b.pointsPerFrame;
+    }
+    void startBake() {
+        bakeDelay.stopTimer();
+        if (still == nullptr) { return; }
+        auto job = std::make_shared<Bake>();
+        job->settings = settings;
+        bake = job;
+        bakeProgress.startTimerHz(8);
+        showProgress();
+        bakes.addJob([job, still = still, owner = juce::Component::SafePointer<MotionRasterSettingsPanel>(this)] {
+            juce::MemoryBlock data = still->bytes;
+            if (data.getSize() == 0) { still->video.loadFileAsData(data); }
+            auto prepared = motion::VideoSourcePreparer::prepare(data, still->ffmpeg, job->settings, &job->cancel, &job->progress);
+            if (job->cancel.load()) { return; }
+            // Played as frames traced here, a share of them for a long video.
+            motion::ui::SourcePreview::Result result;
+            if (prepared) {
+                const auto source = motion::PreparedSource(prepared.source);
+                const auto count = source.frameCount();
+                const auto shown = std::min<std::size_t>(count, 240);
+                for (std::size_t index = 0; index < shown && !job->cancel.load(); ++index) {
+                    // Every point, as the still is traced: fewer join the gaps between strokes.
+                    result.frames.push_back(motion::ui::traceSource(source, index * count / shown, static_cast<int>(job->settings.pointsPerFrame)));
+                }
+                result.framesPerSecond = job->settings.videoFrameRate;
+                result.frameStep = static_cast<double>(count) / static_cast<double>(std::max<std::size_t>(shown, 1));
+                result.caption = juce::String(static_cast<juce::int64>(count)) + " frames" + motion::style::dot()
+                    + juce::String(static_cast<double>(count) / job->settings.videoFrameRate, 1) + " s, as it will play";
+            } else {
+                result.error = juce::String(prepared.error);
+            }
+            juce::MessageManager::callAsync([owner, job, frames = prepared.source, result = std::move(result)]() mutable {
+                if (owner == nullptr || owner->bake != job) { return; }
+                owner->bake = nullptr;
+                owner->bakeProgress.stopTimer();
+                owner->preview.setCaption({});
+                if (frames != nullptr) {
+                    owner->baked = frames;
+                    owner->bakedSettings = job->settings;
+                }
+                owner->preview.show(std::move(result));
+            });
+            // Then kept as the cache it will be saved with, while it plays.
+            if (prepared.source == nullptr) { return; }
+            auto archive = motion::BakedSourceArchive::encode(*prepared.source);
+            if (!archive || job->cancel.load()) { return; }
+            juce::MessageManager::callAsync([owner, job, archive = std::make_shared<const juce::MemoryBlock>(std::move(archive.data))] {
+                if (owner == nullptr || owner->bake != nullptr || !same(owner->bakedSettings, job->settings)) { return; }
+                owner->bakedArchive = archive;
+            });
+        });
+    }
+    void showProgress() {
+        if (bake == nullptr) { return; }
+        preview.setCaption("Preparing the whole video" + motion::style::dot() + juce::String(juce::roundToInt(bake->progress.load() * 100)) + "%");
+    }
+    juce::TimedCallback bakeDelay {[this] { startBake(); }};
+    juce::TimedCallback bakeProgress {[this] { showProgress(); }};
+    juce::ThreadPool bakes {1};
     void selectSamples(std::size_t count) {
         const auto found = std::find(strides.begin(), strides.end(), count);
         if (found != strides.end()) { samples.setSelectedId(static_cast<int>(std::distance(strides.begin(), found) + 1), juce::dontSendNotification); }
@@ -251,6 +336,10 @@ private:
             return;
         }
         if (isVideo) {
+            // Settings as they were (Prepare refreshes too) leave the frame,
+            // and the whole video prepared or preparing, as they are.
+            if (videoShown.has_value() && same(*videoShown, settings)) { return; }
+            videoShown = settings;
             preview.request([still = still, chosen = settings](const std::atomic<bool>& cancel) {
                 motion::ui::SourcePreview::Result result;
                 const auto& rgba = still->at(chosen.resolution, cancel);
@@ -272,6 +361,12 @@ private:
                 result.caption = "One frame" + motion::style::dot() + juce::String(static_cast<juce::int64>(chosen.pointsPerFrame)) + " points";
                 return result;
             });
+            // Then the whole video, a moment after the settings settle.
+            if (bake != nullptr) { bake->cancel.store(true); }
+            bake = nullptr;
+            baked = nullptr;
+            bakedArchive = nullptr;
+            bakeDelay.startTimer(500);
             return;
         }
         preview.request([image = data, chosen = settings](const std::atomic<bool>& cancel) {
