@@ -307,7 +307,7 @@ void MotionEditor::setAutoKey(bool on) {
     autoKeyButton.tint = on ? std::optional<juce::Colour>(motion::style::error()) : std::nullopt;
     autoKeyButton.repaint();
     timeline.setAutoKey(on);
-    if (on) { statusBar.show("Auto-key is on: what you change animates, from its clip's start to the playhead.", MotionStatusBar::Kind::notice); }
+    if (on) { statusBar.show("Auto-key on: every change is keyed at the playhead.", MotionStatusBar::Kind::notice); }
 }
 
 void MotionEditor::editRecorded(const motion::Project& before) {

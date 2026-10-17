@@ -289,7 +289,7 @@ void MotionEditor::setUpTransport() {
     addAndMakeVisible(autoKeyButton);
     autoKeyButton.setClickingTogglesState(false);
     autoKeyButton.onColour = motion::style::error().withAlpha(.2f);
-    autoKeyButton.setTooltip("Auto-key: what you change animates, from its clip's start to the playhead");
+    autoKeyButton.setTooltip("Auto-key: every change is keyed at the playhead");
     autoKeyButton.onClick = [this] { setAutoKey(!autoKeyButton.getToggleState()); };
     processor.document.onEdited = [this](const motion::Project& before) { editRecorded(before); };
     startButton.onClick = [this] { seekAndReveal(0); };
