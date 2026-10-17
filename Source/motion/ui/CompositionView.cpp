@@ -367,7 +367,7 @@ void MotionCompositionView::keepUnhidden(const CameraView& view, double time) co
     // 1 across the square output frame, and its inverse depth.
     const auto tangent = std::max(1.0e-9, view->tangent);
     // Faces this near the eye are cut there: nearer, inverse depth runs away.
-    constexpr double near = .01;
+    constexpr double nearest = .01;
     const auto onScreen = [&](motion::Vec3 eye) { return motion::hidden::Screen {eye.x / (eye.z * tangent), eye.y / (eye.z * tangent), 1 / eye.z}; };
     // The buffer covers the whole Scene, past the frame on every side, at
     // about a cell to every pixel and a half: fine enough to cut lines where
@@ -382,8 +382,8 @@ void MotionCompositionView::keepUnhidden(const CameraView& view, double time) co
         for (std::size_t index = 0; index < 3; ++index) {
             const auto& current = corners[index];
             const auto& next = corners[(index + 1) % 3];
-            if (current.z > near) { kept[count++] = current; }
-            if ((current.z > near) != (next.z > near)) { kept[count++] = current + (next - current) * ((near - current.z) / (next.z - current.z)); }
+            if (current.z > nearest) { kept[count++] = current; }
+            if ((current.z > nearest) != (next.z > nearest)) { kept[count++] = current + (next - current) * ((nearest - current.z) / (next.z - current.z)); }
         }
         for (std::size_t piece = 2; piece < count; ++piece) { depth.triangle(onScreen(kept[0]), onScreen(kept[piece - 1]), onScreen(kept[piece])); }
     };
@@ -413,7 +413,7 @@ void MotionCompositionView::keepUnhidden(const CameraView& view, double time) co
             // How long an edge is on screen; one reaching behind the eye is
             // cut as finely as any.
             const auto pixels = [&](const motion::Vec3& from, const motion::Vec3& to) {
-                if (!(from.z > near) || !(to.z > near)) { return 256.0; }
+                if (!(from.z > nearest) || !(to.z > nearest)) { return 256.0; }
                 const auto p = onScreen(from), q = onScreen(to);
                 return std::hypot(p.x - q.x, p.y - q.y) * frame.getWidth() * .5;
             };
@@ -452,7 +452,7 @@ void MotionCompositionView::keepUnhidden(const CameraView& view, double time) co
         const auto steps = std::clamp(static_cast<int>(piece.line.getLength() / 3.0f), 1, 256);
         const auto shows = [&](int step) {
             const auto eye = view->toEye(piece.a + (piece.b - piece.a) * (static_cast<double>(step) / steps));
-            return !(eye.z > near) || depth.shows(onScreen(eye));
+            return !(eye.z > nearest) || depth.shows(onScreen(eye));
         };
         int from = -1;
         const auto keep = [&](int start, int end) {
