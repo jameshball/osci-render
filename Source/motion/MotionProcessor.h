@@ -14,6 +14,7 @@
 #include "live/LiveBlenderController.h"
 #include "live/LiveTextureController.h"
 #include "ScopeBeam.h"
+#include "BeamOutput.h"
 
 class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater, private juce::AudioProcessorParameter::Listener {
 public:
@@ -22,7 +23,7 @@ public:
         const auto size = recordingParameters.getCanvasSize();
         return motion::hidden::Reach::ofCanvas(size.width, size.height, VisualiserGeometry::signalGain);
     }
-    enum class OutputMode { soundtrack, xy, xyrgb };
+    using OutputMode = motion::OutputMode;
     // Pausing the Scope or sharing its picture are view settings, not edits.
     bool isUndoExcluded(const juce::String& paramID) const override {
         return CommonAudioProcessor::isUndoExcluded(paramID) || paramID == "visualiserPaused" || paramID == "textureOutputEnabled";

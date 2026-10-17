@@ -125,7 +125,11 @@ void MotionEditor::setUpMenus() {
             menu.addItem(importAudioMenuId, "Import audio...");
             menu.addSeparator();
             juce::PopupMenu output;
-            for (int id = 1; id <= monitorOutput.getNumItems(); ++id) { output.addItem(outputMenuId + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
+            // In the chooser's order, each by its id.
+            for (int item = 0; item < monitorOutput.getNumItems(); ++item) {
+                const auto id = monitorOutput.getItemId(item);
+                output.addItem(outputMenuId + id, monitorOutput.getItemText(item), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id);
+            }
             // Named as the chooser beside the transport is.
             menu.addSubMenu("Output", output);
             // The project's own rate: what it is drawn and exported at.
@@ -246,15 +250,18 @@ void MotionEditor::setUpTransport() {
     monitorOutput.setColour(juce::ComboBox::arrowColourId, osci::Colours::textMuted());
     monitorOutput.addItem("Audio", 1);
     monitorOutput.addItem("Beam XY", 2);
+    monitorOutput.addItem("Beam XYZ (3 ch)", 4);
+    monitorOutput.addItem("Beam XYZ, inverted Z (3 ch)", 5);
     monitorOutput.addItem("Beam XYRGB (5 ch)", 3);
     refreshOutputChoices();
     monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
-    monitorOutput.setTooltip("What your audio interface plays: the project's audio, or the beam itself to drive a real oscilloscope (XYRGB needs five output channels). The Scope always shows the beam.");
+    monitorOutput.setTooltip("What your audio interface plays: the project's audio, or the beam itself to drive a real oscilloscope. XYZ sends the beam's brightness on a third channel for a scope's Z input (inverted Z for one that blanks on a positive voltage); it needs a DC-coupled output. XYRGB needs five output channels. The Scope always shows the beam.");
     monitorOutput.onChange = [this] {
         const auto mode = static_cast<MotionProcessor::OutputMode>(monitorOutput.getSelectedId() - 1);
-        if (mode == MotionProcessor::OutputMode::xyrgb) {
+        const auto channels = motion::beamOutputChannels(mode);
+        if (channels > 2) {
             auto* holder = juce::StandalonePluginHolder::getInstance();
-            const auto result = holder != nullptr ? holder->configureOutputOnlyChannels(5) : juce::Result::fail("Five-channel output requires the standalone audio device.");
+            const auto result = holder != nullptr ? holder->configureOutputOnlyChannels(channels) : juce::Result::fail("A " + juce::String(channels) + "-channel output requires the standalone audio device.");
             if (result.failed()) {
                 statusBar.show(result.getErrorMessage());
                 monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
@@ -276,7 +283,7 @@ void MotionEditor::setUpTransport() {
         if (mode == MotionProcessor::OutputMode::xy && !xyOnly) {
             suggest(true, "An XY output carries no brightness, so lighting and fades won't show.", "Draw for XY only",
                 "Drawing for XY only: brighter parts are drawn more slowly. Scope settings change it back.");
-        } else if (mode == MotionProcessor::OutputMode::xyrgb && xyOnly) {
+        } else if (channels > 2 && xyOnly) {
             suggest(false, "This output carries brightness, but the scope is set to XY only.", "Use brightness", "The scope uses brightness again.");
         }
     };
@@ -639,7 +646,7 @@ void MotionEditor::timerCallback() {
 }
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
-    // The audio device decides whether the 5-channel output can be chosen.
+    // The audio device decides whether the 3- and 5-channel outputs can be chosen.
     if (source == &processor.document) {
         refreshFromDocument();
     } else {
@@ -1082,5 +1089,8 @@ void MotionEditor::refreshOutputChoices() {
     }
     auto* holder = juce::StandalonePluginHolder::getInstance();
     auto* device = holder != nullptr ? holder->deviceManager.getCurrentAudioDevice() : nullptr;
-    monitorOutput.setItemEnabled(3, device != nullptr && device->getOutputChannelNames().size() >= 5);
+    const auto outputs = device != nullptr ? device->getOutputChannelNames().size() : 0;
+    monitorOutput.setItemEnabled(3, outputs >= 5);
+    monitorOutput.setItemEnabled(4, outputs >= 3);
+    monitorOutput.setItemEnabled(5, outputs >= 3);
 }

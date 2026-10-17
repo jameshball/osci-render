@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/export/SignalExporter.h"
 #include "../Source/motion/render/BeamRenderer.h"
+#include "../Source/motion/BeamOutput.h"
 #include <thread>
 
 class MotionSignalExportTest : public juce::UnitTest {
@@ -179,6 +180,40 @@ public:
             expectUnchanged(firstFile, firstBytes);
         }
         expectEquals(directory.getFile().findChildFiles(juce::File::findFiles, false).size(), 2);
+
+        beginTest("A scope's Z input gets the beam's brightness: its brightest colour, inverted on request");
+        {
+            // x, y, z, r, g, b: lit warm, half lit blue, dark, too bright, not a number.
+            juce::AudioBuffer<float> beam(6, 5);
+            const float values[6][5] = {{.1f, .2f, .3f, .4f, .5f}, {-.1f, -.2f, -.3f, -.4f, -.5f}, {1, 1, 1, 1, 1},
+                {1, 0, 0, 3, std::numeric_limits<float>::quiet_NaN()}, {.78f, .1f, 0, 2, std::numeric_limits<float>::quiet_NaN()}, {.4f, .5f, 0, 1, std::numeric_limits<float>::quiet_NaN()}};
+            for (int channel = 0; channel < 6; ++channel) {
+                beam.copyFrom(channel, 0, values[channel], 5);
+            }
+            const float bright[5] = {1, .5f, 0, 1, 0};
+            for (const auto inverted : {false, true}) {
+                juce::AudioBuffer<float> output(3, 5);
+                output.clear();
+                expect(motion::routeBeam(inverted ? motion::OutputMode::xyzInverted : motion::OutputMode::xyz, beam, output, 5));
+                for (int i = 0; i < 5; ++i) {
+                    expectEquals(output.getSample(0, i), values[0][i]);
+                    expectEquals(output.getSample(1, i), values[1][i]);
+                    expectWithinAbsoluteError(output.getSample(2, i), inverted ? 1 - bright[i] : bright[i], 1.0e-6f);
+                }
+            }
+            // XYRGB plays the colours as they are; too few channels or audio plays none of the beam.
+            juce::AudioBuffer<float> five(5, 5);
+            expect(motion::routeBeam(motion::OutputMode::xyrgb, beam, five, 5));
+            expectEquals(five.getSample(2, 0), 1.0f);
+            expectEquals(five.getSample(3, 0), .78f);
+            expectEquals(five.getSample(4, 0), .4f);
+            juce::AudioBuffer<float> stereo(2, 5);
+            stereo.clear();
+            expect(!motion::routeBeam(motion::OutputMode::xyz, beam, stereo, 5));
+            expect(!motion::routeBeam(motion::OutputMode::soundtrack, beam, five, 5));
+            expect(motion::routeBeam(motion::OutputMode::xy, beam, stereo, 5));
+            expectEquals(stereo.getSample(0, 4), .5f);
+        }
     }
 
 private:

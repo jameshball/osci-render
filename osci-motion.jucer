@@ -451,6 +451,8 @@
             resource="0" file="Source/motion/SessionRecovery.h"/>
       <FILE id="MotScopeBeamh" name="ScopeBeam.h" compile="0" resource="0"
             file="Source/motion/ScopeBeam.h"/>
+      <FILE id="MotBeamOutputh" name="BeamOutput.h" compile="0" resource="0"
+            file="Source/motion/BeamOutput.h"/>
       <FILE id="MotVisualiserStateh" name="VisualiserState.h" compile="0"
             resource="0" file="Source/motion/VisualiserState.h"/>
       <GROUP id="MotionSrcExport" name="export">

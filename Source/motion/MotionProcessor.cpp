@@ -114,7 +114,7 @@ void MotionProcessor::handleAsyncUpdate() {
 
 bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     const auto channels = layouts.getMainOutputChannelSet().size();
-    return layouts.getMainInputChannelSet().isDisabled() && (channels == 2 || channels == 5);
+    return layouts.getMainInputChannelSet().isDisabled() && (channels == 2 || channels == 3 || channels == 5);
 }
 
 void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
@@ -241,12 +241,7 @@ void MotionProcessor::routeSignalOutput(juce::AudioBuffer<float>& buffer) {
     const auto mode = outputMode.load();
     const auto audible = !muteParameter->getBoolValue();
     const auto count = buffer.getNumSamples();
-    const auto requiredChannels = mode == OutputMode::xyrgb ? 5 : 2;
-    if (audible && (mode == OutputMode::xy || mode == OutputMode::xyrgb) && buffer.getNumChannels() >= requiredChannels) {
-        for (int channel = 0; channel < requiredChannels; ++channel) {
-            const auto source = channel < 2 ? channel : channel + 1;
-            buffer.copyFrom(channel, 0, signal, source, 0, count);
-        }
+    if (audible && motion::routeBeam(mode, signal, buffer, count)) {
         applyVolumeAndThreshold(buffer.getArrayOfWritePointers(), count);
     }
 }

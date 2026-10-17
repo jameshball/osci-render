@@ -105,6 +105,12 @@ try:
         if output is None or "XYRGB" not in str(output.get("value", "")):
             raise RuntimeError("Five-channel device configuration failed")
         step("five channel output screenshot", "screenshot", "--file", session.artifact_dir / "xyrgb-output.png")
+    if os.environ.get("MOTION_TEST_XYZ") == "1":
+        step("enable three channel output", "select-option", "--name", "Audio output mode", "--text", "Beam XYZ (3 ch)")
+        output = find(snapshot(), lambda node: node.get("componentName") == "Audio output mode")
+        if output is None or "XYZ" not in str(output.get("value", "")):
+            raise RuntimeError("Three-channel device configuration failed")
+        step("three channel output screenshot", "screenshot", "--file", session.artifact_dir / "xyz-output.png")
     step("restore music monitor", "select-option", "--name", "Audio output mode", "--text", "Audio")
     step("return to timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     step("split soundtrack", "press", "command + k", "--class", "MotionTimelineView")
