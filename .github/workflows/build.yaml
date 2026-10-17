@@ -750,14 +750,17 @@ jobs:
           retention-days: 7
           path: bin/${{ env.OUTPUT_NAME }}.zip
 
+      # The app itself too, to run as built on a test machine without
+      # installing it.
       - name: Upload Windows test binaries
-        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && !inputs.publish
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: osci-motion-windows-test
           retention-days: 7
           path: |
             bin/${{ env.OUTPUT_NAME }}.exe
+            Builds/osci-motion/VisualStudio2022/x64/Release/Standalone Plugin/osci-motion.exe
             Builds/Test/VisualStudio2022/x64/Release/ConsoleApp/osci-render-test.exe
             Builds/MotionCli/VisualStudio2022/x64/Release/ConsoleApp/osci-motion-cli.exe
 
