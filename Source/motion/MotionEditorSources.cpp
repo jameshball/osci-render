@@ -5,20 +5,63 @@
 #include "ui/BlenderSourcePanel.h"
 #include "ui/FractalSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
+#include "ui/SvgSequencePanel.h"
 
 // Files dropped on the timeline land where they were dropped (time and
 // track, as in Premiere); anywhere else they go in at the playhead.
 void MotionEditor::filesDropped(const juce::StringArray& files, int x, int y) {
     std::optional<std::pair<double, motion::Id>> placement;
     if (timeline.isShowing()) { placement = timeline.dropTarget(timeline.getLocalPoint(this, juce::Point<int>(x, y))); }
+    juce::Array<juce::File> chosen;
     for (const auto& file : files) {
         // A dropped project opens, as it would from Finder or Explorer.
         if (juce::File(file).hasFileExtension(".osci-motion")) {
             openProject(juce::File(file));
             return;
         }
-        importSourceFile(juce::File(file), 0, placement);
+        chosen.add(juce::File(file));
     }
+    importSourceFiles(chosen, placement);
+}
+
+// Several SVGs together may be an animation's frames: asked which.
+void MotionEditor::importSourceFiles(juce::Array<juce::File> files, std::optional<std::pair<double, motion::Id>> placement) {
+    juce::Array<juce::File> svgs;
+    for (const auto& file : files) {
+        if (file.hasFileExtension(".svg")) { svgs.add(file); }
+    }
+    for (const auto& file : files) {
+        if (svgs.size() < 2 || !svgs.contains(file)) { importSourceFile(file, 0, placement); }
+    }
+    if (svgs.size() < 2) { return; }
+    motion::svgsequence::sortByName(svgs);
+    auto sheet = std::make_unique<MotionSvgSequencePanel>(svgs);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    sheet->onImport = [owner, svgs, placement, sheet = sheet.get()](bool animation, double frameRate) {
+        sheet->close();
+        if (owner == nullptr) { return; }
+        if (!animation) {
+            for (const auto& file : svgs) { owner->importSourceFile(file, 0, placement); }
+            return;
+        }
+        motion::svgsequence::Frames frames;
+        frames.frameRate = frameRate;
+        for (const auto& file : svgs) { frames.svgs.push_back(file.loadFileAsString()); }
+        // Named for what the files share ("walk_001.svg"...: walk).
+        const auto shared = motion::svgsequence::sharedName(svgs);
+        const auto name = shared.isNotEmpty() ? shared : svgs.getFirst().getFileNameWithoutExtension();
+        const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion sequences").getChildFile(juce::Uuid().toString());
+        const auto file = folder.getChildFile(juce::File::createLegalFileName(name) + motion::svgsequence::extension);
+        const auto data = motion::svgsequence::encode(frames);
+        if (!folder.createDirectory().wasOk() || !file.replaceWithData(data.getData(), data.getSize())) {
+            owner->statusBar.show("Couldn't prepare the SVG sequence.");
+            return;
+        }
+        SourceRequest request {file, placement.has_value() ? placement->first : owner->processor.position.load(), owner->processor.document.generation(), {}};
+        if (placement.has_value()) { request.track = placement->second; }
+        owner->beginSourceImport(std::move(request));
+    };
+    motion::ui::Sheet::show(*this, std::move(sheet));
 }
 
 bool MotionEditor::openSourceFile(const juce::File& file) {
@@ -189,10 +232,14 @@ void MotionEditor::loadProject(const juce::File& file, bool example) {
 void MotionEditor::chooseSourceFile() {
     chooser = std::make_unique<juce::FileChooser>("Import source", processor.getLastOpenedDirectory(), osci::files::sourceWildcard());
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [owner](const juce::FileChooser& chosen) {
-        if (owner != nullptr && chosen.getResult().existsAsFile()) {
-            owner->openSourceFile(chosen.getResult());
+    // Several at once: SVGs among them may be an animation's frames.
+    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems, [owner](const juce::FileChooser& chosen) {
+        if (owner == nullptr) { return; }
+        juce::Array<juce::File> files;
+        for (const auto& file : chosen.getResults()) {
+            if (file.existsAsFile()) { files.add(file); }
         }
+        owner->importSourceFiles(files, std::nullopt);
     });
 }
 
@@ -436,6 +483,8 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     statusBar.clear();
     auto asset = std::make_shared<motion::Asset>();
     asset->name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
+    // A sequence goes by the name its SVGs share, not a file of its own.
+    if (request.replacement == nullptr && request.file.hasFileExtension(motion::svgsequence::extension)) { asset->name = request.file.getFileNameWithoutExtension(); }
     asset->extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension().toLowerCase();
     asset->bakeSettings = settings;
     asset->rasterSettings = rasterSettings;

@@ -133,6 +133,7 @@ private:
     // Import, offering audio files only.
     void chooseAudioFile();
     bool importSourceFile(const juce::File& file, motion::Id relink, std::optional<std::pair<double, motion::Id>> placement = std::nullopt);
+    void importSourceFiles(juce::Array<juce::File> files, std::optional<std::pair<double, motion::Id>> placement);
     void replaceSourceFile(motion::Id asset);
     std::deque<SourceRequest> preparationRequests;
     bool preparationSettingsOpen = false;

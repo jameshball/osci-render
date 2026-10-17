@@ -21,6 +21,7 @@ inline juce::String sourceKind(const Asset& asset) {
     if (osci::files::isImage(extension)) { return "Image"; }
     if (extension == ".svg") { return drawing::isDrawing(asset.data.toString()) ? "Drawing" : "Vector"; }
     if (extension == ".json" || extension == ".lottie") { return "Lottie"; }
+    if (extension == ".svgs") { return "SVG sequence"; }
     if (extension == ".obj") { return "3D object"; }
     // Anything else by its file type.
     return asset.extension.trimCharactersAtStart(".").toUpperCase();

@@ -17,6 +17,7 @@
 #if OSCI_PREMIUM
 #include "../../parser/lottie/LottieParser.h"
 #include "../../parser/lottie/DotLottieArchive.h"
+#include "SvgSequence.h"
 #endif
 
 namespace motion {
@@ -556,6 +557,17 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     }
     if (extension == ".gpla") {
         return decodeGpla(asset, cancel, progress);
+    }
+    if (extension == svgsequence::extension) {
+        const auto sequence = svgsequence::decode(asset.data);
+        if (!sequence.has_value()) { return juce::Result::fail("This SVG sequence is damaged."); }
+        const auto sharedPage = svgsequence::page(sequence->svgs.front());
+        if (sharedPage.isEmpty()) { return juce::Result::fail("The first SVG of the sequence draws nothing."); }
+        return prepareSourceFrames(asset, static_cast<int>(sequence->svgs.size()), sequence->frameRate,
+            [&](int frame, ImportShapes& shapes) {
+                return svgsequence::frameShapes(sequence->svgs[static_cast<std::size_t>(frame)], sharedPage, shapes)
+                    ? juce::Result::ok() : juce::Result::fail("Frame " + juce::String(frame + 1) + " of the sequence isn't an SVG.");
+            }, cancel, progress, {}, {}, true);
     }
     if (osci::files::isLottie(extension)) {
 #if OSCI_PREMIUM

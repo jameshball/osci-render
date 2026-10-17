@@ -2,13 +2,16 @@
 
 #include "MotionStyle.h"
 #include "../model/PreparedSource.h"
+#include <optional>
 
 namespace motion::ui {
 // One frame of a prepared source as strokes in a unit square, centred and
 // scaled to fit: dark samples and long jumps break the line, as the beam
 // blanks them. `view` places a point on the page (y up), front on unless
 // given.
-inline juce::Path traceSource(const PreparedSource& source, std::size_t frame, int steps, juce::Point<float> (*view)(const osci::Point&) = nullptr) {
+// `area`, when given, is the region drawn whatever the frame holds, so an
+// animation's frames keep their places.
+inline juce::Path traceSource(const PreparedSource& source, std::size_t frame, int steps, juce::Point<float> (*view)(const osci::Point&) = nullptr, std::optional<juce::Rectangle<float>> area = std::nullopt) {
     juce::Path path;
     if (frame >= source.frameCount()) { return path; }
     const auto pointFrames = source.drawingAt(frame) == nullptr;
@@ -27,6 +30,12 @@ inline juce::Path traceSource(const PreparedSource& source, std::size_t frame, i
         bottom = std::max(bottom, points.back().y);
     }
     if (points.empty()) { return path; }
+    if (area.has_value()) {
+        left = area->getX();
+        right = area->getRight();
+        top = area->getY();
+        bottom = area->getBottom();
+    }
     // A script that never sets a colour leaves every point unlit; draw it all.
     const auto anyLit = std::find(lit.begin(), lit.end(), true) != lit.end();
     const auto size = std::max({right - left, bottom - top, 1e-6f});
@@ -52,6 +61,12 @@ public:
     struct Result {
         juce::Path path;
         juce::String caption, error;
+        // An animation's frames, played in a loop at this rate (`path`
+        // unused); each stands for `frameStep` of the source's when only a
+        // share of them is traced.
+        std::vector<juce::Path> frames;
+        double framesPerSecond = 0;
+        double frameStep = 1;
     };
     using Work = std::function<Result(const std::atomic<bool>& cancel)>;
 
@@ -68,6 +83,18 @@ public:
         startTimer(120);
     }
 
+    // The rate an animation plays at, whatever its result says (0: still);
+    // and a caption in place of the result's.
+    void setFrameRate(double framesPerSecond) {
+        rate = framesPerSecond;
+        updatePlayback();
+        repaint();
+    }
+    void setCaption(const juce::String& text) {
+        caption = text;
+        repaint();
+    }
+
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
         g.setColour(juce::Colours::black);
@@ -77,8 +104,9 @@ public:
         // The drawing leaves room at the foot for its caption.
         const auto side = std::min(bounds.getWidth(), bounds.getHeight() - 20) - 24;
         const auto square = juce::Rectangle<float>(side, side).withCentre({bounds.getCentreX(), bounds.getY() + 12 + side * .5f});
-        if (!shown.path.isEmpty()) {
-            auto path = shown.path;
+        const auto& drawn = shown.frames.empty() ? shown.path : shown.frames[frameNow()];
+        if (!drawn.isEmpty()) {
+            auto path = drawn;
             path.applyTransform(juce::AffineTransform::scale(square.getWidth(), square.getHeight()).translated(square.getX(), square.getY()));
             // A soft halo under a crisp core reads as a beam, not a vector.
             g.setColour(style::key().withAlpha(.18f));
@@ -87,13 +115,13 @@ public:
             g.strokePath(path, juce::PathStrokeType(1.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         g.setFont(style::caption());
-        if (busy && shown.path.isEmpty()) {
+        if (busy && drawn.isEmpty()) {
             g.setColour(osci::Colours::textMuted().withAlpha(.6f));
             g.drawText("Tracing...", bounds, juce::Justification::centred, false);
         }
         const auto failed = shown.error.isNotEmpty();
         g.setColour(failed ? style::error() : osci::Colours::textMuted().withAlpha(.6f));
-        const auto text = failed ? shown.error : busy && !shown.path.isEmpty() ? juce::String("Updating...") : shown.caption;
+        const auto text = failed ? shown.error : busy && !drawn.isEmpty() ? juce::String("Updating...") : caption.isNotEmpty() ? caption : shown.caption;
         g.drawFittedText(text, bounds.reduced(8, 6).toNearestInt(), failed ? juce::Justification::centred : juce::Justification::centredBottom, 3);
     }
 
@@ -114,6 +142,7 @@ private:
                 if (owner == nullptr || generation != owner->requested) { return; }
                 owner->shown = result;
                 owner->busy = false;
+                owner->updatePlayback();
                 owner->repaint();
             });
         });
@@ -123,6 +152,24 @@ private:
         if (current != nullptr) { current->store(true); }
     }
 
+    double playbackRate() const { return (rate.has_value() ? *rate : shown.framesPerSecond) / std::max(1.0, shown.frameStep); }
+    void updatePlayback() {
+        playStart = juce::Time::getMillisecondCounterHiRes();
+        if (shown.frames.size() > 1 && playbackRate() > 0) {
+            play.startTimerHz(std::clamp(juce::roundToInt(playbackRate()), 1, 60));
+        } else {
+            play.stopTimer();
+        }
+    }
+    std::size_t frameNow() const {
+        if (shown.frames.size() < 2 || playbackRate() <= 0) { return 0; }
+        const auto elapsed = (juce::Time::getMillisecondCounterHiRes() - playStart) / 1000.0;
+        return static_cast<std::size_t>(elapsed * playbackRate()) % shown.frames.size();
+    }
+    std::optional<double> rate;
+    juce::String caption;
+    double playStart = 0;
+    juce::TimedCallback play {[this] { repaint(); }};
     juce::ThreadPool pool {1};
     Work pending;
     std::shared_ptr<std::atomic<bool>> current;
