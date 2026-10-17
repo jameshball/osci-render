@@ -269,7 +269,22 @@ void MotionEditor::setUpLibrary() {
         menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
         menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder()));
         menu.addItem(item(AddMenuId::importAudio, "Import audio...", icons::glyph::wave()));
-        menu.addItem(item(AddMenuId::blenderSource, "Blender source...", icons::glyph::live()));
+        // Live: what other apps send, drawn as it arrives, never prepared ahead.
+        juce::PopupMenu live;
+        live.addItem(item(AddMenuId::blenderSource, "Blender...", icons::glyph::live()));
+        const auto senders = motion::LiveTextureController::senders();
+        if (motion::LiveTextureController::available()) {
+            live.addSectionHeader(motion::texture::technology());
+            for (std::size_t index = 0; index < senders.size(); ++index) {
+                live.addItem(item(AddMenuId::firstTexture + static_cast<int>(index), senders[index].describe(), icons::glyph::screen()));
+            }
+            if (senders.empty()) {
+                juce::PopupMenu::Item none("No app is sharing a picture");
+                none.isEnabled = false;
+                live.addItem(std::move(none));
+            }
+        }
+        menu.addSubMenu("Live", live, true, icons::stroked(icons::glyph::live(), icons::ink()));
         // The examples that ship with osci-motion, by kind, each pictured as
         // it draws (a blank space until its picture is made).
         juce::PopupMenu examples;
@@ -293,7 +308,7 @@ void MotionEditor::setUpLibrary() {
         menu.addSubMenu("Examples", examples, true, icons::stroked(icons::glyph::book(), icons::ink()));
         const juce::Component::SafePointer<MotionEditor> owner(this);
         menu.setLookAndFeel(&getLookAndFeel());
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner, resources](int choice) {
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner, resources, senders](int choice) {
             if (owner == nullptr) { return; }
             // Which of a list's items was chosen, if one was.
             const auto chosen = [choice](int first, std::size_t count) -> std::optional<std::size_t> {
@@ -309,6 +324,8 @@ void MotionEditor::setUpLibrary() {
             const auto lightPreset = chosen(AddMenuId::firstLightPreset, motion::lightPresets.size());
             const auto mirror = chosen(AddMenuId::firstMirror, motion::mirrorPresets.size());
             const auto example = chosen(AddMenuId::firstExample, resources.size());
+            const auto sender = chosen(AddMenuId::firstTexture, senders.size());
+            if (sender.has_value()) { owner->addTextureSource(senders[*sender]); }
             if (generator.has_value()) { owner->addGenerator(motion::generatorDefinitions[*generator]); }
             if (lightPreset.has_value()) { owner->addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[*lightPreset]); }
             if (mirror.has_value()) { owner->addMirror(motion::mirrorPresets[*mirror]); }
@@ -362,10 +379,13 @@ void MotionEditor::setUpLibrary() {
         if (clips.empty()) { statusBar.show("This source is only used inside other compositions.", MotionStatusBar::Kind::notice); }
     };
     assetLibrary.onInsert = [this](motion::Id id) { timeline.insertAsset(id, -1, -1); };
-    assetLibrary.liveStatus = [this](motion::Id id) { return processor.blenderInputs().statusText(id); };
+    assetLibrary.liveStatus = [this](motion::Id id) {
+        const auto asset = motion::findAsset(processor.document.mainProject().assets, id);
+        return asset != nullptr && motion::texture::isSource(asset->extension) ? processor.textureInputs().statusText(id) : processor.blenderInputs().statusText(id);
+    };
     assetLibrary.onBake = [this](motion::Id id) {
         for (const auto& asset : processor.document.mainProject().assets) {
-            if (asset->id == id && asset->liveIdentity != nullptr) { showBlenderSettings(id); return; }
+            if (asset->id == id && asset->liveIdentity != nullptr) { showLiveSettings(id); return; }
         }
         const auto& assets = processor.document.project().assets;
         const auto found = motion::findAsset(assets, id);

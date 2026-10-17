@@ -148,6 +148,16 @@ inline juce::Path live() {
     }
     return fitted(path);
 }
+// A screen: a picture another app shares.
+inline juce::Path screen() {
+    juce::Path path;
+    path.addRoundedRectangle(10.0f, 16.0f, 76.0f, 50.0f, 6.0f);
+    path.startNewSubPath(48, 66);
+    path.lineTo(48, 80);
+    path.startNewSubPath(32, 80);
+    path.lineTo(64, 80);
+    return fitted(path);
+}
 // A wire cube: a 3D model.
 inline juce::Path cube() {
     juce::Path path;

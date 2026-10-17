@@ -2,6 +2,7 @@
 #include "model/SourceParts.h"
 #include "import/SourceDecoding.h"
 #include "live/BlenderCaptureArchive.h"
+#include "import/BakedSourceArchive.h"
 #include "ui/BlenderSourcePanel.h"
 #include "ui/FractalSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
@@ -359,6 +360,98 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
         return juce::Result::ok();
     };
     showOverlay(std::move(overlay));
+}
+
+void MotionEditor::showLiveSettings(motion::Id id) {
+    const auto asset = motion::findAsset(processor.document.mainProject().assets, id);
+    if (asset != nullptr && motion::texture::isSource(asset->extension)) {
+        showTextureSettings(id);
+    } else {
+        showBlenderSettings(id);
+    }
+}
+
+void MotionEditor::addTextureSource(const motion::texture::Sender& sender) {
+    motion::RasterSettings settings;
+    // As an image starts: a Hilbert curve shades as the scope can show.
+    settings.shading = processor.document.project().scope.xyOnly ? motion::RasterSettings::Shading::density : motion::RasterSettings::Shading::colour;
+    motion::Id id = 0;
+    const auto added = processor.document.addTextureSource(motion::texture::encode(sender), sender.name.isNotEmpty() ? sender.name : sender.application, settings, id);
+    if (added.failed()) {
+        statusBar.show(added.getErrorMessage());
+        return;
+    }
+    assetLibrary.refresh();
+    assetLibrary.selectAsset(id);
+    libraryTabs.setSelectedIndex(0);
+    timeline.insertAsset(id, -1, -1);
+}
+
+void MotionEditor::showTextureSettings(motion::Id id) {
+    const auto& document = processor.document;
+    const auto found = motion::findAsset(document.mainProject().assets, id);
+    if (found == nullptr || found->liveIdentity == nullptr || !motion::texture::isSource(found->extension)) { return; }
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const auto generation = document.generation();
+    const auto current = [owner, generation] { return owner != nullptr && owner->processor.document.generation() == generation; };
+    MotionRasterSettingsPanel::Live live;
+    live.frame = [owner, id, current] { return current() ? owner->processor.textureInputs().frame(id) : nullptr; };
+    live.status = [owner, id, current] { return current() ? owner->processor.textureInputs().statusText(id) : juce::String("The project changed"); };
+    live.onChange = [owner, id, current](motion::RasterSettings settings) {
+        if (!current()) { return; }
+        const auto changed = owner->processor.document.setTextureSettings(id, settings);
+        if (changed.failed()) { owner->statusBar.show(changed.getErrorMessage()); }
+    };
+    live.recording = [owner, id, current] { return current() && owner->processor.textureInputs().capturing(id); };
+    live.onRecord = [owner, id, current, generation] {
+        if (!current()) { return juce::Result::fail("The project changed. Reopen its settings."); }
+        auto& inputs = owner->processor.textureInputs();
+        if (!inputs.capturing(id)) { return inputs.beginCapture(id); }
+        auto recording = inputs.finishCapture(id);
+        const auto source = motion::findAsset(owner->processor.document.mainProject().assets, id);
+        if (recording == nullptr || source == nullptr) { return juce::Result::fail("There is no capture to keep."); }
+        if (recording->frames.empty()) { return juce::Result::fail("Nothing arrived while recording."); }
+        auto capture = std::shared_ptr<const motion::TextureCapture>(std::move(recording));
+        auto task = std::make_shared<ImportState>();
+        task->capture = true;
+        task->name = source->name + " capture";
+        task->generation = generation;
+        owner->pendingImports.push_back(task);
+        owner->imports.addJob([owner, id, generation, task, capture] {
+            auto asset = std::make_shared<motion::Asset>();
+            asset->name = task->name;
+            asset->extension = motion::texture::captureExtension;
+            auto result = juce::Result::fail("Capture cancelled.");
+            try {
+                const auto frames = capture->steady();
+                if (!frames) {
+                    result = juce::Result::fail(juce::String(frames.error));
+                } else {
+                    auto archive = motion::BakedSourceArchive::encode(*frames.source);
+                    if (archive) {
+                        asset->data = std::move(archive.data);
+                        result = motion::decodeAsset(*asset, &task->cancelled, &task->progress);
+                    } else { result = juce::Result::fail(archive.error); }
+                }
+            } catch (const std::exception& error) { result = juce::Result::fail("Couldn't keep the capture: " + juce::String(error.what())); }
+            juce::MessageManager::callAsync([owner, id, generation, task, asset, result] {
+                if (owner == nullptr) { return; }
+                std::erase(owner->pendingImports, task);
+                if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
+                if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
+                auto& document = owner->processor.document;
+                asset->id = document.newId();
+                document.edit("Capture live picture", [&](motion::Project& project) { project.assets.push_back(asset); });
+                owner->assetLibrary.refresh();
+                owner->assetLibrary.selectAsset(asset->id);
+                owner->libraryTabs.setSelectedIndex(0);
+                owner->captured(id, asset->id);
+            });
+        });
+        return juce::Result::ok();
+    };
+    auto panel = std::make_unique<MotionRasterSettingsPanel>(found->rasterSettings, false, found->name, juce::MemoryBlock(), document.project().scope.xyOnly, juce::File(), juce::File(), std::move(live));
+    motion::ui::Sheet::show(*this, std::move(panel));
 }
 
 void MotionEditor::captured(motion::Id live, motion::Id capture) {

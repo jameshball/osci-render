@@ -18,6 +18,7 @@
 #include "../../parser/lottie/LottieParser.h"
 #include "../../parser/lottie/DotLottieArchive.h"
 #include "SvgSequence.h"
+#include "../live/TextureSource.h"
 #endif
 
 namespace motion {
@@ -461,8 +462,28 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
     }
+    if (texture::isSource(asset.extension)) {
+        // A picture another app shares: traced as it arrives, never ahead.
+        if (!texture::decode(asset.data).has_value()) { return juce::Result::fail("This shared picture's settings are damaged."); }
+        const auto error = asset.rasterSettings.validate();
+        if (!error.empty()) { return juce::Result::fail(juce::String(error)); }
+        asset.liveIdentity = std::make_shared<const LiveSourceIdentity>();
+        asset.source.reset();
+        asset.audio.reset();
+        if (progress != nullptr) { progress->store(1); }
+        return juce::Result::ok();
+    }
     if (asset.data.getSize() == 0 || asset.data.getSize() > maximumSourceBytes) {
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
+    }
+    if (asset.extension.equalsIgnoreCase(texture::captureExtension)) {
+        // A capture of a shared picture: its traced frames, kept as they came.
+        const auto frames = BakedSourceArchive::decode(asset.data);
+        if (!frames) { return juce::Result::fail(juce::String(frames.error)); }
+        asset.source = std::make_shared<const PreparedSource>(frames.source);
+        asset.audio.reset();
+        if (progress != nullptr) { progress->store(1); }
+        return juce::Result::ok();
     }
     const auto extension = asset.extension.toLowerCase();
     if (extension == juce::String(generatorExtension.data(), generatorExtension.size())) {

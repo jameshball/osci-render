@@ -4,6 +4,7 @@
 #include "GeneratorIcons.h"
 #include "SourceKind.h"
 #include "../model/SourceParts.h"
+#include "MenuIcons.h"
 
 MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(document), list("Motion assets", this) {
     setName("Asset library");
@@ -155,7 +156,8 @@ void MotionAssetLibrary::selectedRowsChanged(int row) {
     const bool text = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".txt");
     const bool live = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr;
     const bool fractal = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lsystem");
-    bakeSettings.setButtonText(live ? "Blender settings..." : definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (fractal ? "Fractal settings..." : (raster ? (osci::files::isVideo(assets[static_cast<std::size_t>(row)]->extension) ? "Video settings..." : "Image settings...") : "Bake settings...")));
+    const bool texture = live && motion::texture::isSource(assets[static_cast<std::size_t>(row)]->extension);
+    bakeSettings.setButtonText(texture ? motion::texture::technology() + " settings..." : live ? "Blender settings..." : definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (fractal ? "Fractal settings..." : (raster ? (osci::files::isVideo(assets[static_cast<std::size_t>(row)]->extension) ? "Video settings..." : "Image settings...") : "Bake settings...")));
     bakeSettings.setVisible(live || definitionRow(row) || text || fractal || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
     const auto model = modelRow(row);
     originalSize.setVisible(model);
@@ -262,6 +264,14 @@ void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce:
             const auto high = std::clamp(peak.maximum, -1.0f, 1.0f), low = std::clamp(peak.minimum, -1.0f, 1.0f);
             graphics.drawVerticalLine(juce::roundToInt(area.getX()) + x, area.getCentreY() - high * area.getHeight() * .4f, area.getCentreY() - low * area.getHeight() * .4f + 1);
         }
+        return;
+    }
+    // A live source has no frames of its own to picture: what kind it is.
+    if (asset.liveIdentity != nullptr) {
+        namespace icons = motion::ui::menu_icons;
+        const auto glyph = motion::texture::isSource(asset.extension) ? icons::glyph::screen() : icons::glyph::live();
+        graphics.setColour(motion::style::key().withAlpha(.85f));
+        graphics.strokePath(glyph, juce::PathStrokeType(1.4f), glyph.getTransformToScaleToFit(area.reduced(5), true));
         return;
     }
     // Traced once per source (a unit-square path), then scaled to the row.

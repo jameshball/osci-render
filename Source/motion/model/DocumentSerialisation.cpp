@@ -6,6 +6,7 @@
 #include "PropertySchema.h"
 #include "../import/BakedSourceArchive.h"
 #include "../import/SourceDecoding.h"
+#include "../live/TextureSource.h"
 #include <charconv>
 #include <iomanip>
 #include <locale>
@@ -747,7 +748,7 @@ juce::XmlElement Document::save(const Project& project) {
             bake->setAttribute("key", asset->bakeKey);
             bake->addTextElement(asset->bakedData.toBase64Encoding());
         } else {
-            if (osci::files::isImage(asset->extension)) {
+            if (osci::files::isImage(asset->extension) || texture::isSource(asset->extension)) {
                 auto* raster = item->createNewChildElement("raster");
                 const auto mode = asset->rasterSettings.mode;
                 raster->setAttribute("mode", mode == RasterSettings::Mode::contours ? "contours" : mode == RasterSettings::Mode::scanlines ? "scanlines" : "hilbert");
@@ -911,7 +912,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             leaveOut("Source whose file is damaged, or larger than the 64 MiB limit");
             continue;
         }
-        if (osci::files::isImage(asset->extension)) {
+        if (osci::files::isImage(asset->extension) || texture::isSource(asset->extension)) {
             // Settings this version doesn't have are its defaults.
             const auto* raster = item->getChildByName("raster");
             const RasterSettings rasterDefaults;

@@ -1927,6 +1927,34 @@ juce::Result Document::addBlenderSource(juce::String name, BlenderSourceSettings
     return juce::Result::ok();
 }
 
+juce::Result Document::addTextureSource(const juce::MemoryBlock& sender, const juce::String& name, RasterSettings settings, Id& id) {
+    auto asset = std::make_shared<Asset>();
+    asset->id = newId();
+    asset->name = uniqueAssetName(mainProject(), name.trim().isEmpty() ? juce::String("Live picture") : name.trim());
+    asset->extension = ".texture";
+    asset->data = sender;
+    asset->rasterSettings = settings;
+    const auto result = decodeAsset(*asset);
+    if (result.failed()) { return result; }
+    edit("Add live picture", [asset](Project& project) { project.assets.push_back(asset); });
+    id = asset->id;
+    return juce::Result::ok();
+}
+
+juce::Result Document::setTextureSettings(Id id, RasterSettings settings) {
+    const auto found = findAsset(state.assets, id);
+    if (found == nullptr || found->liveIdentity == nullptr || !found->extension.equalsIgnoreCase(".texture")) { return juce::Result::fail("The live picture no longer exists."); }
+    const auto error = settings.validate();
+    if (!error.empty()) { return juce::Result::fail(juce::String(error)); }
+    auto replacement = std::make_shared<Asset>(*found);
+    replacement->rasterSettings = settings;
+    tryEditCoalesced("Change live picture", "texture:" + juce::String(id), [id, replacement](Project& project) {
+        for (auto& asset : project.assets) { if (asset->id == id) { asset = replacement; return true; } }
+        return false;
+    });
+    return juce::Result::ok();
+}
+
 juce::Result Document::setBlenderSource(Id id, juce::String name, BlenderSourceSettings settings) {
     const auto found = findAsset(state.assets, id);
     if (found == nullptr || !found->extension.equalsIgnoreCase(".blender")) { return juce::Result::fail("The Blender source no longer exists."); }

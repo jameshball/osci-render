@@ -367,6 +367,7 @@ MotionEditor::~MotionEditor() {
     saveLayout();
     menuBar.setLookAndFeel(nullptr);
     processor.blenderInputs().cancelAllCaptures();
+    processor.textureInputs().cancelAllCaptures();
     stopTimer();
     visualiser.openSettings = {};
     visualiser.closeSettings = {};

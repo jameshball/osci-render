@@ -66,6 +66,24 @@ const GeneratorDefinition* generatorFor(const ProjectType& project, Id target) {
     return nullptr;
 }
 
+// Whether a clip draws a live source (Blender, a shared picture): drawn as it
+// arrives, so no lights or surfaces of its own.
+template <typename ProjectType>
+bool drawsLive(const ProjectType& project, Id target) {
+    if constexpr (requires { project.assets; }) {
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id != target || clip.asset == 0) { continue; }
+                for (const auto& asset : project.assets) {
+                    if (asset != nullptr && asset->id == clip.asset) { return asset->liveIdentity != nullptr; }
+                }
+                return false;
+            }
+        }
+    }
+    return false;
+}
+
 // Whether a clip's source, other than a generator's (see hasProperty), has a
 // surface: faces (a mesh, or a filled shape) for lines to be laid on and to
 // reflect with. A source not made yet, or a composition, may have.
@@ -77,6 +95,8 @@ bool hasSurface(const ProjectType& project, Id target) {
                 if (clip.id != target || clip.asset == 0) { continue; }
                 for (const auto& asset : project.assets) {
                     if (asset == nullptr || asset->id != clip.asset) { continue; }
+                    // A live source draws what arrives as it is: no surfaces.
+                    if (asset->liveIdentity != nullptr) { return false; }
                     return generatorOf(*asset) != nullptr || asset->source == nullptr || asset->source->hasFaces();
                 }
                 return true;

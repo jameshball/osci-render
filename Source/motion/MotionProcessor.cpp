@@ -23,7 +23,14 @@ MotionProcessor::MotionProcessor()
     preparationWorker = std::make_unique<motion::CompositionPreparationWorker>([this] { triggerAsyncUpdate(); });
     recordingParameters.canvasWidth.addListener(this);
     recordingParameters.canvasHeight.addListener(this);
-    blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto frames) { publishLiveSources(std::move(frames)); });
+    blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto entries) {
+        blenderEntries = std::move(entries);
+        publishLiveSources();
+    });
+    textures = std::make_unique<motion::LiveTextureController>(document, [this](auto entries) {
+        textureEntries = std::move(entries);
+        publishLiveSources();
+    });
     // A parameter dragged after a document edit is its own undo step, never
     // joined to the edit's.
     document.onUndoStep = [this] { lastUndoParamId = {}; };
@@ -53,6 +60,7 @@ MotionProcessor::~MotionProcessor() {
     recordingParameters.canvasWidth.removeListener(this);
     recordingParameters.canvasHeight.removeListener(this);
     blender.reset();
+    textures.reset();
     preparationWorker.reset();
     cancelPendingUpdate();
     document.onChanged = nullptr;

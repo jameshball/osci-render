@@ -10,7 +10,7 @@ namespace motion {
 // explicitly started; loading a document never opens a network listener.
 class LiveBlenderController final : private juce::Timer {
 public:
-    LiveBlenderController(Document& document, std::function<void(std::shared_ptr<const LiveSourceFrames>)> publish)
+    LiveBlenderController(Document& document, std::function<void(std::vector<LiveSourceFrames::Entry>)> publish)
         : document(document), publish(std::move(publish)) { startTimerHz(30); }
     ~LiveBlenderController() override { stopTimer(); }
 
@@ -107,9 +107,8 @@ public:
             changed = entries[index].identity != previous[index].identity || entries[index].source != previous[index].source;
         }
         if (changed) {
-            auto frames = std::make_shared<const LiveSourceFrames>(entries);
-            previous = std::move(entries);
-            publish(std::move(frames));
+            previous = entries;
+            publish(std::move(entries));
         }
     }
 private:
@@ -143,7 +142,7 @@ private:
     }
     void timerCallback() override { poll(); }
     Document& document;
-    std::function<void(std::shared_ptr<const LiveSourceFrames>)> publish;
+    std::function<void(std::vector<LiveSourceFrames::Entry>)> publish;
     std::vector<Session> sessions;
     std::vector<LiveSourceFrames::Entry> previous;
 };

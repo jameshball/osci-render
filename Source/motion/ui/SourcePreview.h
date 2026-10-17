@@ -90,6 +90,14 @@ public:
         updatePlayback();
         repaint();
     }
+    // Shown at once, with no work to do (a live picture's latest frame).
+    void show(Result result) {
+        cancel();
+        shown = std::move(result);
+        busy = false;
+        updatePlayback();
+        repaint();
+    }
     void setCaption(const juce::String& text) {
         caption = text;
         repaint();

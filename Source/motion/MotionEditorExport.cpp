@@ -41,8 +41,11 @@ bool MotionEditor::waitsForCapture(bool video, std::function<void()> exportWitho
     juce::StringArray names;
     for (const auto& source : live) { names.add(source->name); }
     const auto many = live.size() > 1;
-    const auto message = "Export draws every frame offline, so it can't wait for Blender to send them. Record a capture of " + (many ? "each of them" : names[0])
-        + " while it plays in Blender: its clips then draw the capture, and you can export.";
+    // Blender's sources play in Blender; a shared picture plays in its app.
+    const auto blender = std::all_of(live.begin(), live.end(), [](const auto& source) { return !motion::texture::isSource(source->extension); });
+    const auto message = blender
+        ? "Export draws every frame offline, so it can't wait for Blender to send them. Record a capture of " + (many ? "each of them" : names[0]) + " while it plays in Blender: its clips then draw the capture, and you can export."
+        : "Export draws every frame offline, so it can't wait for live sources. Record a capture of " + (many ? "each of them" : names[0]) + " while it plays: its clips then draw the capture, and you can export.";
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const auto first = live.front()->id;
     auto sheet = std::make_unique<motion::ui::MessageSheet>("Capture before exporting", message, "Record capture", [owner, first, video] {
@@ -50,7 +53,7 @@ bool MotionEditor::waitsForCapture(bool video, std::function<void()> exportWitho
         owner->captureForExport = first;
         owner->captureForExportGeneration = owner->processor.document.generation();
         owner->captureForVideo = video;
-        owner->showBlenderSettings(first);
+        owner->showLiveSettings(first);
     }, names.joinIntoString(", "));
     sheet->addAlternative(many ? "Export without them" : "Export without it", std::move(exportWithout));
     motion::ui::Sheet::show(*this, std::move(sheet));

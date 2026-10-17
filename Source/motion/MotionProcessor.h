@@ -12,6 +12,7 @@
 #include "render/PreparedState.h"
 #include "live/LiveSourceExchange.h"
 #include "live/LiveBlenderController.h"
+#include "live/LiveTextureController.h"
 #include "ScopeBeam.h"
 
 class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater, private juce::AudioProcessorParameter::Listener {
@@ -70,9 +71,15 @@ public:
     }
     void collectPreparedState() { composition.collect(); liveSources.collect(); }
     // Message-thread publication/preview; source geometry was prepared off audio.
-    void publishLiveSources(std::shared_ptr<const motion::LiveSourceFrames> frames) { liveSources.publish(std::move(frames)); }
+    // Blender's sources and shared pictures, published together.
+    void publishLiveSources() {
+        auto entries = blenderEntries;
+        entries.insert(entries.end(), textureEntries.begin(), textureEntries.end());
+        liveSources.publish(std::make_shared<const motion::LiveSourceFrames>(std::move(entries)));
+    }
     std::shared_ptr<const motion::LiveSourceFrames> liveSourcePreview() const { return liveSources.previewSnapshot(); }
     motion::LiveBlenderController& blenderInputs() { return *blender; }
+    motion::LiveTextureController& textureInputs() { return *textures; }
     bool isPreparingComposition() const { return acceptedPreparationRevision != preparationRevision; }
     juce::String getPreparationError() const { return preparationError; }
     // Message thread: prepares `project` for playback off the audio thread.
@@ -113,6 +120,8 @@ private:
     motion::PreparedState<motion::PreparedComposition> composition;
     motion::LiveSourceExchange liveSources;
     std::unique_ptr<motion::LiveBlenderController> blender;
+    std::unique_ptr<motion::LiveTextureController> textures;
+    std::vector<motion::LiveSourceFrames::Entry> blenderEntries, textureEntries;
     std::uint64_t previousLiveRevision = 0;
 public:
     // A launch that only renders: the session saved on quitting is the one

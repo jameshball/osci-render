@@ -48,6 +48,8 @@
             resource="0" file="tests/MotionAnimateChangeTest.cpp"/>
       <FILE id="MotionSvgSequence" name="MotionSvgSequenceTest.cpp" compile="1"
             resource="0" file="tests/MotionSvgSequenceTest.cpp"/>
+      <FILE id="MotionLivePicture" name="MotionLivePictureTest.cpp" compile="1"
+            resource="0" file="tests/MotionLivePictureTest.cpp"/>
       <FILE id="MotionHiddenLines" name="MotionHiddenLinesTest.cpp" compile="1"
             resource="0" file="tests/MotionHiddenLinesTest.cpp"/>
       <FILE id="MotionGenerators" name="MotionGeneratorsTest.cpp" compile="1"

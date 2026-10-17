@@ -3,6 +3,7 @@
 #include "../model/RasterSettings.h"
 #include "../import/RasterSourcePreparer.h"
 #include "../import/VideoSourcePreparer.h"
+#include "../live/TextureSource.h"
 #include "Sheet.h"
 #include "ScrubField.h"
 #include "SourcePreview.h"
@@ -10,24 +11,34 @@
 
 // How an image or video is traced into beam strokes, the traced picture
 // beside the settings, updated as they change: an image's first frame, or a
-// frame FFmpeg picks from a video.
+// frame FFmpeg picks from a video. For a picture another app shares, the
+// settings apply as they change and the picture is the live one.
 class MotionRasterSettingsPanel final : public motion::ui::Sheet {
 public:
+    struct Live {
+        std::function<std::shared_ptr<const motion::PreparedSource>()> frame;
+        std::function<juce::String()> status;
+        std::function<void(motion::RasterSettings)> onChange;
+        // Starts a capture, or ends one and keeps it.
+        std::function<juce::Result()> onRecord;
+        std::function<bool()> recording;
+    };
     // `xyOnlyScope`: the project's scope has X and Y alone, so a Hilbert
     // curve shades by its density unless told otherwise; else by colour.
     // A video's frame comes from `videoFile` (or its bytes, in `image`) by
     // `ffmpeg`; without FFmpeg there is no picture.
     MotionRasterSettingsPanel(motion::RasterSettings initial, bool video, const juce::String& fileName, juce::MemoryBlock image = {}, bool xyOnlyScope = false,
-            juce::File videoFile = {}, juce::File ffmpeg = {})
-        : Sheet(video ? "Prepare video" : "Prepare image", fileName, "Prepare"), settings(initial), isVideo(video), data(std::move(image)) {
+            juce::File videoFile = {}, juce::File ffmpeg = {}, std::optional<Live> liveSource = std::nullopt)
+        : Sheet(liveSource.has_value() ? motion::texture::technology() + " source" : video ? "Prepare video" : "Prepare image", fileName, liveSource.has_value() ? "Done" : "Prepare"),
+          settings(initial), isVideo(video), data(std::move(image)), live(std::move(liveSource)) {
         if (isVideo && ffmpeg.existsAsFile() && (videoFile.existsAsFile() || data.getSize() > 0)) {
             still = std::make_shared<VideoStill>();
             still->video = videoFile;
             still->bytes = data;
             still->ffmpeg = ffmpeg;
         }
-        setName("Image preparation settings");
-        nameAction(isVideo ? "Prepare video" : "Prepare image");
+        setName(live.has_value() ? "Live picture settings" : "Image preparation settings");
+        nameAction(live.has_value() ? "Done" : isVideo ? "Prepare video" : "Prepare image");
         detailEdited = initial.resolution != motion::RasterSettings().resolution || initial.mode == motion::RasterSettings::Mode::scanlines;
         mode.setSelected(initial.mode == motion::RasterSettings::Mode::scanlines ? 1 : initial.mode == motion::RasterSettings::Mode::hilbert ? 2 : 0);
         mode.setTooltip("Outlines follow image edges. Scanlines fill the visible image with horizontal beam passes. "
@@ -89,6 +100,10 @@ public:
         error.setBorderSize({});
         error.setName("Image preparation validation error");
         primary.onClick = [this] {
+            if (live.has_value()) {
+                close();
+                return;
+            }
             if (submitted) { return; }
             refresh();
             if (valid && onPrepare) {
@@ -106,6 +121,20 @@ public:
             addAndMakeVisible(frameRate);
         }
         if (hasPreview()) { addAndMakeVisible(preview); }
+        if (live.has_value()) {
+            // Changes apply as they're made, so there's nothing to cancel.
+            cancel.setVisible(false);
+            error.setVisible(false);
+            record.setName("Record capture");
+            record.setTooltip("Record what arrives, to draw it offline: export needs a capture of a live picture.");
+            record.onClick = [this] {
+                const auto result = live->onRecord ? live->onRecord() : juce::Result::fail("Recording isn't available.");
+                if (result.failed()) { recordError = result.getErrorMessage(); }
+                showLive();
+            };
+            addAndMakeVisible(record);
+            liveFrames.startTimerHz(15);
+        }
         const auto rows = isVideo ? 7 : 6;
         setSize(widthFor(hasPreview() ? bodyHeight(rows) : 0), heightFor(rows));
         refresh();
@@ -129,12 +158,39 @@ protected:
         invertLabel.setBounds(line.removeFromLeft(caption));
         invert.setBounds(line.removeFromLeft(motion::ui::Switch::width + 4));
         error.setBounds(footerLeft);
+        if (live.has_value()) { record.setBounds(footerLeft.removeFromLeft(std::max(132, record.getBestWidthForHeight(footerLeft.getHeight()) + 20))); }
     }
 
 private:
     static constexpr motion::PropertySpec thresholdSpec {"threshold", "Threshold", "", "", 0, 100, 2, .1, 1, "%"};
     static constexpr motion::PropertySpec frameRateSpec {"frameRate", "Frame rate", "", "", 1, 120, 30, .5, 3, " fps"};
-    bool hasPreview() const { return isVideo ? still != nullptr : data.getSize() > 0; }
+    bool hasPreview() const { return live.has_value() || (isVideo ? still != nullptr : data.getSize() > 0); }
+    std::optional<Live> live;
+    juce::TextButton record;
+    juce::String recordError;
+    std::shared_ptr<const motion::PreparedSource> shownFrame;
+    juce::String shownStatus;
+    // The live picture as it is traced now, and how it's arriving.
+    void showLive() {
+        const auto recording = live->recording && live->recording();
+        record.setButtonText(recording ? "Stop and keep" : "Record capture");
+        // Red while it records, as a recorder's button is.
+        if (recording) {
+            record.setColour(juce::TextButton::buttonColourId, motion::style::error().withAlpha(.3f));
+        } else {
+            record.removeColour(juce::TextButton::buttonColourId);
+        }
+        const auto frame = live->frame ? live->frame() : nullptr;
+        const auto status = recordError.isNotEmpty() ? recordError : live->status ? live->status() : juce::String();
+        if (frame == shownFrame && status == shownStatus) { return; }
+        shownFrame = frame;
+        shownStatus = status;
+        motion::ui::SourcePreview::Result result;
+        if (frame != nullptr && frame->frameCount() > 0) { result.path = motion::ui::traceSource(*frame, 0, static_cast<int>(std::min<std::size_t>(settings.pointsPerFrame, 4096))); }
+        result.caption = status;
+        preview.show(std::move(result));
+    }
+    juce::TimedCallback liveFrames {[this] { showLive(); }};
     // A video's frame, fetched once for each detail on the preview's thread.
     struct VideoStill {
         juce::File video, ffmpeg;
@@ -189,6 +245,11 @@ private:
         if (!valid) { return; }
         settings = next;
         if (!hasPreview()) { return; }
+        if (live.has_value()) {
+            if (live->onChange) { live->onChange(settings); }
+            recordError.clear();
+            return;
+        }
         if (isVideo) {
             preview.request([still = still, chosen = settings](const std::atomic<bool>& cancel) {
                 motion::ui::SourcePreview::Result result;

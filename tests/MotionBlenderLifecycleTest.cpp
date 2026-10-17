@@ -45,7 +45,7 @@ public:
         expect(opensLeavingOut(invalid));
 
         std::shared_ptr<const motion::LiveSourceFrames> frames;
-        motion::LiveBlenderController controller(document, [&](auto value) { frames = std::move(value); });
+        motion::LiveBlenderController controller(document, [&](auto value) { frames = std::make_shared<const motion::LiveSourceFrames>(std::move(value)); });
         beginTest("Explicit listening prepares actual socket geometry without changing document revision");
         expect(!controller.listening(id));
         expect(controller.listen(id, true).wasOk());

@@ -256,6 +256,10 @@ public:
     juce::Result setTempoChange(double beat, double bpm, std::optional<double> replacing = std::nullopt, std::optional<bool> ramp = std::nullopt);
     juce::Result removeTempoChange(double beat);
     juce::Result addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id);
+    // A picture another app shares, by its app and name (see live/TextureSource.h).
+    juce::Result addTextureSource(const juce::MemoryBlock& sender, const juce::String& name, RasterSettings settings, Id& id);
+    // How it's traced, as one undo step for a run of changes to it.
+    juce::Result setTextureSettings(Id id, RasterSettings settings);
     juce::Result setBlenderSource(Id id, juce::String name, BlenderSourceSettings settings);
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
     // Several clips in one undo step; placement is checked after every change applies.

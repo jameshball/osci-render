@@ -118,7 +118,8 @@ void MotionPropertyInspector::refresh() {
         if (generator != nullptr) { specList.assign(generator->parameters.begin(), generator->parameters.end()); }
         const auto base = motion::propertySpecs(*found);
         const auto surface = motion::hasSurface(processor.document.project(), target);
-        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [generator, surface](const auto& spec) { return motion::hasProperty(generator, spec.id, surface); });
+        const auto live = motion::drawsLive(processor.document.project(), target);
+        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [generator, surface, live](const auto& spec) { return motion::hasProperty(generator, spec.id, surface) && !(live && spec.id == "lit"); });
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
         const auto depth = fractalDepthSpec();
         if (depth.has_value()) { specList.insert(specList.begin(), *depth); }

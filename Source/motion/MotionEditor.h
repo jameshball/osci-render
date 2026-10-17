@@ -129,6 +129,12 @@ private:
     std::vector<motion::Id> selectionBeforeExtract;
     void showNextPreparationSettings();
     void showBlenderSettings(motion::Id id = 0);
+    // A picture another app shares (Syphon, Spout): added, with a clip at the
+    // playhead; and how it's traced, beside the live picture.
+    void addTextureSource(const motion::texture::Sender& sender);
+    void showTextureSettings(motion::Id id);
+    // The settings of a live source of either kind.
+    void showLiveSettings(motion::Id id);
     void chooseSourceFile();
     // Import, offering audio files only.
     void chooseAudioFile();
@@ -405,7 +411,7 @@ private:
     // The add menu's items, and the first id of each list in it.
     struct AddMenuId {
         static constexpr int importFile = 1, blenderSource = 2, drawing = 3, importAudio = 4, newScript = 5;
-        static constexpr int firstExample = 100, firstGenerator = 1000, firstLightPreset = 2000, firstMirror = 3000;
+        static constexpr int firstExample = 100, firstGenerator = 1000, firstLightPreset = 2000, firstMirror = 3000, firstTexture = 4000;
     };
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;

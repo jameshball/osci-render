@@ -4,13 +4,15 @@
 #include "../model/Document.h"
 #include "../model/Drawing.h"
 #include "../../parser/FileFormatRegistry.h"
+#include "../live/TextureSource.h"
 
 namespace motion::ui {
 // What kind of source an asset is, as the library and Properties both name it.
 inline juce::String sourceKind(const Asset& asset) {
     const auto extension = asset.extension.toLowerCase();
+    if (texture::isSource(extension)) { return texture::technology(); }
     if (asset.liveIdentity != nullptr) { return "Blender source"; }
-    if (extension == ".blender-capture") { return "Capture"; }
+    if (extension == ".blender-capture" || extension == texture::captureExtension) { return "Capture"; }
     const auto* generator = generatorOf(asset);
     if (generator != nullptr) { return juce::String(generatorCategoryLabel(generator->category).data()); }
     if (asset.audio != nullptr) { return "Audio"; }
