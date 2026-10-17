@@ -46,7 +46,9 @@ public:
 
     juce::String getCustomTextureOutputName() {
         if (parameters.customTextureOutputName.isEmpty()) {
-            parameters.customTextureOutputName = "osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
+            // The product sharing it (osci-render, sosci, osci-motion), made
+            // unique so several can share at once.
+            parameters.customTextureOutputName = juce::String(JucePlugin_Name) + " - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
         }
         return parameters.customTextureOutputName;
     }
