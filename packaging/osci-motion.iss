@@ -4,7 +4,7 @@
 ; osci-motion is a standalone app (no plug-ins), so unlike osci-render and
 ; sosci it doesn't use CommonProductInstaller.iss and its VST3 page.
 #define MyAppName "osci-motion"
-#define MyAppVersion "0.1.0.11"
+#define MyAppVersion "0.1.0.12"
 #define MyAppPublisher "James H Ball"
 #define MyAppURL "https://osci-render.com"
 #define MyAppExeName "osci-motion.exe"
