@@ -44,8 +44,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addChildComponent(modulatorLibrary);
     addAndMakeVisible(tempoValue);
     addAndMakeVisible(tempoLabel);
-    // The Scope's controls float over its top right, like the Scene's tools.
-    addAndMakeVisible(scopeTools);
+    // The Scope's controls float over its top right, like the Scene's tools:
+    // inside it, which draws them into its picture, as over an OpenGL view on
+    // Windows nothing else would show.
+    visualiser.addAndMakeVisible(scopeTools);
     addAndMakeVisible(monitorOutput);
     addAndMakeVisible(outputLabel);
     addAndMakeVisible(loopButton);

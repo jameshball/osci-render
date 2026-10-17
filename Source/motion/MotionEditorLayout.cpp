@@ -166,8 +166,7 @@ void MotionEditor::resized() {
     {
         const auto room = output.getHeight() - 16;
         scopeTools.setVisible(room >= scopeTools.preferredHeight() && output.getWidth() >= scopeTools.preferredWidth() + 16);
-        scopeTools.setBounds(output.getRight() - 8 - scopeTools.preferredWidth(), output.getY() + 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
-        scopeTools.toFront(false);
+        scopeTools.setBounds(output.getWidth() - 8 - scopeTools.preferredWidth(), 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
     }
     viewportBounds = editing;
     viewportHeader.setBounds(editing.removeFromTop(30));
@@ -198,7 +197,6 @@ void MotionEditor::resized() {
         visualiser.toFront(false);
         scopeTools.setVisible(true);
         scopeTools.setBounds(getWidth() - 8 - scopeTools.preferredWidth(), 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
-        scopeTools.toFront(false);
         if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
             const auto width = visualiser.controlsPreferredWidth();
             visualiserControls->setBounds(scopeTools.getX() - 8 - width, 8, width, 24);
