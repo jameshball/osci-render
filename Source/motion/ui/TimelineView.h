@@ -168,6 +168,7 @@ public:
 
 private:
     double pixelsPerSecond = 70;
+    std::uint64_t viewGeneration = 0;
     double scrollTime = 0;
     bool autoKey = false;
     // Rows without their own height use this; Alt+wheel scales it.

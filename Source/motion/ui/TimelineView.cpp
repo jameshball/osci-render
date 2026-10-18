@@ -336,6 +336,12 @@ void MotionTimelineView::updateToolButtons() {
 void MotionTimelineView::refreshTracks() {
     const auto& project = processor.document.project();
     updateToolButtons();
+    // Another project (or composition): the view is kept, within its length.
+    if (viewGeneration != processor.document.scopeGeneration()) {
+        viewGeneration = processor.document.scopeGeneration();
+        pixelsPerSecond = clampZoom(pixelsPerSecond);
+        scrollTime = std::clamp(scrollTime, 0.0, std::max(0.0, contentEnd() - std::max(1, getWidth() - namesWidth) / pixelsPerSecond));
+    }
     ensureTrackRows();
     validateTrackDrag();
     // A drag whose source went away never says it left.
