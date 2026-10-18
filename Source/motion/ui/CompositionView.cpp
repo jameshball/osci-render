@@ -389,7 +389,8 @@ void MotionCompositionView::keepUnhidden(const CameraView& view, double time) co
     };
     for (const auto& clip : prepared->clips) {
         const auto sampleTime = clipTime(clip, time);
-        if (clip.light || !clip.active(sampleTime) || !clip.visible(sampleTime) || clip.source == nullptr) { continue; }
+        // Only what is solid hides anything, as the beam draws it: a wireframe hides nothing, itself included.
+        if (clip.light || !clip.active(sampleTime) || !clip.visible(sampleTime) || clip.source == nullptr || !(clip.solid(sampleTime) > 0)) { continue; }
         const auto* drawing = clip.source->drawingAt(clip.source->frameIndex(clip.localTime(sampleTime)));
         if (drawing == nullptr || drawing->faces().empty()) { continue; }
         const auto& mesh = drawing->faces();
