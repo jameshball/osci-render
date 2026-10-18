@@ -294,7 +294,7 @@ void MotionTimelineView::zoomBy(double factor) {
     const auto playheadX = timeX(processor.position.load()) - namesWidth;
     const auto centreX = playheadX >= 0 && playheadX <= getWidth() - namesWidth ? playheadX : std::max(0, (getWidth() - namesWidth) / 2);
     const auto anchor = scrollTime + centreX / pixelsPerSecond;
-    const auto zoom = std::clamp(pixelsPerSecond * factor, 0.000001, 500.0);
+    const auto zoom = clampZoom(pixelsPerSecond * factor);
     animateView(zoom, std::max(0.0, anchor - centreX / zoom));
 }
 
@@ -1159,14 +1159,18 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
     }
 }
 
-double MotionTimelineView::timelineSpan() const {
+double MotionTimelineView::contentEnd() const {
     const auto& project = processor.document.project();
     auto end = project.duration;
     for (const auto& track : project.tracks) {
         for (const auto& clip : track.clips) { end = std::max(end, clip.timing(project.tempo()).end()); }
     }
+    return end;
+}
+
+double MotionTimelineView::timelineSpan() const {
     const auto visible = std::max(1, getWidth() - namesWidth) / pixelsPerSecond;
-    return std::max({end * 1.05, scrollTime + visible, 0.001});
+    return std::max({contentEnd() * 1.05, scrollTime + visible, 0.001});
 }
 
 juce::Rectangle<int> MotionTimelineView::horizontalThumb() const {
@@ -1249,12 +1253,12 @@ void MotionTimelineView::barDragged(const juce::MouseEvent& event) {
     if (drag.mode == BarDrag::Mode::scrollTime) {
         scrollTime = std::max(0.0, drag.scrollTime + delta);
     } else if (drag.mode == BarDrag::Mode::zoomRight) {
-        pixelsPerSecond = std::clamp(width / std::max(1.0 / 120, visible + delta), 0.000001, 500.0);
+        pixelsPerSecond = clampZoom(width / std::max(1.0 / 120, visible + delta));
         scrollTime = drag.scrollTime;
     } else {
         const auto end = drag.scrollTime + visible;
         const auto start = std::clamp(drag.scrollTime + delta, 0.0, std::max(0.0, end - 1.0 / 120));
-        pixelsPerSecond = std::clamp(width / (end - start), 0.000001, 500.0);
+        pixelsPerSecond = clampZoom(width / (end - start));
         scrollTime = start;
     }
     userScrolled();
@@ -1788,7 +1792,7 @@ void MotionTimelineView::mouseMagnify(const juce::MouseEvent& event, float scale
 void MotionTimelineView::zoomAround(int x, double factor) {
     const auto anchorX = std::clamp(x - namesWidth, 0, std::max(0, getWidth() - namesWidth));
     const auto anchorTime = scrollTime + anchorX / pixelsPerSecond;
-    pixelsPerSecond = std::clamp(pixelsPerSecond * factor, 0.000001, 500.0);
+    pixelsPerSecond = clampZoom(pixelsPerSecond * factor);
     scrollTime = std::max(0.0, anchorTime - anchorX / pixelsPerSecond);
     userScrolled();
     repaint();

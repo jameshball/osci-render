@@ -226,6 +226,8 @@ private:
     // style: drag the thumb to scroll, its ends to zoom).
     static constexpr int barSize = 8, scrollStrip = barSize + 4;
     double timelineSpan() const;
+    // Where the composition or its last clip ends.
+    double contentEnd() const;
     juce::Rectangle<int> horizontalBar() const { return {namesWidth + 2, getHeight() - barSize - 2, std::max(0, getWidth() - namesWidth - 4), barSize}; }
     juce::Rectangle<int> horizontalThumb() const;
     bool horizontalBarShown() const { return std::max(1, getWidth() - namesWidth) / pixelsPerSecond < timelineSpan() * 0.999 || scrollTime > 0; }
@@ -249,6 +251,8 @@ private:
     std::optional<juce::Rectangle<int>> blocked;
     // Keeps the time under `x` fixed while zooming.
     void zoomAround(int x, double factor);
+    // Zoomed out no further than the whole timeline twice over; in, to 500 px a second.
+    double clampZoom(double value) const { return std::clamp(value, std::max(1, getWidth() - namesWidth) / (2 * std::max(1.0, contentEnd())), 500.0); }
     void userScrolled();
     // Vertical zoom: every row without its own height, keeping the row under
     // the pointer in place.
