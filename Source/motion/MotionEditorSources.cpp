@@ -1124,6 +1124,8 @@ void MotionEditor::newScript() {
         "local x = r * math.cos(phase + turn)\n"
         "local y = r * math.sin(phase + turn)\n"
         "return {x, y}\n";
+    // Its editor opens now or not at all: never queued behind one open.
+    if (sceneEditorOpen()) { return; }
     // Named Script, or Script 2 and on beside others.
     juce::String name = "Script";
     for (int number = 2; std::any_of(processor.document.project().assets.begin(), processor.document.project().assets.end(), [&](const auto& asset) { return asset->name.upToLastOccurrenceOf(".", false, false) == name; }); ++number) {
