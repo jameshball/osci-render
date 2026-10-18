@@ -48,7 +48,7 @@ inline std::optional<Frames> decode(const juce::MemoryBlock& data) {
 // places relative to each other.
 inline juce::Rectangle<float> page(const juce::String& svg) {
     if (!SvgParser::readable(svg)) { return {}; }
-    const auto drawable = juce::Drawable::createFromImageData(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
+    const auto drawable = juce::Drawable::createFromSVGString(svg);
     if (drawable == nullptr) { return {}; }
     const auto* composite = dynamic_cast<const juce::DrawableComposite*>(drawable.get());
     const auto area = composite != nullptr ? composite->getContentArea() : juce::Rectangle<float>();
@@ -59,7 +59,7 @@ inline juce::Rectangle<float> page(const juce::String& svg) {
 // shared page, not its own drawing. False when it isn't an SVG.
 inline bool frameShapes(const juce::String& svg, juce::Rectangle<float> sharedPage, std::vector<std::unique_ptr<osci::Shape>>& shapes) {
     if (!SvgParser::readable(svg)) { return false; }
-    const auto drawable = juce::Drawable::createFromImageData(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
+    const auto drawable = juce::Drawable::createFromSVGString(svg);
     if (drawable == nullptr || sharedPage.isEmpty()) { return false; }
     auto path = drawable->getOutlineAsPath();
     const auto scale = 1.8f / std::max(sharedPage.getWidth(), sharedPage.getHeight());
