@@ -303,6 +303,11 @@ private:
     // A session for each source the project has, settings kept current, and
     // (now and then) connected when its app is sharing.
     void reconcile() {
+        // Listing or connecting to senders can run the message loop, and so
+        // this timer: run again inside itself, it would change the sessions
+        // this is walking.
+        if (reconciling) { return; }
+        const juce::ScopedValueSetter<bool> guard(reconciling, true);
         const auto& assets = document.mainProject().assets;
         std::erase_if(sessions, [&](const auto& session) {
             return std::none_of(assets.begin(), assets.end(), [&](const auto& asset) { return asset->liveIdentity == session.identity; });
@@ -362,5 +367,6 @@ private:
     std::vector<Session> sessions;
     std::vector<LiveSourceFrames::Entry> previous;
     double lastLook = 0;
+    bool reconciling = false;
 };
 }
