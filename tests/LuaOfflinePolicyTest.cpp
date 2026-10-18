@@ -114,7 +114,7 @@ public:
         expect(loop.setOfflinePolicy(policy).wasOk());
         LuaState loopState;
         expectEquals(loop.run(loopState, vars).count, 0);
-        expect(loopErrors.message.containsIgnoreCase("instruction budget"), loopErrors.message);
+        expect(loopErrors.message.containsIgnoreCase("took too long"), loopErrors.message);
 
         beginTest("Cancellation is checked before and during execution");
         std::atomic<bool> cancelled {true};
