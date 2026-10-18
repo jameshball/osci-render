@@ -426,11 +426,13 @@ public:
     int getCallOutBoxBorderSize(const juce::CallOutBox&) override { return 16; }
     float getCallOutBoxCornerSize(const juce::CallOutBox&) override { return panelRadius + 1.0f; }
     void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override { paintComboBox(g, width, height, box); }
-    // Combo text keeps the field inset and clears the arrow.
+    // Combo text keeps the field inset, starts clear of a caption laid over
+    // it (see captionWidth) and stops clear of the arrow.
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
         PluginLookAndFeel::positionComboBoxText(box, label);
-        const auto left = 8 - getLabelBorderSize(label).getLeft();
-        label.setBounds(left, 1, juce::jmax(1, box.getWidth() - 22 - left), box.getHeight() - 2);
+        const auto caption = static_cast<int>(box.getProperties()[motion::style::captionWidth]);
+        const auto left = (caption > 0 ? 6 + caption : 8) - getLabelBorderSize(label).getLeft();
+        label.setBounds(left, 1, juce::jmax(1, box.getWidth() - 18 - left), box.getHeight() - 2);
     }
     // Tick boxes keep body text and one tick size at any height.
     void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button, bool highlighted, bool down) override {
@@ -565,12 +567,13 @@ inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>&
             const auto cell = (column == 0 ? bounds.withWidth(half) : bounds.withLeft(bounds.getRight() - half)).reduced(0, 3);
             auto* combo = dynamic_cast<juce::ComboBox*>(fields[index]);
             if (combo != nullptr) { combo->setJustificationType(juce::Justification::centredRight); }
-            fields[index]->setBounds(cell);
             auto& caption = captions[index];
             caption.setInterceptsMouseClicks(false, false);
             const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(caption.getFont(), caption.getText())) + 2;
-            caption.setBounds(cell.withTrimmedLeft(6).withWidth(width));
+            // Known before the field is placed: a combo puts its text clear of it then.
             fields[index]->getProperties().set(captionWidth, width + 4);
+            fields[index]->setBounds(cell);
+            caption.setBounds(cell.withTrimmedLeft(6).withWidth(width));
             auto* label = dynamic_cast<juce::Label*>(fields[index]);
             if (label != nullptr) { label->setBorderSize({0, 6 + width + 4, 0, 6}); }
             caption.toFront(false);
