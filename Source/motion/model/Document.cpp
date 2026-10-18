@@ -13,6 +13,8 @@ static juce::Result noIdentitiesLeft() { return juce::Result::fail("This project
 
 namespace motion {
 
+static const char* const limitsMessage = "A clip ends within 24 hours, its offset is within 24 hours, and it plays at most 1000 times as fast.";
+
 // Approximate bytes a snapshot holds by value (curves, keys, clips, tracks).
 // Shared, immutable payloads are counted separately, per step, only when that
 // step alone keeps them alive.
@@ -1543,6 +1545,7 @@ juce::Result Document::applyClipTimings(const std::vector<std::pair<Id, ClipTimi
     std::set<std::size_t> touched;
     for (const auto& [clipId, timing] : timings) {
         if (!timing.valid()) { return juce::Result::fail("Enter a start of 0 or more, and a duration and speed above 0."); }
+        if (!timing.withinLimits()) { return juce::Result::fail(limitsMessage); }
         const auto track = std::find_if(tracks.begin(), tracks.end(), [clipId](const Track& item) { return holdsClip(item, clipId); });
         if (track == tracks.end()) { return juce::Result::fail("A selected clip no longer exists."); }
         if (track->locked) { return juce::Result::fail("Unlock the track before changing clip timing."); }
@@ -1580,6 +1583,7 @@ juce::Result Document::applyClipTimings(const std::vector<std::pair<Id, ClipTimi
 juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
     const auto& state = project();
     if (!resolvedSeconds.valid()) { return juce::Result::fail("Enter a start of 0 or more, and a duration and speed above 0."); }
+    if (!resolvedSeconds.withinLimits()) { return juce::Result::fail(limitsMessage); }
     for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
         const auto& track = state.tracks[trackIndex];
         for (std::size_t clipIndex = 0; clipIndex < track.clips.size(); ++clipIndex) {

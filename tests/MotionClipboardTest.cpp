@@ -86,6 +86,25 @@ public:
             expectEquals(f.clip(f.first)->start, 0.0);
             expect(f.undo.getUndoDescription() == description, "A rejected batch adds no undo step");
         }
+        beginTest("A clip's timing stays within what a composition may be: ending within 24 hours, at most 1000 times as fast");
+        {
+            Fixture f; f.initialise();
+            const motion::Tempo tempo(120);
+            const auto original = f.clip(f.second)->timing(tempo);
+            const auto rejected = [&](auto change) {
+                auto timing = original;
+                change(timing);
+                return f.document.setClipTiming(f.second, timing).failed() && f.document.setClipTimings({{f.second, timing}}).failed();
+            };
+            expect(rejected([](motion::ClipTiming& t) { t.setDuration(1.0e308); }), "an endless clip");
+            expect(rejected([](motion::ClipTiming& t) { t.moveTo(999999999999.0); }), "a clip starting ages from now");
+            expect(rejected([](motion::ClipTiming& t) { t.offset = 1.0e308; }), "an offset past any source");
+            expect(rejected([](motion::ClipTiming& t) { t.rate = 1.0e308; }), "an absurd speed");
+            auto fine = original;
+            fine.rate = 1000;
+            fine.setDuration(60);
+            expect(f.document.setClipTiming(f.second, fine).wasOk(), "a long, fast clip within the limits");
+        }
         beginTest("Nudged clips move together, presses in a row one undo step, never onto another or before the start");
         {
             Fixture f; f.initialise();

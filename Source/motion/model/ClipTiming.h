@@ -62,6 +62,10 @@ struct ClipTiming {
         }
         return resolved.valid() ? std::optional<ClipTiming>(resolved) : std::nullopt;
     }
+    // What an edit may set: as long as a composition may be (24 hours), and
+    // no faster than 1000 times.
+    static constexpr double longest = 24 * 3600, fastest = 1000;
+    bool withinLimits() const { return finish <= longest + 1.0e-6 && std::abs(offset) <= longest && rate <= fastest; }
     bool valid() const {
         return std::isfinite(start) && start >= 0 && std::isfinite(length) && length > 0
             && std::isfinite(finish) && finish > start && std::isfinite(offset) && std::isfinite(rate) && rate > 0;
