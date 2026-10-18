@@ -672,15 +672,28 @@ void MotionEditor::showStartScreen() {
 // recovery, and one that opens a file or render skips the start screen, as
 // one by automation does, or once it is turned off.
 void MotionEditor::atLaunch() {
-    if (!juce::JUCEApplicationBase::isStandaloneApp() || commandLineRender != juce::File() || !processor.remembersFiles) {
+    const auto startScreen = restoreAtLaunch();
+    // Files given with the launch open now, over what was restored.
+    launched = true;
+    if (launchFiles.isNotEmpty()) {
+        CommonPluginEditor::handleCommandLine(std::exchange(launchFiles, juce::String()));
         return;
+    }
+    if (startScreen) { showStartScreenOnceReady(); }
+}
+
+// Reopens the work left when osci-motion last closed unexpectedly. True when
+// the start screen is to show.
+bool MotionEditor::restoreAtLaunch() {
+    if (!juce::JUCEApplicationBase::isStandaloneApp() || commandLineRender != juce::File() || !processor.remembersFiles) {
+        return false;
     }
     recovery = std::make_unique<motion::SessionRecovery>(processor.applicationFolder);
     // A new project makes a new editor: what follows is for the app opening.
     static bool opened = false;
     if (std::exchange(opened, true)) {
         recoveredState = {processor.document.generation(), processor.document.revision(), processor.document.unsaved()};
-        return;
+        return false;
     }
     const auto left = recovery->file();
     juce::MemoryBlock session;
@@ -689,10 +702,7 @@ void MotionEditor::atLaunch() {
         statusBar.show("Reopened your work from " + left.getLastModificationTime().formatted("%H:%M") + ", after osci-motion closed unexpectedly. Save it to keep it.", MotionStatusBar::Kind::notice);
     }
     recoveredState = {processor.document.generation(), processor.document.revision(), processor.document.unsaved()};
-    if (osci::isJucewrightAutomationLaunch() || !processor.globalSettings.getBool("showStartScreen", true)) {
-        return;
-    }
-    showStartScreenOnceReady();
+    return !osci::isJucewrightAutomationLaunch() && processor.globalSettings.getBool("showStartScreen", true);
 }
 
 // After Privacy & Terms, when they are to be accepted first.

@@ -268,6 +268,10 @@ private:
     enum class CommandLineProject { none, waiting, loaded, failed };
     CommandLineProject commandLineProject = CommandLineProject::none;
     juce::File commandLineProjectFile;
+    // Files given at launch wait for the last session to be restored, then
+    // open over it: restoring it as they load would replace them.
+    bool launched = false;
+    juce::String launchFiles;
     // A load of `file` that ended without opening it (failed, cancelled, or
     // the project changed meanwhile).
     void projectNotLoaded(const juce::File& file);
@@ -321,6 +325,7 @@ private:
     // As osci-motion opens: the work a crash cut short reopened, then the
     // start screen.
     void atLaunch();
+    bool restoreAtLaunch();
     void showStartScreenOnceReady();
     // The session written every little while for a crash to leave behind;
     // none for a launch that only renders.

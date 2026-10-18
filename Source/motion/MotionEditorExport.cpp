@@ -326,7 +326,12 @@ void MotionEditor::handleCommandLine(const juce::String& commandLine) {
         commandLineProject = CommandLineProject::waiting;
         commandLineProjectFile = project;
     }
-    if (remaining.size() > 0) { CommonPluginEditor::handleCommandLine(remaining.joinIntoString(" ")); }
+    if (remaining.isEmpty()) { return; }
+    if (!launched) {
+        launchFiles = (launchFiles + " " + remaining.joinIntoString(" ")).trim();
+        return;
+    }
+    CommonPluginEditor::handleCommandLine(remaining.joinIntoString(" "));
 }
 
 void MotionEditor::failCommandLineRender(const juce::String& message) {
