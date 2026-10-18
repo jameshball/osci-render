@@ -784,9 +784,11 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
         juce::String startTime = globalSettings.getString("startTime");
         juce::String endTime = globalSettings.getString("endTime");
         juce::String lastHeartbeat = globalSettings.getString("lastHeartbeatTime");
-        juce::Time start = juce::Time::fromISO8601(startTime);
-        juce::Time end = juce::Time::fromISO8601(endTime);
-        juce::Time heartbeat = juce::Time::fromISO8601(lastHeartbeat);
+        // A setting never saved is no time at all: JUCE asserts parsing an empty one.
+        const auto parse = [](const juce::String& text) { return text.isEmpty() ? juce::Time() : juce::Time::fromISO8601(text); };
+        juce::Time start = parse(startTime);
+        juce::Time end = parse(endTime);
+        juce::Time heartbeat = parse(lastHeartbeat);
         juce::Time now = juce::Time::getCurrentTime();
         bool heartbeatStale = (now.toMilliseconds() - heartbeat.toMilliseconds()) > 3000;
         if ((startTime.isNotEmpty() && endTime.isNotEmpty()) || (startTime.isNotEmpty() && endTime.isEmpty())) {
