@@ -708,6 +708,16 @@ public:
             truncated.setSize(bytes.getSize() / 2);
             const auto [cut, cutWhy] = problemOf(truncated);
             expect(cut == Problem::damaged && cutWhy.contains("backup"), cutWhy);
+            // Nested thousands deep, as no project is: refused, not read until the stack runs out.
+            const auto deepText = "<motion-project schema=\"1\">" + juce::String::repeatedString("<composition>", 20000)
+                + juce::String::repeatedString("</composition>", 20000) + "</motion-project>";
+            juce::MemoryBlock deep;
+            deep.append("VC2!", 4);
+            const auto deepSize = static_cast<juce::uint32>(deepText.getNumBytesAsUTF8() + 1);
+            deep.append(&deepSize, 4);
+            deep.append(deepText.toRawUTF8(), deepText.getNumBytesAsUTF8() + 1);
+            const auto [nested, nestedWhy] = problemOf(deep);
+            expect(nested == Problem::damaged && nestedWhy.contains("nested"), nestedWhy);
             motion::ProjectFile missing;
             expect(motion::ProjectFile::read(juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("no such project.osci-motion"), missing).failed() && missing.problem == Problem::unreadable);
         }

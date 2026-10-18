@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Document.h"
+#include <osci_file_import/osci_file_import.h>
 #include "ProjectSummary.h"
 #include <atomic>
 #include <limits>
@@ -32,6 +33,14 @@ struct ProjectFile {
         if (!headed || size > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
             file.problem = Problem::notProject;
             return juce::Result::fail("It isn't an osci-motion project. To draw a model, image, text or sound, add it to a project with Add source, or drop it on the window.");
+        }
+        // Nested past anything osci-motion writes: JUCE would read it until
+        // the stack runs out.
+        const auto declared = static_cast<std::size_t>(juce::ByteOrder::littleEndianInt(static_cast<const char*>(data) + 4));
+        const auto text = juce::String::fromUTF8(static_cast<const char*>(data) + 8, static_cast<int>(std::min(declared, size - 8)));
+        if (osci::xmlNestingDepth(text) > 256) {
+            file.problem = Problem::damaged;
+            return damaged("its parts are nested far deeper than any project's.");
         }
         file.xml = juce::AudioProcessor::getXmlFromBinary(data, static_cast<int>(size));
         if (file.xml != nullptr && file.xml->hasTagName("motion-project") && file.xml->getIntAttribute("schema") > 1) {
