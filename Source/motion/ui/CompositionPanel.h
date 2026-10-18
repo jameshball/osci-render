@@ -155,8 +155,11 @@ private:
         for (const auto& track : document.project().tracks) {
             for (const auto& clip : track.clips) { lastClip = std::max(lastClip, clip.timing(document.project().tempo()).end()); }
         }
-        if (!value.has_value() || *value <= 0 || *value > 24 * 3600) {
-            if (onError) { onError("Enter a length in seconds, up to 24 hours."); }
+        // At least one frame: anything shorter has nothing to draw.
+        const auto rate = document.project().frameRate;
+        const auto frame = rate > 0 ? 1.0 / rate : 1.0 / 60.0;
+        if (!value.has_value() || *value < frame - 1.0e-9 || *value > 24 * 3600) {
+            if (onError) { onError("Enter a length from one frame (" + juce::String(frame, 3) + " s) to 24 hours."); }
         } else if (*value < lastClip - 1.0e-9) {
             if (onError) { onError("The composition runs at least to its last clip (" + juce::String(lastClip, 2) + " s)."); }
         } else if (std::abs(*value - document.project().duration) > 1.0e-9) {
