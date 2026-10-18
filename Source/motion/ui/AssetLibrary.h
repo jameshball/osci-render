@@ -9,7 +9,7 @@
 #include "../model/Drawing.h"
 #include <osci_gui/osci_gui.h>
 
-class MotionAssetLibrary : public juce::Component, private juce::ListBoxModel, private juce::ScrollBar::Listener {
+class MotionAssetLibrary : public juce::Component, private juce::ListBoxModel, private juce::ScrollBar::Listener, private juce::AsyncUpdater {
 public:
     // While a source is written in the Scene, its edit button rests.
     void setEditingSource(bool editing) { edit.setEnabled(!editing); }
@@ -36,6 +36,7 @@ public:
 
 
     void updateStatus();
+    void handleAsyncUpdate() override;
 
     void resized() override;
 

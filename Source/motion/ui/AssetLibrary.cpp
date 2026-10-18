@@ -100,6 +100,12 @@ void MotionAssetLibrary::updateStatus() {
     if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr && liveStatus) { help = liveStatus(assetId(row)); }
     if (definitionRow(row) && !document.canReferenceComposition(assetId(row))) { help = "It contains the composition you're editing, so it can't go inside it."; }
     status.setText(importStatus.isNotEmpty() ? importStatus : help, juce::dontSendNotification);
+    // Laid out once the event that changed it is over: resizing the list
+    // rebuilds its rows, and a click on one is still being handled.
+    triggerAsyncUpdate();
+}
+
+void MotionAssetLibrary::handleAsyncUpdate() {
     resized();
 }
 
@@ -195,7 +201,6 @@ void MotionAssetLibrary::selectedRowsChanged(int row) {
     updateStatus();
     juce::ignoreUnused(row);
     list.repaint();
-    resized();
 }
 
 // A 3D object as imported, not parts split from one (which keep their place).
