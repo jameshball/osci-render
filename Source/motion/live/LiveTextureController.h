@@ -342,7 +342,9 @@ private:
             // A sender gone (its app quit or restarted) doesn't always say so:
             // let go of it once it's no longer listed, keeping its last
             // picture, so the one that takes its name is found.
-            if (look && found->input->connected() && found->input->connectedTo().isNotEmpty() && available()) {
+            // Only once its frames have stopped: listing senders spins the
+            // message loop, and costs nothing while pictures still arrive.
+            if (look && found->input->connected() && found->rate == 0 && found->countedAt > 0 && found->input->connectedTo().isNotEmpty() && available()) {
                 if (!sharing.has_value()) { sharing = osci::texture::listOpenGLSources(); }
                 const auto listed = std::any_of(sharing->begin(), sharing->end(), [&](const auto& source) { return source.opaqueId == found->input->connectedTo(); });
                 if (!listed) { found->input->letGo(); }
