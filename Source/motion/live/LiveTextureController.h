@@ -64,6 +64,7 @@ public:
     }
     void connect(const osci::texture::SourceInfo& source) {
         disconnect();
+        sourceId = source.opaqueId;
         stopped.store(false);
         grabber = std::make_unique<osci::texture::OpenGLTextureFrameGrabber>(source);
         // Frames flow once it has started (it says so with its first).
@@ -78,6 +79,10 @@ public:
         const juce::SpinLock::ScopedLockType lock(latestLock);
         latest = nullptr;
     }
+    // Stops receiving but keeps the last picture, until a sender is found again.
+    void letGo() { grabber = nullptr; }
+    // Which sender it receives from: one instance of it, while it lasts.
+    const juce::String& connectedTo() const { return sourceId; }
     bool connected() const { return grabber != nullptr && !stopped.load(); }
     bool stoppedSending() const { return grabber != nullptr && stopped.load(); }
     std::uint64_t tracedFrames() const { return traced.load(); }
@@ -177,6 +182,7 @@ private:
 
     std::unique_ptr<osci::texture::OpenGLTextureFrameGrabber> grabber;
     std::atomic<bool> stopped {false};
+    juce::String sourceId;
     std::atomic<bool> stopping {false};
     std::atomic<int> dimension {RasterSettings().resolution};
     mutable juce::SpinLock settingsLock, fitLock, pendingLock, latestLock, captureLock;
@@ -326,6 +332,14 @@ private:
                 found->rate = found->countedAt > 0 && found->input->connected() ? static_cast<double>(traced - found->counted) / (time - found->countedAt) : 0;
                 found->counted = traced;
                 found->countedAt = time;
+            }
+            // A sender gone (its app quit or restarted) doesn't always say so:
+            // let go of it once it's no longer listed, keeping its last
+            // picture, so the one that takes its name is found.
+            if (look && found->input->connected() && found->input->connectedTo().isNotEmpty() && available()) {
+                if (!sharing.has_value()) { sharing = osci::texture::listOpenGLSources(); }
+                const auto listed = std::any_of(sharing->begin(), sharing->end(), [&](const auto& source) { return source.opaqueId == found->input->connectedTo(); });
+                if (!listed) { found->input->letGo(); }
             }
             if (!look || found->input->connected() || !available()) { continue; }
             if (!sharing.has_value()) { sharing = osci::texture::listOpenGLSources(); }
