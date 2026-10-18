@@ -519,7 +519,9 @@ void MotionCompositionView::forEachPiece(const motion::PreparedClip& clip, doubl
     const auto count = drawing->shapeCount();
     const auto bent = warps(clip);
     // Big sources take fewer steps per curve, so the Scene stays quick.
-    const auto mostSteps = static_cast<int>(std::clamp<std::size_t>(60000 / std::max<std::size_t>(1, count), 1, 48));
+    // A shape an effect bends may wind a long way (a swirl far from the
+    // centre), so it may take more.
+    const auto mostSteps = static_cast<int>(std::clamp<std::size_t>(60000 / std::max<std::size_t>(1, count), 1, bent ? 512 : 48));
     const auto pixels = outputFrame().getHeight() / 2.0;
     const auto place = [&](osci::Shape& shape, float progress) {
         const auto point = clip.processPoint(shape.nextVector(progress), time);
@@ -538,11 +540,20 @@ void MotionCompositionView::forEachPiece(const motion::PreparedClip& clip, doubl
             const auto least = straight ? 1 : std::min(4, mostSteps);
             steps = mostSteps;
             if (mostSteps > least) {
-                const auto first = view->project(start.second), middle = view->project(place(*shape, .5f).second), last = view->project(end.second);
-                if (first.has_value() && middle.has_value() && last.has_value()) {
-                    const auto span = (std::hypot(middle->x - first->x, middle->y - first->y) + std::hypot(last->x - middle->x, last->y - middle->y)) * pixels;
-                    if (std::isfinite(span)) { steps = static_cast<int>(std::clamp(std::ceil(span / 4), static_cast<double>(least), static_cast<double>(mostSteps))); }
+                // Measured at several points: a long line an effect winds
+                // round (a swirl) is far longer than its ends and middle say.
+                constexpr int probes = 8;
+                double span = 0;
+                bool measured = true;
+                auto before = view->project(start.second);
+                for (int probe = 1; probe <= probes && measured; ++probe) {
+                    const auto at = probe == probes ? view->project(end.second) : view->project(place(*shape, static_cast<float>(probe) / probes).second);
+                    measured = before.has_value() && at.has_value();
+                    if (measured) { span += std::hypot(at->x - before->x, at->y - before->y); }
+                    before = at;
                 }
+                span *= pixels;
+                if (measured && std::isfinite(span)) { steps = static_cast<int>(std::clamp(std::ceil(span / 4), static_cast<double>(least), static_cast<double>(mostSteps))); }
             }
         }
         auto previous = start;
