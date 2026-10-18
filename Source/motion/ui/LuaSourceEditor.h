@@ -23,7 +23,15 @@ public:
         bake.setTooltip((editing ? "Bake the source with these changes (" : "Bake the source and add it (") + motion::style::shortcutText("Cmd+Return") + ")");
         motion::style::makePrimary(bake);
         addAndMakeVisible(bake);
-        baking.onBake = [this](motion::BakeSettings values) { if (onDone) { onDone(values, model.getCode()); } };
+        baking.onBake = [this](motion::BakeSettings values) {
+            // The code as it stands already failed: say so here, at its line,
+            // rather than bake it all to fail again.
+            if (problem.isVisible() && !stale) {
+                refuse();
+                return;
+            }
+            if (onDone) { onDone(values, model.getCode()); }
+        };
         baking.onChanged = [this] { if (onChanged) { onChanged(); } };
         addAndMakeVisible(baking);
         // The code sits on the Scene's dark page. The shared editor's frame
@@ -73,7 +81,8 @@ public:
         model.clearDiagnostic();
         if (problemLine > 0) { static_cast<ErrorListener&>(model).onError(problemLine, message.fromFirstOccurrenceOf(":", false, false).trim()); }
         problem.setColour(juce::Label::textColourId, osci::Colours::text());
-        problem.setText(message, juce::dontSendNotification);
+        // Refused for this problem, it still says so while the code is unchanged.
+        problem.setText(refused && message.isNotEmpty() ? refusal + message : message, juce::dontSendNotification);
         motion::style::tooltipWhenCut(problem);
         if (problem.isVisible() != message.isNotEmpty()) {
             problem.setVisible(message.isNotEmpty());
@@ -119,12 +128,7 @@ public:
 
     void mouseUp(const juce::MouseEvent& event) override {
         // The problem strip goes to the line it names.
-        if (event.eventComponent != &problem || problemLine <= 0) { return; }
-        auto& codeView = editor.getEditor();
-        const juce::CodeDocument::Position position(codeView.getDocument(), problemLine - 1, 0);
-        codeView.moveCaretTo(position, false);
-        codeView.scrollToKeepCaretOnScreen();
-        codeView.grabKeyboardFocus();
+        if (event.eventComponent == &problem) { goToProblem(); }
     }
 
     bool keyPressed(const juce::KeyPress& key) override {
@@ -146,14 +150,40 @@ private:
     void codeDocumentTextInserted(const juce::String&, int) override { codeChanged(); }
     void codeDocumentTextDeleted(int, int) override { codeChanged(); }
     void codeChanged() {
+        refused = false;
         markStale();
         if (onChanged) { onChanged(); }
     }
+    void goToProblem() {
+        if (problemLine <= 0) { return; }
+        auto& codeView = editor.getEditor();
+        const juce::CodeDocument::Position position(codeView.getDocument(), problemLine - 1, 0);
+        codeView.moveCaretTo(position, false);
+        codeView.scrollToKeepCaretOnScreen();
+        codeView.grabKeyboardFocus();
+    }
+    // Add or Apply pressed while the code has a problem.
+    void refuse() {
+        refused = true;
+        const auto text = problem.getText();
+        if (!text.startsWith(refusal)) {
+            problem.setText(refusal + text, juce::dontSendNotification);
+            motion::style::tooltipWhenCut(problem);
+        }
+        // The panel turns its button off as it asks to bake.
+        baking.bakeButton().setEnabled(true);
+        goToProblem();
+        repaint();
+    }
+    bool refused = false;
+    static constexpr const char* refusal = "Fix this first: ";
     void markStale() {
         if (stale || !problem.isVisible()) { return; }
         stale = true;
         problem.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        problem.setText(problem.getText() + "  (last bake)", juce::dontSendNotification);
+        const auto text = problem.getText();
+        const auto bare = text.startsWith(refusal) ? text.substring(juce::String(refusal).length()) : text;
+        problem.setText(bare + "  (last bake)", juce::dontSendNotification);
         motion::style::tooltipWhenCut(problem);
         repaint();
     }
