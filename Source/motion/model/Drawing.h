@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <osci_file_import/osci_file_import.h>
 #include <array>
 #include <optional>
 #include <vector>
@@ -98,6 +99,7 @@ inline bool isDrawing(const juce::String& svg) { return svg.contains(marker); }
 // Each path element of a marked drawing, as a JUCE path in drawn (y up) space.
 inline std::vector<std::pair<juce::Path, juce::String>> paths(const juce::String& svg) {
     std::vector<std::pair<juce::Path, juce::String>> result;
+    if (!SvgParser::readable(svg)) { return result; }
     const auto xml = juce::parseXML(svg);
     if (xml == nullptr || !xml->hasAttribute(marker)) { return result; }
     for (const auto* element : xml->getChildWithTagNameIterator("path")) {

@@ -665,7 +665,11 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
             SvgParser::pathToShapes(path, shapes, false);
         }
     } else if (extension == ".svg") {
-        SvgParser svg(content);
+        SvgParser svg(content, false);
+        if (!svg.loaded()) {
+            return juce::Result::fail(SvgParser::readable(content) ? "This file isn't an SVG osci-motion can read."
+                                                                   : "This SVG nests its elements too deeply to read: over 256 levels.");
+        }
         shapes = svg.draw();
     } else if (extension == ".txt") {
         if (content.length() > 16384) {

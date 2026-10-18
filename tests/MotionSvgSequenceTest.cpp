@@ -57,6 +57,35 @@ public:
             expectWithinAbsoluteError(top(0), top(1), 1.0e-3f);
             expectWithinAbsoluteError(top(0), .09f, .01f);
         }
+
+        beginTest("An SVG nested thousands deep is refused, not read until a thread's stack runs out");
+        {
+            // Parsed as an import does: on a worker thread, with its usual stack.
+            const auto parse = [](int depth) {
+                const auto svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">" + juce::String::repeatedString("<g>", depth)
+                    + "<path d=\"M10 10L90 30\"/>" + juce::String::repeatedString("</g>", depth) + "</svg>";
+                struct Worker final : juce::Thread {
+                    explicit Worker(juce::String text) : juce::Thread("SVG import"), svg(std::move(text)) {}
+                    void run() override { count = SvgParser(svg).draw().size(); }
+                    juce::String svg;
+                    std::size_t count = 0;
+                } worker(svg);
+                worker.startThread();
+                worker.waitForThreadToExit(60000);
+                return worker.count;
+            };
+            // The one line, or the cross drawn when the SVG can't be loaded.
+            expectEquals(static_cast<int>(parse(200)), 1);
+            expectEquals(static_cast<int>(parse(5000)), 2);
+            // osci-motion says so itself: refused, it is not loaded and draws nothing.
+            const auto deep = "<svg>" + juce::String::repeatedString("<g>", 5000) + juce::String::repeatedString("</g>", 5000) + "</svg>";
+            expect(!SvgParser::readable(deep));
+            expect(SvgParser::readable("<svg><!-- <g><g><g> --><g a=\"<g>\"/></svg>"));
+            SvgParser refused(deep, false);
+            expect(!refused.loaded());
+            expect(refused.draw().empty());
+            expect(!motion::svgsequence::decode(juce::MemoryBlock(deep.toRawUTF8(), deep.getNumBytesAsUTF8())).has_value());
+        }
     }
 };
 

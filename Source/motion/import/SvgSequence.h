@@ -28,6 +28,8 @@ inline juce::MemoryBlock encode(const Frames& frames) {
 }
 
 inline std::optional<Frames> decode(const juce::MemoryBlock& data) {
+    // Nested past what XML is read safely with: not a sequence this wrote.
+    if (!SvgParser::readable(data.toString())) { return std::nullopt; }
     const auto root = juce::parseXML(data.toString());
     if (root == nullptr || !root->hasTagName("svg-sequence")) { return std::nullopt; }
     Frames frames;
@@ -45,6 +47,7 @@ inline std::optional<Frames> decode(const juce::MemoryBlock& data) {
 // none: every frame is placed on the first frame's, so they keep their
 // places relative to each other.
 inline juce::Rectangle<float> page(const juce::String& svg) {
+    if (!SvgParser::readable(svg)) { return {}; }
     const auto drawable = juce::Drawable::createFromImageData(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
     if (drawable == nullptr) { return {}; }
     const auto* composite = dynamic_cast<const juce::DrawableComposite*>(drawable.get());
@@ -55,6 +58,7 @@ inline juce::Rectangle<float> page(const juce::String& svg) {
 // A frame's shapes, fitted as one SVG is fitted to the screen but by the
 // shared page, not its own drawing. False when it isn't an SVG.
 inline bool frameShapes(const juce::String& svg, juce::Rectangle<float> sharedPage, std::vector<std::unique_ptr<osci::Shape>>& shapes) {
+    if (!SvgParser::readable(svg)) { return false; }
     const auto drawable = juce::Drawable::createFromImageData(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
     if (drawable == nullptr || sharedPage.isEmpty()) { return false; }
     auto path = drawable->getOutlineAsPath();
