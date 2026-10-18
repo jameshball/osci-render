@@ -70,6 +70,10 @@ public:
     static constexpr double insidePush = .25;
     static constexpr double slopePush = 1.5;
 
+    // A pixel coordinate as an int, however far off the buffer (or not a
+    // number) the point is: converting one out of int's range is undefined.
+    static int cell(double value) { return std::isfinite(value) ? static_cast<int>(std::clamp(value, -1.0e9, 1.0e9)) : -1000000000; }
+
     explicit DepthBuffer(Reach reach = {}, int across = pixelsAcross) : size(2 * overscan / std::max(16, across)) { cover(reach); }
     // Its pixels' size, in output units.
     double pixelSize() const { return size; }
@@ -115,10 +119,10 @@ public:
         // The pixels whose centres (x + .5) the triangle's box can reach, with
         // room for a centre right on an edge.
         constexpr double margin = 1.0e-6;
-        const auto left = std::max(0, static_cast<int>(std::ceil(std::min({ax, bx, cx}) - .5 - margin)));
-        const auto right = std::min(width - 1, static_cast<int>(std::floor(std::max({ax, bx, cx}) - .5 + margin)));
-        const auto bottom = std::max(0, static_cast<int>(std::ceil(std::min({ay, by, cy}) - .5 - margin)));
-        const auto top = std::min(height - 1, static_cast<int>(std::floor(std::max({ay, by, cy}) - .5 + margin)));
+        const auto left = std::max(0, cell(std::ceil(std::min({ax, bx, cx}) - .5 - margin)));
+        const auto right = std::min(width - 1, cell(std::floor(std::max({ax, bx, cx}) - .5 + margin)));
+        const auto bottom = std::max(0, cell(std::ceil(std::min({ay, by, cy}) - .5 - margin)));
+        const auto top = std::min(height - 1, cell(std::floor(std::max({ay, by, cy}) - .5 + margin)));
         if (left > right || bottom > top) { return; }
         // Inverse depth is linear on screen: its plane, and how steeply it
         // changes across a pixel, which is how far it is pushed back.
@@ -185,7 +189,7 @@ public:
     std::optional<Nearest> nearestAt(double x, double y) const {
         if (empty) { return std::nullopt; }
         const auto px = toPixelX(x), py = toPixelY(y);
-        const auto column = static_cast<int>(std::floor(px)), row = static_cast<int>(std::floor(py));
+        const auto column = cell(std::floor(px)), row = cell(std::floor(py));
         if (column < 0 || row < 0 || column >= width || row >= height) { return std::nullopt; }
         const auto& here = pixels[static_cast<std::size_t>(row) * static_cast<std::size_t>(width) + static_cast<std::size_t>(column)];
         if (here.w == 0) { return std::nullopt; }
@@ -199,7 +203,7 @@ public:
     std::optional<std::uint64_t> hiddenBy(Screen point) const {
         if (empty) { return std::nullopt; }
         const auto px = toPixelX(point.x), py = toPixelY(point.y);
-        const auto x = static_cast<int>(std::floor(px)), y = static_cast<int>(std::floor(py));
+        const auto x = cell(std::floor(px)), y = cell(std::floor(py));
         if (x < 0 || y < 0 || x >= width || y >= height) { return std::nullopt; }
         const auto cell = static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
         const auto& here = pixels[cell];
@@ -242,7 +246,7 @@ public:
         constexpr double reach = 1.5;
         const auto px = toPixelX(point.x), py = toPixelY(point.y);
         const auto cx = px - .5, cy = py - .5;
-        const auto x0 = static_cast<int>(std::floor(cx - reach)) + 1, y0 = static_cast<int>(std::floor(cy - reach)) + 1;
+        const auto x0 = cell(std::floor(cx - reach)) + 1, y0 = cell(std::floor(cy - reach)) + 1;
         double shown = 0, total = 0;
         for (auto y = y0; y < y0 + 3; ++y) {
             const auto wy = reach - std::abs(y - cy);
