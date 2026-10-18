@@ -691,7 +691,10 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             if (request.replacement != nullptr) {
                 const auto& assets = document.project().assets;
                 if (std::find(assets.begin(), assets.end(), request.replacement) == assets.end()) {
-                    owner->statusBar.show("The source changed while baking. Its previous result has been kept.", MotionStatusBar::Kind::warning);
+                    // Gone (removed or undone) or changed by another edit meanwhile.
+                    const auto gone = std::none_of(assets.begin(), assets.end(), [&](const auto& item) { return item->id == request.replacement->id; });
+                    owner->statusBar.show(gone ? "The source was removed while it was being edited, so the edit wasn't applied."
+                                               : "The source changed while baking. Its previous result has been kept.", MotionStatusBar::Kind::warning);
                     return;
                 }
                 asset->id = request.replacement->id;
