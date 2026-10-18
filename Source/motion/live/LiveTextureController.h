@@ -308,7 +308,8 @@ private:
         // this is walking.
         if (reconciling) { return; }
         const juce::ScopedValueSetter<bool> guard(reconciling, true);
-        const auto& assets = document.mainProject().assets;
+        // Its own copy: an edit made while the loop runs replaces the project's.
+        const auto assets = document.mainProject().assets;
         std::erase_if(sessions, [&](const auto& session) {
             return std::none_of(assets.begin(), assets.end(), [&](const auto& asset) { return asset->liveIdentity == session.identity; });
         });
