@@ -50,6 +50,20 @@ public:
             expectEquals(frames.source->sample(.5 / 30, .5).x, 1.0f);
             expectEquals(frames.source->sample(5.5 / 30, .5).x, 2.0f);
         }
+
+        beginTest("A capture whose sender goes ends there and is kept, not stretched to when it's saved");
+        {
+            motion::LiveTextureInput input;
+            input.beginCapture();
+            expect(input.capturing() && !input.captureEnded());
+            input.endCapture(motion::CaptureEnding::disconnected);
+            expect(input.captureEnded());
+            juce::Thread::sleep(300);
+            const auto kept = input.finishCapture();
+            expect(kept != nullptr && kept->ending == motion::CaptureEnding::disconnected);
+            if (kept != nullptr) { expect(kept->duration < .2, "it ends when the sender went, not at the save"); }
+            expect(!input.capturing());
+        }
     }
 };
 

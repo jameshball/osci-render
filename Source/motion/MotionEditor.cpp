@@ -644,6 +644,7 @@ void MotionEditor::timerCallback() {
     if (slowTick || moved || live) { composition.repaint(); }
     // The playhead moves values; the slow tick also refreshes structure.
     if (slowTick) {
+        keepEndedCaptures();
         refreshInspector();
     } else if (moved) {
         propertyInspector.refreshValues();

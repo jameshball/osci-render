@@ -134,7 +134,7 @@ try:
     sender.sendall(b"CLOSE\n"); sender.close(); sender = None
     # Blender disconnecting ends the capture there, and it saves itself.
     command("wait-for-locator", "--class", "juce::ListBox::RowComponent", "--name", "Live diamond capture", "--exact", "--timeout-ms", "15000")
-    command("wait-for-locator", "--name", "Blender disconnected, so the capture ended there. Captured Live diamond", "--role", "label", "--exact", "--timeout-ms", "5000")
+    command("wait-for-locator", "--name", "Live diamond stopped sending, so its capture ended there. Captured Live diamond", "--role", "label", "--exact", "--timeout-ms", "5000")
     command("wait", "--ms", "400")
     step("select captured asset", "click", "--class", "juce::ListBox::RowComponent", "--name", "Live diamond capture", "--exact", "--position", "60,20")
     step("insert captured asset", "press", "Return", "--component-name", "Motion assets")

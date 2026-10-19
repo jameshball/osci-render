@@ -80,10 +80,26 @@ try:
     time.sleep(3)
     step("recording screenshot", "screenshot", "--file", session.artifact_dir / "recording.png", "--scale", "2")
     step("stop and keep", "click", "--name", "Stop and keep", "--exact")
-    session.wait_for_undo("Capture live picture", 60)
-    step("done", "click", "--name", "Done", "--exact")
+    # Kept: its settings close by themselves, so what was kept shows.
+    session.wait_for_undo("Capture live source", 60)
     time.sleep(.5)
     step("captured screenshot", "screenshot", "--file", session.artifact_dir / "captured.png", "--scale", "2")
+    # The sending app quitting mid-capture ends it there, and it is kept by itself.
+    step("select live source", "click", "--class", "juce::ListBox::RowComponent", "--name", sender["name"], "--exact", "--position", "60,20")
+    session.hover_selected_source()
+    step("reopen its settings", "click", "--name", "Syphon settings...", "--exact")
+    step("record again", "click", "--name", "Record capture", "--exact")
+    time.sleep(2)
+    server = subprocess.run(["ps", "-axo", "comm="], capture_output=True, text=True).stdout
+    server = next(line for line in server.splitlines() if line.endswith("/Simple Server"))
+    # Quit as a person quits it, so it tells Syphon it has gone (a sender that
+    # only stops sending looks paused, and its capture goes on).
+    subprocess.run(["osascript", "-e", 'quit app "Simple Server"'], check=True)
+    try:
+        command("wait-for-text", "stopped sending, so its capture ended there.", "--timeout-ms", "20000")
+        step("sender gone screenshot", "screenshot", "--file", session.artifact_dir / "sender-gone.png", "--scale", "2")
+    finally:
+        subprocess.Popen(["open", "-g", "-a", server.split("/Contents/MacOS/")[0]])
     print("Motion live picture passed", flush=True)
 finally:
     session.stop_app()

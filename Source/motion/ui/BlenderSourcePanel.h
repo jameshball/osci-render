@@ -96,7 +96,6 @@ public:
     std::function<juce::String()> connectionStatus;
     // Why the running capture stopped taking frames (too long, too big).
     std::function<juce::String()> captureError;
-    std::function<bool()> captureEnded;
 
     void paint(juce::Graphics& g) override {
         Sheet::paint(g);
@@ -164,11 +163,6 @@ private:
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : live ? osci::Colours::text() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : state, juce::dontSendNotification);
         if (existing) {
-            // One that ended by itself (Blender gone, or a limit) is saved.
-            if (isCapturing && isCapturing() && captureEnded && captureEnded()) {
-                capture();
-                return;
-            }
             const bool recording = isCapturing && isCapturing();
             const bool listening = isListening && isListening();
             listen.setButtonText(listening ? "Stop listening" : "Start listening");

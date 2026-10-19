@@ -302,65 +302,20 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
     controls->isListening = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->processor.blenderInputs().listening(id); };
     controls->connectionStatus = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation ? owner->processor.blenderInputs().connectionText(id) : juce::String("Project changed"); };
     controls->captureError = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation ? owner->processor.blenderInputs().captureError(id) : juce::String(); };
-    controls->isCapturing = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->processor.blenderInputs().capturing(id); };
-    controls->captureEnded = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->processor.blenderInputs().captureEnded(id); };
+    controls->isCapturing = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->liveCapturing(id); };
     controls->onCancelCapture = [owner, id, generation] {
-        if (owner != nullptr && owner->processor.document.generation() == generation) { owner->processor.blenderInputs().cancelCapture(id); }
+        if (owner != nullptr && owner->processor.document.generation() == generation) { owner->cancelLiveCapture(id); }
     };
-    controls->onRecord = [owner, dialog, id, generation, panelIdentity] {
+    controls->onRecord = [owner, id, generation, panelIdentity] {
         const auto identity = *panelIdentity;
         if (owner == nullptr || owner->processor.document.generation() != generation) { return juce::Result::fail("The project changed. Reopen source settings."); }
-        auto& inputs = owner->processor.blenderInputs();
         const auto& assets = owner->processor.document.mainProject().assets;
         const auto source = std::find_if(assets.begin(), assets.end(), [id, identity](const auto& asset) { return asset->id == id && asset->liveIdentity == identity; });
         if (source == assets.end()) { return juce::Result::fail("The source changed. Reopen its settings."); }
-        if (!inputs.capturing(id)) {
-            if (std::any_of(owner->pendingImports.begin(), owner->pendingImports.end(), [](const auto& task) { return task->capture; })) {
-                return juce::Result::fail("Wait for the previous capture to finish preparing.");
-            }
-            return inputs.beginCapture(id);
-        }
-        auto recording = inputs.finishCapture(id);
-        if (recording == nullptr) { return juce::Result::fail("There is no capture to save."); }
-        if (recording->failure != motion::BlenderCapture::Failure::none) { return juce::Result::fail(recording->error()); }
-        const juce::String why = recording->endedBecause();
-        auto capture = std::shared_ptr<const motion::BlenderCapture>(std::move(recording));
-        auto task = std::make_shared<ImportState>();
-        task->capture = true;
-        task->name = (*source)->name + " capture";
-        task->generation = generation;
-        owner->pendingImports.push_back(task);
-        owner->imports.addJob([owner, id, generation, identity, task, capture, why] {
-            auto asset = std::make_shared<motion::Asset>();
-            asset->name = task->name;
-            asset->extension = ".blender-capture";
-            auto result = juce::Result::fail("Capture cancelled.");
-            try {
-                auto archive = motion::BlenderCaptureArchive::encode(*capture, &task->cancelled);
-                if (archive) {
-                    asset->data.replaceAll(archive.bytes.data(), archive.bytes.size());
-                    result = motion::decodeAsset(*asset, &task->cancelled, &task->progress);
-                } else { result = juce::Result::fail(archive.error); }
-            } catch (const std::exception& error) { result = juce::Result::fail("Couldn't prepare the capture: " + juce::String(error.what())); }
-            juce::MessageManager::callAsync([owner, id, generation, identity, task, asset, result, why] {
-                if (owner == nullptr) { return; }
-                std::erase(owner->pendingImports, task);
-                if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
-                auto& document = owner->processor.document;
-                const auto& sources = document.mainProject().assets;
-                if (std::none_of(sources.begin(), sources.end(), [&](const auto& source) { return source->liveIdentity == identity; })) { return; }
-                if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
-                asset->id = document.newId();
-                document.edit("Capture Blender source", [&](motion::Project& project) { project.assets.push_back(asset); });
-                owner->assetLibrary.refresh();
-                owner->assetLibrary.selectAsset(asset->id);
-                owner->libraryTabs.setSelectedIndex(0);
-                owner->captured(id, asset->id, why);
-            });
-        });
-        juce::MessageManager::callAsync([owner, dialog] { if (owner != nullptr && dialog != nullptr) { owner->dismissOverlay(dialog.getComponent(), [] {}); } });
-        return juce::Result::ok();
+        return owner->recordLiveCapture(id);
     };
+    liveSettings = controls;
+    liveSettingsId = id;
     showOverlay(std::move(overlay));
 }
 
@@ -404,56 +359,120 @@ void MotionEditor::showTextureSettings(motion::Id id) {
         const auto changed = owner->processor.document.setTextureSettings(id, settings);
         if (changed.failed()) { owner->statusBar.show(changed.getErrorMessage()); }
     };
-    live.recording = [owner, id, current] { return current() && owner->processor.textureInputs().capturing(id); };
-    live.onRecord = [owner, id, current, generation] {
-        if (!current()) { return juce::Result::fail("The project changed. Reopen its settings."); }
-        auto& inputs = owner->processor.textureInputs();
-        if (!inputs.capturing(id)) { return inputs.beginCapture(id); }
-        auto recording = inputs.finishCapture(id);
-        const auto source = motion::findAsset(owner->processor.document.mainProject().assets, id);
-        if (recording == nullptr || source == nullptr) { return juce::Result::fail("There is no capture to keep."); }
-        if (recording->frames.empty()) { return juce::Result::fail("Nothing arrived while recording."); }
-        auto capture = std::shared_ptr<const motion::TextureCapture>(std::move(recording));
-        auto task = std::make_shared<ImportState>();
-        task->capture = true;
-        task->name = source->name + " capture";
-        task->generation = generation;
-        owner->pendingImports.push_back(task);
-        owner->imports.addJob([owner, id, generation, task, capture] {
-            auto asset = std::make_shared<motion::Asset>();
-            asset->name = task->name;
-            asset->extension = motion::texture::captureExtension;
-            auto result = juce::Result::fail("Capture cancelled.");
-            try {
-                const auto frames = capture->steady();
-                if (!frames) {
-                    result = juce::Result::fail(juce::String(frames.error));
-                } else {
-                    auto archive = motion::BakedSourceArchive::encode(*frames.source);
-                    if (archive) {
-                        asset->data = std::move(archive.data);
-                        result = motion::decodeAsset(*asset, &task->cancelled, &task->progress);
-                    } else { result = juce::Result::fail(archive.error); }
-                }
-            } catch (const std::exception& error) { result = juce::Result::fail("Couldn't keep the capture: " + juce::String(error.what())); }
-            juce::MessageManager::callAsync([owner, id, generation, task, asset, result] {
-                if (owner == nullptr) { return; }
-                std::erase(owner->pendingImports, task);
-                if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
-                if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
-                auto& document = owner->processor.document;
-                asset->id = document.newId();
-                document.edit("Capture live picture", [&](motion::Project& project) { project.assets.push_back(asset); });
-                owner->assetLibrary.refresh();
-                owner->assetLibrary.selectAsset(asset->id);
-                owner->libraryTabs.setSelectedIndex(0);
-                owner->captured(id, asset->id);
-            });
-        });
-        return juce::Result::ok();
-    };
+    live.recording = [owner, id, current] { return current() && owner->liveCapturing(id); };
+    live.onRecord = [owner, id, current] { return current() ? owner->recordLiveCapture(id) : juce::Result::fail("The project changed. Reopen its settings."); };
     auto panel = std::make_unique<MotionRasterSettingsPanel>(found->rasterSettings, false, found->name, juce::MemoryBlock(), document.project().scope.xyOnly, juce::File(), juce::File(), std::move(live));
+    liveSettings = panel.get();
+    liveSettingsId = id;
     motion::ui::Sheet::show(*this, std::move(panel));
+}
+
+bool MotionEditor::liveCapturing(motion::Id id) {
+    return processor.blenderInputs().capturing(id) || processor.textureInputs().capturing(id);
+}
+
+juce::Result MotionEditor::recordLiveCapture(motion::Id id) {
+    if (liveCapturing(id)) { return keepLiveCapture(id); }
+    if (std::any_of(pendingImports.begin(), pendingImports.end(), [](const auto& task) { return task->capture; })) {
+        return juce::Result::fail("Wait for the previous capture to finish preparing.");
+    }
+    const auto source = motion::findAsset(processor.document.mainProject().assets, id);
+    if (source == nullptr || source->liveIdentity == nullptr) { return juce::Result::fail("The source changed. Reopen its settings."); }
+    return motion::texture::isSource(source->extension) ? processor.textureInputs().beginCapture(id) : processor.blenderInputs().beginCapture(id);
+}
+
+void MotionEditor::cancelLiveCapture(motion::Id id) {
+    processor.blenderInputs().cancelCapture(id);
+    processor.textureInputs().cancelCapture(id);
+}
+
+juce::Result MotionEditor::keepLiveCapture(motion::Id id) {
+    const auto source = motion::findAsset(processor.document.mainProject().assets, id);
+    if (source == nullptr || source->liveIdentity == nullptr) { return juce::Result::fail("There is no capture to keep."); }
+    // Each kind of source makes its capture's file its own way, on a worker;
+    // the rest is the same for all.
+    std::function<juce::Result(motion::Asset&, const std::atomic<bool>&)> make;
+    juce::String extension;
+    auto ending = motion::CaptureEnding::none;
+    if (motion::texture::isSource(source->extension)) {
+        auto recording = processor.textureInputs().finishCapture(id);
+        if (recording == nullptr) { return juce::Result::fail("There is no capture to keep."); }
+        if (recording->frames.empty()) { return juce::Result::fail("Nothing arrived while recording."); }
+        ending = recording->ending;
+        extension = motion::texture::captureExtension;
+        make = [capture = std::shared_ptr<const motion::TextureCapture>(std::move(recording))](motion::Asset& asset, const std::atomic<bool>&) {
+            const auto frames = capture->steady();
+            if (!frames) { return juce::Result::fail(juce::String(frames.error)); }
+            auto archive = motion::BakedSourceArchive::encode(*frames.source);
+            if (!archive) { return juce::Result::fail(archive.error); }
+            asset.data = std::move(archive.data);
+            return juce::Result::ok();
+        };
+    } else {
+        auto recording = processor.blenderInputs().finishCapture(id);
+        if (recording == nullptr) { return juce::Result::fail("There is no capture to keep."); }
+        if (recording->failure != motion::BlenderCapture::Failure::none) { return juce::Result::fail(recording->error()); }
+        ending = recording->ending;
+        extension = ".blender-capture";
+        make = [capture = std::shared_ptr<const motion::BlenderCapture>(std::move(recording))](motion::Asset& asset, const std::atomic<bool>& cancelled) {
+            auto archive = motion::BlenderCaptureArchive::encode(*capture, &cancelled);
+            if (!archive) { return juce::Result::fail(archive.error); }
+            asset.data.replaceAll(archive.bytes.data(), archive.bytes.size());
+            return juce::Result::ok();
+        };
+    }
+    const juce::String why = motion::captureEndedBecause(ending, source->name.toStdString());
+    const auto identity = source->liveIdentity;
+    const auto generation = processor.document.generation();
+    auto task = std::make_shared<ImportState>();
+    task->capture = true;
+    task->name = source->name + " capture";
+    task->generation = generation;
+    pendingImports.push_back(task);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    imports.addJob([owner, id, identity, generation, task, extension, make, why] {
+        auto asset = std::make_shared<motion::Asset>();
+        asset->name = task->name;
+        asset->extension = extension;
+        auto result = juce::Result::fail("Capture cancelled.");
+        try {
+            result = make(*asset, task->cancelled);
+            if (result.wasOk()) { result = motion::decodeAsset(*asset, &task->cancelled, &task->progress); }
+        } catch (const std::exception& error) { result = juce::Result::fail("Couldn't keep the capture: " + juce::String(error.what())); }
+        juce::MessageManager::callAsync([owner, id, identity, generation, task, asset, result, why] {
+            if (owner == nullptr) { return; }
+            std::erase(owner->pendingImports, task);
+            if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
+            auto& document = owner->processor.document;
+            const auto& sources = document.mainProject().assets;
+            if (std::none_of(sources.begin(), sources.end(), [&](const auto& source) { return source->liveIdentity == identity; })) { return; }
+            if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
+            asset->id = document.newId();
+            document.edit("Capture live source", [&](motion::Project& project) { project.assets.push_back(asset); });
+            owner->assetLibrary.refresh();
+            owner->assetLibrary.selectAsset(asset->id);
+            owner->libraryTabs.setSelectedIndex(0);
+            owner->captured(id, asset->id, why);
+        });
+    });
+    // Its settings, if open, close, so what was kept shows.
+    if (liveSettingsId == id) {
+        juce::MessageManager::callAsync([sheet = liveSettings] { if (sheet != nullptr) { sheet->close(); } });
+    }
+    return juce::Result::ok();
+}
+
+// A capture that ended by itself (its sender gone, or full) is kept, open
+// settings or not.
+void MotionEditor::keepEndedCaptures() {
+    std::vector<motion::Id> ended;
+    for (const auto& asset : processor.document.mainProject().assets) {
+        if (asset->liveIdentity != nullptr && (processor.blenderInputs().captureEnded(asset->id) || processor.textureInputs().captureEnded(asset->id))) { ended.push_back(asset->id); }
+    }
+    for (const auto id : ended) {
+        const auto kept = keepLiveCapture(id);
+        if (kept.failed()) { statusBar.show(kept.getErrorMessage()); }
+    }
 }
 
 void MotionEditor::captured(motion::Id live, motion::Id capture, const juce::String& why) {

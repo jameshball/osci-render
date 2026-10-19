@@ -69,7 +69,7 @@ public:
         expect(wait([&] { return receiver.captureEnded(); }));
         juce::Thread::sleep(300);
         const auto ended = receiver.finishCapture();
-        expect(ended != nullptr && ended->ending == motion::BlenderCapture::Ending::disconnected && ended->failure == motion::BlenderCapture::Failure::none);
+        expect(ended != nullptr && ended->ending == motion::CaptureEnding::disconnected && ended->failure == motion::BlenderCapture::Failure::none);
         if (ended != nullptr) {
             expect(ended->frames.size() >= 2 && ended->duration > 0 && ended->duration < .25, "ends at the disconnect, not at finish");
         }

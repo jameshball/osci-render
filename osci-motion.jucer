@@ -492,6 +492,8 @@
       <GROUP id="MotionSrcLive" name="live">
         <FILE id="MotliveBlenderCaptureh" name="BlenderCapture.h" compile="0"
               resource="0" file="Source/motion/live/BlenderCapture.h"/>
+        <FILE id="MotliveCaptureEndingh" name="CaptureEnding.h" compile="0"
+              resource="0" file="Source/motion/live/CaptureEnding.h"/>
         <FILE id="MotliveBlenderCaptureArchiveh" name="BlenderCaptureArchive.h"
               compile="0" resource="0" file="Source/motion/live/BlenderCaptureArchive.h"/>
         <FILE id="MotliveBlenderFrameh" name="BlenderFrame.h" compile="0" resource="0"

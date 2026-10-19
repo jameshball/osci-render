@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CaptureEnding.h"
 #include "LiveSourceFrames.h"
 #include "TextureSource.h"
 #include "../import/RasterBeamBuilder.h"
@@ -10,7 +11,7 @@
 namespace motion {
 
 // What a capture of a shared picture holds: each traced frame and when it
-// arrived, from the start of the capture.
+// arrived, from the start of the capture, and why it ended if by itself.
 struct TextureCapture {
     static constexpr std::size_t maximumBytes = 192 * 1024 * 1024;
     static constexpr double frameRate = 30;
@@ -19,7 +20,7 @@ struct TextureCapture {
     std::vector<double> times;
     std::vector<std::vector<PointSample>> frames; // Empty: nothing lit.
     std::size_t bytes = 0;
-    bool full = false;
+    CaptureEnding ending = CaptureEnding::none;
 
     // At a steady rate, each frame what had arrived by then.
     PreparedPointFrames::Result steady() const {
@@ -105,21 +106,37 @@ public:
     }
     std::unique_ptr<TextureCapture> finishCapture() {
         const juce::SpinLock::ScopedLockType lock(captureLock);
-        if (capture != nullptr) { capture->duration = now() - captureStart; }
+        if (capture != nullptr && capture->ending == CaptureEnding::none) { capture->duration = now() - captureStart; }
         return std::move(capture);
+    }
+    // Stops recording, keeping what came before: the sender gone (at its last
+    // frame), or no room left (now).
+    void endCapture(CaptureEnding why) {
+        const juce::SpinLock::ScopedLockType lock(captureLock);
+        endLocked(why);
     }
     bool capturing() const {
         const juce::SpinLock::ScopedLockType lock(captureLock);
         return capture != nullptr;
     }
-    // Seconds recorded, and whether the capture has no room left.
-    std::pair<double, bool> captureProgress() const {
+    // A capture still waiting to be saved, which ended by itself.
+    bool captureEnded() const {
         const juce::SpinLock::ScopedLockType lock(captureLock);
-        return {capture != nullptr ? now() - captureStart : 0, capture != nullptr && capture->full};
+        return capture != nullptr && capture->ending != CaptureEnding::none;
+    }
+    double captureSeconds() const {
+        const juce::SpinLock::ScopedLockType lock(captureLock);
+        return capture != nullptr ? now() - captureStart : 0;
     }
 
 private:
     static double now() { return juce::Time::getMillisecondCounterHiRes() / 1000.0; }
+    void endLocked(CaptureEnding why) {
+        if (capture == nullptr || capture->ending != CaptureEnding::none) { return; }
+        capture->ending = why;
+        const auto lastFrame = capture->times.empty() ? now() - captureStart : capture->times.back() + 1 / TextureCapture::frameRate;
+        capture->duration = why == CaptureEnding::disconnected ? std::min(lastFrame, now() - captureStart) : now() - captureStart;
+    }
 
     // The GL thread (the first frame, the message thread): the picture
     // fitted small, for the tracer to take.
@@ -168,10 +185,10 @@ private:
             }
             traced.fetch_add(1);
             const juce::SpinLock::ScopedLockType lock(captureLock);
-            if (capture == nullptr || capture->full) { continue; }
+            if (capture == nullptr || capture->ending != CaptureEnding::none) { continue; }
             const auto bytes = kept.size() * sizeof(PointSample);
             if (capture->bytes + bytes > TextureCapture::maximumBytes || capture->times.size() == capture->times.capacity()) {
-                capture->full = true;
+                endLocked(capture->bytes + bytes > TextureCapture::maximumBytes ? CaptureEnding::size : CaptureEnding::updates);
                 continue;
             }
             capture->times.push_back(now() - captureStart);
@@ -222,10 +239,7 @@ public:
         const auto sender = texture::decode(asset->data);
         const auto* session = findSession(asset->liveIdentity);
         const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
-        if (session != nullptr && session->input->capturing()) {
-            const auto [seconds, full] = session->input->captureProgress();
-            return full ? "Recording" + dot + "full, stop to keep it" : "Recording" + dot + juce::String(juce::roundToInt(seconds)) + " s";
-        }
+        if (session != nullptr && session->input->capturing()) { return "Recording" + dot + juce::String(juce::roundToInt(session->input->captureSeconds())) + " s"; }
         if (session == nullptr || !session->input->connected()) {
             return "Waiting for " + (sender.has_value() ? sender->describe() : juce::String("the app")) + " to share its picture";
         }
@@ -258,6 +272,10 @@ public:
     bool capturing(Id id) const {
         const auto* session = sessionFor(id);
         return session != nullptr && session->input->capturing();
+    }
+    bool captureEnded(Id id) const {
+        const auto* session = sessionFor(id);
+        return session != nullptr && session->input->captureEnded();
     }
 
     void poll() {
@@ -349,6 +367,8 @@ private:
                 const auto listed = std::any_of(sharing->begin(), sharing->end(), [&](const auto& source) { return source.opaqueId == found->input->connectedTo(); });
                 if (!listed) { found->input->letGo(); }
             }
+            // Its sender gone (stopped, or let go above): a capture ends there.
+            if (!found->input->connected()) { found->input->endCapture(CaptureEnding::disconnected); }
             if (!look || found->input->connected() || !available()) { continue; }
             if (!sharing.has_value()) { sharing = osci::texture::listOpenGLSources(); }
             const auto match = std::find_if(sharing->begin(), sharing->end(), [&](const auto& source) {

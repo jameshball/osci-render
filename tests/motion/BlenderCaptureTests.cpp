@@ -118,7 +118,7 @@ int main() {
     duration.append(1, second);
     duration.append(motion::BlenderCapture::maximumSeconds + .001, third);
     duration.finish(motion::BlenderCapture::maximumSeconds + 30);
-    check(duration.failure == motion::BlenderCapture::Failure::none && duration.ending == motion::BlenderCapture::Ending::duration
+    check(duration.failure == motion::BlenderCapture::Failure::none && duration.ending == motion::CaptureEnding::duration
         && duration.frames.size() == 2 && nearby(duration.duration, motion::BlenderCapture::maximumSeconds) && motion::BlenderCaptureArchive::encode(duration),
         "a capture reaching the ten-minute limit ends there and keeps the ten minutes");
     motion::BlenderCapture updateLimit(true);
@@ -127,13 +127,13 @@ int main() {
         updateLimit.append(static_cast<double>(index) * .01, index % 2 == 0 ? second : third);
     }
     updateLimit.finish(1000);
-    check(updateLimit.failure == motion::BlenderCapture::Failure::none && updateLimit.ending == motion::BlenderCapture::Ending::frames
+    check(updateLimit.failure == motion::BlenderCapture::Failure::none && updateLimit.ending == motion::CaptureEnding::updates
         && updateLimit.frames.size() == motion::BlenderCapture::maximumFrames && nearby(updateLimit.duration, static_cast<double>(motion::BlenderCapture::maximumFrames) * .01)
         && motion::BlenderCaptureArchive::encode(updateLimit), "a capture reaching its update limit ends there and keeps what it has");
     motion::BlenderCapture disconnected(true);
     disconnected.begin(0, first);
     disconnected.append(.5, second);
-    disconnected.end(2, motion::BlenderCapture::Ending::disconnected);
+    disconnected.end(2, motion::CaptureEnding::disconnected);
     disconnected.append(3, third);
     disconnected.finish(30);
     check(disconnected.ended() && disconnected.frames.size() == 2 && nearby(disconnected.duration, 2) && motion::BlenderCaptureArchive::encode(disconnected),

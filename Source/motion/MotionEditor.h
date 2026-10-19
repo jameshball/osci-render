@@ -137,6 +137,14 @@ private:
     // playhead; and how it's traced, beside the live picture.
     void addTextureSource(const motion::texture::Sender& sender);
     void showTextureSettings(motion::Id id);
+    // A live source's capture, Blender's or a shared picture's alike: begun,
+    // or kept if one runs; cancelled; kept as a source of its own (and its
+    // settings closed). One that ends by itself is kept as it ends.
+    bool liveCapturing(motion::Id id);
+    juce::Result recordLiveCapture(motion::Id id);
+    void cancelLiveCapture(motion::Id id);
+    juce::Result keepLiveCapture(motion::Id id);
+    void keepEndedCaptures();
     // The settings of a live source of either kind.
     void showLiveSettings(motion::Id id);
     void chooseSourceFile();
@@ -479,6 +487,9 @@ private:
         std::uint64_t generation = 0;
     };
     std::vector<std::shared_ptr<ImportState>> pendingImports;
+    // The live source settings open, if any, and whose.
+    juce::Component::SafePointer<motion::ui::Sheet> liveSettings;
+    motion::Id liveSettingsId = 0;
     struct ExportState {
         std::atomic<bool> cancelled { false };
         std::atomic<double> progress { 0.0 };

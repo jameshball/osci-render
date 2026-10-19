@@ -111,7 +111,7 @@ private:
     static double nowSeconds() { return juce::Time::getMillisecondCounterHiRes() / 1000.0; }
     void setState(State state, juce::String message) {
         const juce::SpinLock::ScopedLockType guard(lock);
-        if (capture != nullptr && status.state == State::connected && state != State::connected) { capture->end(nowSeconds(), BlenderCapture::Ending::disconnected); }
+        if (capture != nullptr && status.state == State::connected && state != State::connected) { capture->end(nowSeconds(), CaptureEnding::disconnected); }
         status.state = state;
         status.message = std::move(message);
     }
