@@ -516,14 +516,13 @@ void MotionEditor::timerCallback() {
     auto& previewRate = processor.recordingParameters.frameRate;
     // Keep playback and export cadence aligned within the live renderer's supported range.
     const auto projectFrameRate = static_cast<float>(std::clamp<double>(processor.document.mainProject().frameRate, previewRate.min, previewRate.max));
-    if (!visualiser.isRecording() && std::abs(previewRate.getValueUnnormalised() - projectFrameRate) > 0.005f) {
+    if (std::abs(previewRate.getValueUnnormalised() - projectFrameRate) > 0.005f) {
         previewRate.setUnnormalisedValueNotifyingHost(projectFrameRate);
     }
-    scopeTools.canvas.setEnabled(!visualiser.isRecording() && exportState == nullptr);
+    scopeTools.canvas.setEnabled(exportState == nullptr);
     {
         using Control = VisualiserComponent::Control;
         // The strip shows what the visualiser is doing, however it started.
-        scopeTools.record.setToggleState(visualiser.isControlOn(Control::record), juce::dontSendNotification);
         scopeTools.textureOutput.setToggleState(visualiser.isControlOn(Control::textureOutput), juce::dontSendNotification);
         scopeTools.popout.setToggleState(visualiser.isControlOn(Control::popout), juce::dontSendNotification);
         const auto settingsShown = visualiser.hasControl(Control::settings), popoutShown = visualiser.hasControl(Control::popout);

@@ -162,7 +162,6 @@ void MotionEditor::setUpScope() {
     outputHeader.setName("Scope");
     visualiser.setControlButtonsHidden(true);
     using Control = VisualiserComponent::Control;
-    scopeTools.record.onClick = [this] { visualiser.clickControl(Control::record, &scopeTools.record); };
     scopeTools.textureOutput.onClick = [this] { visualiser.clickControl(Control::textureOutput, &scopeTools.textureOutput); };
     scopeTools.settings.onClick = [this] { visualiser.clickControl(Control::settings, &scopeTools.settings); };
     scopeTools.popout.onClick = [this] { visualiser.clickControl(Control::popout, &scopeTools.popout); };

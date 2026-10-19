@@ -125,7 +125,6 @@ inline juce::Colour result() { return juce::Colour(0xffbfa6ff); }
 inline juce::Colour tangent() { return juce::Colour(0xffe7bc6c); }
 inline juce::Colour motionPath() { return juce::Colour(0xffb8d4ea); }
 inline juce::Colour waveform() { return juce::Colour(0xff97c7df); }
-inline juce::Colour record() { return juce::Colour(0xffe5484d); }
 // Softer than osci::Colours::danger() for text and refusals on dark panels.
 inline juce::Colour error() { return juce::Colour(0xffe98080); }
 inline juce::Colour axisX() { return juce::Colour(0xffe07a7a); }
