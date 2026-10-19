@@ -95,14 +95,15 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
 
     bool cancelled = false;
     auto* exportJob = juce::ThreadPoolJob::getCurrentThreadPoolJob();
-    while (process.isRunning()) {
+    // Waits through waitForProcessToFinish alone: asking isRunning() again once
+    // it has finished resets JUCE's exit code to 0, so a failed mux would pass.
+    while (!process.waitForProcessToFinish(200)) {
         if ((cancelRequested != nullptr && cancelRequested->load()) || juce::Thread::currentThreadShouldExit()
             || (exportJob != nullptr && exportJob->shouldExit())) {
             process.kill();
             cancelled = true;
             break;
         }
-        process.waitForProcessToFinish(200);
     }
     outputReader.join();
     if (cancelled) {

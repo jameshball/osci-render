@@ -66,6 +66,8 @@ struct ScopeRender {
             return juce::Result::fail("Couldn't start " + app.getFullPathName() + ".");
         }
         const auto output = process.readAllProcessOutput();
+        // Its exit code is known only once it has finished, not merely closed its output.
+        process.waitForProcessToFinish(-1);
         const auto exitCode = process.getExitCode();
         if (said != nullptr) { *said = output; }
         if (exitCode != 0 || !destination.existsAsFile()) {
@@ -83,6 +85,7 @@ struct ScopeRender {
         const juce::StringArray command {tool.getFullPathName(), "-v", "error", "-ss", juce::String(std::max(0.0, time), 3), "-i", video.getFullPathName(), "-frames:v", "1", "-y", image.getFullPathName()};
         if (!process.start(command)) { return juce::Result::fail("Couldn't start FFmpeg."); }
         const auto output = process.readAllProcessOutput();
+        process.waitForProcessToFinish(-1);
         if (process.getExitCode() != 0 || !image.existsAsFile()) { return juce::Result::fail("FFmpeg couldn't take the frame at " + juce::String(time, 3) + " s: " + output.trim()); }
         return juce::Result::ok();
     }
