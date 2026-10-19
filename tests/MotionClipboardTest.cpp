@@ -246,6 +246,17 @@ public:
             expect(f.document.pasteKeys(f.second, {{"position.x", 0, keys[0]}}, 4).failed());
             expect(f.undo.getUndoDescription() == description);
         }
+        beginTest("A new modulation moves a property by a quarter of its range, or a quarter unit when it has none");
+        {
+            Fixture f; f.initialise();
+            const auto& project = f.document.project();
+            expectWithinAbsoluteError(motion::Document::routeAmount(project, f.first, "rings"), 25.0, 1.0e-9);
+            expectWithinAbsoluteError(motion::Document::routeAmount(project, f.first, "opacity"), 25.0, 1.0e-9);
+            expectWithinAbsoluteError(motion::Document::routeAmount(project, f.first, "position.x"), 0.25, 1.0e-9);
+            expectWithinAbsoluteError(motion::Document::routeAmount(project, f.first, "scale.y"), 0.25, 1.0e-9);
+            expectWithinAbsoluteError(motion::Document::routeAmount(project, f.first, "rotation.z"), 45.0, 1.0e-9);
+            expectWithinAbsoluteError(motion::Document::routeAmount(project, f.first, "red"), 0.5, 1.0e-9);
+        }
         beginTest("Undo history is bounded by memory while keeping recent steps");
         {
             juce::UndoManager undo(300, 3);

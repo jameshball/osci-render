@@ -1808,11 +1808,17 @@ static double defaultRouteAmount(const std::string& property) {
     return 0.25;
 }
 
-// A quarter of a Scope property's range; otherwise as defaultRouteAmount.
+// A quarter of a property's range when it has one (a percentage moves by 25),
+// rotations and colours as defaultRouteAmount says, and a quarter unit for
+// the unbounded (a position or a scale).
 double Document::routeAmount(const Project& project, Id target, const std::string& property) {
     const auto found = findPropertyTarget(project, target);
-    const auto* spec = found.has_value() && found->beam ? findPropertySpec(beamPropertySpecs, property) : nullptr;
-    return spec != nullptr ? 0.25 * (spec->maximum - spec->minimum) : defaultRouteAmount(property);
+    const auto* beam = found.has_value() && found->beam ? findPropertySpec(beamPropertySpecs, property) : nullptr;
+    if (beam != nullptr) { return 0.25 * (beam->maximum - beam->minimum); }
+    const auto spec = specFor(project, target, property);
+    const auto bounded = spec.has_value() && spec->minimum > -unbounded && spec->maximum < unbounded && spec->maximum > spec->minimum;
+    if (bounded && !property.starts_with("rotation.") && property != "red" && property != "green" && property != "blue") { return 0.25 * (spec->maximum - spec->minimum); }
+    return defaultRouteAmount(property);
 }
 
 
