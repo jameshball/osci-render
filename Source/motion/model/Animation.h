@@ -192,6 +192,13 @@ public:
         return std::all_of(keys.begin(), keys.end(), [](const Keyframe& key) { return key.valid(); });
     }
     bool animated() const { return !keys.empty(); }
+    // Every key gone, the value held as it was at `time`.
+    void clearKeys(double time) {
+        if (keys.empty()) { return; }
+        base = evaluateBase(time);
+        keys.clear();
+        refreshTangents();
+    }
     // The key at this time, matched as removeKey and setKeyValue match it.
     const Keyframe* findKey(double time) const {
         const auto index = matchingIndex(time);

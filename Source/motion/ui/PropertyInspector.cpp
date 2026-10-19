@@ -1,6 +1,7 @@
 #include "PropertyInspector.h"
 #include "SourceKind.h"
 #include "../model/KeyEdit.h"
+#include "DocumentMenu.h"
 #include "../model/LightPresets.h"
 #include "../../parser/FileFormatRegistry.h"
 
@@ -510,6 +511,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
                 onModulate(target, property);
             };
             row->key.onClick = [this, raw] { toggleKeys(*raw); };
+            row->key.onPopupMenu = [this, raw] { showKeyMenu(*raw); };
             // Like Motion's other icon buttons: no focus ring after a click.
             row->key.setWantsKeyboardFocus(false);
             if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
@@ -994,6 +996,26 @@ void MotionPropertyInspector::toggleKeys(Row& row) {
     });
     if (!row.fields.empty() && onPropertySelected) { onPropertySelected(target, std::string(row.fields.front()->spec.id)); }
     if (onKeyTimeEdited) { onKeyTimeEdited(); }
+}
+
+void MotionPropertyInspector::showKeyMenu(Row& row) {
+    const auto found = motion::findPropertyTarget(processor.document.project(), target);
+    if (!found.has_value()) { return; }
+    std::vector<std::string> properties;
+    bool animated = false;
+    for (auto& field : row.fields) {
+        properties.emplace_back(field->spec.id);
+        const auto* curve = found->curve(properties.back());
+        animated = animated || (curve != nullptr && curve->animated());
+    }
+    const auto what = row.group.toLowerCase();
+    juce::PopupMenu menu;
+    menu.addItem(1, "Remove " + what + " keyframes", animated && !found->locked);
+    const juce::Component::SafePointer<MotionPropertyInspector> owner(this);
+    motion::ui::showDocumentMenu(menu, row.key, processor.document, juce::PopupMenu::Options().withTargetComponent(&row.key), [owner, id = target, properties, what](int result) {
+        if (owner == nullptr || result != 1) { return; }
+        owner->processor.document.removeKeyframes(id, properties, owner->processor.position.load(), what);
+    });
 }
 
 void MotionPropertyInspector::jumpToKey(Row& row, bool forward) {

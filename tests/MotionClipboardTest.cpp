@@ -257,6 +257,26 @@ public:
             expectWithinAbsoluteError(motion::Document::routeAmount(project, f.first, "rotation.z"), 45.0, 1.0e-9);
             expectWithinAbsoluteError(motion::Document::routeAmount(project, f.first, "red"), 0.5, 1.0e-9);
         }
+        beginTest("A property's keyframes go in one step, holding its value at the playhead, and come back on undo");
+        {
+            Fixture f; f.initialise();
+            f.document.edit("Key", [&](motion::Project& project) {
+                auto* curve = motion::findPropertyCurve(project, f.first, "position.x");
+                curve->setKey({0.0, 0.0, motion::Interpolation::linear});
+                curve->setKey({1.0, 2.0, motion::Interpolation::linear});
+            });
+            const auto clip = f.clip(f.first);
+            const auto at = clip->start + 0.5;
+            expect(f.document.removeKeyframes(f.first, {"position.x", "position.y"}, at, "position").wasOk());
+            const auto* curve = motion::findPropertyCurve(f.document.project(), f.first, "position.x");
+            expect(curve != nullptr && !curve->animated());
+            if (curve != nullptr) { expectWithinAbsoluteError(curve->base, 1.0, 1.0e-6); }
+            expect(f.undo.getUndoDescription() == "Remove position keyframes");
+            expect(f.document.removeKeyframes(f.first, {"position.x"}, at, "position").failed(), "nothing left to remove");
+            expect(f.undo.undo());
+            curve = motion::findPropertyCurve(f.document.project(), f.first, "position.x");
+            expect(curve != nullptr && curve->keyframes().size() == 2);
+        }
         beginTest("Undo history is bounded by memory while keeping recent steps");
         {
             juce::UndoManager undo(300, 3);

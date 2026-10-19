@@ -33,6 +33,7 @@ public:
     }
     std::function<void(const std::string&)> onChoose;
     std::function<void(const std::string&, bool)> onShow;
+    std::function<void(const std::string&)> onRemoveKeys;
 
     // What the channels belong to: its kind ("Clip", "Camera") and name.
     void setOwner(juce::String kind, juce::String name) {
@@ -220,12 +221,16 @@ private:
         menu.addSeparator();
         menu.addItem(3, "Show every curve");
         menu.addItem(4, "Hide the other curves");
+        const auto channel = std::find_if(channels.begin(), channels.end(), [&](const auto& item) { return item.id == id; });
+        menu.addSeparator();
+        menu.addItem(5, "Remove keyframes", channel != channels.end() && channel->keyed);
         menu.setLookAndFeel(&getLookAndFeel());
         const juce::Component::SafePointer<MotionCurveList> owner(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&row), [owner, id, shown](int choice) {
             if (owner == nullptr) { return; }
             if (choice == 1 && owner->onChoose) { owner->onChoose(id); }
             if (choice == 2) { owner->show(id, !shown); }
+            if (choice == 5 && owner->onRemoveKeys) { owner->onRemoveKeys(id); }
             for (const auto& channel : owner->channels) {
                 if (choice == 3) { owner->show(channel.id, true); }
                 if (choice == 4) { owner->show(channel.id, channel.id == id); }

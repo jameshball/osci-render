@@ -387,6 +387,9 @@ public:
     juce::Result removeRoute(Id id);
     // Links (or unlinks, with nullopt) a property; refuses cycles.
     juce::Result setLink(Id target, const std::string& property, std::optional<PropertyLink> link);
+    // A property's animation gone in one step: its keys, each property held at
+    // its value at `projectTime`. `what` names it for undo ("position").
+    juce::Result removeKeyframes(Id target, const std::vector<std::string>& properties, double projectTime, const juce::String& what);
     // Shows a gesture in progress without an undo step; commit() then records
     // it from where it began.
     void preview(Project project);

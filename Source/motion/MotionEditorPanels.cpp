@@ -597,6 +597,10 @@ void MotionEditor::setUpGraph() {
         refreshCurveList();
         curveEditor.repaint();
     };
+    curveList.onRemoveKeys = [this](const std::string& property) {
+        const auto removed = processor.document.removeKeyframes(curveTarget, {property}, processor.position.load(), motion::propertyLabel(processor.document.project(), curveTarget, property).toLowerCase());
+        if (removed.failed()) { statusBar.show(removed.getErrorMessage()); }
+    };
     curveEditor.onPropertyChosen = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
     curveEditor.onPreview = [this](const motion::PropertyMap* curves) {
         auto preview = processor.document.project();

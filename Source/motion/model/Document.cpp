@@ -1902,6 +1902,23 @@ juce::Result Document::removeRoute(Id id) {
     return removed ? juce::Result::ok() : juce::Result::fail("The route no longer exists.");
 }
 
+juce::Result Document::removeKeyframes(Id target, const std::vector<std::string>& properties, double projectTime, const juce::String& what) {
+    const auto found = findPropertyTarget(project(), target);
+    if (!found.has_value() || found->locked) { return juce::Result::fail("Those keyframes can't be removed."); }
+    const auto local = found->localTime(project().frameTime(projectTime));
+    const auto removed = tryEdit("Remove " + what + " keyframes", [&](Project& updated) {
+        bool any = false;
+        for (const auto& property : properties) {
+            auto* curve = findPropertyCurve(updated, target, property);
+            if (curve == nullptr || !curve->animated()) { continue; }
+            curve->clearKeys(local);
+            any = true;
+        }
+        return any;
+    });
+    return removed ? juce::Result::ok() : juce::Result::fail("There are no keyframes to remove.");
+}
+
 juce::Result Document::setLink(Id target, const std::string& property, std::optional<PropertyLink> link) {
     const auto& current = project();
     const auto* curve = findPropertyCurve(current, target, property);
