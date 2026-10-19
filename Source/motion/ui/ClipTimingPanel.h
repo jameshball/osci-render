@@ -44,6 +44,8 @@ public:
         addAndMakeVisible(status);
         refresh();
     }
+    // The duration, for "Edit clip timing" to go to.
+    juce::Component& durationField() { return values[1]; }
     void setSelection(motion::Id id) {
         if (id != selected) { discardEditors(); selected = id; error.clear(); }
         refresh();

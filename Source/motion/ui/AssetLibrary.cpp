@@ -91,6 +91,16 @@ void MotionAssetLibrary::selectAsset(motion::Id id) {
     }
 }
 
+void MotionAssetLibrary::revealAsset(motion::Id id) {
+    for (std::size_t row = 0; row < assets.size() + definitions.size(); ++row) {
+        if (assetId(static_cast<int>(row)) == id) {
+            list.selectRow(static_cast<int>(row), true);
+            osci::revealRow(list, static_cast<int>(row));
+            return;
+        }
+    }
+}
+
 void MotionAssetLibrary::updateStatus() {
     cancelImport.setVisible(importStatus.isNotEmpty());
     status.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(0.6f));

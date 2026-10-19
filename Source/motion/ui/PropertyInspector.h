@@ -42,7 +42,8 @@ public:
     void setHeading(std::optional<std::pair<juce::String, juce::String>> value);
     void relayout() { layoutContent(); }
     // Scrolls so `component` (inside the inspector) is fully in view.
-    void reveal(juce::Component& component);
+    // Scrolled to and marked, as osci::reveal does, once laid out.
+    void reveal(juce::Component& component, osci::RevealOptions options);
     void setTarget(motion::Id id);
     void setSelectionCount(std::size_t count);
 

@@ -412,7 +412,11 @@ void MotionEditor::setUpProperties() {
         }
     };
     effectStack.onHeightChanged = [this] { propertyInspector.relayout(); };
-    effectStack.onReveal = [this](juce::Component& card) { propertyInspector.reveal(card); };
+    effectStack.onReveal = [this](juce::Component& card) {
+        osci::RevealOptions options;
+        options.margin = motion::style::padding;
+        propertyInspector.reveal(card, options);
+    };
     // A clip's timing leads its Properties, as layer timing does in other editors.
     inspectorLead.add(compositionSettings, [this] { return compositionSettings.preferredHeight(); });
     inspectorLead.add(clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
@@ -549,7 +553,20 @@ void MotionEditor::setUpTimeline() {
         request.uniqueClip = id;
         beginSourceImport(std::move(request));
     };
-    timeline.onTimingRequested = [this](motion::Id id) { select(id); };
+    // Its timing in Properties, gone to as a browser goes to an anchor, ready to type.
+    timeline.onTimingRequested = [this](motion::Id id) {
+        select(id);
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        juce::MessageManager::callAsync([owner] {
+            if (owner == nullptr) { return; }
+            osci::RevealOptions options;
+            options.focus = true;
+            // Near the top, with its Timing heading still in view.
+            options.align = osci::RevealOptions::Align::start;
+            options.margin = 40;
+            owner->propertyInspector.reveal(owner->clipTimingPanel.durationField(), options);
+        });
+    };
     timeline.onLoopSelection = [this] { loopSelection(); };
     timeline.canPaste = [this] { return !std::holds_alternative<std::monostate>(clipboard); };
     timeline.onCommand = [this](const juce::String& name) {
@@ -560,7 +577,7 @@ void MotionEditor::setUpTimeline() {
     timeline.onRevealSource = [this](motion::Id asset) {
         libraryTabs.setSelectedIndex(0);
         assetLibrary.refresh();
-        assetLibrary.selectAsset(asset);
+        assetLibrary.revealAsset(asset);
     };
     timeline.onError = [this](const juce::String& message) { statusBar.show(message); };
     timeline.chosenSource = [this] { return assetLibrary.chosen(); };

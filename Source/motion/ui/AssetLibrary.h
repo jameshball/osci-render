@@ -33,6 +33,8 @@ public:
     void refresh();
 
     void selectAsset(motion::Id id);
+    // Selected, scrolled to and marked: "Show in Sources".
+    void revealAsset(motion::Id id);
 
 
     void updateStatus();

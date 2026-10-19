@@ -82,13 +82,9 @@ void MotionPropertyInspector::setHeading(std::optional<std::pair<juce::String, j
     refresh();
 }
 
-void MotionPropertyInspector::reveal(juce::Component& component) {
+void MotionPropertyInspector::reveal(juce::Component& component, osci::RevealOptions options) {
     layoutContent();
-    const auto area = content.getLocalArea(&component, component.getLocalBounds());
-    auto position = viewport.getViewPosition();
-    if (area.getBottom() > position.y + viewport.getMaximumVisibleHeight()) { position.y = area.getBottom() - viewport.getMaximumVisibleHeight() + motion::style::padding; }
-    if (area.getY() < position.y) { position.y = area.getY() - motion::style::padding; }
-    viewport.setViewPosition(position);
+    osci::reveal(component, std::move(options));
 }
 
 void MotionPropertyInspector::setTarget(motion::Id id) {
