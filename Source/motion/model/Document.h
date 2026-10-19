@@ -10,6 +10,7 @@
 #include "PreparedSource.h"
 #include "LiveSourceIdentity.h"
 #include "BlenderSourceSettings.h"
+#include "../../../modules/osci_gui/visualiser/osci_VisualiserGeometry.h"
 #include <limits>
 #include "LoadNotes.h"
 #include "BakeSettings.h"
@@ -159,15 +160,17 @@ inline const GeneratorDefinition* generatorOf(const Asset& asset) {
 // How a project is exported: its frame (the Scope's canvas too, so what is
 // framed is what is exported), the video codec (as VideoCodec numbers it),
 // the encoder's quality (its CRF: 1 best to 51, 0 lossless) and whether the
-// soundtrack goes with it.
+// soundtrack goes with it. Its frame is a size the renderer draws: even,
+// within the canvas's limits.
 struct ExportSettings {
     int width = 1024, height = 1024;
     int codec = 0;
     int crf = 16;
     bool soundtrack = true;
-    static constexpr int smallest = 64, largest = 8192, codecs = 5;
+    static constexpr int codecs = 5;
     bool operator==(const ExportSettings&) const = default;
-    bool valid() const { return width >= smallest && width <= largest && height >= smallest && height <= largest && codec >= 0 && codec < codecs && crf >= 0 && crf <= 51; }
+    static bool drawable(int size) { return VisualiserGeometry::sanitiseCanvasDimension(size) == size; }
+    bool valid() const { return drawable(width) && drawable(height) && codec >= 0 && codec < codecs && crf >= 0 && crf <= 51; }
 };
 
 struct Project : Composition {

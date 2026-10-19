@@ -682,6 +682,12 @@ public:
             broken->getChildByName("export")->setAttribute("width", 3);
             expect(opensLeavingOut(exported, *broken));
             expect(exported.project().exportSettings == motion::ExportSettings {});
+            // A size the renderer can't draw (odd, or past its limits) isn't kept and quietly drawn at another.
+            for (const auto size : {127, 8192}) {
+                broken->getChildByName("export")->setAttribute("width", size);
+                expect(opensLeavingOut(exported, *broken));
+                expect(exported.project().exportSettings == motion::ExportSettings {});
+            }
         }
 
         beginTest("A file that can't open at all says why, and what to do");

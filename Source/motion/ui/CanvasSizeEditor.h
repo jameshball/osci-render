@@ -78,7 +78,7 @@ private:
     int caption, row, gap;
     juce::ComboBox preset;
     // Sizes the renderer takes: even, from 128 to 4096 pixels.
-    static constexpr int smallest = 128, largest = 4096;
+    static constexpr int smallest = VisualiserGeometry::minCanvasDimension, largest = VisualiserGeometry::maxCanvasDimension;
     static constexpr motion::PropertySpec sizeSpec {"size", "Size", "", "", smallest, largest, 1024, 2, 0, " px"};
     juce::Label presetLabel { "Canvas preset caption", "Preset" }, widthLabel { "Video width caption", "Width" }, heightLabel { "Video height caption", "Height" };
     motion::ui::ScrubField width, height;
