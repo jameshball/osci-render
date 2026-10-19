@@ -35,6 +35,7 @@
 #include "ui/TextSourceEditor.h"
 #include "ui/LuaSourceEditor.h"
 #include "ui/TextAnimationPanel.h"
+#include "ui/ModelSizeInspector.h"
 #include "ui/CompositionPanel.h"
 #include <deque>
 #include <variant>
@@ -399,6 +400,9 @@ private:
     // Properties lead: a clip's timing, then a text clip's character animation.
     osci::SectionStack inspectorLead;
     MotionTextAnimationPanel textAnimation { processor };
+    MotionModelSizeInspector modelSize { processor };
+    // A 3D object's size, from Sources or Properties: fitted or its file's own.
+    void setModelOriginalSize(motion::Id asset, bool original);
     MotionCompositionPanel compositionSettings { processor };
     struct QueuedTextAnimation {
         motion::Id asset;

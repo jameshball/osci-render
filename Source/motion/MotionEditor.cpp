@@ -806,6 +806,7 @@ void MotionEditor::select(motion::Id id) {
     selection = id;
     clipTimingPanel.setSelection(id);
     textAnimation.setSelection(id);
+    modelSize.setSelection(id);
     // Cameras have no effects, so selecting one shows its Properties.
     const auto camera = selectionIsCamera();
     timeline.setSelection(id);
@@ -904,6 +905,7 @@ void MotionEditor::refreshInspector() {
     propertyInspector.setSelectionCount(std::max<std::size_t>(1, timeline.selectedClipIds().size()));
     clipTimingPanel.refresh();
     textAnimation.refresh();
+    modelSize.refresh();
     compositionSettings.setShown(selection == 0);
     compositionSettings.refresh();
     inspectorLead.resized();

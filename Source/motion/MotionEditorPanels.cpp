@@ -339,15 +339,7 @@ void MotionEditor::setUpLibrary() {
         const auto found = motion::findAsset(processor.document.project().assets, id);
         if (found == nullptr) { return; }
         auto panel = std::make_unique<MotionModelSizePanel>(found->name, found->originalSize, found->fittedScale);
-        panel->onChange = [this, id](bool keep) {
-            const auto current = motion::findAsset(processor.document.project().assets, id);
-            if (current == nullptr || current->originalSize == keep) { return; }
-            SourceRequest request;
-            request.replacement = current;
-            request.generation = processor.document.generation();
-            request.originalSize = keep;
-            beginSourceImport(std::move(request));
-        };
+        panel->onChange = [this, id](bool keep) { setModelOriginalSize(id, keep); };
         showPopover(std::move(panel), getLocalArea(&button, button.getLocalBounds()));
     };
     assetLibrary.onEditDrawing = [this](motion::Id id) { showDrawingEditor(id); };
@@ -424,6 +416,8 @@ void MotionEditor::setUpProperties() {
     // A clip's timing leads its Properties, as layer timing does in other editors.
     inspectorLead.add(compositionSettings, [this] { return compositionSettings.preferredHeight(); });
     inspectorLead.add(clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
+    inspectorLead.add(modelSize, [this] { return modelSize.preferredHeight(); });
+    modelSize.onChange = [this](motion::Id id, bool original) { setModelOriginalSize(id, original); };
     compositionSettings.onTiming = [this](int command) { applyTiming(command); };
     compositionSettings.onError = [this](const juce::String& message) { statusBar.show(message); };
     // Panels in the lead resize it, and Properties lays out again.
@@ -433,6 +427,7 @@ void MotionEditor::setUpProperties() {
     propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
     clipTimingPanel.onHeightChanged = relayoutLead;
     textAnimation.onHeightChanged = relayoutLead;
+    modelSize.onHeightChanged = relayoutLead;
     // A change to the characters prepares the text source again in place.
     textAnimation.onApply = [this](motion::Id id, motion::TextSettings settings) {
         const auto& assets = processor.document.project().assets;
@@ -618,4 +613,14 @@ void MotionEditor::setUpGraph() {
 // A preset's generator reflecting wholly (every preset names one: see MirrorPresets.h).
 void MotionEditor::addMirror(const motion::MirrorPreset& preset) {
     addGenerator(*motion::findGenerator(preset.generator), std::nullopt, preset.name, {{"reflects", motion::Curve(100)}});
+}
+
+void MotionEditor::setModelOriginalSize(motion::Id asset, bool original) {
+    const auto current = motion::findAsset(processor.document.project().assets, asset);
+    if (current == nullptr || current->originalSize == original) { return; }
+    SourceRequest request;
+    request.replacement = current;
+    request.generation = processor.document.generation();
+    request.originalSize = original;
+    beginSourceImport(std::move(request));
 }
