@@ -220,6 +220,17 @@ public:
             }
         }
 
+        beginTest("A device with too few channels for the beam's brightness plays it on X and Y");
+        {
+            using Mode = motion::OutputMode;
+            expect(motion::playableOn(Mode::xyrgb, 5) == Mode::xyrgb);
+            expect(motion::playableOn(Mode::xyrgb, 3) == Mode::xy);
+            expect(motion::playableOn(Mode::xyz, 3) == Mode::xyz);
+            expect(motion::playableOn(Mode::xyzInverted, 2) == Mode::xy);
+            expect(motion::playableOn(Mode::xy, 1) == Mode::xy);
+            expect(motion::playableOn(Mode::soundtrack, 0) == Mode::soundtrack);
+        }
+
         beginTest("A scope's Z input gets the beam's brightness: its brightest colour, inverted on request");
         {
             // x, y, z, r, g, b: lit warm, half lit blue, dark, too bright, not a number.

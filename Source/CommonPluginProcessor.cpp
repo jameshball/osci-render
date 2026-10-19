@@ -513,6 +513,7 @@ void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
     }
 
     internalSampleRate.process(buffer, midi, [this](auto& b, auto& m) { processBlockInternal(b, m); });
+    afterDeviceRate(buffer);
 }
 
 bool CommonAudioProcessor::canSetInternalSampleRateRatio(double ratio) const {

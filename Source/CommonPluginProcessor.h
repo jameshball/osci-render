@@ -55,6 +55,8 @@ public:
 
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override final;
     virtual void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
+    // What processBlockInternal made, once brought to the device's rate.
+    virtual void afterDeviceRate(juce::AudioBuffer<float>&) {}
     virtual void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) {}
     virtual bool supportsInternalSampleRateOverride() const { return false; }
 

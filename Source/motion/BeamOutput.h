@@ -65,6 +65,22 @@ inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, j
     return true;
 }
 
+// The mode an output with `active` channels can play: the beam on X and Y
+// when there are too few for its brightness.
+inline OutputMode playableOn(OutputMode mode, int active) {
+    return beamOutputChannels(mode) > std::max(active, 2) ? OutputMode::xy : mode;
+}
+
+// Keeps the brightness on a mode's output (Z, or red, green and blue) from
+// dark to full. Brought down to a slower device, a step in it rings past
+// both: light that can't be, flashing at a scope's Z input or a laser.
+inline void clampBrightness(OutputMode mode, juce::AudioBuffer<float>& output, int count) {
+    const auto channels = std::min(beamOutputChannels(mode), output.getNumChannels());
+    for (int channel = 2; channel < channels; ++channel) {
+        juce::FloatVectorOperations::clip(output.getWritePointer(channel), output.getReadPointer(channel), 0.0f, 1.0f, count);
+    }
+}
+
 // Silences the beam on an output: still and dark. Silence alone isn't dark
 // on an inverted Z input, where no voltage lights the beam where it rests.
 inline void blankBeam(OutputMode mode, juce::AudioBuffer<float>& output, int count) {

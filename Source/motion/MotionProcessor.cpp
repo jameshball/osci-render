@@ -248,6 +248,10 @@ void MotionProcessor::routeSignalOutput(juce::AudioBuffer<float>& buffer) {
     }
 }
 
+void MotionProcessor::afterDeviceRate(juce::AudioBuffer<float>& buffer) {
+    motion::clampBrightness(outputMode.load(), buffer, buffer.getNumSamples());
+}
+
 juce::AudioProcessorEditor* MotionProcessor::createEditor() {
     return new MotionEditor(*this);
 }

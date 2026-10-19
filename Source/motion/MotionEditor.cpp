@@ -661,6 +661,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
         refreshFromDocument();
     } else {
         refreshOutputChoices();
+        keepOutputPlayable();
     }
 }
 
@@ -1120,6 +1121,20 @@ void MotionEditor::refreshKeyPanel() {
         keyPanel.setVisible(selection.count > 0);
         layoutGraphSide();
     }
+}
+
+void MotionEditor::keepOutputPlayable() {
+    auto* holder = juce::StandalonePluginHolder::getInstance();
+    auto* device = holder != nullptr ? holder->deviceManager.getCurrentAudioDevice() : nullptr;
+    if (device == nullptr) { return; }
+    const auto mode = processor.getOutputMode();
+    const auto active = device->getActiveOutputChannels().countNumberOfSetBits();
+    const auto playable = motion::playableOn(mode, active);
+    if (playable == mode) { return; }
+    const auto wanted = monitorOutput.getItemText(monitorOutput.indexOfItemId(static_cast<int>(mode) + 1));
+    processor.setOutputMode(playable);
+    monitorOutput.setSelectedId(static_cast<int>(playable) + 1, juce::dontSendNotification);
+    statusBar.show(device->getName() + " plays " + juce::String(active) + " channels, too few for " + wanted + ": the beam plays on X and Y.");
 }
 
 void MotionEditor::refreshOutputChoices() {

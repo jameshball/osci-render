@@ -281,6 +281,9 @@ private:
     double snapDivision(int index) const;
     void refreshTiming();
     void refreshOutputChoices();
+    // A device chosen since that has too few channels for the beam's
+    // brightness plays it on X and Y, and says so.
+    void keepOutputPlayable();
     // Keyboard shortcuts are data: each command appears in a menu with its
     // shortcut and is dispatched from keyPressed when no focused view used it.
     struct Command {

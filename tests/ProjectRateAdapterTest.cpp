@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/audio/platform/ProjectRateAdapter.h"
+#include "../Source/motion/BeamOutput.h"
 
 // A project drawn at its own rate reaches the device as the same signal: a
 // tone made at the project's rate is the same tone at the device's.
@@ -43,6 +44,37 @@ public:
             expectWithinAbsoluteError(peak, .5, .03);
             // It makes the project's rate's worth of samples for the time played.
             expectWithinAbsoluteError(static_cast<double>(made) / static_cast<double>(heard.size()), rate / device, rate / device * .01);
+        }
+
+        beginTest("Brightness brought down to the device stays from dark to full");
+        {
+            // A beam blanked and lit in turn, as it is between strokes.
+            ProjectRateAdapter adapter;
+            adapter.prepare(48000.0, 192000.0, 512, 5);
+            std::int64_t made = 0;
+            juce::AudioBuffer<float> block(5, 512);
+            juce::MidiBuffer midi;
+            float lowest = 0, highest = 1, clampedLowest = 0, clampedHighest = 1, xLowest = 0;
+            for (int round = 0; round < 40; ++round) {
+                adapter.process(block, midi, [&](juce::AudioBuffer<float>& internal, juce::MidiBuffer&) {
+                    for (int sample = 0; sample < internal.getNumSamples(); ++sample) {
+                        const auto lit = (made++ / 37) % 2 == 0 ? 1.0f : 0.0f;
+                        for (int channel = 0; channel < 5; ++channel) { internal.setSample(channel, sample, lit); }
+                    }
+                });
+                lowest = std::min(lowest, block.findMinMax(2, 0, 512).getStart());
+                highest = std::max(highest, block.findMinMax(2, 0, 512).getEnd());
+                motion::clampBrightness(motion::OutputMode::xyrgb, block, 512);
+                for (int channel = 2; channel < 5; ++channel) {
+                    clampedLowest = std::min(clampedLowest, block.findMinMax(channel, 0, 512).getStart());
+                    clampedHighest = std::max(clampedHighest, block.findMinMax(channel, 0, 512).getEnd());
+                }
+                xLowest = std::min(xLowest, block.findMinMax(0, 0, 512).getStart());
+            }
+            expect(lowest < -.01f && highest > 1.01f, "the filter rings past dark and full");
+            expectEquals(clampedLowest, 0.0f);
+            expectEquals(clampedHighest, 1.0f);
+            expect(xLowest < -.01f, "X and Y, positions, are left as they are");
         }
     }
 };
