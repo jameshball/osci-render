@@ -164,18 +164,18 @@ void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, std::optional<
     }
 }
 
-// The Timeline's ruler: labels left-aligned on major ticks, short marks on
-// the snap grid between them, scrubbed by dragging.
+// The Graph's ruler: labels centred over major ticks, short marks on the
+// snap grid between them, scrubbed by dragging.
 void MotionCurveEditor::paintRuler(juce::Graphics& g, double step, std::optional<double> minorStep) {
     const auto grid = processor.document.project().timeGrid();
     juce::Graphics::ScopedSaveState state(g);
     g.reduceClipRegion(juce::Rectangle<int>(gutter, 0, getWidth() - gutter, bandHeight));
     if (minorStep.has_value()) {
         g.setColour(juce::Colours::white.withAlpha(.16f));
-        grid.forEachTick(viewStart, viewEnd, *minorStep, [&](double time) { g.fillRect(std::round(timeX(time)), bandHeight - 4.0f, 1.0f, 4.0f); });
+        motion::ui::paintRulerTicks(g, grid, viewStart, viewEnd, *minorStep, bandHeight, 4.0f, [this](double time) { return timeX(time); });
     }
     g.setColour(juce::Colours::white.withAlpha(.3f));
-    grid.forEachTick(viewStart, viewEnd, step, [&](double time) { g.fillRect(std::round(timeX(time)), bandHeight - 8.0f, 1.0f, 8.0f); });
+    motion::ui::paintRulerTicks(g, grid, viewStart, viewEnd, step, bandHeight, 8.0f, [this](double time) { return timeX(time); });
     motion::ui::paintRulerLabels(g, grid, viewStart, viewEnd, step, {gutter, 0, getWidth() - gutter, bandHeight - 4}, [this](double time) { return std::round(timeX(time)); });
 }
 

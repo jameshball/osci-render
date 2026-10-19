@@ -785,7 +785,15 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     }
     g.setColour(motion::style::gridMajor());
     grid.forEachTick(scrollTime, viewEnd, step, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
-    motion::ui::paintRulerLabels(g, grid, scrollTime, viewEnd, step, {0, 0, getWidth(), 26}, [this](double time) { return timeX(time); });
+    // As the Graph's ruler: a mark at the foot of each labelled time, the line
+    // below carrying on from it.
+    {
+        juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(namesWidth, 0, getWidth() - namesWidth, toolsHeight);
+        g.setColour(juce::Colours::white.withAlpha(.3f));
+        motion::ui::paintRulerTicks(g, grid, scrollTime, viewEnd, step, static_cast<float>(toolsHeight), 6.0f, [this](double time) { return timeX(time); });
+    }
+    motion::ui::paintRulerLabels(g, grid, scrollTime, viewEnd, step, {namesWidth, 0, getWidth() - namesWidth, toolsHeight - 4}, [this](double time) { return timeX(time); });
     paintLoop(g);
     paintBake(g);
     g.setColour(osci::Colours::surfaceRaised());
