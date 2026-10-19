@@ -364,6 +364,10 @@ void MotionEditor::continueCommandLineRender() {
     for (const auto& source : processor.document.liveSourcesInUse()) { std::cerr << "osci-motion: leaving out " << source->name << ", a live source; capture it to render it." << std::endl; }
     const auto project = motion::Document::withoutLiveSources(processor.document.mainProject());
     auto config = exportConfiguration(project);
+    if (!commandLineRender.hasFileExtension(config.fileExtension)) {
+        failCommandLineRender("this project's video is " + juce::String(VideoEncodingConstants::getVideoCodecInfo(config.codec).displayName) + ", which goes in a ." + config.fileExtension + " file: name the output that.");
+        return;
+    }
     config.includeAudio = config.includeAudio && commandLineStills.empty();
     auto state = std::make_shared<ExportState>();
     state->sampleRate = processor.exportSampleRate();

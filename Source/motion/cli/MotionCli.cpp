@@ -3,6 +3,7 @@
 #include "SignalDiff.h"
 #include "ScopeRender.h"
 #include "../export/SignalExporter.h"
+#include "../../video/VideoEncodingConstants.h"
 
 // osci-motion on the command line: projects drawn offline exactly as Export
 // draws them, to a signal, numbers, or (rendered by the app) video and
@@ -112,6 +113,19 @@ void writePreviews(const juce::File& video, const std::vector<double>& times, co
 }
 
 // A video of the project as Export makes it, rendered by the app.
+// The kind of file a project's video goes in, as its codec has it (ProRes
+// in a .mov), with the dot.
+juce::String videoExtension(const juce::File& project) {
+    juce::MemoryBlock bytes;
+    std::unique_ptr<juce::XmlElement> xml;
+    if (project.loadFileAsData(bytes)) { xml = juce::AudioProcessor::getXmlFromBinary(bytes.getData(), static_cast<int>(bytes.getSize())); }
+    const auto* document = xml != nullptr ? xml->getChildByName("composition") : nullptr;
+    const auto* exporting = document != nullptr ? document->getChildByName("export") : nullptr;
+    const auto codec = exporting != nullptr ? exporting->getIntAttribute("codec", 0) : 0;
+    const auto known = codec >= 0 && codec < static_cast<int>(VideoEncodingConstants::videoCodecs.size());
+    return "." + juce::String(VideoEncodingConstants::getVideoCodecInfo(static_cast<VideoCodec>(known ? codec : 0)).defaultFileExtension);
+}
+
 juce::File renderVideo(const juce::ArgumentList& args, const juce::File& project, const juce::File& destination, const std::vector<double>& stills = {}) {
     say("Rendering " + project.getFileName() + (stills.empty() ? juce::String() : " (" + juce::String(static_cast<int>(stills.size())) + " stills)") + " with the app...");
     const auto start = juce::Time::getMillisecondCounterHiRes();
@@ -132,7 +146,7 @@ void video(const juce::ArgumentList& args) {
     const auto project = fileArgument(files[0]);
     if (!project.existsAsFile()) { juce::ConsoleApplication::fail("There is no project at " + project.getFullPathName() + "."); }
     const auto out = args.getValueForOption("--out");
-    renderVideo(args, project, out.isNotEmpty() ? fileArgument(out) : project.getSiblingFile(sceneName(project) + ".mp4"));
+    renderVideo(args, project, out.isNotEmpty() ? fileArgument(out) : project.getSiblingFile(sceneName(project) + videoExtension(project)));
 }
 
 // A recipe made into a project file, to open in the app.
@@ -146,6 +160,7 @@ void make(const juce::ArgumentList& args) {
     if (read.failed()) { juce::ConsoleApplication::fail(recipe.getFileName() + ": " + read.getErrorMessage()); }
     const auto out = args.getValueForOption("--out");
     const auto destination = out.isNotEmpty() ? fileArgument(out) : recipe.getSiblingFile(sceneName(recipe) + ".osci-motion");
+    if (!destination.hasFileExtension(".osci-motion")) { juce::ConsoleApplication::fail("A project is an .osci-motion file: name --out with .osci-motion."); }
     const auto written = motion::ProjectFile::write(project, destination);
     if (written.failed()) { juce::ConsoleApplication::fail(written.getErrorMessage()); }
     // "picture": a time, in seconds, whose frame the app draws as the
@@ -153,7 +168,7 @@ void make(const juce::ArgumentList& args) {
     const auto picture = juce::JSON::parse(recipe.loadFileAsString()).getProperty("picture", {});
     if (!picture.isVoid()) {
         const std::vector<double> times {static_cast<double>(picture)};
-        const juce::TemporaryFile video(".mp4"), still(".png");
+        const juce::TemporaryFile video(videoExtension(destination)), still(".png");
         renderVideo(args, destination, video.getFile(), times);
         const auto at = motion::Stretches::upTo(times, project.frameRate).exportTime(0, times[0]) + .5 / (project.frameRate > 0 ? project.frameRate : 60.0);
         const auto taken = ScopeRender::still(video.getFile(), at, still.getFile());
@@ -186,6 +201,7 @@ void render(const juce::ArgumentList& args) {
     auto composition = open(project, sampleRateOf(args));
     const auto previews = args.getValueForOption("--previews");
     const auto out = args.getValueForOption("--out");
+    if (out.isNotEmpty() && !fileArgument(out).hasFileExtension(".wav")) { juce::ConsoleApplication::fail("The signal is a WAV file: name --out with .wav."); }
     if (previews.isNotEmpty()) {
         // The Scope's picture, from a video the app renders: of only a short
         // stretch up to each frame (its persistence built as playing builds
@@ -198,8 +214,8 @@ void render(const juce::ArgumentList& args) {
         if (!folder.createDirectory()) { juce::ConsoleApplication::fail("Couldn't make " + folder.getFullPathName() + "."); }
         const auto stretches = motion::Stretches::upTo(times, composition.frameRate);
         const auto halfFrame = .5 / (composition.frameRate > 0 ? composition.frameRate : 60.0);
-        const juce::TemporaryFile stills(".mp4");
-        const auto source = given.isNotEmpty() ? fileArgument(given) : renderVideo(args, project, whole ? folder.getChildFile(sceneName(project) + ".mp4") : stills.getFile(), whole ? std::vector<double> {} : times);
+        const juce::TemporaryFile stills(videoExtension(project));
+        const auto source = given.isNotEmpty() ? fileArgument(given) : renderVideo(args, project, whole ? folder.getChildFile(sceneName(project) + videoExtension(project)) : stills.getFile(), whole ? std::vector<double> {} : times);
         writePreviews(source, times, [&](std::size_t index) { return whole ? times[index] + halfFrame : stretches.exportTime(index, times[index]) + halfFrame; }, folder, sceneName(project), args.containsOption("--sheet"));
         if (out.isEmpty()) { return; }
     }
@@ -398,7 +414,7 @@ int main(int argc, char* argv[]) {
         "Writes the beam's signal (XYRGB unless --output; beside the project unless --out), and pictures of frames as the Scope shows them.",
         "With --previews and no --out, writes only the pictures, rendered by the app: a short stretch up to each frame, in seconds,\n"
         "or with --whole a video of all of it, kept in that folder (--video takes them from one rendered before). --sheet puts them on one image.", render});
-    app.addCommand({"video", "video <project> [--out=file.mp4] [--app=osci-motion.app]",
+    app.addCommand({"video", "video <project> [--out=file.mp4|.mov, as its codec has it] [--app=osci-motion.app]",
         "Renders the project to video with the app, as Export does.", {}, video});
     app.addCommand({"stats", "stats <project> [--frames=N | --at=t1,t2] [--json] [--rate=Hz]",
         "Each frame's beam in numbers: drawn and travelled length, brightness, a fingerprint of its samples.", {}, stats});
