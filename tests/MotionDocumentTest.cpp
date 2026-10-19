@@ -679,14 +679,17 @@ public:
             expect(motion::Document::prepareLoad(exported.save(), reopened).wasOk());
             expect(reopened.exportSettings == wide, "the frame, codec, quality and soundtrack come back");
             auto broken = std::make_unique<juce::XmlElement>(exported.save());
-            broken->getChildByName("export")->setAttribute("width", 3);
+            broken->getChildByName("export")->setAttribute("codec", 99);
             expect(opensLeavingOut(exported, *broken));
             expect(exported.project().exportSettings == motion::ExportSettings {});
-            // A size the renderer can't draw (odd, or past its limits) isn't kept and quietly drawn at another.
-            for (const auto size : {127, 8192}) {
+            // A size the renderer can't draw (odd, or past its limits) is moved, with a note, to the
+            // nearest it can, keeping the rest, instead of quietly being drawn at another.
+            broken->getChildByName("export")->setAttribute("codec", 3);
+            for (const auto [size, drawn] : {std::pair {127, 128}, std::pair {333, 332}, std::pair {8192, 4096}}) {
                 broken->getChildByName("export")->setAttribute("width", size);
                 expect(opensLeavingOut(exported, *broken));
-                expect(exported.project().exportSettings == motion::ExportSettings {});
+                expectEquals(exported.project().exportSettings.width, drawn);
+                expectEquals(exported.project().exportSettings.codec, 3);
             }
         }
 

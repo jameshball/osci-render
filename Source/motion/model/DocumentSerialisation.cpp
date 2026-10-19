@@ -840,6 +840,13 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         settings.codec = exporting->getIntAttribute("codec", settings.codec);
         settings.crf = exporting->getIntAttribute("crf", settings.crf);
         settings.soundtrack = exporting->getBoolAttribute("soundtrack", settings.soundtrack);
+        // A size the renderer can't draw is moved to the nearest it can.
+        const auto drawn = VisualiserGeometry::sanitiseRenderSize(settings.width, settings.height);
+        if (drawn.width != settings.width || drawn.height != settings.height) {
+            notes.note("Video size this version can't draw, made the nearest it can", juce::String(settings.width) + " x " + juce::String(settings.height) + " to " + juce::String(drawn.width) + " x " + juce::String(drawn.height));
+            settings.width = drawn.width;
+            settings.height = drawn.height;
+        }
         if (settings.valid()) {
             project.exportSettings = settings;
         } else {
