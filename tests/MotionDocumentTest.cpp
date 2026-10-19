@@ -1041,6 +1041,16 @@ private:
         expect(linked->audio != nullptr && linked->audio->frameCount() == 4, "it decodes from its file");
         motion::Project project;
         project.assets.push_back(linked);
+        motion::Track track;
+        track.id = 9101;
+        track.name = "Sound";
+        track.kind = motion::TrackKind::audio;
+        motion::Clip clip;
+        clip.id = 9102;
+        clip.asset = linked->id;
+        clip.duration = 2;
+        track.clips.push_back(clip);
+        project.tracks.push_back(track);
         const auto xml = motion::Document::save(project);
         const auto* saved = xml.getChildByName("asset");
         expect(saved != nullptr && saved->getStringAttribute("file") == sound.getFullPathName(), "it saves where its file is");
@@ -1061,12 +1071,22 @@ private:
             expect(read.wasOk(), read.getErrorMessage());
             expect(reopened.project.assets.size() == 1 && reopened.project.assets[0]->linked == moved.getChildFile("Sound.wav"), "a moved project finds its file beside it");
         }
-        // Gone: left out, and said where it was looked for.
+        // Gone: kept silent with its clip, said where it was looked for, and
+        // saved as it was, so it comes back once the file does.
         {
             motion::ProjectFile reopened;
             const auto read = motion::ProjectFile::read(projectFile, reopened);
             expect(read.wasOk(), read.getErrorMessage());
-            expect(reopened.project.assets.empty() && reopened.notes.lines().joinIntoString(" ").contains(sound.getFullPathName()), "a missing file says where it was");
+            const auto& assets = reopened.project.assets;
+            expect(assets.size() == 1 && assets[0]->missing && assets[0]->audio != nullptr && assets[0]->audio->frameCount() == 1, "a missing file's sound is kept, silent");
+            expect(reopened.project.tracks.size() == 1 && reopened.project.tracks[0].clips.size() == 1, "and its clip stays");
+            expect(reopened.notes.lines().joinIntoString(" ").contains(sound.getFullPathName()), "a missing file says where it was");
+            expect(motion::ProjectFile::write(reopened.project, projectFile).wasOk());
+            expect(moved.getChildFile("Sound.wav").copyFileTo(sound));
+            motion::ProjectFile found;
+            expect(motion::ProjectFile::read(projectFile, found).wasOk());
+            expect(found.project.assets.size() == 1 && !found.project.assets[0]->missing && found.project.assets[0]->audio->frameCount() == 4
+                && found.project.tracks.size() == 1 && found.project.tracks[0].clips.size() == 1, "saved while missing, it is all there once the file is back");
         }
         root.deleteRecursively();
     }

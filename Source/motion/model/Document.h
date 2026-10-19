@@ -33,6 +33,9 @@ struct Asset {
     juce::MemoryBlock data;
     juce::File linked;
     bool isLinked() const { return linked != juce::File(); }
+    // Its linked file wasn't found: kept as it was, silent and drawing
+    // nothing (or a video's frames the project holds), until it is.
+    bool missing = false;
     BakeSettings bakeSettings;
     RasterSettings rasterSettings;
     TextSettings textSettings;

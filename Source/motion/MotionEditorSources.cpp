@@ -219,12 +219,12 @@ void MotionEditor::loadProject(const juce::File& file, bool example) {
                 owner->processor.addRecentProjectFile(file);
             }
             owner->updateTitle();
-            // What couldn't be used (from another version, or a linked file not found): what was left out.
+            // What couldn't be used as it was (from another version, or a linked file not found): left out, kept or reset.
             if (!notes.empty()) {
-                juce::String message = "Some of it couldn't be used, so these were left out or put right:\n";
+                juce::String message = "Some of it couldn't be used as it was:\n";
                 for (const auto& line : notes.lines()) { message << juce::String(juce::CharPointer_UTF8("\xe2\x80\xa2 ")) << line << "\n"; }
                 message << "\nSaving keeps the project as it opened now.";
-                motion::ui::MessageSheet::show(*owner, "Opened, with some things left out", message, "OK", {}, file.getFileName());
+                motion::ui::MessageSheet::show(*owner, "Opened, with some changes", message, "OK", {}, file.getFileName());
             }
         });
     });

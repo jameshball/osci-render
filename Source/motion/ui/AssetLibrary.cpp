@@ -143,6 +143,7 @@ juce::String MotionAssetLibrary::editLabel(int row) const {
     if (!validAssetRow(row)) { return {}; }
     const auto& asset = *assets[static_cast<std::size_t>(row)];
     const auto extension = asset.extension.toLowerCase();
+    if (asset.missing) { return "Find its file..."; }
     if (motion::texture::isSource(extension)) { return motion::texture::technology() + " settings..."; }
     if (asset.liveIdentity != nullptr) { return "Blender settings..."; }
     if (extension == ".txt") { return "Edit text..."; }
@@ -162,7 +163,9 @@ void MotionAssetLibrary::editRow(int row) {
     }
     if (!validAssetRow(row)) { return; }
     const auto& asset = *assets[static_cast<std::size_t>(row)];
-    if (modelRow(row)) {
+    if (asset.missing) {
+        if (onReplace) { onReplace(assetId(row)); }
+    } else if (modelRow(row)) {
         if (onModelSettings) { onModelSettings(assetId(row), edit); }
     } else if (asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset.data.toString())) {
         if (onEditDrawing) { onEditDrawing(assetId(row)); }
@@ -272,6 +275,11 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
             detail += motion::style::dot() + juce::String(asset.source->duration(), 1) + " s";
+        }
+        // Its linked file wasn't found: its edit button finds it again.
+        if (asset.missing) {
+            detail = "File missing";
+            graphics.setColour(motion::style::error());
         }
     }
     graphics.drawText(detail, bounds, juce::Justification::centredLeft);

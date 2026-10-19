@@ -93,6 +93,36 @@ juce::Result prepareBaked(Asset& asset, const juce::String& key, const std::func
     return juce::Result::ok();
 }
 
+// A linked file not where the project says: kept, so its clips stay as they
+// were and are saved, silent and drawing nothing (or a video's frames the
+// project holds) until it's back or replaced.
+juce::Result keepMissing(Asset& asset, std::atomic<double>* progress) {
+    asset.missing = true;
+    asset.source.reset();
+    asset.audio.reset();
+    if (progress != nullptr) { progress->store(1); }
+    if (osci::files::isAudio(asset.extension)) {
+        const auto silence = PreparedAudio::create(48000, 1, 1, [](float* const* destination, std::size_t, std::size_t, std::size_t frames) {
+            std::fill(destination[0], destination[0] + frames, 0.0f);
+            return true;
+        });
+        if (!silence) { return juce::Result::fail(juce::String(silence.error)); }
+        asset.audio = silence.audio;
+        return juce::Result::ok();
+    }
+    if (asset.bakedData.getSize() > 0) {
+        const auto frames = BakedSourceArchive::decode(asset.bakedData);
+        if (frames && frames.source->frameRate() == asset.rasterSettings.videoFrameRate && frames.source->pointsPerFrame() == asset.rasterSettings.pointsPerFrame) {
+            asset.source = std::make_shared<const PreparedSource>(frames.source);
+            return juce::Result::ok();
+        }
+    }
+    std::vector<std::shared_ptr<const PreparedDrawing>> blank;
+    blank.push_back(std::make_shared<const PreparedDrawing>(std::vector<std::unique_ptr<osci::Shape>> {}));
+    asset.source = std::make_shared<const PreparedSource>(std::move(blank), 1.0);
+    return juce::Result::ok();
+}
+
 // repeatsPrevious(frame) lets identical frames share one drawing (and count
 // once against the geometry budget).
 // An OBJ's faces as triangles (polygons fanned), in the normalised space its
@@ -480,8 +510,9 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
     }
+    asset.missing = false;
     if (asset.isLinked()) {
-        if (!asset.linked.existsAsFile()) { return juce::Result::fail("Its file isn't at " + asset.linked.getFullPathName() + " any more: put it back, or beside the project, and open the project again"); }
+        if (!asset.linked.existsAsFile()) { return keepMissing(asset, progress); }
     } else if (asset.data.getSize() == 0 || asset.data.getSize() > maximumSourceBytes) {
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
     }
