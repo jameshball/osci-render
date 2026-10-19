@@ -302,7 +302,7 @@ int runBenchmark() {
         const auto channels = options.mode == "xyrgb" ? 5 : 2;
         layout.outputBuses.set(0, juce::AudioChannelSet::discreteChannels(channels));
         if (!processor.setBusesLayout(layout)) { throw std::runtime_error("Cannot configure five-channel XYRGB output"); }
-        processor.setOutputMode(options.mode == "xyrgb" ? MotionProcessor::OutputMode::xyrgb : options.mode == "xy" ? MotionProcessor::OutputMode::xy : MotionProcessor::OutputMode::soundtrack);
+        processor.setRouting(options.mode == "xyrgb" || options.mode == "xy" ? motion::OutputRouting {motion::OutputRouting::off, options.mode == "xyrgb" ? motion::OutputMode::xyrgb : motion::OutputMode::xy, 0} : motion::OutputRouting {});
         processor.muteParameter->setBoolValue(false);
         processor.setRateAndBufferSizeDetails(options.rate, options.blockSize);
         processor.prepareToPlay(options.rate, options.blockSize);

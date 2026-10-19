@@ -63,10 +63,10 @@ void MotionEditor::resized() {
         const auto labelled = output.getWidth() >= 46 + 160;
         const auto pickerWidth = labelled ? 160 : std::min(160, output.getWidth());
         outputLabel.setVisible(labelled);
-        monitorOutput.setVisible(pickerWidth >= 100);
+        outputButton.setVisible(pickerWidth >= 100);
         output = output.removeFromRight(pickerWidth + (labelled ? 46 : 0));
         if (labelled) { outputLabel.setBounds(output.removeFromLeft(46).withTrimmedRight(6)); }
-        monitorOutput.setBounds(output.reduced(0, 4));
+        outputButton.setBounds(output.reduced(0, 4));
     }
     menuBar.setBounds(top.withRight(transport.getX()));
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));

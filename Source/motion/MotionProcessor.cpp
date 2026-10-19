@@ -114,7 +114,8 @@ void MotionProcessor::handleAsyncUpdate() {
 
 bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     const auto channels = layouts.getMainOutputChannelSet().size();
-    return layouts.getMainInputChannelSet().isDisabled() && (channels == 2 || channels == 3 || channels == 5);
+    // Two for the sound alone, more for the beam beside it (up to an interface's worth).
+    return layouts.getMainInputChannelSet().isDisabled() && channels >= 2 && channels <= 64;
 }
 
 void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
@@ -195,7 +196,7 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
         const auto last = motion::sampleIndex(std::clamp(loopEnd.load(std::memory_order_relaxed), 0.0, prepared->duration), sampleRate);
         if (first.has_value() && last.has_value() && *last > *first) { loopStartSample = static_cast<juce::int64>(*first); loopEndSample = static_cast<juce::int64>(*last); }
     }
-    const auto mode = outputMode.load();
+    const auto route = getRouting();
     const auto audible = !muteParameter->getBoolValue();
     const auto* volumes = volumeEffect->getAnimatedValuesReadPointer(0, count);
     const auto fallbackVolume = volumeEffect->getValue();
@@ -203,13 +204,13 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running) { oscillatorSample = audioSample; }
         const auto point = transitionGuard.apply(beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames));
-        if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
+        if (route.soundOn() && running && audible && buffer.getNumChannels() >= route.sound + 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);
             const auto volume = volumes != nullptr ? volumes[i] : fallbackVolume;
             const auto gain = std::isfinite(volume) ? static_cast<double>(volume) : 0.0;
             constexpr auto limit = static_cast<double>(std::numeric_limits<float>::max());
-            buffer.setSample(0, i, static_cast<float>(std::clamp(audio.left * gain, -limit, limit)));
-            buffer.setSample(1, i, static_cast<float>(std::clamp(audio.right * gain, -limit, limit)));
+            buffer.setSample(route.sound, i, static_cast<float>(std::clamp(audio.left * gain, -limit, limit)));
+            buffer.setSample(route.sound + 1, i, static_cast<float>(std::clamp(audio.right * gain, -limit, limit)));
         }
         writeSignal(i, point);
         ++oscillatorSample;
@@ -238,18 +239,20 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
 }
 
 void MotionProcessor::routeSignalOutput(juce::AudioBuffer<float>& buffer) {
-    const auto mode = outputMode.load();
+    const auto route = getRouting();
+    if (!route.beamOn()) { return; }
     const auto audible = !muteParameter->getBoolValue();
     const auto count = buffer.getNumSamples();
     if (!audible) {
-        motion::blankBeam(mode, buffer, count);
-    } else if (motion::routeBeam(mode, signal, buffer, count)) {
-        applyVolumeAndThreshold(buffer.getArrayOfWritePointers(), count);
+        motion::blankBeam(route.beam, buffer, count, route.beamFirst);
+    } else if (motion::routeBeam(route.beam, signal, buffer, count, route.beamFirst)) {
+        applyVolumeAndThreshold(buffer.getArrayOfWritePointers() + route.beamFirst, count);
     }
 }
 
 void MotionProcessor::afterDeviceRate(juce::AudioBuffer<float>& buffer) {
-    motion::clampBrightness(outputMode.load(), buffer, buffer.getNumSamples());
+    const auto route = getRouting();
+    if (route.beamOn()) { motion::clampBrightness(route.beam, buffer, buffer.getNumSamples(), route.beamFirst); }
 }
 
 juce::AudioProcessorEditor* MotionProcessor::createEditor() {

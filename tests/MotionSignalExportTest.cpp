@@ -220,15 +220,35 @@ public:
             }
         }
 
-        beginTest("A device with too few channels for the beam's brightness plays it on X and Y");
+        beginTest("The sound and the beam play on outputs of their own, and a smaller device keeps what it can");
         {
             using Mode = motion::OutputMode;
-            expect(motion::playableOn(Mode::xyrgb, 5) == Mode::xyrgb);
-            expect(motion::playableOn(Mode::xyrgb, 3) == Mode::xy);
-            expect(motion::playableOn(Mode::xyz, 3) == Mode::xyz);
-            expect(motion::playableOn(Mode::xyzInverted, 2) == Mode::xy);
-            expect(motion::playableOn(Mode::xy, 1) == Mode::xy);
-            expect(motion::playableOn(Mode::soundtrack, 0) == Mode::soundtrack);
+            using Routing = motion::OutputRouting;
+            const Routing both {0, Mode::xy, 2};
+            expect(both.fits(4) && !both.fits(3) && both.channels() == 4);
+            expect(Routing::unpack(both.pack()) == both);
+            const Routing off {Routing::off, Mode::xyrgb, 3};
+            expect(Routing::unpack(off.pack()) == off && off.channels() == 8 && !off.soundOn());
+            expect(Routing {0, Mode::xy, 1}.overlaps(), "they can't share an output");
+            // What fits stays; a beam moves to free outputs; the sound gives way
+            // to it when there is no room for both; too wide plays on X and Y.
+            expect(motion::fitRouting(both, 16) == both);
+            expect(motion::fitRouting(Routing {0, Mode::xy, 6}, 4) == Routing({0, Mode::xy, 2}));
+            expect(motion::fitRouting(both, 2) == Routing({Routing::off, Mode::xy, 0}));
+            expect(motion::fitRouting(Routing {Routing::off, Mode::xyrgb, 0}, 3) == Routing({Routing::off, Mode::xy, 0}));
+            expect(motion::fitRouting(Routing {4, Mode::soundtrack, 0}, 2) == Routing({0, Mode::soundtrack, 0}));
+            // The beam written from its first output on, the rest left as they were.
+            juce::AudioBuffer<float> beam(6, 3), output(5, 3);
+            beam.clear();
+            beam.setSample(0, 0, .5f);
+            beam.setSample(1, 0, -.25f);
+            output.clear();
+            output.setSample(0, 0, .9f);
+            expect(motion::routeBeam(Mode::xy, beam, output, 3, 2));
+            expectEquals(output.getSample(2, 0), .5f);
+            expectEquals(output.getSample(3, 0), -.25f);
+            expectEquals(output.getSample(0, 0), .9f);
+            expect(!motion::routeBeam(Mode::xyz, beam, output, 3, 3), "no room past the last output");
         }
 
         beginTest("A scope's Z input gets the beam's brightness: its brightest colour, inverted on request");

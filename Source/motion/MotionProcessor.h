@@ -28,8 +28,9 @@ public:
     bool isUndoExcluded(const juce::String& paramID) const override {
         return CommonAudioProcessor::isUndoExcluded(paramID) || paramID == "visualiserPaused" || paramID == "textureOutputEnabled";
     }
-    OutputMode getOutputMode() const { return outputMode.load(); }
-    void setOutputMode(OutputMode value) { outputMode.store(value); }
+    // Where the sound and the beam play on the audio interface.
+    motion::OutputRouting getRouting() const { return motion::OutputRouting::unpack(routing.load()); }
+    void setRouting(const motion::OutputRouting& value) { routing.store(value.pack()); }
     // The live rate: exports use it so the file matches what the scope showed.
     double exportSampleRate() const {
         const auto rate = std::round(requestedSampleRate.load());
@@ -117,7 +118,7 @@ private:
     std::array<std::atomic<float>, motion::beamPropertySpecs.size()> scopeBeam;
     std::unique_ptr<motion::ScopeBeamSlots> scopeBeamSlots;
     juce::int64 oscillatorSample = 0;
-    std::atomic<OutputMode> outputMode { OutputMode::soundtrack };
+    std::atomic<std::uint32_t> routing { motion::OutputRouting {}.pack() };
     motion::PreparedState<motion::PreparedComposition> composition;
     motion::LiveSourceExchange liveSources;
     std::unique_ptr<motion::LiveBlenderController> blender;

@@ -95,22 +95,22 @@ try:
         raise RuntimeError("Audio gain undo failed")
     step("show gain graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("gain graph screenshot", "screenshot", "--file", session.artifact_dir / "soundtrack-gain.png")
-    # The output picker shows in the Scope header when there is room (it is
-    # also in the Audio menu).
+    # Output in the top bar opens a panel: the sound's outputs, the beam's
+    # form and where it plays. On a device with two outputs the beam takes
+    # them from the sound.
     step("widen workspace", "resize-window", "--w", 1440, "--h", 800)
-    step("select XY output", "select-option", "--name", "Audio output mode", "--text", "Beam XY")
-    if os.environ.get("MOTION_TEST_XYRGB") == "1":
-        step("enable five channel output", "select-option", "--name", "Audio output mode", "--text", "Beam XYRGB (5 ch)")
-        output = find(snapshot(), lambda node: node.get("componentName") == "Audio output mode")
-        if output is None or "XYRGB" not in str(output.get("value", "")):
-            raise RuntimeError("Five-channel device configuration failed")
-        step("five channel output screenshot", "screenshot", "--file", session.artifact_dir / "xyrgb-output.png")
-    if os.environ.get("MOTION_TEST_XYZ") == "1":
-        step("enable three channel output", "select-option", "--name", "Audio output mode", "--text", "Beam XYZ (3 ch)")
-        output = find(snapshot(), lambda node: node.get("componentName") == "Audio output mode")
-        if output is None or "XYZ" not in str(output.get("value", "")):
-            raise RuntimeError("Three-channel device configuration failed")
-        step("three channel output screenshot", "screenshot", "--file", session.artifact_dir / "xyz-output.png")
+    step("open output", "click", "--class", "MotionOutputButton", "--exact")
+    step("select XY output", "select-option", "--name", "Beam form", "--exact", "--text", "XY")
+    for variable, form, needs in (("MOTION_TEST_XYRGB", "XYRGB", "five"), ("MOTION_TEST_XYZ", "XYZ", "three")):
+        if os.environ.get(variable) != "1":
+            continue
+        step("enable " + needs + " channel output", "select-option", "--name", "Beam form", "--exact", "--text", form)
+        output = find(snapshot(), lambda node: node.get("componentName") == "Beam form")
+        if output is None or str(output.get("value", "")) != form:
+            raise RuntimeError(needs.capitalize() + "-channel device configuration failed")
+        step(needs + " channel output screenshot", "screenshot", "--source", "native", "--file", session.artifact_dir / (form.lower() + "-output.png"))
+    step("output panel screenshot", "screenshot", "--source", "native", "--file", session.artifact_dir / "output-panel.png")
+    step("close output", "click", "--name", "Close output", "--exact")
     # Every Output choice exports, whatever the device has room for; the
     # project's audio too, now there is some.
     step("open file menu", "click", "--name", "File", "--exact")
@@ -123,7 +123,10 @@ try:
     step("export audio menu screenshot", "screenshot", "--file", session.artifact_dir / "export-audio-menu.png")
     step("close export audio menu", "press", "Escape")
     step("close file menu", "press", "Escape")
-    step("restore music monitor", "select-option", "--name", "Audio output mode", "--text", "Audio")
+    step("open output again", "click", "--class", "MotionOutputButton", "--exact")
+    step("turn the beam off", "select-option", "--name", "Beam form", "--exact", "--text", "Off")
+    step("restore the sound", "select-option", "--name", "Sound outputs", "--exact", "--text", "Outputs 1\u20132")
+    step("close output again", "click", "--name", "Close output", "--exact")
     step("return to timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     step("split soundtrack", "press", "command + k", "--class", "MotionTimelineView")
     wait_undo("Split clip")

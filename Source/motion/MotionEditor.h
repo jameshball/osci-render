@@ -36,6 +36,7 @@
 #include "ui/LuaSourceEditor.h"
 #include "ui/TextAnimationPanel.h"
 #include "ui/ModelSizeInspector.h"
+#include "ui/OutputPanel.h"
 #include "ui/CompositionPanel.h"
 #include <deque>
 #include <variant>
@@ -472,7 +473,16 @@ private:
     void tap();
     bool compactTransport = false;
     juce::Label outputLabel;
-    juce::ComboBox monitorOutput;
+    MotionOutputButton outputButton;
+    juce::Component::SafePointer<MotionOutputPanel> outputPanel;
+    // The device the routing is for.
+    juce::String routingDevice;
+    // Where the sound and the beam play: the Output panel, and applying a
+    // routing (the device opened with outputs enough for it).
+    void showOutputPanel();
+    juce::Result applyRouting(motion::OutputRouting routing);
+    bool restoreRouting();
+    MotionOutputPanel::Device outputDevice() const;
     MotionPropertyInspector propertyInspector;
     MotionStatusBar statusBar;
     // When a frame was last simplified to fit the beam's time.

@@ -49,10 +49,10 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     // One export at a time. Audio as each Output choice plays it, whatever
     // the audio device has room for.
     juce::PopupMenu audio;
-    for (int item = 0; item < monitorOutput.getNumItems(); ++item) {
-        const auto id = monitorOutput.getItemId(item);
-        const auto soundtrack = static_cast<MotionProcessor::OutputMode>(id - 1) == MotionProcessor::OutputMode::soundtrack;
-        audio.addItem(firstExportAudioId + id - 1, (soundtrack ? juce::String("Audio") : monitorOutput.getItemText(item)) + "...", !soundtrack || soundtrackClip() != 0);
+    using Mode = MotionProcessor::OutputMode;
+    const std::pair<Mode, const char*> exports[] {{Mode::soundtrack, "Audio"}, {Mode::xy, "Beam XY"}, {Mode::xyz, "Beam XYZ (3 ch)"}, {Mode::xyzInverted, "Beam XYZ, inverted Z (3 ch)"}, {Mode::xyrgb, "Beam XYRGB (5 ch)"}};
+    for (const auto& [mode, name] : exports) {
+        audio.addItem(firstExportAudioId + static_cast<int>(mode), juce::String(name) + "...", mode != Mode::soundtrack || soundtrackClip() != 0);
     }
     menu.addSubMenu("Export audio", audio, exportState == nullptr);
 #if OSCI_PREMIUM

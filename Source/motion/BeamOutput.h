@@ -43,11 +43,11 @@ inline std::array<float, 5> beamSample(OutputMode mode, float x, float y, float 
 }
 
 // Plays the beam's signal (x, y, z, r, g, b channels) on an output in the
-// mode's channels. False, leaving the output as it was, for audio or when
-// the output has too few channels.
-inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, juce::AudioBuffer<float>& output, int count) {
+// mode's channels, from `first` on. False, leaving the output as it was,
+// for audio or when the output has too few channels.
+inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, juce::AudioBuffer<float>& output, int count, int first = 0) {
     const auto channels = beamOutputChannels(mode);
-    if (channels == 0 || output.getNumChannels() < channels || signal.getNumChannels() < 6) {
+    if (channels == 0 || first < 0 || output.getNumChannels() < first + channels || signal.getNumChannels() < 6) {
         return false;
     }
     const auto* x = signal.getReadPointer(0);
@@ -55,7 +55,7 @@ inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, j
     const auto* r = signal.getReadPointer(3);
     const auto* g = signal.getReadPointer(4);
     const auto* b = signal.getReadPointer(5);
-    auto* const* out = output.getArrayOfWritePointers();
+    auto* const* out = output.getArrayOfWritePointers() + first;
     for (int i = 0; i < count; ++i) {
         const auto sample = beamSample(mode, x[i], y[i], r[i], g[i], b[i]);
         for (int channel = 0; channel < channels; ++channel) {
@@ -65,29 +65,73 @@ inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, j
     return true;
 }
 
-// The mode an output with `active` channels can play: the beam on X and Y
-// when there are too few for its brightness.
-inline OutputMode playableOn(OutputMode mode, int active) {
-    return beamOutputChannels(mode) > std::max(active, 2) ? OutputMode::xy : mode;
-}
-
 // Keeps the brightness on a mode's output (Z, or red, green and blue) from
 // dark to full. Brought down to a slower device, a step in it rings past
 // both: light that can't be, flashing at a scope's Z input or a laser.
-inline void clampBrightness(OutputMode mode, juce::AudioBuffer<float>& output, int count) {
-    const auto channels = std::min(beamOutputChannels(mode), output.getNumChannels());
-    for (int channel = 2; channel < channels; ++channel) {
+inline void clampBrightness(OutputMode mode, juce::AudioBuffer<float>& output, int count, int first = 0) {
+    const auto channels = std::min(first + beamOutputChannels(mode), output.getNumChannels());
+    for (int channel = std::max(0, first) + 2; channel < channels; ++channel) {
         juce::FloatVectorOperations::clip(output.getWritePointer(channel), output.getReadPointer(channel), 0.0f, 1.0f, count);
     }
 }
 
-// Silences the beam on an output: still and dark. Silence alone isn't dark
-// on an inverted Z input, where no voltage lights the beam where it rests.
-inline void blankBeam(OutputMode mode, juce::AudioBuffer<float>& output, int count) {
-    output.clear(0, count);
-    if (mode == OutputMode::xyzInverted && output.getNumChannels() >= 3) {
-        juce::FloatVectorOperations::fill(output.getWritePointer(2), zBrightness(0, 0, 0, true), count);
+// Silences the beam on an output, from `first` on: still and dark. Silence
+// alone isn't dark on an inverted Z input, where no voltage lights the beam
+// where it rests.
+inline void blankBeam(OutputMode mode, juce::AudioBuffer<float>& output, int count, int first = 0) {
+    const auto channels = std::min(first + std::max(beamOutputChannels(mode), 2), output.getNumChannels());
+    for (int channel = std::max(0, first); channel < channels; ++channel) { output.clear(channel, 0, count); }
+    if (mode == OutputMode::xyzInverted && output.getNumChannels() >= first + 3) {
+        juce::FloatVectorOperations::fill(output.getWritePointer(first + 2), zBrightness(0, 0, 0, true), count);
     }
+}
+
+// Where the project plays on the audio interface: its sound on a pair of
+// outputs, the beam on as many outputs as its form needs, both, either or
+// neither. Outputs count from 0 (the interface's output 1).
+struct OutputRouting {
+    static constexpr int off = -1;
+    // The first of the sound's two outputs, or off.
+    int sound = 0;
+    // The beam's form (soundtrack: no beam), and its first output.
+    OutputMode beam = OutputMode::soundtrack;
+    int beamFirst = 0;
+
+    bool soundOn() const { return sound >= 0; }
+    bool beamOn() const { return beamOutputChannels(beam) > 0 && beamFirst >= 0; }
+    int beamChannels() const { return beamOn() ? beamOutputChannels(beam) : 0; }
+    // The outputs it needs open: up to the last it uses.
+    int channels() const { return std::max(soundOn() ? sound + 2 : 0, beamOn() ? beamFirst + beamChannels() : 0); }
+    bool overlaps() const { return soundOn() && beamOn() && sound < beamFirst + beamChannels() && beamFirst < sound + 2; }
+    bool fits(int outputs) const { return !overlaps() && channels() <= outputs; }
+    bool operator==(const OutputRouting&) const = default;
+
+    // One word for the audio thread.
+    std::uint32_t pack() const {
+        return static_cast<std::uint32_t>(sound + 1) | (static_cast<std::uint32_t>(beam) << 8) | (static_cast<std::uint32_t>(beamFirst + 1) << 16);
+    }
+    static OutputRouting unpack(std::uint32_t word) {
+        return {static_cast<int>(word & 0xff) - 1, static_cast<OutputMode>((word >> 8) & 0xff), static_cast<int>((word >> 16) & 0xff) - 1};
+    }
+};
+
+// The nearest routing a device with `outputs` outputs can play: what fits
+// stays as it was; the beam moves to the first outputs free of the sound,
+// or (failing that) the sound gives way to it; a beam too wide for the
+// device plays on X and Y alone.
+inline OutputRouting fitRouting(OutputRouting routing, int outputs) {
+    if (routing.fits(outputs)) { return routing; }
+    if (routing.soundOn() && routing.sound + 2 > outputs) { routing.sound = outputs >= 2 ? 0 : OutputRouting::off; }
+    if (routing.beamOn() && routing.beamChannels() > outputs) { routing.beam = outputs >= 2 ? OutputMode::xy : OutputMode::soundtrack; }
+    if (!routing.beamOn()) { return routing.fits(outputs) ? routing : OutputRouting {outputs >= 2 ? 0 : OutputRouting::off, OutputMode::soundtrack, 0}; }
+    for (int first = 0; first + routing.beamChannels() <= outputs; ++first) {
+        auto moved = routing;
+        moved.beamFirst = first;
+        if (moved.fits(outputs)) { return moved; }
+    }
+    routing.sound = OutputRouting::off;
+    routing.beamFirst = 0;
+    return routing;
 }
 
 }
