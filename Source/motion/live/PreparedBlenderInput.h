@@ -25,6 +25,7 @@ public:
     std::unique_ptr<BlenderCapture> finishCapture() { return receiver.finishCapture(); }
     void cancelCapture() { receiver.cancelCapture(); }
     bool capturing() const { return receiver.capturing(); }
+    bool captureEnded() const { return receiver.captureEnded(); }
     void checkCaptureTime() { receiver.checkCaptureTime(); }
     juce::String captureError() const { return receiver.captureError(); }
     BlenderReceiver::Status status() const { return receiver.getStatus(); }

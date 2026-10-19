@@ -303,6 +303,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
     controls->connectionStatus = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation ? owner->processor.blenderInputs().connectionText(id) : juce::String("Project changed"); };
     controls->captureError = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation ? owner->processor.blenderInputs().captureError(id) : juce::String(); };
     controls->isCapturing = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->processor.blenderInputs().capturing(id); };
+    controls->captureEnded = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->processor.blenderInputs().captureEnded(id); };
     controls->onCancelCapture = [owner, id, generation] {
         if (owner != nullptr && owner->processor.document.generation() == generation) { owner->processor.blenderInputs().cancelCapture(id); }
     };
@@ -322,13 +323,14 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
         auto recording = inputs.finishCapture(id);
         if (recording == nullptr) { return juce::Result::fail("There is no capture to save."); }
         if (recording->failure != motion::BlenderCapture::Failure::none) { return juce::Result::fail(recording->error()); }
+        const juce::String why = recording->endedBecause();
         auto capture = std::shared_ptr<const motion::BlenderCapture>(std::move(recording));
         auto task = std::make_shared<ImportState>();
         task->capture = true;
         task->name = (*source)->name + " capture";
         task->generation = generation;
         owner->pendingImports.push_back(task);
-        owner->imports.addJob([owner, id, generation, identity, task, capture] {
+        owner->imports.addJob([owner, id, generation, identity, task, capture, why] {
             auto asset = std::make_shared<motion::Asset>();
             asset->name = task->name;
             asset->extension = ".blender-capture";
@@ -340,7 +342,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
                     result = motion::decodeAsset(*asset, &task->cancelled, &task->progress);
                 } else { result = juce::Result::fail(archive.error); }
             } catch (const std::exception& error) { result = juce::Result::fail("Couldn't prepare the capture: " + juce::String(error.what())); }
-            juce::MessageManager::callAsync([owner, id, generation, identity, task, asset, result] {
+            juce::MessageManager::callAsync([owner, id, generation, identity, task, asset, result, why] {
                 if (owner == nullptr) { return; }
                 std::erase(owner->pendingImports, task);
                 if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
@@ -353,7 +355,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
                 owner->assetLibrary.refresh();
                 owner->assetLibrary.selectAsset(asset->id);
                 owner->libraryTabs.setSelectedIndex(0);
-                owner->captured(id, asset->id);
+                owner->captured(id, asset->id, why);
             });
         });
         juce::MessageManager::callAsync([owner, dialog] { if (owner != nullptr && dialog != nullptr) { owner->dismissOverlay(dialog.getComponent(), [] {}); } });
@@ -454,12 +456,17 @@ void MotionEditor::showTextureSettings(motion::Id id) {
     motion::ui::Sheet::show(*this, std::move(panel));
 }
 
-void MotionEditor::captured(motion::Id live, motion::Id capture) {
+void MotionEditor::captured(motion::Id live, motion::Id capture, const juce::String& why) {
     auto& document = processor.document;
     const auto source = motion::findAsset(document.mainProject().assets, live);
-    if (source == nullptr || document.assetUses(live) == 0) { captureForExport = 0; return; }
+    if (source == nullptr || document.assetUses(live) == 0) {
+        captureForExport = 0;
+        if (why.isNotEmpty()) { statusBar.show(why + " It's in the library.", MotionStatusBar::Kind::notice); }
+        return;
+    }
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const auto name = source->name;
+    const auto first = why.isNotEmpty() ? why + " " : juce::String();
     // Recorded to export with: its clips draw the capture straight away.
     if (captureForExport == live && captureForExportGeneration == document.generation()) {
         captureForExport = 0;
@@ -467,13 +474,13 @@ void MotionEditor::captured(motion::Id live, motion::Id capture) {
         if (used.failed()) { statusBar.show(used.getErrorMessage()); return; }
         const auto video = captureForVideo;
         const auto mode = captureForSignal;
-        statusBar.show("The capture now draws in place of " + name, MotionStatusBar::Kind::notice, video ? "Export video" : "Export audio", [owner, video, mode] {
+        statusBar.show(first + "The capture now draws in place of " + name, MotionStatusBar::Kind::notice, video ? "Export video" : "Export audio", [owner, video, mode] {
             if (owner == nullptr) { return; }
             if (video) { owner->exportVideo(); } else { owner->exportSignal(mode); }
         });
         return;
     }
-    statusBar.show("Captured " + name, MotionStatusBar::Kind::notice, "Use in its clips", [owner, live, capture] {
+    statusBar.show(first + "Captured " + name, MotionStatusBar::Kind::notice, "Use in its clips", [owner, live, capture] {
         if (owner == nullptr) { return; }
         const auto used = owner->processor.document.drawSourceInstead(live, capture);
         if (used.failed()) { owner->statusBar.show(used.getErrorMessage()); }

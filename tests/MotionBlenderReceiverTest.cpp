@@ -58,6 +58,23 @@ public:
         expectEquals(receiver.snapshot().serial, std::uint64_t(6));
         client.close();
 
+        beginTest("A capture ends when Blender disconnects, keeping what it recorded, not when it is saved");
+        expectConnect(client, port);
+        expect(wait([&] { return receiver.getStatus().state == State::connected; }));
+        expect(receiver.beginCapture(true));
+        expect(send(client, encodedFrame(8)));
+        expect(wait([&] { return receiver.snapshot().serial == 7; }));
+        expect(!receiver.captureEnded());
+        expect(send(client, "CLOSE\n"));
+        expect(wait([&] { return receiver.captureEnded(); }));
+        juce::Thread::sleep(300);
+        const auto ended = receiver.finishCapture();
+        expect(ended != nullptr && ended->ending == motion::BlenderCapture::Ending::disconnected && ended->failure == motion::BlenderCapture::Failure::none);
+        if (ended != nullptr) {
+            expect(ended->frames.size() >= 2 && ended->duration > 0 && ended->duration < .25, "ends at the disconnect, not at finish");
+        }
+        client.close();
+
         beginTest("Bind failure is reported without replacing another receiver");
         motion::BlenderReceiver occupied;
         occupied.start(port);
@@ -72,7 +89,7 @@ public:
         receiver.stop();
         expect(juce::Time::getMillisecondCounterHiRes() - before < 1000);
         expectEquals(static_cast<int>(receiver.getStatus().state), static_cast<int>(State::stopped));
-        expectEquals(receiver.snapshot().serial, std::uint64_t(6));
+        expectEquals(receiver.snapshot().serial, std::uint64_t(7));
         client.close();
         receiver.start(0);
         expect(wait([&] { return receiver.getStatus().state == State::listening; }));

@@ -115,16 +115,29 @@ int main() {
         "backwards capture timestamps reject atomically");
     motion::BlenderCapture duration(true);
     duration.begin(0, first);
-    duration.append(motion::BlenderCapture::maximumSeconds + .001, second);
-    check(duration.failure == motion::BlenderCapture::Failure::duration && !motion::BlenderCaptureArchive::encode(duration),
-        "ten-minute capture limit rejects atomically");
+    duration.append(1, second);
+    duration.append(motion::BlenderCapture::maximumSeconds + .001, third);
+    duration.finish(motion::BlenderCapture::maximumSeconds + 30);
+    check(duration.failure == motion::BlenderCapture::Failure::none && duration.ending == motion::BlenderCapture::Ending::duration
+        && duration.frames.size() == 2 && nearby(duration.duration, motion::BlenderCapture::maximumSeconds) && motion::BlenderCaptureArchive::encode(duration),
+        "a capture reaching the ten-minute limit ends there and keeps the ten minutes");
     motion::BlenderCapture updateLimit(true);
     updateLimit.begin(0, first);
     for (std::size_t index = 1; index <= motion::BlenderCapture::maximumFrames; ++index) {
         updateLimit.append(static_cast<double>(index) * .01, index % 2 == 0 ? second : third);
     }
-    check(updateLimit.failure == motion::BlenderCapture::Failure::frames && !motion::BlenderCaptureArchive::encode(updateLimit),
-        "frame-count limit rejects before archive publication");
+    updateLimit.finish(1000);
+    check(updateLimit.failure == motion::BlenderCapture::Failure::none && updateLimit.ending == motion::BlenderCapture::Ending::frames
+        && updateLimit.frames.size() == motion::BlenderCapture::maximumFrames && nearby(updateLimit.duration, static_cast<double>(motion::BlenderCapture::maximumFrames) * .01)
+        && motion::BlenderCaptureArchive::encode(updateLimit), "a capture reaching its update limit ends there and keeps what it has");
+    motion::BlenderCapture disconnected(true);
+    disconnected.begin(0, first);
+    disconnected.append(.5, second);
+    disconnected.end(2, motion::BlenderCapture::Ending::disconnected);
+    disconnected.append(3, third);
+    disconnected.finish(30);
+    check(disconnected.ended() && disconnected.frames.size() == 2 && nearby(disconnected.duration, 2) && motion::BlenderCaptureArchive::encode(disconnected),
+        "a capture ends when Blender disconnects, not when it is saved");
 
     std::vector<std::uint8_t> oversized(motion::BlenderCaptureArchive::maximumBytes + 1, 0);
     check(!motion::BlenderCaptureArchive::decode(oversized), "archive byte limit rejects before parsing");

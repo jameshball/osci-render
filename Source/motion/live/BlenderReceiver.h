@@ -99,6 +99,11 @@ public:
         const juce::SpinLock::ScopedLockType guard(lock);
         return capture != nullptr;
     }
+    // A capture still waiting to be saved, which ended by itself.
+    bool captureEnded() const {
+        const juce::SpinLock::ScopedLockType guard(lock);
+        return capture != nullptr && capture->ended();
+    }
 
     static constexpr std::size_t maximumMessageBytes = 10 * 1024 * 1024;
 
@@ -106,7 +111,7 @@ private:
     static double nowSeconds() { return juce::Time::getMillisecondCounterHiRes() / 1000.0; }
     void setState(State state, juce::String message) {
         const juce::SpinLock::ScopedLockType guard(lock);
-        if (capture != nullptr && !capture->freezeOnDisconnect && state != State::connected) { capture->append(nowSeconds(), nullptr); }
+        if (capture != nullptr && status.state == State::connected && state != State::connected) { capture->end(nowSeconds(), BlenderCapture::Ending::disconnected); }
         status.state = state;
         status.message = std::move(message);
     }

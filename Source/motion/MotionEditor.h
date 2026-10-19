@@ -253,7 +253,8 @@ private:
     bool captureForVideo = false;
     MotionProcessor::OutputMode captureForSignal = MotionProcessor::OutputMode::xyrgb;
     // A capture of the live source `live` was saved as `capture`.
-    void captured(motion::Id live, motion::Id capture);
+    // `why` it ended by itself, if it did.
+    void captured(motion::Id live, motion::Id capture, const juce::String& why = {});
     struct ExportState;
     void startVideoExport(std::shared_ptr<ExportState> state, motion::Project project, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot,
         VisualiserRenderer::RenderMode renderMode, VideoEncodingConfiguration config, juce::File destination, std::function<void(bool)> finished);

@@ -132,9 +132,9 @@ try:
     command("wait", "--ms", "250")
     step("recording capture controls", "screenshot", "--file", session.artifact_dir / "blender-capturing.png")
     sender.sendall(b"CLOSE\n"); sender.close(); sender = None
-    command("wait", "--ms", "250")
-    step("save portable capture", "click", "--component-name", "Save Blender capture")
+    # Blender disconnecting ends the capture there, and it saves itself.
     command("wait-for-locator", "--class", "juce::ListBox::RowComponent", "--name", "Live diamond capture", "--exact", "--timeout-ms", "15000")
+    command("wait-for-locator", "--name", "Blender disconnected, so the capture ended there. Captured Live diamond", "--role", "label", "--exact", "--timeout-ms", "5000")
     command("wait", "--ms", "400")
     step("select captured asset", "click", "--class", "juce::ListBox::RowComponent", "--name", "Live diamond capture", "--exact", "--position", "60,20")
     step("insert captured asset", "press", "Return", "--component-name", "Motion assets")
@@ -152,7 +152,7 @@ try:
     archive = bits.to_bytes(int(size), "little")
     assert archive[:8] == b"MOTVEC01"
     capture_clip = next(item for item in clips if item.get("asset") == captured[0].get("id"))
-    assert 0.7 < float(capture_clip.get("duration")) < 10
+    assert 0.3 < float(capture_clip.get("duration")) < 10
     source = saved_xml.find("./composition/asset/blender")
     assert source is not None and source.get("port") == str(port) and source.get("disconnect") == "blank"
     step("captured output after live disconnect", "screenshot", "--file", session.artifact_dir / "blender-disconnected.png")

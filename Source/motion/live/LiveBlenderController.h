@@ -57,6 +57,10 @@ public:
         const auto* session = sessionFor(id);
         return session != nullptr && session->input->capturing();
     }
+    bool captureEnded(Id id) const {
+        const auto* session = sessionFor(id);
+        return session != nullptr && session->input->captureEnded();
+    }
     // What the library says of a source: its capture while one runs, else
     // its connection.
     juce::String statusText(Id id) const {
