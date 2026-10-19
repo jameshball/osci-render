@@ -122,8 +122,8 @@ bool MotionEditor::ffmpegReady(std::function<void()> resume) {
 
 void MotionEditor::exportVideo(bool leaveOutLive) {
 #if OSCI_PREMIUM
-    if (exportState != nullptr || waitsForSliderBakes()) { return; }
     const juce::Component::SafePointer<MotionEditor> self(this);
+    if (exportState != nullptr || waitsForSliderBakes([self, leaveOutLive] { if (self != nullptr) { self->exportVideo(leaveOutLive); } })) { return; }
     if (!leaveOutLive && waitsForCapture(true, [self] { if (self != nullptr) { self->exportVideo(true); } })) { return; }
     if (!ffmpegReady([self, leaveOutLive] { if (self != nullptr) { self->exportVideo(leaveOutLive); } })) { return; }
     std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
@@ -381,13 +381,16 @@ void MotionEditor::continueCommandLineRender() {
 #endif
 }
 
-// An export drawn before the Lua sliders finish baking would leave them out.
-bool MotionEditor::waitsForSliderBakes() {
+// An export drawn before the Lua sliders finish baking would leave them out,
+// so it waits for them.
+bool MotionEditor::waitsForSliderBakes(std::function<void()> resume) {
     sliderBakes.update();
     if (!sliderBakes.busy()) {
         return false;
     }
-    statusBar.show("The Lua sliders are still baking. Export once they're done.", MotionStatusBar::Kind::notice);
+    afterSliderBakes = std::move(resume);
+    afterSliderBakesGeneration = processor.document.generation();
+    statusBar.showWorking(waitingForSliderBakes);
     return true;
 }
 
@@ -395,10 +398,10 @@ void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutL
     // The project's audio draws nothing: Lua sliders and live sources don't
     // matter to it.
     const auto beam = motion::beamOutputChannels(mode) > 0;
-    if (exportState != nullptr || (beam && waitsForSliderBakes())) {
+    const juce::Component::SafePointer<MotionEditor> self(this);
+    if (exportState != nullptr || (beam && waitsForSliderBakes([self, mode, leaveOutLive] { if (self != nullptr) { self->exportSignal(mode, leaveOutLive); } }))) {
         return;
     }
-    const juce::Component::SafePointer<MotionEditor> self(this);
     if (beam && !leaveOutLive && waitsForCapture(false, [self, mode] { if (self != nullptr) { self->exportSignal(mode, true); } })) {
         captureForSignal = mode;
         return;

@@ -89,8 +89,9 @@ private:
     static juce::File withExtension(juce::File chosen, const juce::String& extension);
     // Says an export is done, with a way to find it.
     void exported(const juce::File& file);
-    // True (and says so) while Lua sliders are still baking.
-    bool waitsForSliderBakes();
+    // True while Lua sliders are still baking: `resume` then runs once they
+    // land (not if one fails or another project opens first).
+    bool waitsForSliderBakes(std::function<void()> resume);
 
     // Construction, by area of the workspace.
     void setUpMenus();
@@ -347,6 +348,9 @@ private:
         void componentBeingDeleted(juce::Component& overlay) override { overlay.removeComponentListener(this); }
     } dialogStyle;
     motion::LuaSliderBakes sliderBakes { processor.document };
+    std::function<void()> afterSliderBakes;
+    std::uint64_t afterSliderBakesGeneration = 0;
+    static constexpr const char* waitingForSliderBakes = "Exporting once the Lua sliders finish baking...";
     MotionTimelineView timeline;
     MotionCompositionView composition;
     // The beam's shares at the playhead, for Properties.

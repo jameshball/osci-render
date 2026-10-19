@@ -78,7 +78,15 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     processor.document.addChangeListener(this);
     auto* holder = juce::StandalonePluginHolder::getInstance();
     if (holder != nullptr) { holder->deviceManager.addChangeListener(this); }
-    sliderBakes.onStatus = [this](const juce::String& text, bool error) { statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice); };
+    sliderBakes.onStatus = [this](const juce::String& text, bool error) {
+        statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice);
+        // An export asked for while they baked goes ahead once they're done.
+        if (afterSliderBakes == nullptr || (!error && sliderBakes.busy())) { return; }
+        auto resume = std::exchange(afterSliderBakes, nullptr);
+        if (error) { return; }
+        const juce::Component::SafePointer<MotionEditor> self(this);
+        juce::MessageManager::callAsync([self, resume] { if (self != nullptr) { resume(); } });
+    };
     // Beam overloaded: why, and the next rate up to draw it whole.
     statusBar.onOverload = [this](juce::Component& mark) {
         const auto rate = processor.document.mainProject().sampleRate;
@@ -659,6 +667,11 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
 void MotionEditor::refreshFromDocument() {
     // A drawing belongs to the project it was started in.
     if (sceneEditor != nullptr && processor.document.generation() != sceneEditorGeneration) { closeSceneEditor(); }
+    // So does an export waiting for its Lua sliders.
+    if (afterSliderBakes != nullptr && processor.document.generation() != afterSliderBakesGeneration) {
+        afterSliderBakes = nullptr;
+        if (statusBar.text() == waitingForSliderBakes) { statusBar.clear(); }
+    }
     // An undo or a delete can remove what was selected. Undoing an extraction
     // removes the parts it made and selects the clips they came from again.
     if (selection != 0 && !selectionExists()) {
