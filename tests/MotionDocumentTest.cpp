@@ -119,6 +119,12 @@ public:
         expect(opensLeavingOut(loaded, invalid), "a marker that isn't valid is left out");
         expect(loaded.project().markers.empty());
         expect(loaded.load(document.save()).wasOk());
+        // A composition, or a clip, past 24 hours is what no edit makes: reset or left out.
+        auto endless = document.save();
+        endless.setAttribute("duration", 1.0e30);
+        expect(opensLeavingOut(loaded, endless), "a composition 1e30 s long is reset");
+        expectEquals(loaded.project().duration, 180.0);
+        expect(loaded.load(document.save()).wasOk());
         // An identity so high that new ones would run into the Scope's is refused.
         auto crowded = document.save();
         crowded.getChildByName("marker")->setAttribute("id", juce::String(static_cast<juce::uint64>(motion::Document::maximumId)));

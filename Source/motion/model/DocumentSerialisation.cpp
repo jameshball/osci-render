@@ -402,7 +402,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         if (!allowed) { notes.note("Composition setting that isn't valid, reset", name); }
     };
     const auto duration = xml.getDoubleAttribute("duration", 180);
-    setting(project.duration, duration, std::isfinite(duration) && duration > 0, "duration", 180.0);
+    setting(project.duration, duration, std::isfinite(duration) && duration > 0 && duration <= ClipTiming::longest, "duration", 180.0);
     const auto fps = xml.getDoubleAttribute("fps", defaults.frameRate);
     setting(project.frameRate, fps, std::isfinite(fps) && fps >= 0.001 && fps <= 1000, "frame rate", defaults.frameRate);
     const auto bpm = xml.getDoubleAttribute("bpm", 120);
@@ -579,6 +579,11 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                     notes.note("Audio clip gain or pan that isn't valid, reset", clipName);
                     clip.properties = defaultProperties(audioPropertySpecs);
                 }
+            }
+            // Within what an edit may set (see ClipTiming::withinLimits).
+            if (!clip.timing(project.tempo()).withinLimits()) {
+                notes.note("Clip timed past 24 hours or over 1000 times as fast", clipName);
+                continue;
             }
             if (!track.insert(std::move(clip), project.tempo())) {
                 notes.note("Clip that overlaps another on its track, or has no length", clipName);
