@@ -1076,15 +1076,21 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         if (event.x >= namesWidth) { gesture = ClipMarquee {juce::Rectangle<int>(event.getPosition(), event.getPosition()), event.getPosition(), std::move(base)}; }
         return;
     }
+    // Shift takes the run from the clip clicked last to this one: every clip
+    // on the tracks between them, within their times (with Cmd too, added to
+    // the selection). Cmd alone adds or removes one.
+    if (event.mods.isShiftDown() && clipAnchor != 0 && clipAnchor != clip->id && selectRange(clipAnchor, clip->id, event.mods.isCommandDown())) { return; }
     if (event.mods.isShiftDown() || event.mods.isCommandDown()) {
         if (selectedClips.contains(clip->id)) {
             selectedClips.erase(clip->id);
         } else {
             selectedClips.insert(clip->id);
         }
+        clipAnchor = clip->id;
         notifySelection(selectedClips.contains(clip->id) ? clip->id : (selectedClips.empty() ? 0 : *selectedClips.begin()));
         return;
     }
+    clipAnchor = clip->id;
     if (processor.document.project().tracks[row].locked) { selectClip(clip->id); return; }
     const auto id = clip->id;
     const auto bounds = clipBounds(*clip, row);
@@ -2812,4 +2818,36 @@ void MotionTimelineView::paintCompositionRow(juce::Graphics& g, int y, int heigh
     }
     g.setColour(motion::style::keyTick().withMultipliedAlpha(opacity));
     g.fillPath(ticks);
+}
+
+bool MotionTimelineView::selectRange(motion::Id from, motion::Id to, bool adding) {
+    const auto& project = processor.document.project();
+    const auto tempo = project.tempo();
+    // Each clip's track, as the rows list them, and its span.
+    const auto locate = [&](motion::Id id) -> std::optional<std::pair<int, motion::ClipTiming>> {
+        for (std::size_t row = 0; row < rows.size(); ++row) {
+            if (rows[row].isLane() || rows[row].track < 0) { continue; }
+            for (const auto& clip : project.tracks[static_cast<std::size_t>(rows[row].track)].clips) {
+                if (clip.id == id) { return std::pair {static_cast<int>(row), clip.timing(tempo)}; }
+            }
+        }
+        return std::nullopt;
+    };
+    const auto first = locate(from), last = locate(to);
+    if (!first.has_value() || !last.has_value()) { return false; }
+    const auto top = std::min(first->first, last->first), bottom = std::max(first->first, last->first);
+    const auto start = std::min(first->second.start, last->second.start), end = std::max(first->second.end(), last->second.end());
+    auto picked = adding ? selectedClips : std::set<motion::Id> {};
+    for (auto row = top; row <= bottom; ++row) {
+        const auto& item = rows[static_cast<std::size_t>(row)];
+        if (item.isLane() || item.track < 0) { continue; }
+        for (const auto& clip : project.tracks[static_cast<std::size_t>(item.track)].clips) {
+            const auto timing = clip.timing(tempo);
+            if (timing.start < end && timing.end() > start) { picked.insert(clip.id); }
+        }
+    }
+    selectedClips = std::move(picked);
+    notifySelection(to);
+    repaint();
+    return true;
 }

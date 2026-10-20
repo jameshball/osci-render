@@ -583,7 +583,7 @@ void MotionEditor::showShortcuts() {
         sections.push_back(std::move(section));
     }
     sections.push_back({"Timeline", {{"V / B / S / R", "Move, ripple trim, slip and stretch tools"}, {"M", "Add a marker at the playhead"}, {"Cmd+click the ruler", "Move the nearer loop point there"},
-        {"Drag empty space", "Select clips (Shift adds)"}, {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"},
+        {"Drag empty space", "Select clips (Shift adds)"}, {"Shift+click a clip", "Select every clip from the last one clicked (Cmd too: add them)"}, {"Cmd+click a clip", "Add or remove it"}, {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"},
         {"Double-click a lane", "Add a key"}, {"Alt+Left / Right", "Nudge the selected keys, or else clips, a frame (Shift: ten)"}}});
     sections.push_back({"Scrolling and zoom (timeline, graph)", {{"Wheel / two fingers", "Pan (Shift: horizontal)"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
         {"Alt+wheel", "Track height, value range or key height"}}});

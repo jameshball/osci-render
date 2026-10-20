@@ -427,6 +427,9 @@ public:
     void groupSelectedTracks();
     // Selects the composition, so Properties shows its effects.
     void showCompositionEffects();
+    // Every clip on the tracks from `from`'s to `to`'s within both their times;
+    // `adding` keeps what was selected. False if either is gone.
+    bool selectRange(motion::Id from, motion::Id to, bool adding);
     // The selected clips into a new composition, used where they were
     // (Cmd+Shift+C, as After Effects' Pre-compose; Alt+G too, as Final Cut).
     void createCompositionFromSelection();
@@ -586,6 +589,8 @@ private:
     mutable std::vector<int> rowTops;
     mutable int contentHeight = 0;
     mutable std::set<motion::Id> expandedTracks;
+    // The clip clicked last: where a Shift-click's run starts.
+    motion::Id clipAnchor = 0;
     mutable std::set<motion::Id> collapsedGroups;
     mutable std::uint64_t layoutGeneration = 0;
     mutable std::optional<std::uint64_t> layoutRevision;
