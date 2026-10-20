@@ -45,7 +45,7 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
         menu.addSubMenu("Light preset", presets);
     }
     menu.addSeparator();
-    menu.addItem(4, "Create composition from selection", !locked && !selectedClips.empty());
+    menu.addItem(motion::style::menuItem("Create composition from selection", 4, "Cmd+Shift+C").setEnabled(!locked && !selectedClips.empty()));
     if (definition != 0) { menu.addItem(5, "Open composition"); menu.addItem(6, "Make composition unique", !locked); }
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
         if (result >= 39 && result < 40 + static_cast<int>(motion::lightPresets.size())) {
@@ -60,13 +60,7 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
         } else if (result == 3 && onMakeUnique) {
             onMakeUnique(id);
         } else if (result == 4) {
-            motion::Id instance = 0;
-            auto& document = processor.document;
-            const auto name = "Composition " + juce::String(document.mainProject().definitions.size() + 1);
-            const auto created = document.createComposition({selectedClips.begin(), selectedClips.end()}, name, instance);
-            if (created.failed()) { if (onError) { onError(created.getErrorMessage()); } return; }
-            selectClip(instance);
-            refreshTracks();
+            createCompositionFromSelection();
         } else if (result == 5 && onEnterComposition) {
             onEnterComposition(id);
         } else if (result == 7 || result == 8) {
@@ -521,4 +515,18 @@ void MotionTimelineView::fitProject() {
     animateView(std::clamp(std::max(1, getWidth() - namesWidth - 20) / duration, 0.000001, 500.0), 0.0);
     resized();
     repaint();
+}
+
+void MotionTimelineView::createCompositionFromSelection() {
+    if (selectedClips.empty()) {
+        if (onError) { onError("Select clips to make a composition of them."); }
+        return;
+    }
+    motion::Id instance = 0;
+    auto& document = processor.document;
+    const auto name = "Composition " + juce::String(document.mainProject().definitions.size() + 1);
+    const auto created = document.createComposition({selectedClips.begin(), selectedClips.end()}, name, instance);
+    if (created.failed()) { if (onError) { onError(created.getErrorMessage()); } return; }
+    selectClip(instance);
+    refreshTracks();
 }

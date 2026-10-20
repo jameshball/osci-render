@@ -136,6 +136,9 @@ void MotionEditor::registerCommands() {
         timeline.selectClips(duplicates);
     });
     addCommand(2, "Group tracks", juce::KeyPress('g', command, 0), "Cmd+G", [this] { timeline.groupSelectedTracks(); });
+    // After Effects' Pre-compose keys; Final Cut's and CapCut's Alt+G works too.
+    addCommand(2, "Create composition from selection", juce::KeyPress('c', command | shift, 0), "Cmd+Shift+C", [this] { timeline.createCompositionFromSelection(); });
+    addCommand(0, "Create composition from selection", juce::KeyPress('g', juce::ModifierKeys::altModifier, 0), {}, [this] { timeline.createCompositionFromSelection(); });
     menus.addMenuSeparator(2);
     // After Effects conventions: [ and ] move the clip's start or end to the
     // playhead; Alt+[ and Alt+] trim it there.
@@ -572,7 +575,7 @@ void MotionEditor::showShortcuts() {
         }
         sections.push_back(std::move(section));
     }
-    sections.push_back({"Timeline", {{"V / B / S / R", "Move, ripple trim, slip and stretch tools"}, {"M", "Add a marker at the playhead"},
+    sections.push_back({"Timeline", {{"V / B / S / R", "Move, ripple trim, slip and stretch tools"}, {"M", "Add a marker at the playhead"}, {"Cmd+click the ruler", "Move the nearer loop point there"},
         {"Drag empty space", "Select clips (Shift adds)"}, {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"},
         {"Double-click a lane", "Add a key"}, {"Alt+Left / Right", "Nudge the selected keys, or else clips, a frame (Shift: ten)"}}});
     sections.push_back({"Scrolling and zoom (timeline, graph)", {{"Wheel / two fingers", "Pan (Shift: horizontal)"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
