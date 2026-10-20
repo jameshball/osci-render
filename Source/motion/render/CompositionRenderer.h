@@ -579,10 +579,15 @@ struct PreparedCamera {
 // editorGeometry: the editor's shapes, rebuilt during drags.
 enum class CompositionPurpose { signal, culling, editorGeometry };
 
-// Whole beam cycles per video frame, at least 45 Hz so scopes do not flicker.
-inline double beamCycleRate(double frameRate) {
+// The beam's base frequency: whole cycles per video frame, `cycles` of them,
+// or (0) as few as reach 45 Hz so scopes do not flicker.
+inline double automaticBeamCycles(double frameRate) {
+    if (!std::isfinite(frameRate) || frameRate <= 0) { return 1; }
+    return std::max(1.0, std::ceil(45.0 / frameRate - 1.0e-9));
+}
+inline double beamCycleRate(double frameRate, int cycles = 0) {
     if (!std::isfinite(frameRate) || frameRate <= 0) { return 60; }
-    return frameRate * std::max(1.0, std::ceil(45.0 / frameRate - 1.0e-9));
+    return frameRate * (cycles > 0 ? static_cast<double>(cycles) : automaticBeamCycles(frameRate));
 }
 
 // The Scope's picture in project time: each beam property's curve with its
@@ -607,7 +612,7 @@ struct PreparedBeam {
 inline hidden::Reach squareScope() { return hidden::Reach::ofCanvas(1, 1, VisualiserGeometry::signalGain); }
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = squareScope()) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = squareScope()) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate, project.beamCycles)), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         // Editor geometry is rebuilt during drags; loudness modulation only
         // matters to the signal, so the envelope is built there alone.

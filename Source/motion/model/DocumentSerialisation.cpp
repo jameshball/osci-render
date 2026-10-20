@@ -720,6 +720,7 @@ juce::XmlElement Document::save(const Project& project) {
     xml.setAttribute("scopeSettle", exactNumber(project.scope.settleMicros));
     if (project.scope.xyOnly) { xml.setAttribute("scopeXYOnly", true); }
     xml.setAttribute("sampleRate", exactNumber(project.sampleRate));
+    if (project.beamCycles != 0) { xml.setAttribute("beamCycles", project.beamCycles); }
     if (project.description.isNotEmpty()) { xml.setAttribute("description", project.description); }
     auto* exporting = xml.createNewChildElement("export");
     exporting->setAttribute("width", project.exportSettings.width);
@@ -830,6 +831,11 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     if (!Project::validSampleRate(project.sampleRate)) {
         notes.note("Sample rate this version can't draw at, set to 192 kHz", juce::String(project.sampleRate) + " Hz");
         project.sampleRate = Project::defaultSampleRate;
+    }
+    project.beamCycles = xml.getIntAttribute("beamCycles", 0);
+    if (project.beamCycles < 0 || project.beamCycles > Project::mostBeamCycles) {
+        notes.note("Beam frequency that isn't valid, set to Auto", juce::String(project.beamCycles) + " times a frame");
+        project.beamCycles = 0;
     }
     project.description = xml.getStringAttribute("description").trim().substring(0, Project::longestDescription);
     const auto* exporting = xml.getChildByName("export");

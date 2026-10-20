@@ -92,6 +92,29 @@ public:
     }
 
     void testMarkers() {
+        beginTest("The beam's base frequency is the frame rate times whole cycles, Auto reaching 45 Hz, and it is saved");
+        {
+            expectEquals(motion::beamCycleRate(24), 48.0);
+            expectEquals(motion::beamCycleRate(60), 60.0);
+            expectEquals(motion::beamCycleRate(24, 1), 24.0);
+            expectEquals(motion::beamCycleRate(24, 3), 72.0);
+            expectEquals(motion::beamCycleRate(0, 3), 60.0);
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            document.edit("Change beam frequency", [](motion::Project& project) { project.beamCycles = 3; });
+            juce::UndoManager loadedUndo;
+            motion::Document loaded(loadedUndo);
+            expect(loaded.load(document.save()).wasOk());
+            expectEquals(loaded.mainProject().beamCycles, 3);
+            expectEquals(motion::PreparedComposition(loaded.mainProject()).beamRate, 180.0);
+            auto wild = document.save();
+            wild.setAttribute("beamCycles", 99);
+            expect(opensLeavingOut(loaded, wild), "a beam frequency no setting makes is reset to Auto");
+            expectEquals(loaded.mainProject().beamCycles, 0);
+            expect(undo.undo());
+            expectEquals(document.mainProject().beamCycles, 0);
+        }
+
         beginTest("Markers support scoped editing, undo, persistence and independent composition copies");
         juce::UndoManager undo;
         motion::Document document(undo);

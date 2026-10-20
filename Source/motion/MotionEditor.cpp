@@ -93,6 +93,17 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         juce::MessageManager::callAsync([self, resume] { if (self != nullptr) { resume(); } });
     };
     // Beam overloaded: why, and the next rate up to draw it whole.
+    // The rates lead to where the beam's frequency is set, marked there.
+    statusBar.onStatisticsClicked = [this] {
+        select(0);
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        juce::MessageManager::callAsync([owner] {
+            if (owner == nullptr || !owner->compositionSettings.beamField().isShowing()) { return; }
+            osci::RevealOptions options;
+            options.margin = motion::style::padding;
+            owner->propertyInspector.reveal(owner->compositionSettings.beamField(), options);
+        });
+    };
     statusBar.onOverload = [this](juce::Component& mark) {
         const auto rate = processor.document.mainProject().sampleRate;
         // Up to the default from below it; past that, twice as fast.
@@ -494,7 +505,7 @@ void MotionEditor::timerCallback() {
     }
     {
         const auto rate = processor.exportSampleRate();
-        const auto beamRate = motion::beamCycleRate(processor.document.mainProject().frameRate);
+        const auto beamRate = motion::beamCycleRate(processor.document.mainProject().frameRate, processor.document.mainProject().beamCycles);
         const auto layers = processor.beamLayers.load(std::memory_order_relaxed);
         const auto simplified = processor.beamSimplified.load(std::memory_order_relaxed);
         const auto dot = motion::style::dot();

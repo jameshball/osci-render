@@ -3,6 +3,7 @@
 #include "../MotionProcessor.h"
 #include "TypedNumber.h"
 #include "MotionStyle.h"
+#include "../render/CompositionRenderer.h"
 #include <array>
 #include <functional>
 
@@ -16,7 +17,7 @@ public:
         setName("Composition settings");
         motion::style::inspector::styleHeading(title, "Timing");
         addAndMakeVisible(title);
-        const std::array<const char*, 4> labels {"Duration", "Rate", "Tempo", "Meter"};
+        const std::array<const char*, 5> labels {"Duration", "Rate", "Tempo", "Meter", "Beam"};
         for (std::size_t index = 0; index < captions.size(); ++index) {
             motion::style::inspector::styleCaption(captions[index], labels[index]);
             addAndMakeVisible(captions[index]);
@@ -39,7 +40,13 @@ public:
         for (std::size_t index = 0; index < rateNames.size(); ++index) { frameRate.addItem(rateNames[index], 500 + static_cast<int>(index)); }
         meter.setName("Composition meter");
         for (const auto beats : {2, 3, 4, 5, 6, 7}) { meter.addItem(juce::String(beats) + "/4", 400 + beats); }
-        for (auto* combo : {&frameRate, &meter}) {
+        // The beam's base frequency: whole times a frame is drawn, so each
+        // frame plays whole; the items are made for the frame rate in refresh().
+        beam.setName("Composition beam frequency");
+        beam.setTitle("Beam frequency");
+        beam.setTooltip("The beam's base frequency: how many times a second the picture is drawn. Each frame is drawn a whole number of times, so it follows the frame rate. Below 45 Hz a scope's picture flickers; higher draws each frame with fewer points.");
+        frameRate.setTooltip("Frames a second. The beam draws each frame a whole number of times (see Beam)");
+        for (auto* combo : {&frameRate, &meter, &beam}) {
             motion::style::styleField(*combo);
             combo->onChange = [this, combo] { if (!updating && onTiming) { onTiming(combo->getSelectedId()); } };
             addAndMakeVisible(*combo);
@@ -74,6 +81,21 @@ public:
     std::function<void(const juce::String&)> onError;
     std::function<void()> onHeightChanged;
     static constexpr std::array<double, 8> rates {24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120};
+    // The Timing menu's ids for the beam's frequency: Auto, then 1 to 8 cycles a frame.
+    static constexpr int beamCommand = 800, beamChoiceCount = 8;
+    static juce::String hertz(double value) { return juce::String(value, value == std::floor(value) ? 0 : 2) + " Hz"; }
+    static std::vector<std::pair<int, juce::String>> beamChoices(double frameRate) {
+        std::vector<std::pair<int, juce::String>> choices;
+        choices.emplace_back(beamCommand, "Auto" + motion::style::dot() + hertz(motion::beamCycleRate(frameRate)));
+        for (int cycles = 1; cycles <= beamChoiceCount; ++cycles) {
+            const auto times = cycles == 1 ? juce::String("once a frame") : cycles == 2 ? juce::String("twice a frame") : juce::String(cycles) + " times a frame";
+            const auto rate = motion::beamCycleRate(frameRate, cycles);
+            choices.emplace_back(beamCommand + cycles, hertz(rate) + motion::style::dot() + times + (rate < 45 ? " (flickers)" : ""));
+        }
+        return choices;
+    }
+    // Where the beam's frequency is set, for the status bar's rates to lead to.
+    juce::Component& beamField() { return beam; }
 
     void setShown(bool value) {
         if (shown == value) { return; }
@@ -85,7 +107,7 @@ public:
         if (!shown) {
             return 0;
         }
-        const auto timing = motion::style::inspector::headingHeight + 2 * motion::style::inspector::row + 10;
+        const auto timing = motion::style::inspector::headingHeight + 3 * motion::style::inspector::row + 10;
         return timing + (aboutShown ? aboutGap + motion::style::inspector::headingHeight + aboutHeight + 10 : 0);
     }
     void refresh() {
@@ -112,12 +134,17 @@ public:
         frameRate.setSelectedId(rate, juce::dontSendNotification);
         if (rate == 0) { frameRate.setText(juce::String(project.frameRate, 3) + " fps", juce::dontSendNotification); }
         meter.setSelectedId(400 + project.beatsPerBar, juce::dontSendNotification);
+        // Beam: Auto, or once, twice... a frame, each named for its frequency.
+        const auto& main = processor.document.mainProject();
+        beam.clear(juce::dontSendNotification);
+        for (const auto& [id, text] : beamChoices(main.frameRate)) { beam.addItem(text, id); }
+        beam.setSelectedId(beamCommand + main.beamCycles, juce::dontSendNotification);
         updating = false;
     }
     void resized() override {
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
-        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter});
+        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter, &beam});
         area.removeFromTop(aboutGap);
         aboutTitle.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
         area.removeFromTop(4);
@@ -183,6 +210,6 @@ private:
     bool aboutShown = false;
     juce::Label title, length, tempo, aboutTitle;
     juce::TextEditor about;
-    std::array<juce::Label, 4> captions;
-    juce::ComboBox frameRate, meter;
+    std::array<juce::Label, 5> captions;
+    juce::ComboBox frameRate, meter, beam;
 };

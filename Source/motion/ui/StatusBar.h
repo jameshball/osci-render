@@ -24,6 +24,9 @@ public:
         stats.setJustificationType(juce::Justification::centredRight);
         stats.setMinimumHorizontalScale(1.0f);
         stats.setColour(juce::Label::textColourId, osci::Colours::textSubtle());
+        stats.setName("Rates");
+        stats.addMouseListener(this, false);
+        stats.setMouseCursor(juce::MouseCursor::PointingHandCursor);
         addAndMakeVisible(stats);
         action.setName("Status action");
         action.getProperties().set(motion::style::captionButton, true);
@@ -94,6 +97,18 @@ public:
     juce::String text() const { return message.getText(); }
     // Shown whole while it fits in half the bar; its tooltip has `details`
     // (or, when cut short, the text itself, whole).
+    // The rates on the right were clicked: where they are set.
+    std::function<void()> onStatisticsClicked;
+    void mouseUp(const juce::MouseEvent& event) override {
+        if (event.eventComponent == &stats && onStatisticsClicked && !event.mods.isPopupMenu() && event.getDistanceFromDragStart() < 4) { onStatisticsClicked(); }
+    }
+    void mouseEnter(const juce::MouseEvent& event) override {
+        if (event.eventComponent == &stats && onStatisticsClicked) { stats.setColour(juce::Label::textColourId, osci::Colours::text()); }
+    }
+    void mouseExit(const juce::MouseEvent& event) override {
+        if (event.eventComponent == &stats) { stats.setColour(juce::Label::textColourId, osci::Colours::textSubtle()); }
+    }
+
     void setStatistics(const juce::String& text, const juce::String& details = {}) {
         if (stats.getText() == text && statsDetails == details) { return; }
         statsDetails = details;
@@ -145,7 +160,7 @@ public:
         if (closeAtEnd) { dismiss.setBounds(juce::Rectangle<int>(action.getRight() + 4, area.getY(), 22, area.getHeight()).withSizeKeepingCentre(14, 14)); }
         motion::style::tooltipWhenCut(message);
         if (statsDetails.isNotEmpty()) {
-            stats.setTooltip(statsDetails);
+            stats.setTooltip(statsDetails + (onStatisticsClicked ? "\n\nClick to set the beam's frequency" : ""));
         } else {
             motion::style::tooltipWhenCut(stats);
         }

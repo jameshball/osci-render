@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 #include <JuceHeader.h>
 #include "../../LookAndFeel.h"
 #include "../model/KeyEasing.h"
@@ -551,7 +553,8 @@ inline void styleHeading(juce::Label& label, const juce::String& text) {
 // and Z carry their axis, and the value on the right. They share the left
 // and right edges of Properties' value columns, clear of the keys' gutter.
 // Visible fields only, two to a line in order.
-inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>& captions, const std::array<juce::Component*, 4>& fields) {
+template <std::size_t count>
+inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, count>& captions, const std::type_identity_t<std::array<juce::Component*, count>>& fields) {
     const PropertyGrid grid(area.getWidth());
     const auto right = grid.value + grid.column;
     const auto half = (right - gap) / 2;
@@ -563,7 +566,9 @@ inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>&
         auto bounds = area.removeFromTop(row).withWidth(right);
         for (std::size_t column = 0; column < 2 && line * 2 + column < shown.size(); ++column) {
             const auto index = shown[line * 2 + column];
-            const auto cell = (column == 0 ? bounds.withWidth(half) : bounds.withLeft(bounds.getRight() - half)).reduced(0, 3);
+            // A field alone on the last line takes the whole line.
+            const auto alone = line * 2 + 1 >= shown.size();
+            const auto cell = (alone ? bounds : column == 0 ? bounds.withWidth(half) : bounds.withLeft(bounds.getRight() - half)).reduced(0, 3);
             auto* combo = dynamic_cast<juce::ComboBox*>(fields[index]);
             if (combo != nullptr) { combo->setJustificationType(juce::Justification::centredRight); }
             auto& caption = captions[index];

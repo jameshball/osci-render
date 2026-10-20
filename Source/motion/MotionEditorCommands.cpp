@@ -785,6 +785,11 @@ juce::PopupMenu MotionEditor::timingMenu() {
     juce::PopupMenu frames;
     for (std::size_t i = 0; i < timingRates.size(); ++i) { frames.addItem(500 + static_cast<int>(i), rateNames[i], true, std::abs(project.frameRate - timingRates[i]) < 1.0e-9); }
     menu.addSubMenu("Frame rate", frames);
+    juce::PopupMenu beam;
+    for (const auto& [id, text] : MotionCompositionPanel::beamChoices(processor.document.mainProject().frameRate)) {
+        beam.addItem(id, text, true, id - MotionCompositionPanel::beamCommand == processor.document.mainProject().beamCycles);
+    }
+    menu.addSubMenu("Beam frequency", beam);
     return menu;
 }
 
@@ -826,6 +831,13 @@ bool MotionEditor::applyTiming(int result) {
             if (std::abs(state.snapBeats - state.beatsPerBar) < 1.0e-9) { state.snapBeats = result - 400; }
             state.beatsPerBar = result - 400;
         });
+        return true;
+    }
+    if (result >= MotionCompositionPanel::beamCommand && result <= MotionCompositionPanel::beamCommand + MotionCompositionPanel::beamChoiceCount) {
+        const auto cycles = result - MotionCompositionPanel::beamCommand;
+        if (processor.document.mainProject().beamCycles != cycles) {
+            processor.document.edit("Change beam frequency", [cycles](motion::Project& state) { state.beamCycles = cycles; });
+        }
         return true;
     }
     if (result >= 500 && result < 508) {
