@@ -180,12 +180,16 @@ void MotionEditor::registerCommands() {
     menus.addMenuSeparator(3);
     addCommand(3, "Loop playback", juce::KeyPress('l', 0, 0), "L", [this] { toggleLoop(); });
     // As a video player's: > faster, < slower.
-    // macOS reports Shift+. as > and Windows as . with Shift; a layout with
-    // its own < and > key (AZERTY) types them without.
+    // macOS reports Shift+. as >; Windows reports the . key with Shift. A layout
+    // with its own < and > key (AZERTY) types them without Shift.
     addCommand(3, "Play faster", juce::KeyPress('>', shift, 0), ">", [this] { changeSpeed(1); });
     addCommand(3, "Play slower", juce::KeyPress('<', shift, 0), "<", [this] { changeSpeed(-1); });
-    for (const auto& key : {juce::KeyPress('.', shift, 0), juce::KeyPress('>', 0, 0)}) { addCommand(0, "Play faster", key, {}, [this] { changeSpeed(1); }); }
-    for (const auto& key : {juce::KeyPress(',', shift, 0), juce::KeyPress('<', 0, 0)}) { addCommand(0, "Play slower", key, {}, [this] { changeSpeed(-1); }); }
+    addCommand(0, "Play faster", juce::KeyPress('>', 0, 0), {}, [this] { changeSpeed(1); });
+    addCommand(0, "Play slower", juce::KeyPress('<', 0, 0), {}, [this] { changeSpeed(-1); });
+   #if JUCE_WINDOWS
+    addCommand(0, "Play faster", juce::KeyPress('.', shift, 0), {}, [this] { changeSpeed(1); });
+    addCommand(0, "Play slower", juce::KeyPress(',', shift, 0), {}, [this] { changeSpeed(-1); });
+   #endif
     addCommand(3, "Set loop start at playhead", juce::KeyPress('i', 0, 0), "I", [this] { setLoopEdge(true); });
     addCommand(3, "Set loop end at playhead", juce::KeyPress('o', 0, 0), "O", [this] { setLoopEdge(false); });
     addCommand(3, "Loop selected clips", juce::KeyPress('l', shift, 0), "Shift+L", [this] { loopSelection(); });
@@ -234,7 +238,14 @@ void MotionEditor::copySelection(bool cut) {
         return;
     }
     if (timeline.hasSelectedKeys()) {
-        clipboard = timeline.copiedKeys();
+        // Only a clip's own keys paste; an effect's are left where they are,
+        // and the clipboard keeps what it had.
+        auto keys = timeline.copiedKeys();
+        if (keys.empty()) {
+            statusBar.show("Only a clip's own keys can be copied so far, not an effect's.", MotionStatusBar::Kind::notice);
+            return;
+        }
+        clipboard = std::move(keys);
     } else if (timeline.hasSelectedClips()) {
         clipboard = timeline.copiedClips();
     } else {

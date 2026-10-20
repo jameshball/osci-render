@@ -28,8 +28,8 @@ public:
         play.onClick = [this] { if (onPlay) { onPlay(); } };
         speed.onClick = [this] { if (onSpeedMenu) { onSpeedMenu(speed); } };
         speed.setButtonText(speedText(1.0));
-        // Its buttons' moves count as its own, for knowing it is hovered.
-        addMouseListener(this, true);
+        // On its buttons is still on it.
+        for (auto* button : std::initializer_list<juce::Component*> {&start, &play, &end, &speed}) { button->addMouseListener(&buttonHover, false); }
         setAlpha(0.0f);
         setInterceptsMouseClicks(false, false);
     }
@@ -191,6 +191,12 @@ private:
         }
     };
 
+    struct ButtonHover final : juce::MouseListener {
+        explicit ButtonHover(MotionScopeTransport& owner) : transport(owner) {}
+        void mouseEnter(const juce::MouseEvent&) override { transport.hovered = true; transport.wake(); }
+        void mouseMove(const juce::MouseEvent&) override { transport.wake(); }
+        MotionScopeTransport& transport;
+    } buttonHover {*this};
     struct Pointer final : juce::MouseListener {
         explicit Pointer(MotionScopeTransport& owner) : transport(owner) {}
         // JUCE also reports moves when what is under a still pointer changes;

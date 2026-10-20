@@ -166,7 +166,7 @@ int MotionTimelineView::rowEdgeAt(juce::Point<int> point) const {
         const auto bottom = rowY(row) + heightAt(row);
         if (bottom > getHeight() + resizeStrip) { break; }
         // Tracks and groups resize; lanes keep their height.
-        if (!rows[static_cast<std::size_t>(row)].isLane() && point.y >= bottom - resizeStrip - 1 && point.y <= bottom + 1) { return row; }
+        if (!rows[static_cast<std::size_t>(row)].isLane() && !rows[static_cast<std::size_t>(row)].composition() && point.y >= bottom - resizeStrip - 1 && point.y <= bottom + 1) { return row; }
     }
     return -1;
 }
@@ -981,7 +981,8 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         cameraBandDown(event);
         return;
     }
-    if (event.mods.isLeftButtonDown() && event.mods.isCommandDown() && event.x >= namesWidth && event.y < rulerHeight && moveNearestLoopEdge(event)) { return; }
+    // The time ruler itself; the marker and camera bands below keep their own Cmd-clicks.
+    if (event.mods.isLeftButtonDown() && event.mods.isCommandDown() && event.x >= namesWidth && event.y < toolsHeight && moveNearestLoopEdge(event)) { return; }
     if (event.mods.isLeftButtonDown() && loopDown(event)) { return; }
     if (barDown(event)) { return; }
     const auto* marker = markerAt(event.getPosition());
@@ -1066,7 +1067,8 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     const auto group = groupAtY(event.y);
     if (group != 0) { selectClip(group); return; }
     const auto visible = visualRowAt(event.y);
-    if (visible >= 0 && visible < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(visible)].composition() && event.x >= namesWidth) { showCompositionEffects(); return; }
+    // On the composition's bar; past its end the row is empty space, for a box.
+    if (visible >= 0 && visible < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(visible)].composition() && event.x >= namesWidth && event.x <= timeX(processor.document.project().duration)) { showCompositionEffects(); return; }
     int row = 0;
     const auto* clip = clipAt(event.getPosition(), row);
     if (clip == nullptr) {
@@ -2217,10 +2219,11 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
         const auto* curve = target.has_value() ? target->curve(row.property) : nullptr;
         const auto timing = target.has_value() ? target->clock() : motion::ClipTiming();
         if (curve == nullptr || !curve->animated() || timing.rate == 0) { continue; }
-        // Tinted as what holds it: its clip, or the composition's slate.
         const auto* clip = laneClip(project, owner);
         const auto* track = clip != nullptr ? motion::findClipTrack(project, clip->id) : nullptr;
-        const auto tint = clip != nullptr && track != nullptr ? clipColour(*clip, *track) : motion::style::compositionClip();
+        // Tinted as what holds it: its clip, the composition's slate, or (a track's own effect) neutral.
+        const auto composition = std::any_of(project.effects.begin(), project.effects.end(), [owner](const auto& effect) { return effect.id == owner; });
+        const auto tint = clip != nullptr && track != nullptr ? clipColour(*clip, *track) : composition ? motion::style::compositionClip() : osci::Colours::textMuted();
         const auto left = timeX(timing.start), right = timeX(timing.end());
         g.setColour(tint.withAlpha(.18f));
         g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
@@ -2501,11 +2504,10 @@ void MotionTimelineView::ensureTrackRows() const {
         std::erase_if(selectedTracks, [&project](auto id) {
             return motion::findGroup(project, id) == nullptr && std::none_of(project.tracks.begin(), project.tracks.end(), [id](const auto& track) { return track.id == id; });
         });
+        // A key stays selected while its owner (a clip or an effect) still has it.
         std::erase_if(selectedKeys, [&project](const KeyRef& key) {
-            const auto* clip = motion::findClip(project, key.clip);
-            if (clip == nullptr) { return true; }
-            const auto found = clip->properties.find(key.property);
-            return found == clip->properties.end() || found->second.findKey(key.time) == nullptr;
+            const auto* curve = motion::findPropertyCurve(project, key.clip, key.property);
+            return curve == nullptr || curve->findKey(key.time) == nullptr;
         });
         layoutRevision = revision;
     }

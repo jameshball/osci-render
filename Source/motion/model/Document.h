@@ -186,7 +186,7 @@ struct Project : Composition {
     // Whole times each frame is drawn: the beam's base frequency is the frame
     // rate times this. 0: as few as reach 45 Hz, so scopes don't flicker.
     int beamCycles = 0;
-    static constexpr int mostBeamCycles = 16;
+    static constexpr int mostBeamCycles = 8;
     ExportSettings exportSettings;
     // What the project is, in a sentence or two: shown under its name on
     // the start screen.

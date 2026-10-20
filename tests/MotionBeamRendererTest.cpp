@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "../Source/motion/render/SampleClock.h"
 #include <set>
 #include <chrono>
 #include <random>
@@ -96,6 +97,24 @@ public:
             for (std::int64_t index : {0ll, 1ll, 799ll, 800ll, 801ll, 123456ll, 9999999ll}) {
                 const auto cycle = motion::BeamRenderer::cycleOf(index, rate, 60);
                 expect(motion::BeamRenderer::cycleStart(cycle, rate, 60) <= index && index < motion::BeamRenderer::cycleStart(cycle + 1, rate, 60));
+            }
+        }
+
+        beginTest("Off normal speed, each beam cycle still plans once");
+        {
+            const auto shape = square(1, .1f);
+            const motion::PreparedComposition composition(project({{shape, -.6}, {shape, .6}}), 48000);
+            for (const double speed : {0.25, 0.5, 1.0, 2.0, 4.0}) {
+                motion::BeamRenderer beam;
+                double carry = 0;
+                std::int64_t timeline = 0;
+                const std::int64_t samples = 48000;
+                for (std::int64_t index = 0; index < samples; ++index) {
+                    beam.sample(composition, static_cast<double>(timeline) / 48000, index, 48000, true, 1, nullptr, speed);
+                    timeline = motion::advancePlayhead(timeline, speed, carry, 0, 0, 1000000000).sample;
+                }
+                const auto cycles = static_cast<double>(samples) / (48000.0 / composition.beamRate);
+                expect(static_cast<double>(beam.plansMade()) <= cycles + 2, "at " + juce::String(speed) + "x: " + juce::String(static_cast<juce::int64>(beam.plansMade())) + " plans for " + juce::String(cycles) + " cycles");
             }
         }
 

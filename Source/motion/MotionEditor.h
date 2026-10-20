@@ -404,6 +404,7 @@ private:
     void showSpeedMenu(juce::Component& anchor);
     void changeSpeed(int steps);
     void refreshSpeed();
+    void showInComposition(std::function<juce::Component&()> part);
     // Properties lead: a clip's timing, then a text clip's character animation.
     osci::SectionStack inspectorLead;
     MotionTextAnimationPanel textAnimation { processor };

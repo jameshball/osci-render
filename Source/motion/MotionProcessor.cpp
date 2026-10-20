@@ -214,9 +214,10 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
     for (int i = 0; i < count; ++i) {
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running && atSpeed) { oscillatorSample = audioSample; }
-        const auto point = transitionGuard.apply(beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames));
+        const auto point = transitionGuard.apply(beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames, speed));
         if (route.soundOn() && running && audible && buffer.getNumChannels() >= route.sound + 2) {
-            const auto audio = prepared->soundtrack.sample(audioTime);
+            // Between samples off normal speed, so slow playback glides rather than steps.
+            const auto audio = prepared->soundtrack.sample(atSpeed ? audioTime : (static_cast<double>(audioSample) + speedCarry) / sampleRate);
             const auto volume = volumes != nullptr ? volumes[i] : fallbackVolume;
             const auto gain = std::isfinite(volume) ? static_cast<double>(volume) : 0.0;
             constexpr auto limit = static_cast<double>(std::numeric_limits<float>::max());

@@ -82,7 +82,7 @@ public:
     std::function<void()> onHeightChanged;
     static constexpr std::array<double, 8> rates {24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120};
     // The Timing menu's ids for the beam's frequency: Auto, then 1 to 8 cycles a frame.
-    static constexpr int beamCommand = 800, beamChoiceCount = 8;
+    static constexpr int beamCommand = 800, beamChoiceCount = motion::Project::mostBeamCycles;
     static juce::String hertz(double value) { return juce::String(value, value == std::floor(value) ? 0 : 2) + " Hz"; }
     static std::vector<std::pair<int, juce::String>> beamChoices(double frameRate) {
         std::vector<std::pair<int, juce::String>> choices;

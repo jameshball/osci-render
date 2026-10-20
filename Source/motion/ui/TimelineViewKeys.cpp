@@ -125,7 +125,7 @@ void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
     auto* keyDrag = active<KeyDrag>();
     if (keyDrag == nullptr) { return; }
     if (processor.document.revision() != keyDrag->revision) { gesture = {}; return; }
-    const auto grabbed = ownerOf(keyDrag->before, keyDrag->grabbed.clip);
+    const auto grabbed = ownerOf(std::as_const(keyDrag->before), keyDrag->grabbed.clip);
     if (!grabbed.has_value()) { return; }
     const auto timing = grabbed->clock();
     if (timing.rate == 0) { return; }
@@ -137,7 +137,7 @@ void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
     keyDrag->changed = delta != 0;
     selectedKeys = keyDrag->keys;
     for (auto& key : selectedKeys) {
-        const auto owner = ownerOf(keyDrag->before, key.clip);
+        const auto owner = ownerOf(std::as_const(keyDrag->before), key.clip);
         if (owner.has_value()) { key.time = movedKeyTime(owner->clock(), key.time, delta); }
     }
     processor.document.preview(std::move(updated));
@@ -262,8 +262,10 @@ void MotionTimelineView::showKeyMenu() {
         const auto shape = static_cast<motion::Interpolation>(result - 1);
         const auto keys = selectedKeys;
         processor.document.tryEdit("Change key interpolation", [&](motion::Project& project) {
-            if (keysLocked(project, keys)) { return false; }
-            return changeKeys(project, keys, [shape](motion::Curve& curve, const KeyRef& key) { return motion::keyedit::setInterpolation(curve, key.time, shape); });
+            // Keys on locked tracks keep theirs; the others change.
+            std::vector<KeyRef> open;
+            std::copy_if(keys.begin(), keys.end(), std::back_inserter(open), [&project](const auto& key) { return !keysLocked(project, std::array {key}); });
+            return changeKeys(project, open, [shape](motion::Curve& curve, const KeyRef& key) { return motion::keyedit::setInterpolation(curve, key.time, shape); });
         });
     });
 }

@@ -812,8 +812,20 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     lastClick = event.position;
     const auto underneath = again && !adding && selected != 0 ? hitsAt(event.position) : std::vector<motion::Id> {};
     cycleOnRelease = underneath.size() > 1 && std::find(underneath.begin(), underneath.end(), selected) != underneath.end();
-    // Pressed again on the selection: a drag still moves it; a click (on release) moves on.
-    if (cycleOnRelease) { object = selected; }
+    // Pressed again on the selection: a drag still moves it (from its own
+    // nearest point, so on its own depth); a click (on release) moves on.
+    if (cycleOnRelease) {
+        object = selected;
+        float nearest = std::numeric_limits<float>::max();
+        for (const auto& piece : screenPieces()) {
+            juce::Point<float> closest;
+            const auto distance = piece.clip->editorId() == selected ? piece.line.getDistanceFromPoint(event.position, closest) : nearest;
+            if (distance < nearest) {
+                nearest = distance;
+                dragAnchor = nearestOnSegment(event.position, piece.a, piece.b);
+            }
+        }
+    }
     // Empty space starts a marquee; Shift adds to the selection.
     if (object == 0) {
         marqueeArmed = true;

@@ -95,8 +95,6 @@ public:
         repaint();
     }
     juce::String text() const { return message.getText(); }
-    // Shown whole while it fits in half the bar; its tooltip has `details`
-    // (or, when cut short, the text itself, whole).
     // The rates on the right were clicked: where they are set.
     std::function<void()> onStatisticsClicked;
     void mouseUp(const juce::MouseEvent& event) override {
@@ -109,6 +107,8 @@ public:
         if (event.eventComponent == &stats) { stats.setColour(juce::Label::textColourId, osci::Colours::textSubtle()); }
     }
 
+    // Shown whole while it fits in half the bar; its tooltip has `details`
+    // (or, when cut short, the text itself, whole).
     void setStatistics(const juce::String& text, const juce::String& details = {}) {
         if (stats.getText() == text && statsDetails == details) { return; }
         statsDetails = details;

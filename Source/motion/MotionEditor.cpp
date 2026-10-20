@@ -104,16 +104,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     // Beam overloaded: why, and the next rate up to draw it whole.
     // The rates lead to where the beam's frequency is set, marked there.
-    statusBar.onStatisticsClicked = [this] {
-        select(0);
-        const juce::Component::SafePointer<MotionEditor> owner(this);
-        juce::MessageManager::callAsync([owner] {
-            if (owner == nullptr || !owner->compositionSettings.beamField().isShowing()) { return; }
-            osci::RevealOptions options;
-            options.margin = motion::style::padding;
-            owner->propertyInspector.reveal(owner->compositionSettings.beamField(), options);
-        });
-    };
+    statusBar.onStatisticsClicked = [this] { showInComposition([this]() -> juce::Component& { return compositionSettings.beamField(); }); };
     statusBar.onOverload = [this](juce::Component& mark) {
         const auto rate = processor.document.mainProject().sampleRate;
         // Up to the default from below it; past that, twice as fast.
@@ -156,7 +147,7 @@ void MotionEditor::setUpMenus() {
     menus.addTopLevelMenu("File");
     menus.customMenuLogic = [this](juce::PopupMenu& menu, int index) {
         if (index == fileMenu) { buildFileMenu(menu); }
-        if (index == viewMenu) {
+        if (index == viewMenu && juce::JUCEApplicationBase::isStandaloneApp()) {
             juce::PopupMenu sizes;
             const auto current = juce::Desktop::getInstance().getGlobalScaleFactor();
             for (std::size_t item = 0; item < interfaceSizes.size(); ++item) {
@@ -363,6 +354,13 @@ void MotionEditor::setUpTransport() {
 }
 
 MotionEditor::~MotionEditor() {
+    // An open popover goes first: it may be a window of its own, styled by
+    // this editor's look and calling back into it.
+    if (popover != nullptr) {
+        popover->setLookAndFeel(nullptr);
+        if (popover->isCurrentlyModal(false)) { popover->exitModalState(0); }
+        delete popover.getComponent();
+    }
     if (luaPreviewCancel != nullptr) { luaPreviewCancel->store(true); }
     luaPreviews.removeAllJobs(true, 10000);
     processor.document.onEdited = nullptr;
@@ -1274,7 +1272,7 @@ void MotionEditor::refreshSpeed() {
     const auto speed = processor.playbackSpeed.load();
     const auto text = MotionScopeTransport::speedText(speed);
     playButton.setTooltip("Play / pause (Space)" + (speed != 1.0 ? motion::style::dot() + "at " + text : juce::String()));
-    statusBar.show(speed == 1.0 ? juce::String("Playing at normal speed.") : "Playing at " + text + ": < and > change it, and exports always play at normal speed.", MotionStatusBar::Kind::notice);
+    statusBar.show(speed == 1.0 ? juce::String("Back to normal speed.") : "Speed " + text + ": < and > change it; exports always play at normal speed.", MotionStatusBar::Kind::notice);
     repaint();
 }
 
@@ -1296,4 +1294,17 @@ void MotionEditor::setInterfaceSize(float scale, bool keepWindowSize) {
         window->setBounds(juce::Rectangle<int>(juce::roundToInt(bounds.getWidth() * ratio), juce::roundToInt(bounds.getHeight() * ratio)).withCentre(bounds.getCentre() * ratio));
     }
     if (keepWindowSize) { statusBar.show("Interface at " + juce::String(juce::roundToInt(scale * 100)) + "%.", MotionStatusBar::Kind::notice); }
+}
+
+// Selects the composition, then goes to what `part` names in its
+// Properties and marks it, once Properties shows it.
+void MotionEditor::showInComposition(std::function<juce::Component&()> part) {
+    select(0);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    juce::MessageManager::callAsync([owner, part = std::move(part)] {
+        if (owner == nullptr || !part().isShowing()) { return; }
+        osci::RevealOptions options;
+        options.margin = motion::style::padding;
+        owner->propertyInspector.reveal(part(), options);
+    });
 }

@@ -110,6 +110,7 @@ Project Document::mergeScope(Project view) const {
     auto whole = state;
     whole.scope = view.scope;
     whole.sampleRate = view.sampleRate;
+    whole.beamCycles = view.beamCycles;
     whole.exportSettings = view.exportSettings;
     whole.description = view.description;
     whole.beam = view.beam;

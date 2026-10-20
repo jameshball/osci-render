@@ -95,10 +95,11 @@ public:
     void setOrderImprovement(bool enabled) { improving = enabled; planned = false; }
 
     // index is the oscillator sample. time is the timeline time of that sample;
-    // when advancing, the cycle latches the timeline time of its first sample.
+    // when advancing, the cycle latches the timeline time of its first sample,
+    // the timeline moving `speed` samples for each of the oscillator's.
     // generation must change whenever the composition or live frames change.
     osci::Point sample(const PreparedComposition& composition, double time, std::int64_t index, double rate, bool advancing,
-        std::uint64_t generation, const LiveSourceFrames* liveFrames = nullptr) {
+        std::uint64_t generation, const LiveSourceFrames* liveFrames = nullptr, double speed = 1.0) {
         if (index < 0 || !std::isfinite(rate) || rate <= 0 || !std::isfinite(time)) { return {0, 0, 0, 0, 0, 0}; }
         const auto cycleRate = composition.beamRate;
         auto first = planFirst, end = planEnd;
@@ -111,10 +112,12 @@ public:
             end = cycleStart(cycle + 1, rate, cycleRate);
         }
         // Per-sample transport time carries rounding; half a sample of drift is
-        // the same cycle, anything more is a seek.
-        const auto latched = advancing ? time - static_cast<double>(index - first) / rate : time;
+        // the same cycle, anything more is a seek. Off 1x the timeline moves in
+        // whole samples while the speed's fraction carries, so up to one more.
+        const auto latched = advancing ? time - static_cast<double>(index - first) * speed / rate : time;
+        const auto drift = (speed == 1.0 ? 0.5 : 1.5) / rate;
         if (!planned || first != planFirst || end != planEnd || generation != planGeneration || rate != planRate || advancing != planAdvancing
-            || std::abs(latched - planTime) > 0.5 / rate) {
+            || std::abs(latched - planTime) > drift) {
             plan(composition, latched, first, end, rate, liveFrames);
             planGeneration = generation;
             planCycleRate = cycleRate;
@@ -134,6 +137,8 @@ public:
     // Diagnostic view of the current plan, for tests and the editor meter.
     std::span<const Segment> plannedSegments() const { return {segments->data(), segmentCount}; }
     std::size_t plannedLayers() const { return layerCount; }
+    // Cycles planned so far, for tests that a cycle plans once.
+    std::uint64_t plansMade() const { return planCount; }
     // Whether the current plan had to leave strokes out to fit the cycle (a
     // higher sample rate draws them all).
     bool plannedSimplified() const { return planSimplified; }
@@ -257,6 +262,7 @@ private:
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
         planned = true; planFirst = first; planEnd = end; planRate = rate; planTime = time; planSimplified = false;
+        ++planCount;
         segmentCount = 0; layerCount = 0; lastSegment = 0;
         const auto* baked = composition.hiddenLines != nullptr ? composition.hiddenLines->at(time) : nullptr;
         for (const auto& clip : composition.clips) {
@@ -761,6 +767,7 @@ private:
     bool planned = false, planAdvancing = true, improving = true;
     std::int64_t planFirst = 0, planEnd = 0;
     double planRate = 0, planTime = 0, planCycleRate = 0;
+    std::uint64_t planCount = 0;
     std::uint64_t planGeneration = 0;
 };
 }
