@@ -531,10 +531,7 @@ void EffectComponent::showContextMenu(juce::Point<int> screenPos) {
                         safeThis->effect.parameters[safeThis->index]->step);
             });
             settings->setSize(settings->getDesiredWidth(), settings->getDesiredHeight());
-            auto* parent = safeThis->getTopLevelComponent();
-            const auto targetBounds = parent->getLocalArea(&safeThis->label, safeThis->label.getLocalBounds());
-            juce::CallOutBox::launchAsynchronously(
-                std::move(settings), targetBounds, parent);
+            osci::launchCallOut(std::move(settings), safeThis->label, safeThis->label.getLocalBounds());
         });
 }
 

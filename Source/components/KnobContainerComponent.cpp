@@ -98,9 +98,5 @@ void KnobContainerComponent::showSettingsPopup() {
         }
     });
     settings->setSize(settings->getDesiredWidth(), settings->getDesiredHeight());
-    auto* parent = getTopLevelComponent();
-    const auto targetBounds = parent->getLocalArea(this, getLocalBounds());
-    auto& myBox = juce::CallOutBox::launchAsynchronously(
-        std::move(settings), targetBounds, parent);
-    juce::ignoreUnused(myBox);
+    osci::launchCallOut(std::move(settings), *this, getLocalBounds());
 }

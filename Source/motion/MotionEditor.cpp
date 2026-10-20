@@ -368,10 +368,10 @@ MotionEditor::~MotionEditor() {
 void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, Placement placement) {
     auto* panel = content.get();
     motion::style::styleFields(*panel);
-    auto& box = juce::CallOutBox::launchAsynchronously(std::move(content), anchor, this);
+    // A window of its own where the Scope's OpenGL view would cover it.
+    const auto available = placement == Placement::below ? getLocalBounds().withTop(anchor.getBottom()) : placement == Placement::left ? getLocalBounds().withRight(anchor.getX()) : getLocalBounds();
+    auto& box = osci::launchCallOut(std::move(content), *this, anchor, available);
     box.setArrowSize(9.0f);
-    if (placement == Placement::below) { box.updatePosition(anchor, getLocalBounds().withTop(anchor.getBottom())); }
-    if (placement == Placement::left) { box.updatePosition(anchor, getLocalBounds().withRight(anchor.getX())); }
     popover = &box;
     // Escape in a field closes the popover, as it does anywhere else in it.
     std::vector<juce::TextEditor*> fields;
