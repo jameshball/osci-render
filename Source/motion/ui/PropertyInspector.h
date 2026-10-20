@@ -174,6 +174,10 @@ private:
     // A property's value at `time` before its drivers: its curve's, or its default.
     double baseValue(const motion::PropertyTarget& found, std::string_view property, double time) const;
     void apply(motion::Project& project, const std::string& property, double value, double time) const;
+    // A field's edit: with Scale linked, the other axes keep their proportions
+    // to the edited one (all take its value when it was zero).
+    void applyEdit(motion::Project& project, const std::string& property, double value, double time) const;
+    bool scaleLinked() const;
     void beginGesture(const std::string& property);
     void previewValue(const std::string& property, double value);
     void endGesture(const juce::String& name = "Change property");

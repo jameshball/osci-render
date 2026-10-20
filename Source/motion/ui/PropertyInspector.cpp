@@ -521,6 +521,22 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
                 row->mode->onClick = [this, raw, path] { setMotionMode(path, raw->mode->getToggleState() || raw->misaligned); };
                 row->addAndMakeVisible(*row->mode);
             }
+            // Scale's axes linked: one changed, the others follow in proportion,
+            // as linked width and height do in other editors. Remembered for
+            // every object, as a preference.
+            if (row->group == "Scale") {
+                row->mode = std::make_unique<motion::ui::Chip>("Link scale", motion::icons::Icon::link);
+                row->mode->setName("Link scale");
+                row->mode->setTitle("Link scale");
+                row->mode->setTooltip("Link X, Y and Z: changing one scales the others in proportion");
+                row->mode->quiet = true;
+                row->mode->setToggleState(scaleLinked(), juce::dontSendNotification);
+                row->mode->onClick = [this, raw] {
+                    processor.globalSettings.set("linkScale", raw->mode->getToggleState());
+                    processor.globalSettings.save();
+                };
+                row->addAndMakeVisible(*row->mode);
+            }
             // The anchor: the point rotation and scale turn about.
             if (row->group == "Anchor" && onCentreAnchor) {
                 row->mode = std::make_unique<motion::ui::Chip>("Centre anchor", motion::icons::Icon::centre);
@@ -876,6 +892,27 @@ void MotionPropertyInspector::apply(motion::Project& project, const std::string&
     motion::keyedit::setValue(*curve, time, value);
 }
 
+bool MotionPropertyInspector::scaleLinked() const {
+    return processor.globalSettings.getBool("linkScale", false);
+}
+
+void MotionPropertyInspector::applyEdit(motion::Project& project, const std::string& property, double value, double time) const {
+    const auto found = scaleLinked() && property.starts_with("scale.") ? motion::findPropertyTarget(std::as_const(project), target) : std::nullopt;
+    if (!found.has_value()) {
+        apply(project, property, value, time);
+        return;
+    }
+    // From the values before the edit, so a drag keeps the proportions it started with.
+    const auto from = baseValue(*found, property, time);
+    std::vector<std::pair<std::string, double>> values;
+    for (const auto* axis : {"scale.x", "scale.y", "scale.z"}) {
+        if (std::none_of(specList.begin(), specList.end(), [&](const auto& spec) { return spec.id == axis; })) { continue; }
+        const auto other = baseValue(*found, axis, time);
+        values.emplace_back(axis, axis == property ? value : std::abs(from) > 1.0e-12 ? other * value / from : value);
+    }
+    for (const auto& [axis, next] : values) { apply(project, axis, next, time); }
+}
+
 void MotionPropertyInspector::beginGesture(const std::string& property) {
     const auto found = motion::findPropertyTarget(processor.document.project(), target);
     if (!found.has_value() || found->locked) { return; }
@@ -887,7 +924,7 @@ void MotionPropertyInspector::beginGesture(const std::string& property) {
 
 void MotionPropertyInspector::previewValue(const std::string& property, double value) {
     if (!gesture.active() || gestureTarget != target) { return; }
-    gesture.preview([&](motion::Project& project) { apply(project, property, value, gestureTime); });
+    gesture.preview([&](motion::Project& project) { applyEdit(project, property, value, gestureTime); });
 }
 
 void MotionPropertyInspector::endGesture(const juce::String& name) {
@@ -952,7 +989,7 @@ void MotionPropertyInspector::commitValue(const std::string& property, double va
     }
     const auto time = keyTime(*found);
     // Arrow-key steps in a row are one undo step.
-    processor.document.editCoalesced(label, "property:" + juce::String(target) + ":" + juce::String(property), [&](motion::Project& project) { apply(project, property, value, time); });
+    processor.document.editCoalesced(label, "property:" + juce::String(target) + ":" + juce::String(property), [&](motion::Project& project) { applyEdit(project, property, value, time); });
     if (onPropertySelected) { onPropertySelected(target, property); }
     if (onKeyTimeEdited) { onKeyTimeEdited(); }
 }
