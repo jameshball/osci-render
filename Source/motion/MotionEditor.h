@@ -453,7 +453,7 @@ private:
     enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, audioMenu, viewMenu, timingMenuIndex, helpMenu };
     static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100, outputMenuId = 2000, importAudioMenuId = 3200;
     // View > Interface size: everything drawn larger or smaller, saved as a preference.
-    static constexpr int interfaceSizeMenuId = 3300;
+    static constexpr int interfaceSizeMenuId = 3300, softwareRenderingMenuId = 3400;
     static constexpr std::array<float, 8> interfaceSizes { .8f, .9f, 1.0f, 1.1f, 1.25f, 1.5f, 1.75f, 2.0f };
     void setInterfaceSize(float scale, bool keepWindowSize);
     // The rates a project can be drawn at, from what audio runs at to four

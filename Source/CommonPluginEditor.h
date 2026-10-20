@@ -71,6 +71,12 @@ public:
     bool isFullScreen();
     void resized() override;
     void parentHierarchyChanged() override;
+    // Windows draws the editor with Direct2D unless this is on: then with
+    // JUCE's software renderer, which screen capture that reads a window's
+    // pixels (OBS's Window Capture on Automatic or BitBlt) can see; Direct2D
+    // windows come out white there.
+    bool usesSoftwareRendering() const;
+    void setSoftwareRendering(bool software);
 
 protected:
 #if OSCI_PREMIUM

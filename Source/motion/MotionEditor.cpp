@@ -155,6 +155,10 @@ void MotionEditor::setUpMenus() {
             }
             menu.addSeparator();
             menu.addSubMenu("Interface size", sizes);
+           #if JUCE_WINDOWS
+            // OBS's Window Capture (Automatic or BitBlt) shows Direct2D windows white.
+            menu.addItem(softwareRenderingMenuId, "Draw for screen capture (OBS)", true, usesSoftwareRendering());
+           #endif
         }
         if (index == audioMenu) {
             menu.addItem(importAudioMenuId, "Import audio...");
@@ -193,6 +197,11 @@ void MotionEditor::setUpMenus() {
         }
     };
     menus.customMenuSelectedLogic = [this](int id, int index) {
+        if (index == viewMenu && id == softwareRenderingMenuId) {
+            setSoftwareRendering(!usesSoftwareRendering());
+            statusBar.show(usesSoftwareRendering() ? juce::String("Drawn for screen capture: OBS's Window Capture sees all of osci-motion.") : juce::String("Drawn with Direct2D: fastest, but OBS needs its Windows 10 capture method to see it."), MotionStatusBar::Kind::notice);
+            return true;
+        }
         if (index == viewMenu && id >= interfaceSizeMenuId && id < interfaceSizeMenuId + static_cast<int>(interfaceSizes.size())) {
             setInterfaceSize(interfaceSizes[static_cast<std::size_t>(id - interfaceSizeMenuId)], true);
             return true;

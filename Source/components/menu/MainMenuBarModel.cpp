@@ -176,6 +176,10 @@ void MainMenuBarModel::addCommonInterfaceMenuItems(int topLevelMenuIndex, Common
     if (processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addToggleMenuItem(topLevelMenuIndex, "Full Screen", [&editor] { editor.toggleFullScreen(); }, [&editor] { return editor.isFullScreen(); }, "F11");
         addMenuItem(topLevelMenuIndex, "Reset Window Size and Position", [&editor] { editor.resetWindowSizeAndPosition(); });
+#if JUCE_WINDOWS
+        // OBS's Window Capture (Automatic or BitBlt) sees a Direct2D window as white.
+        addToggleMenuItem(topLevelMenuIndex, "Draw for Screen Capture (OBS)", [&editor] { editor.setSoftwareRendering(!editor.usesSoftwareRendering()); }, [&editor] { return editor.usesSoftwareRendering(); });
+#endif
     }
 }
 
