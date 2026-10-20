@@ -1522,7 +1522,8 @@ void MotionCompositionView::paintOverChildren(juce::Graphics& g) {
             g.drawText("Everything", label, juce::Justification::centred, false);
         }
     }
-    const juce::String help = navigating ? "WASD / arrows move" + motion::style::dot() + "Q E down / up" + motion::style::dot() + "Shift faster" + motion::style::dot() + "Esc finishes"
+    using Key = osci::KeyPosition;
+    const juce::String help = navigating ? osci::keysAtPositions({Key::w, Key::a, Key::s, Key::d}) + " / arrows move" + motion::style::dot() + osci::keysAtPositions({Key::q}) + " " + osci::keysAtPositions({Key::e}) + " down / up" + motion::style::dot() + "Shift faster" + motion::style::dot() + "Esc finishes"
         : (validGesture() || navigationDrag) && dragHint.isNotEmpty() ? dragHint : juce::String();
     if (help.isNotEmpty()) {
         auto strip = getLocalBounds().removeFromBottom(26).reduced(8, 3);
@@ -1824,9 +1825,11 @@ void MotionCompositionView::timerCallback() {
     const auto now = juce::Time::getMillisecondCounterHiRes();
     const auto seconds = std::clamp((now - lastTick) / 1000.0, 0.0, 0.05);
     lastTick = now;
-    const auto down = [](int letter, int arrow = 0) { return juce::KeyPress::isKeyCurrentlyDown(letter) || (arrow != 0 && juce::KeyPress::isKeyCurrentlyDown(arrow)); };
-    const motion::Vec3 direction { static_cast<double>(down('D', juce::KeyPress::rightKey) - down('A', juce::KeyPress::leftKey)),
-        static_cast<double>(down('E') - down('Q')), static_cast<double>(down('W', juce::KeyPress::upKey) - down('S', juce::KeyPress::downKey)) };
+    // By position, as games do: W A S D (Z Q S D on AZERTY), Q and E; or the arrows.
+    using Key = osci::KeyPosition;
+    const auto down = [](Key key, int arrow = 0) { return osci::isKeyPositionDown(key) || (arrow != 0 && juce::KeyPress::isKeyCurrentlyDown(arrow)); };
+    const motion::Vec3 direction { static_cast<double>(down(Key::d, juce::KeyPress::rightKey) - down(Key::a, juce::KeyPress::leftKey)),
+        static_cast<double>(down(Key::e) - down(Key::q)), static_cast<double>(down(Key::w, juce::KeyPress::upKey) - down(Key::s, juce::KeyPress::downKey)) };
     const auto modifiers = juce::ModifierKeys::getCurrentModifiersRealtime();
     if (modifiers.isCommandDown() || modifiers.isCtrlDown() || modifiers.isAltDown()) { return; }
     const auto fast = modifiers.isShiftDown();

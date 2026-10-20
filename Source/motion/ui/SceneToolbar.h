@@ -22,7 +22,7 @@ public:
         parts.setTooltip("Pick parts (Tab)");
         path.setTooltip("Motion path (P)");
         faces.setTooltip("Solid view: faces hide the lines behind them");
-        fly.setTooltip("Fly (N): mouse to look, WASD to move, Esc to finish");
+        fly.setTooltip("Fly (N): mouse to look, " + osci::keysAtPositions({osci::KeyPosition::w, osci::KeyPosition::a, osci::KeyPosition::s, osci::KeyPosition::d}) + " or the arrows to move, Esc to finish");
         frame.setTooltip("Frame selection (F)");
         lookThrough.setClickingTogglesState(true);
         lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");
