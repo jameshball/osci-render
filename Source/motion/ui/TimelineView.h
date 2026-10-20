@@ -248,6 +248,10 @@ private:
     void paintLoop(juce::Graphics& g) const;
     struct LoopDrag { enum class Mode { move, left, right } mode; double start, end; int downX; motion::Project before; std::uint64_t revision; bool changed; };
     bool loopDown(const juce::MouseEvent& event);
+    // Cmd-click (Ctrl on Windows and Linux) on the ruler moves the nearer loop
+    // point there, as modifier-clicks on Cubase's ruler set its locators;
+    // without a loop it makes one from there to the playhead.
+    bool moveNearestLoopEdge(const juce::MouseEvent& event);
     void loopDragged(const juce::MouseEvent& event);
     std::optional<juce::Rectangle<int>> blocked;
     // Keeps the time under `x` fixed while zooming.
@@ -405,6 +409,9 @@ public:
     // Tracks and groups picked together by their headers (Cmd or Shift),
     // for grouping them in one go (Cmd+G).
     void groupSelectedTracks();
+    // The selected clips into a new composition, used where they were
+    // (Cmd+Shift+C, as After Effects' Pre-compose; Alt+G too, as Final Cut).
+    void createCompositionFromSelection();
     // Puts these tracks (or groups) in a new group, in one undo step.
     void groupTracks(const std::vector<motion::Id>& ids);
 private:

@@ -963,6 +963,7 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         cameraBandDown(event);
         return;
     }
+    if (event.mods.isLeftButtonDown() && event.mods.isCommandDown() && event.x >= namesWidth && event.y < rulerHeight && moveNearestLoopEdge(event)) { return; }
     if (event.mods.isLeftButtonDown() && loopDown(event)) { return; }
     if (barDown(event)) { return; }
     const auto* marker = markerAt(event.getPosition());
@@ -1315,6 +1316,35 @@ bool MotionTimelineView::loopDown(const juce::MouseEvent& event) {
     }
     const auto mode = std::abs(event.x - bounds.getX()) <= 5 ? LoopDrag::Mode::left : std::abs(event.x - bounds.getRight()) <= 5 ? LoopDrag::Mode::right : LoopDrag::Mode::move;
     gesture = LoopDrag {mode, project.loopStart, project.loopEnd, event.x, project, processor.document.revision(), false};
+    return true;
+}
+
+bool MotionTimelineView::moveNearestLoopEdge(const juce::MouseEvent& event) {
+    const auto& project = processor.document.project();
+    if (project.duration <= 0) { return false; }
+    const auto frame = project.frameRate > 0 ? 1 / project.frameRate : 1.0 / 30;
+    const auto time = std::clamp(snapTime(scrollTime + (event.x - namesWidth) / pixelsPerSecond, event.mods), 0.0, project.duration);
+    auto start = project.loopStart, end = project.loopEnd;
+    juce::String label;
+    if (!project.hasLoop()) {
+        const auto playhead = std::clamp(processor.position.load(), 0.0, project.duration);
+        start = std::min(time, playhead);
+        end = std::abs(time - playhead) >= frame ? std::max(time, playhead) : project.duration;
+        label = "Set loop";
+    } else if (std::abs(time - start) <= std::abs(time - end)) {
+        start = std::min(time, end - frame);
+        label = "Move loop start";
+    } else {
+        end = std::max(time, start + frame);
+        label = "Move loop end";
+    }
+    if (end - start < frame || (start == project.loopStart && end == project.loopEnd)) { return true; }
+    const motion::Document::ViewChange view(processor.document);
+    processor.document.edit(label, [start, end](motion::Project& state) {
+        state.loopStart = start;
+        state.loopEnd = end;
+    });
+    repaint();
     return true;
 }
 
