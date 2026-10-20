@@ -20,6 +20,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     visualiserControls = &visualiser.detachControls(*this);
     visualiser.onControlsChanged = [this] { resized(); };
     visualiser.setControlStyle(osci::Colours::text().withAlpha(.78f), 5);
+    // The Scope shows the project as it plays: Space plays and pauses that.
+    visualiser.setPausable(false);
     // Children in paint order: each draws over those added before it.
     for (auto* header : { &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
@@ -62,6 +64,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     undoDescription.setMinimumHorizontalScale(1.0f);
     undoButton.onClick = [this] { undoRedoControls.undo(); refreshUndo(); };
     redoButton.onClick = [this] { undoRedoControls.redo(); refreshUndo(); };
+    undoButton.onPopupMenu = [this] { osci::showUndoHistory(processor.getUndoManager(), false, undoButton, [this] { refreshUndo(); }); };
+    redoButton.onPopupMenu = [this] { osci::showUndoHistory(processor.getUndoManager(), true, redoButton, [this] { refreshUndo(); }); };
     addChildComponent(effectLibrary);
     addChildComponent(cancelExport);
     addAndMakeVisible(inspectorTitle);
@@ -448,8 +452,10 @@ void MotionEditor::refreshUndo() {
     undoButton.setEnabled(undoManager.canUndo());
     redoButton.setEnabled(undoManager.canRedo());
     const auto undoKeys = " (" + motion::style::shortcutText("Cmd+Z") + ")", redoKeys = " (" + motion::style::shortcutText("Cmd+Shift+Z") + ")";
-    undoButton.setTooltip((undo.isNotEmpty() ? "Undo " + undo : juce::String("Undo")) + undoKeys);
-    redoButton.setTooltip((redo.isNotEmpty() ? "Redo " + redo : juce::String("Redo")) + redoKeys);
+    // Right-click lists the steps, so several go at once.
+    const auto history = motion::style::dot() + "right-click for history";
+    undoButton.setTooltip((undo.isNotEmpty() ? "Undo " + undo : juce::String("Undo")) + undoKeys + (undoManager.canUndo() ? history : juce::String()));
+    redoButton.setTooltip((redo.isNotEmpty() ? "Redo " + redo : juce::String("Redo")) + redoKeys + (undoManager.canRedo() ? history : juce::String()));
     undoDescription.setText(undo.isNotEmpty() ? "Undo " + undo : juce::String(), juce::dontSendNotification);
     motion::style::tooltipWhenCut(undoDescription);
 }

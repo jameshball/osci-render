@@ -152,7 +152,7 @@ inline void draw(juce::Graphics& g, Icon icon, juce::Rectangle<float> area, juce
 }
 
 // A square icon button: toggles light up in the accent, hover fades in.
-class Button final : public juce::Button {
+class Button : public juce::Button {
 public:
     Button(const juce::String& name, Icon glyph) : juce::Button(name), icon(glyph) {
         setTitle(name);

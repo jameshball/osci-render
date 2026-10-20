@@ -437,7 +437,8 @@ private:
     double pendingAnimationTime = 0;
     bool animating = false;
     // Undo and redo in the transport's style; the shared control stays out.
-    motion::icons::Button undoButton { "Undo", motion::icons::Icon::undo }, redoButton { "Redo", motion::icons::Icon::redo };
+    // Right-clicked, each lists its steps, to go back (or on) several at once.
+    osci::WithPopupMenu<motion::icons::Button> undoButton { "Undo", motion::icons::Icon::undo }, redoButton { "Redo", motion::icons::Icon::redo };
     juce::Label undoDescription;
     void refreshUndo();
     // The menu bar's menus, in order, and ids clear of the menu model's own
