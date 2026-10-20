@@ -806,7 +806,14 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     const auto time = editingTime();
-    const auto object = pickAt(event.position, &dragAnchor);
+    auto object = pickAt(event.position, &dragAnchor);
+    // A double-click opens the source instead, so a click cycles only after a pause.
+    const auto again = lastClick.has_value() && lastClick->getDistanceFrom(event.position) <= 4.0f && event.getNumberOfClicks() == 1;
+    lastClick = event.position;
+    const auto underneath = again && !adding && selected != 0 ? hitsAt(event.position) : std::vector<motion::Id> {};
+    cycleOnRelease = underneath.size() > 1 && std::find(underneath.begin(), underneath.end(), selected) != underneath.end();
+    // Pressed again on the selection: a drag still moves it; a click (on release) moves on.
+    if (cycleOnRelease) { object = selected; }
     // Empty space starts a marquee; Shift adds to the selection.
     if (object == 0) {
         marqueeArmed = true;
@@ -1052,7 +1059,18 @@ juce::String MotionCompositionView::centreAnchor(motion::Id id) {
     return {};
 }
 
-void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
+void MotionCompositionView::mouseUp(const juce::MouseEvent& event) {
+    if (std::exchange(cycleOnRelease, false) && event.getDistanceFromDragStart() < 3) {
+        const auto hits = hitsAt(event.position);
+        const auto at = std::find(hits.begin(), hits.end(), selected);
+        if (at != hits.end()) {
+            cancelGesture();
+            selected = std::next(at) != hits.end() ? *std::next(at) : hits.front();
+            if (onSelection) { onSelection(selected); }
+            repaint();
+            return;
+        }
+    }
     if (navigationDrag && lockedCamera != 0) { processor.document.endHeld(); }
     navigationDrag = false;
     if (marqueeArmed) {
@@ -1115,6 +1133,27 @@ motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::Ve
     if (hit == nullptr) { return 0; }
     if (anchor != nullptr) { *anchor = nearestOnSegment(position, hit->a, hit->b); }
     return hit->clip->editorId();
+}
+
+std::vector<motion::Id> MotionCompositionView::hitsAt(juce::Point<float> position) const {
+    const auto ray = camera.ray(normalized(position));
+    std::vector<std::pair<double, motion::Id>> nearest;
+    for (const auto& piece : screenPieces()) {
+        juce::Point<float> closest;
+        if (piece.line.getDistanceFromPoint(position, closest) >= 18) { continue; }
+        const auto id = piece.clip->editorId();
+        const auto depth = ray.has_value() ? (nearestOnSegment(position, piece.a, piece.b) - ray->origin).length() : static_cast<double>(piece.depth);
+        const auto found = std::find_if(nearest.begin(), nearest.end(), [&](const auto& item) { return item.second == id; });
+        if (found == nearest.end()) {
+            nearest.emplace_back(depth, id);
+        } else {
+            found->first = std::min(found->first, depth);
+        }
+    }
+    std::sort(nearest.begin(), nearest.end());
+    std::vector<motion::Id> ids;
+    for (const auto& [depth, id] : nearest) { ids.push_back(id); }
+    return ids;
 }
 
 // What a click acts on: the object under the pointer, or the selected group

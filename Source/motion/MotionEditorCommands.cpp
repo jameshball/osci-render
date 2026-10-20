@@ -565,6 +565,7 @@ void MotionEditor::showShortcuts() {
         if (menu == 1) {
             section.entries.push_back({"Cmd+Z", "Undo"});
             section.entries.push_back({"Cmd+Shift+Z", "Redo"});
+            section.entries.push_back({"Right-click Undo / Redo", "Go back or on several steps"});
         }
         for (const auto& command : commands) {
             if (command.menu == menu && command.shortcut.isNotEmpty()) { section.entries.push_back({command.shortcut, command.name.trimCharactersAtEnd(".")}); }
@@ -580,6 +581,7 @@ void MotionEditor::showShortcuts() {
         {"F / Shift+F", "Frame all curves / this curve"}, {"Right-click a key", "Interpolation and easing"}, {"Drag the time axis", "Scrub"},
         {"Alt+arrows", "Nudge the selected keys (Shift: further)"}, {"Right-click a curve's name", "Show or hide curves"}}});
     sections.push_back({"Scene", {{"G / R / S", "Move, rotate and scale tools"}, {"Y", "Anchor tool"}, {"Tab", "Pick parts (Cmd+A all, E extracts them)"}, {"F", "Frame the selection"}, {"0", "Reset the view"},
+        {"Click again", "Select what is behind (pause between clicks)"},
         {"1 / 3 / 7", "Front, right and top views (Ctrl: opposite side)"}, {"N", "Fly through the scene"}, {"P", "Show the motion path"},
         {"Two fingers / wheel", "Orbit / zoom"}, {"Shift + two fingers", "Pan"}, {"Alt+drag", "Orbit with the mouse"}}});
     Overlay::show(*this, std::move(sections));

@@ -125,12 +125,14 @@ public:
 
     void mouseDrag(const juce::MouseEvent& event) override;
 
-    void mouseUp(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent& event) override;
 
     // The visible clip drawn nearest the point (within 18 px), and the world
     // point there.
     motion::Id pickAt(juce::Point<float> position, motion::Vec3* anchor) const;
     motion::Id pickTarget(juce::Point<float> position, motion::Vec3* anchor) const;
+    // Every object drawn within 18 px of the point, nearest the eye first.
+    std::vector<motion::Id> hitsAt(juce::Point<float> position) const;
     bool inSelectedGroup(motion::Id clip) const;
 
     // Context hints only while flying or dragging (the tool strip's tooltips
@@ -316,6 +318,10 @@ private:
     bool effectDrag = false;
     motion::ui::PreviewGesture edit {processor.document};
     juce::Point<float> down;
+    // Clicking again where the last click was, on what it selected, selects
+    // what is drawn behind that, and so round, as Blender's select does.
+    std::optional<juce::Point<float>> lastClick;
+    bool cycleOnRelease = false;
     motion::editor::Camera camera, cameraAtDown;
     struct Pose {
         double x = 0, y = 0, z = 0, pitch = 0, yaw = 0, fov = 0;
