@@ -195,6 +195,10 @@ void MotionEditor::resized() {
         visualiser.toFront(false);
         scopeTools.setVisible(true);
         scopeTools.setBounds(getWidth() - 8 - scopeTools.preferredWidth(), 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
+        // The transport along the foot, as wide as reads well.
+        const auto transportWidth = std::min(720, getWidth() - 32);
+        scopeTransport.setBounds((getWidth() - transportWidth) / 2, getHeight() - 16 - MotionScopeTransport::preferredHeight, transportWidth, MotionScopeTransport::preferredHeight);
+        scopeTransport.toFront(false);
         if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
             const auto width = visualiser.controlsPreferredWidth();
             visualiserControls->setBounds(scopeTools.getX() - 8 - width, 8, width, 24);
@@ -220,6 +224,18 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
         corners.addRoundedRectangle(panel.toFloat(), motion::style::panelRadius);
         corners.setUsingNonZeroWinding(false);
         graphics.fillPath(corners);
+    }
+    // Not at normal speed: a badge on Play says how fast, so it's never forgotten.
+    const auto speed = processor.playbackSpeed.load();
+    if (speed != 1.0) {
+        const auto text = MotionScopeTransport::speedText(speed);
+        graphics.setFont(motion::style::heading());
+        const auto width = juce::GlyphArrangement::getStringWidth(graphics.getCurrentFont(), text) + 6.0f;
+        const auto badge = juce::Rectangle<float>(width, 12.0f).withPosition(static_cast<float>(playButton.getRight()) - width + 3.0f, static_cast<float>(playButton.getY()) - 3.0f);
+        graphics.setColour(motion::style::accent());
+        graphics.fillRoundedRectangle(badge, 6.0f);
+        graphics.setColour(juce::Colours::black);
+        graphics.drawText(text, badge, juce::Justification::centred, false);
     }
     if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return; }
     const auto panel = focusedPanel();

@@ -51,6 +51,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // inside it, which draws them into its picture, as over an OpenGL view on
     // Windows nothing else would show.
     visualiser.addAndMakeVisible(scopeTools);
+    visualiser.addChildComponent(scopeTransport);
+    scopeTransport.watch(visualiser);
+    scopeTransport.onStart = [this] { seekAndReveal(0); };
+    scopeTransport.onEnd = [this] { seekAndReveal(processor.document.project().duration); };
+    scopeTransport.onPlay = [this] { togglePlayback(); };
+    scopeTransport.onSeek = [this](double time) { processor.seek(time); };
+    scopeTransport.onSpeedMenu = [this](juce::Component& anchor) { showSpeedMenu(anchor); };
     addAndMakeVisible(outputButton);
     addAndMakeVisible(outputLabel);
     addAndMakeVisible(loopButton);
@@ -83,6 +90,9 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     auto* holder = juce::StandalonePluginHolder::getInstance();
     if (holder != nullptr) { holder->deviceManager.addChangeListener(this); }
     keepOutputPlayable();
+    // The interface size chosen last: the window was saved at it.
+    const auto size = static_cast<float>(processor.globalSettings.getDouble("interfaceSize", 1.0));
+    if (std::abs(size - 1.0f) > .001f) { setInterfaceSize(size, false); }
     sliderBakes.onStatus = [this](const juce::String& text, bool error) {
         statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice);
         // An export asked for while they baked goes ahead once they're done.
@@ -146,6 +156,15 @@ void MotionEditor::setUpMenus() {
     menus.addTopLevelMenu("File");
     menus.customMenuLogic = [this](juce::PopupMenu& menu, int index) {
         if (index == fileMenu) { buildFileMenu(menu); }
+        if (index == viewMenu) {
+            juce::PopupMenu sizes;
+            const auto current = juce::Desktop::getInstance().getGlobalScaleFactor();
+            for (std::size_t item = 0; item < interfaceSizes.size(); ++item) {
+                sizes.addItem(interfaceSizeMenuId + static_cast<int>(item), juce::String(juce::roundToInt(interfaceSizes[item] * 100)) + "%", true, std::abs(current - interfaceSizes[item]) < .001f);
+            }
+            menu.addSeparator();
+            menu.addSubMenu("Interface size", sizes);
+        }
         if (index == audioMenu) {
             menu.addItem(importAudioMenuId, "Import audio...");
             menu.addSeparator();
@@ -183,6 +202,10 @@ void MotionEditor::setUpMenus() {
         }
     };
     menus.customMenuSelectedLogic = [this](int id, int index) {
+        if (index == viewMenu && id >= interfaceSizeMenuId && id < interfaceSizeMenuId + static_cast<int>(interfaceSizes.size())) {
+            setInterfaceSize(interfaceSizes[static_cast<std::size_t>(id - interfaceSizeMenuId)], true);
+            return true;
+        }
         if (index == audioMenu && id == importAudioMenuId) {
             chooseAudioFile();
             return true;
@@ -443,6 +466,8 @@ void MotionEditor::dismissPopover(juce::Component* content) {
 void MotionEditor::setScopeFullScreen(bool value) {
     if (value == scopeFullScreen) { return; }
     scopeFullScreen = value;
+    scopeTransport.setVisible(value);
+    if (value) { scopeTransport.wake(); } else { scopeTransport.sleep(); }
     scopeTools.fullScreen.setIcon(value ? motion::icons::Icon::fullscreenExit : motion::icons::Icon::fullscreen);
     scopeTools.fullScreen.setTooltip(value ? "Exit full screen (Esc)" : "Full screen");
     resized();
@@ -472,6 +497,21 @@ void MotionEditor::refreshUndo() {
 }
 
 void MotionEditor::timerCallback() {
+    if (scopeFullScreen) {
+        const auto& project = processor.document.project();
+        const auto grid = project.timeGrid();
+        MotionScopeTransport::State state;
+        state.position = processor.position.load();
+        state.duration = project.duration;
+        state.loopStart = project.loopStart;
+        state.loopEnd = project.loopEnd;
+        state.looping = project.looping;
+        state.playing = processor.playing.load();
+        state.speed = processor.playbackSpeed.load();
+        state.time = juce::String(grid.positionLabel(state.position));
+        state.length = juce::String(grid.positionLabel(project.duration));
+        scopeTransport.setState(state);
+    }
     continueCommandLineRender();
     keepRecovery();
     const auto now = juce::Time::getMillisecondCounterHiRes();
@@ -1201,4 +1241,59 @@ juce::Result MotionEditor::applyRouting(motion::OutputRouting routing) {
         }
     }
     return juce::Result::ok();
+}
+
+// Playback speeds in a menu by `anchor`, as a video player's: each a step
+// of < and >.
+void MotionEditor::showSpeedMenu(juce::Component& anchor) {
+    juce::PopupMenu menu;
+    const auto current = processor.playbackSpeed.load();
+    for (std::size_t index = 0; index < MotionProcessor::playbackSpeeds.size(); ++index) {
+        const auto speed = MotionProcessor::playbackSpeeds[index];
+        menu.addItem(static_cast<int>(index) + 1, MotionScopeTransport::speedText(speed) + (speed == 1.0 ? juce::String("  Normal") : juce::String()), true, speed == current);
+    }
+    menu.setLookAndFeel(&motionLookAndFeel);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&anchor), [owner](int result) {
+        if (owner == nullptr || result <= 0) { return; }
+        owner->processor.playbackSpeed.store(MotionProcessor::playbackSpeeds[static_cast<std::size_t>(result - 1)]);
+        owner->refreshSpeed();
+    });
+}
+
+void MotionEditor::changeSpeed(int steps) {
+    const auto& speeds = MotionProcessor::playbackSpeeds;
+    const auto current = processor.playbackSpeed.load();
+    auto index = static_cast<int>(std::distance(speeds.begin(), std::min_element(speeds.begin(), speeds.end(), [current](double a, double b) { return std::abs(a - current) < std::abs(b - current); })));
+    index = std::clamp(index + steps, 0, static_cast<int>(speeds.size()) - 1);
+    processor.playbackSpeed.store(speeds[static_cast<std::size_t>(index)]);
+    refreshSpeed();
+}
+
+void MotionEditor::refreshSpeed() {
+    const auto speed = processor.playbackSpeed.load();
+    const auto text = MotionScopeTransport::speedText(speed);
+    playButton.setTooltip("Play / pause (Space)" + (speed != 1.0 ? motion::style::dot() + "at " + text : juce::String()));
+    statusBar.show(speed == 1.0 ? juce::String("Playing at normal speed.") : "Playing at " + text + ": < and > change it, and exports always play at normal speed.", MotionStatusBar::Kind::notice);
+    repaint();
+}
+
+// Everything drawn larger or smaller. Chosen from the menu, the window keeps
+// its size on screen and holds more or less; at launch it opens as it was.
+void MotionEditor::setInterfaceSize(float scale, bool keepWindowSize) {
+    if (!juce::JUCEApplicationBase::isStandaloneApp() || !std::isfinite(scale)) { return; }
+    scale = std::clamp(scale, interfaceSizes.front(), interfaceSizes.back());
+    auto& desktop = juce::Desktop::getInstance();
+    const auto previous = desktop.getGlobalScaleFactor();
+    processor.globalSettings.set("interfaceSize", static_cast<double>(scale));
+    processor.globalSettings.save();
+    if (std::abs(previous - scale) < .001f) { return; }
+    auto* window = getTopLevelComponent();
+    const auto bounds = window != nullptr ? window->getBounds() : juce::Rectangle<int>();
+    desktop.setGlobalScaleFactor(scale);
+    if (keepWindowSize && window != nullptr && !bounds.isEmpty()) {
+        const auto ratio = previous / scale;
+        window->setBounds(juce::Rectangle<int>(juce::roundToInt(bounds.getWidth() * ratio), juce::roundToInt(bounds.getHeight() * ratio)).withCentre(bounds.getCentre() * ratio));
+    }
+    if (keepWindowSize) { statusBar.show("Interface at " + juce::String(juce::roundToInt(scale * 100)) + "%.", MotionStatusBar::Kind::notice); }
 }

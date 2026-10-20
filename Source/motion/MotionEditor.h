@@ -38,6 +38,7 @@
 #include "ui/ModelSizeInspector.h"
 #include "ui/OutputPanel.h"
 #include "ui/CompositionPanel.h"
+#include "ui/ScopeTransport.h"
 #include <deque>
 #include <variant>
 
@@ -398,6 +399,11 @@ private:
     MotionSceneToolbar sceneTools;
     MotionPartPickToolbar partPickTools;
     MotionScopeToolbar scopeTools;
+    // Along the foot of the Scope while full screen.
+    MotionScopeTransport scopeTransport;
+    void showSpeedMenu(juce::Component& anchor);
+    void changeSpeed(int steps);
+    void refreshSpeed();
     // Properties lead: a clip's timing, then a text clip's character animation.
     osci::SectionStack inspectorLead;
     MotionTextAnimationPanel textAnimation { processor };
@@ -445,6 +451,10 @@ private:
     // (1-based per item) for the items added to them here.
     enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, audioMenu, viewMenu, timingMenuIndex, helpMenu };
     static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100, outputMenuId = 2000, importAudioMenuId = 3200;
+    // View > Interface size: everything drawn larger or smaller, saved as a preference.
+    static constexpr int interfaceSizeMenuId = 3300;
+    static constexpr std::array<float, 8> interfaceSizes { .8f, .9f, 1.0f, 1.1f, 1.25f, 1.5f, 1.75f, 2.0f };
+    void setInterfaceSize(float scale, bool keepWindowSize);
     // The rates a project can be drawn at, from what audio runs at to four
     // times 192 kHz.
     static constexpr std::array<double, 8> projectSampleRates {44100, 48000, 88200, 96000, 176400, 192000, 384000, 768000};

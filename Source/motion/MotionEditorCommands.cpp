@@ -179,6 +179,13 @@ void MotionEditor::registerCommands() {
     addCommand(3, "Next edit point", juce::KeyPress(juce::KeyPress::downKey), "Down", [this] { jumpToEdit(true); });
     menus.addMenuSeparator(3);
     addCommand(3, "Loop playback", juce::KeyPress('l', 0, 0), "L", [this] { toggleLoop(); });
+    // As a video player's: > faster, < slower.
+    // macOS reports Shift+. as > and Windows as . with Shift; a layout with
+    // its own < and > key (AZERTY) types them without.
+    addCommand(3, "Play faster", juce::KeyPress('>', shift, 0), ">", [this] { changeSpeed(1); });
+    addCommand(3, "Play slower", juce::KeyPress('<', shift, 0), "<", [this] { changeSpeed(-1); });
+    for (const auto& key : {juce::KeyPress('.', shift, 0), juce::KeyPress('>', 0, 0)}) { addCommand(0, "Play faster", key, {}, [this] { changeSpeed(1); }); }
+    for (const auto& key : {juce::KeyPress(',', shift, 0), juce::KeyPress('<', 0, 0)}) { addCommand(0, "Play slower", key, {}, [this] { changeSpeed(-1); }); }
     addCommand(3, "Set loop start at playhead", juce::KeyPress('i', 0, 0), "I", [this] { setLoopEdge(true); });
     addCommand(3, "Set loop end at playhead", juce::KeyPress('o', 0, 0), "O", [this] { setLoopEdge(false); });
     addCommand(3, "Loop selected clips", juce::KeyPress('l', shift, 0), "Shift+L", [this] { loopSelection(); });
