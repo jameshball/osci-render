@@ -24,4 +24,28 @@ inline std::optional<std::int64_t> sampleIndex(double seconds, double sampleRate
     }
     return nearestSample(seconds, sampleRate);
 }
+
+// One sample of playback at `speed`: the playhead moves on by the speed (a
+// fraction carried in `carry` to the next sample), and crossing the loop's
+// end goes back to its start, as reaching the composition's end goes to 0.
+// A playhead that started past the loop plays on to the end. True when it
+// jumped, which the beam guards against.
+struct PlayheadStep {
+    std::int64_t sample = 0;
+    bool jumped = false;
+};
+inline PlayheadStep advancePlayhead(std::int64_t sample, double speed, double& carry, std::int64_t loopStart, std::int64_t loopEnd, std::int64_t duration) {
+    auto next = sample;
+    if (speed == 1.0) {
+        ++next;
+    } else {
+        carry += speed;
+        const auto steps = static_cast<std::int64_t>(carry);
+        carry -= static_cast<double>(steps);
+        next += steps;
+    }
+    if (loopEnd > loopStart && sample < loopEnd && next >= loopEnd) { return {loopStart, true}; }
+    if (next >= duration) { return {0, true}; }
+    return {next, false};
+}
 }

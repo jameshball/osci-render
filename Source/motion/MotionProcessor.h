@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include "../CommonPluginProcessor.h"
 #include "model/Document.h"
 #include "model/ProjectFile.h"
@@ -49,6 +51,11 @@ public:
     // Loop playback (seconds); the editor mirrors the project's loop range.
     std::atomic<double> loopStart { 0.0 }, loopEnd { 0.0 };
     std::atomic<bool> looping { false };
+    // Playback speed, from a quarter to four times: time on the timeline moves
+    // that much faster; the beam keeps its own frequency, and the soundtrack
+    // plays faster and higher, as a tape would. Exports always play at 1x.
+    static constexpr std::array<double, 5> playbackSpeeds { 0.25, 0.5, 1.0, 2.0, 4.0 };
+    std::atomic<double> playbackSpeed { 1.0 };
     void seek(double seconds) {
         seekSerial.fetch_add(1);
         requestedPosition.store(std::max(0.0, seconds));
@@ -106,6 +113,9 @@ private:
     juce::String preparationError;
     std::uint64_t previousRevision = 0;
     bool wasPlaying = false;
+    // The fraction of a sample a slow or fast speed has carried over.
+    double speedCarry = 0;
+    double previousSpeed = 1;
     motion::BeamTransitionGuard transitionGuard;
     motion::BeamRenderer beam;
 public:

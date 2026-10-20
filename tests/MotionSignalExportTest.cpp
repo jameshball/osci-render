@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "../Source/motion/render/SampleClock.h"
 #include "../Source/motion/export/SignalExporter.h"
 #include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/BeamOutput.h"
@@ -11,6 +12,35 @@ public:
     void runTest() override {
         juce::TemporaryFile directory(".motion-signal-export-tests");
         const auto created = directory.getFile().createDirectory();
+        beginTest("The playhead moves at the playback speed, loops and ends at any speed, and plays on past a loop it started after");
+        {
+            const auto run = [](double speed, std::int64_t from, int samples, std::int64_t loopStart, std::int64_t loopEnd, std::int64_t duration) {
+                double carry = 0;
+                auto sample = from;
+                int jumps = 0;
+                for (int i = 0; i < samples; ++i) {
+                    const auto step = motion::advancePlayhead(sample, speed, carry, loopStart, loopEnd, duration);
+                    sample = step.sample;
+                    jumps += step.jumped ? 1 : 0;
+                }
+                return std::pair {sample, jumps};
+            };
+            expectEquals(run(1.0, 0, 1000, 0, 0, 100000).first, static_cast<std::int64_t>(1000));
+            expectEquals(run(2.0, 0, 1000, 0, 0, 100000).first, static_cast<std::int64_t>(2000));
+            expectEquals(run(4.0, 0, 1000, 0, 0, 100000).first, static_cast<std::int64_t>(4000));
+            expectEquals(run(0.5, 0, 1000, 0, 0, 100000).first, static_cast<std::int64_t>(500));
+            expectEquals(run(0.25, 0, 1000, 0, 0, 100000).first, static_cast<std::int64_t>(250));
+            // A loop from 100 to 200 at 4x (steps of 4 from 0 land on 200) and at 2x from an odd start (never on 200).
+            const auto looped = run(4.0, 0, 60, 100, 200, 100000);
+            expect(looped.first >= 100 && looped.first < 200 && looped.second == 1, "4x wraps at the loop's end once");
+            const auto odd = run(2.0, 101, 60, 100, 200, 100000);
+            expect(odd.first >= 100 && odd.first < 200 && odd.second == 1, "a step over the loop's end still wraps");
+            // Started past the loop: on to the end, then 0.
+            const auto past = run(2.0, 300, 50, 100, 200, 400);
+            expectEquals(past.first, static_cast<std::int64_t>(0));
+            expectEquals(past.second, 1);
+        }
+
         beginTest("The exporter writes exact-length five-channel floating-point XYRGB samples");
         expect(created.wasOk(), created.getErrorMessage());
         if (created.failed()) {

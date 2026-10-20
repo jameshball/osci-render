@@ -182,6 +182,17 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
     if (requested >= 0.0 && std::isfinite(requested)) {
         audioSample = motion::sampleIndex(std::min(requested, prepared->duration), sampleRate).value_or(0);
         oscillatorSample = audioSample;
+        speedCarry = 0;
+        transitionGuard.begin();
+    }
+    // At 1x the beam's cycles keep step with the timeline; at another speed
+    // they run on by themselves, so the beam keeps its frequency.
+    const auto wanted = playbackSpeed.load(std::memory_order_relaxed);
+    const auto speed = std::isfinite(wanted) ? std::clamp(wanted, playbackSpeeds.front(), playbackSpeeds.back()) : 1.0;
+    const auto atSpeed = speed == 1.0;
+    if (speed != previousSpeed) {
+        previousSpeed = speed;
+        speedCarry = 0;
         transitionGuard.begin();
     }
     // The beam keeps drawing while stopped (the picture at the playhead);
@@ -202,7 +213,7 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
     const auto fallbackVolume = volumeEffect->getValue();
     for (int i = 0; i < count; ++i) {
         audioTime = static_cast<double>(audioSample) / sampleRate;
-        if (running) { oscillatorSample = audioSample; }
+        if (running && atSpeed) { oscillatorSample = audioSample; }
         const auto point = transitionGuard.apply(beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames));
         if (route.soundOn() && running && audible && buffer.getNumChannels() >= route.sound + 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);
@@ -215,16 +226,9 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
         writeSignal(i, point);
         ++oscillatorSample;
         if (running) {
-            ++audioSample;
-            // Crossing the loop end jumps back to its start; starting after
-            // the loop plays on to the end.
-            if (loopEndSample > loopStartSample && audioSample == loopEndSample) {
-                audioSample = loopStartSample;
-                transitionGuard.begin();
-            } else if (audioSample >= durationSamples) {
-                audioSample = 0;
-                transitionGuard.begin();
-            }
+            const auto step = motion::advancePlayhead(audioSample, speed, speedCarry, loopStartSample, loopEndSample, durationSamples);
+            audioSample = step.sample;
+            if (step.jumped) { transitionGuard.begin(); }
         }
     }
     beamLayers.store(static_cast<int>(beam.plannedLayers()), std::memory_order_relaxed);
