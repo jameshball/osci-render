@@ -338,6 +338,13 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     repaint();
 }
 
+void VisualiserComponent::setPausable(bool shouldBePausable) {
+    pausable = shouldBePausable;
+    if (!pausable && isPaused()) {
+        setPaused(false);
+    }
+}
+
 bool VisualiserComponent::isPaused() const {
     return !active;
 }
@@ -347,8 +354,10 @@ bool VisualiserComponent::isTransparentBackgroundEnabled() const {
 }
 
 void VisualiserComponent::updatePausedState() {
-    bool shouldBePaused = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
-    if (active == shouldBePaused) { // active and paused are opposites
+    // An unpausable picture puts the parameter back when a host or a loaded state pauses it.
+    const bool requested = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
+    const bool shouldBePaused = pausable && requested;
+    if (active == shouldBePaused || requested != shouldBePaused) { // active and paused are opposites
         setPaused(shouldBePaused, true);
     }
 }
@@ -448,7 +457,7 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
 void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
     pauseOnMouseUp = false;
     if (event.originalComponent == this) {
-        if (event.mods.isLeftButtonDown() && !record.getToggleState()) {
+        if (pausable && event.mods.isLeftButtonDown() && !record.getToggleState()) {
             pauseOnMouseUp = true;
         }
     }
@@ -476,7 +485,7 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
     } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
         enableFullScreen();
         return true;
-    } else if (key.isKeyCode(juce::KeyPress::spaceKey)) {
+    } else if (pausable && key.isKeyCode(juce::KeyPress::spaceKey)) {
         setPaused(active);
         return true;
     }

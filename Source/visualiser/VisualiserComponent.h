@@ -50,6 +50,10 @@ public:
     void paint(juce::Graphics& g) override;
     void setPaused(bool paused, bool affectAudio = true);
     bool isPaused() const;
+    // A host whose picture is never live (osci-motion plays a project) keeps
+    // it running: a click or Space no longer pauses it, here or popped out.
+    void setPausable(bool shouldBePausable);
+    bool isPausable() const { return pausable; }
     bool isTransparentBackgroundEnabled() const;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
@@ -140,6 +144,7 @@ private:
     std::atomic<bool> active = true;
     std::atomic<unsigned int> pendingParameterUpdates { 0 };
     bool pauseOnMouseUp = false;
+    bool pausable = true;
 
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
