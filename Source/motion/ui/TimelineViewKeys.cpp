@@ -6,28 +6,27 @@
 // added and deleted in place.
 
 namespace {
-template <typename Keys>
-bool holdsKey(const motion::Clip& clip, const Keys& keys) {
-    return std::any_of(keys.begin(), keys.end(), [&clip](const auto& key) { return key.clip == clip.id; });
-}
-template <typename Keys>
-bool holdsKey(const motion::Track& track, const Keys& keys) {
-    return std::any_of(track.clips.begin(), track.clips.end(), [&keys](const auto& clip) { return holdsKey(clip, keys); });
-}
-// True when one of `keys` is on a locked track.
+// Each key's owner (a clip, an effect...) and its clock, through which its
+// content time maps to the timeline's.
+template <typename ProjectType>
+auto ownerOf(ProjectType& project, motion::Id owner) { return motion::findPropertyTarget(project, owner); }
+// True when one of `keys` belongs to something on a locked track.
 template <typename Keys>
 bool keysLocked(const motion::Project& project, const Keys& keys) {
-    return std::any_of(project.tracks.begin(), project.tracks.end(), [&keys](const auto& track) { return track.locked && holdsKey(track, keys); });
-}
-// Calls change(clip) for each clip on an unlocked track that holds one of
-// `keys`; tracks without them stay shared.
-template <typename Keys, typename Change>
-void changeKeyedClips(motion::Project& project, const Keys& keys, Change&& change) {
-    project.tracks.changeEach([&keys](const motion::Track& track) { return !track.locked && holdsKey(track, keys); }, [&](motion::Track& track) {
-        for (auto& clip : track.clips) {
-            if (holdsKey(clip, keys)) { change(clip); }
-        }
+    return std::any_of(keys.begin(), keys.end(), [&project](const auto& key) {
+        const auto target = ownerOf(project, key.clip);
+        return target.has_value() && target->locked;
     });
+}
+// Calls change(curve, key) for each of `keys` whose curve exists; true if any did.
+template <typename Keys, typename Change>
+bool changeKeys(motion::Project& project, const Keys& keys, Change&& change) {
+    bool any = false;
+    for (const auto& key : keys) {
+        auto* curve = motion::findPropertyCurve(project, key.clip, key.property);
+        if (curve != nullptr) { any = change(*curve, key) || any; }
+    }
+    return any;
 }
 }
 
@@ -35,16 +34,15 @@ std::optional<MotionTimelineView::KeyRef> MotionTimelineView::keyAt(juce::Point<
     const auto* lane = laneAtY(point.y);
     if (lane == nullptr || point.x < namesWidth) { return std::nullopt; }
     const auto& project = processor.document.project();
-    const auto& track = project.tracks[static_cast<std::size_t>(lane->track)];
     std::optional<KeyRef> best;
     auto bestDistance = 7.0;
-    for (const auto& clip : track.clips) {
-        const auto found = clip.properties.find(lane->lane);
-        const auto timing = clip.timing(project.tempo());
-        if (found == clip.properties.end() || timing.rate == 0) { continue; }
-        for (const auto& key : found->second.keyframes()) {
-            const auto distance = std::abs(timeX(timing.projectTime(key.time)) - point.x);
-            if (distance < bestDistance) { bestDistance = distance; best = KeyRef{clip.id, lane->lane, key.time}; }
+    for (const auto owner : lane->owners) {
+        const auto target = ownerOf(project, owner);
+        const auto* curve = target.has_value() ? target->curve(lane->property) : nullptr;
+        if (curve == nullptr || target->clock().rate == 0) { continue; }
+        for (const auto& key : curve->keyframes()) {
+            const auto distance = std::abs(timeX(target->projectTime(key.time)) - point.x);
+            if (distance < bestDistance) { bestDistance = distance; best = KeyRef{owner, lane->property, key.time}; }
         }
     }
     return best;
@@ -56,10 +54,11 @@ std::vector<MotionTimelineView::KeyRef> MotionTimelineView::allLaneKeys() const 
     const auto& project = processor.document.project();
     for (const auto& row : rows) {
         if (!row.isLane()) { continue; }
-        for (const auto& clip : project.tracks[static_cast<std::size_t>(row.track)].clips) {
-            const auto found = clip.properties.find(row.lane);
-            if (found == clip.properties.end() || clip.timing(project.tempo()).rate == 0) { continue; }
-            for (const auto& key : found->second.keyframes()) { result.push_back({clip.id, row.lane, key.time}); }
+        for (const auto owner : row.owners) {
+            const auto target = ownerOf(project, owner);
+            const auto* curve = target.has_value() ? target->curve(row.property) : nullptr;
+            if (curve == nullptr || target->clock().rate == 0) { continue; }
+            for (const auto& key : curve->keyframes()) { result.push_back({owner, row.property, key.time}); }
         }
     }
     return result;
@@ -72,13 +71,13 @@ std::vector<MotionTimelineView::KeyRef> MotionTimelineView::keysInside(juce::Rec
         const auto& row = rows[static_cast<std::size_t>(visible)];
         const auto y = rowY(visible);
         if (!row.isLane() || y + laneHeight / 2 < area.getY() || y + laneHeight / 2 > area.getBottom()) { continue; }
-        for (const auto& clip : project.tracks[static_cast<std::size_t>(row.track)].clips) {
-            const auto found = clip.properties.find(row.lane);
-            const auto timing = clip.timing(project.tempo());
-            if (found == clip.properties.end() || timing.rate == 0) { continue; }
-            for (const auto& key : found->second.keyframes()) {
-                const auto x = timeX(timing.projectTime(key.time));
-                if (x >= area.getX() && x <= area.getRight()) { result.push_back({clip.id, row.lane, key.time}); }
+        for (const auto owner : row.owners) {
+            const auto target = ownerOf(project, owner);
+            const auto* curve = target.has_value() ? target->curve(row.property) : nullptr;
+            if (curve == nullptr || target->clock().rate == 0) { continue; }
+            for (const auto& key : curve->keyframes()) {
+                const auto x = timeX(target->projectTime(key.time));
+                if (x >= area.getX() && x <= area.getRight()) { result.push_back({owner, row.property, key.time}); }
             }
         }
     }
@@ -92,13 +91,18 @@ static double movedKeyTime(const motion::ClipTiming& timing, double time, double
 bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<KeyRef>& keys, double delta) {
     if (keysLocked(project, keys)) { return false; }
     bool collided = false;
-    const auto tempo = project.tempo();
-    changeKeyedClips(project, keys, [&](motion::Clip& clip) {
-        const auto timing = clip.timing(tempo);
-        for (auto& [name, curve] : clip.properties) {
+    std::vector<motion::Id> owners;
+    for (const auto& key : keys) {
+        if (std::find(owners.begin(), owners.end(), key.clip) == owners.end()) { owners.push_back(key.clip); }
+    }
+    for (const auto owner : owners) {
+        auto target = ownerOf(project, owner);
+        if (!target.has_value() || target->properties == nullptr) { continue; }
+        const auto timing = target->clock();
+        for (auto& [name, curve] : *target->properties) {
             std::vector<motion::Keyframe> moving;
             for (const auto& key : curve.keyframes()) {
-                const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.clip == clip.id && item.property == name && motion::sameTime(item.time, key.time); });
+                const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.clip == owner && item.property == name && motion::sameTime(item.time, key.time); });
                 if (chosen) { moving.push_back(key); }
             }
             if (moving.empty()) { continue; }
@@ -113,7 +117,7 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
                 curve.setKey(key);
             }
         }
-    });
+    }
     return !collided;
 }
 
@@ -121,9 +125,9 @@ void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
     auto* keyDrag = active<KeyDrag>();
     if (keyDrag == nullptr) { return; }
     if (processor.document.revision() != keyDrag->revision) { gesture = {}; return; }
-    const auto* clip = motion::findClip(keyDrag->before, keyDrag->grabbed.clip);
-    if (clip == nullptr) { return; }
-    const auto timing = clip->timing(keyDrag->before.tempo());
+    const auto grabbed = ownerOf(keyDrag->before, keyDrag->grabbed.clip);
+    if (!grabbed.has_value()) { return; }
+    const auto timing = grabbed->clock();
     if (timing.rate == 0) { return; }
     const auto grabbedTime = timing.projectTime(keyDrag->grabbed.time);
     auto delta = (x - keyDrag->downX) / pixelsPerSecond;
@@ -133,8 +137,8 @@ void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
     keyDrag->changed = delta != 0;
     selectedKeys = keyDrag->keys;
     for (auto& key : selectedKeys) {
-        const auto* owner = motion::findClip(keyDrag->before, key.clip);
-        if (owner != nullptr) { key.time = movedKeyTime(owner->timing(keyDrag->before.tempo()), key.time, delta); }
+        const auto owner = ownerOf(keyDrag->before, key.clip);
+        if (owner.has_value()) { key.time = movedKeyTime(owner->clock(), key.time, delta); }
     }
     processor.document.preview(std::move(updated));
     keyDrag->revision = processor.document.revision();
@@ -149,8 +153,8 @@ bool MotionTimelineView::nudgeSelectedKeys(int frames) {
     // Where each selected key lands, through its clip's own timing.
     auto moved = keys;
     for (auto& key : moved) {
-        const auto* owner = motion::findClip(project, key.clip);
-        if (owner != nullptr) { key.time = movedKeyTime(owner->timing(project.tempo()), key.time, delta); }
+        const auto owner = ownerOf(project, key.clip);
+        if (owner.has_value()) { key.time = movedKeyTime(owner->clock(), key.time, delta); }
     }
     // Nothing moves onto another key, nor when a key's track is locked.
     const auto nudged = processor.document.tryEditCoalesced(keys.size() > 1 ? "Nudge keys" : "Nudge key", "timeline.nudge.keys", [this, &keys, delta](motion::Project& updated) { return moveKeys(updated, keys, delta); });
@@ -196,15 +200,7 @@ bool MotionTimelineView::easeSelectedKeys(bool in, bool out) {
     const auto keys = selectedKeys;
     const auto eased = processor.document.tryEdit(in && out ? "Easy ease" : (in ? "Easy ease in" : "Easy ease out"), [&keys, in, out](motion::Project& project) {
         if (keysLocked(project, keys)) { return false; }
-        bool any = false;
-        changeKeyedClips(project, keys, [&](motion::Clip& clip) {
-            for (const auto& key : keys) {
-                if (key.clip != clip.id) { continue; }
-                const auto found = clip.properties.find(key.property);
-                any = (found != clip.properties.end() && motion::easeKey(found->second, key.time, in, out)) || any;
-            }
-        });
-        return any;
+        return changeKeys(project, keys, [in, out](motion::Curve& curve, const KeyRef& key) { return motion::easeKey(curve, key.time, in, out); });
     });
     repaint();
     return eased;
@@ -214,15 +210,7 @@ void MotionTimelineView::deleteSelectedKeys() {
     const auto keys = selectedKeys;
     const auto removed = processor.document.tryEdit(keys.size() > 1 ? "Delete keys" : "Delete key", [&keys](motion::Project& project) {
         if (keysLocked(project, keys)) { return false; }
-        bool any = false;
-        changeKeyedClips(project, keys, [&](motion::Clip& clip) {
-            for (const auto& key : keys) {
-                if (key.clip != clip.id) { continue; }
-                const auto found = clip.properties.find(key.property);
-                if (found != clip.properties.end()) { any = found->second.removeKey(key.time) || any; }
-            }
-        });
-        return any;
+        return changeKeys(project, keys, [](motion::Curve& curve, const KeyRef& key) { return curve.removeKey(key.time); });
     });
     if (removed) { selectedKeys.clear(); }
     repaint();
@@ -231,23 +219,25 @@ void MotionTimelineView::deleteSelectedKeys() {
 void MotionTimelineView::addKeyAt(const Row& lane, int x, juce::ModifierKeys modifiers) {
     const auto& project = processor.document.project();
     const auto time = snapTime(scrollTime + (x - namesWidth) / pixelsPerSecond, modifiers);
-    const auto& track = project.tracks[static_cast<std::size_t>(lane.track)];
-    const motion::Clip* target = nullptr;
-    for (const auto& clip : track.clips) {
-        const auto timing = clip.timing(project.tempo());
-        if (time >= timing.start && time <= timing.end()) { target = &clip; }
+    // The owner whose span holds the time (a later one wins, as it draws on top).
+    std::optional<motion::Id> owner;
+    double local = 0;
+    for (const auto candidate : lane.owners) {
+        const auto target = ownerOf(project, candidate);
+        if (!target.has_value() || target->locked || time < target->start || time > target->end()) { continue; }
+        owner = candidate;
+        local = target->localTime(time);
     }
-    if (target == nullptr || track.locked) { return; }
-    const auto clipId = target->id;
-    const auto local = target->timing(project.tempo()).localTime(time);
-    const auto property = lane.lane;
+    if (!owner.has_value()) { return; }
+    const auto id = *owner;
+    const auto property = lane.property;
     const auto added = processor.document.tryEdit("Add key", [&](motion::Project& updated) {
-        auto* curve = motion::findPropertyCurve(updated, clipId, property);
+        auto* curve = motion::findPropertyCurve(updated, id, property);
         if (curve == nullptr) { return false; }
         curve->setKeyValue(local, curve->evaluateBase(local));
         return true;
     });
-    if (added) { selectedKeys = {{clipId, property, local}}; }
+    if (added) { selectedKeys = {{id, property, local}}; }
     repaint();
 }
 
@@ -272,15 +262,8 @@ void MotionTimelineView::showKeyMenu() {
         const auto shape = static_cast<motion::Interpolation>(result - 1);
         const auto keys = selectedKeys;
         processor.document.tryEdit("Change key interpolation", [&](motion::Project& project) {
-            bool any = false;
-            changeKeyedClips(project, keys, [&](motion::Clip& clip) {
-                for (const auto& key : keys) {
-                    if (key.clip != clip.id) { continue; }
-                    const auto found = clip.properties.find(key.property);
-                    if (found != clip.properties.end()) { any = motion::keyedit::setInterpolation(found->second, key.time, shape) || any; }
-                }
-            });
-            return any;
+            if (keysLocked(project, keys)) { return false; }
+            return changeKeys(project, keys, [shape](motion::Curve& curve, const KeyRef& key) { return motion::keyedit::setInterpolation(curve, key.time, shape); });
         });
     });
 }

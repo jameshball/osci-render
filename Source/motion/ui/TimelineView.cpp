@@ -351,6 +351,7 @@ void MotionTimelineView::refreshTracks() {
         addTrack.setVisible(true);
     }
     std::erase_if(headers, [&](const auto& header) {
+        if (header->id == compositionRow) { return project.effects.empty(); }
         return motion::findGroup(project, header->id) == nullptr && std::none_of(project.tracks.begin(), project.tracks.end(), [&](const auto& track) { return track.id == header->id; });
     });
     const auto updateHeader = [&](const motion::Track& track, bool group) {
@@ -395,9 +396,26 @@ void MotionTimelineView::refreshTracks() {
             headers.push_back(std::move(header));
             found = headers.end() - 1;
         }
-        const auto lanes = group ? false : !animatedProperties(track).empty();
+        const auto lanes = group ? false : !trackLanes(project, track).empty();
         (*found)->update(track, group, collapsedGroups.contains(track.id), lanes, expandedTracks.contains(track.id));
     };
+    if (!project.effects.empty()) {
+        auto found = std::find_if(headers.begin(), headers.end(), [](const auto& header) { return header->id == compositionRow; });
+        if (found == headers.end()) {
+            auto header = std::make_unique<MotionTrackHeader>(compositionRow);
+            header->onSelect = [this](motion::Id, juce::ModifierKeys) { showCompositionEffects(); };
+            header->onMenu = [this](motion::Id) { showCompositionEffects(); };
+            header->onLanes = [this](motion::Id id) {
+                if (expandedTracks.contains(id)) { expandedTracks.erase(id); } else { expandedTracks.insert(id); }
+                layoutRevision.reset();
+                refreshTracks();
+            };
+            headerArea.addAndMakeVisible(*header);
+            headers.push_back(std::move(header));
+            found = headers.end() - 1;
+        }
+        (*found)->updateComposition(!compositionLanes(project).empty(), expandedTracks.contains(compositionRow));
+    }
     for (const auto& track : project.tracks) { updateHeader(track, false); }
     for (const auto& group : project.groups) {
         motion::Track display;
@@ -1047,6 +1065,8 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     if (beamDown(event)) { return; }
     const auto group = groupAtY(event.y);
     if (group != 0) { selectClip(group); return; }
+    const auto visible = visualRowAt(event.y);
+    if (visible >= 0 && visible < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(visible)].composition() && event.x >= namesWidth) { showCompositionEffects(); return; }
     int row = 0;
     const auto* clip = clipAt(event.getPosition(), row);
     if (clip == nullptr) {
@@ -2029,12 +2049,17 @@ std::vector<double> MotionTimelineView::clipKeyTimes(const motion::Clip& clip) c
     std::vector<double> times;
     const auto timing = clip.timing(processor.document.project().tempo());
     if (!(timing.rate != 0)) { return times; }
-    for (const auto& [name, curve] : clip.properties) {
-        for (const auto& key : curve.keyframes()) {
-            const auto time = timing.projectTime(key.time);
-            if (time >= timing.start - 1.0e-9 && time <= timing.end() + 1.0e-9) { times.push_back(time); }
+    // Its own keys and its effects' alike: each is the clip changing.
+    const auto add = [&](const motion::PropertyMap& properties) {
+        for (const auto& [name, curve] : properties) {
+            for (const auto& key : curve.keyframes()) {
+                const auto time = timing.projectTime(key.time);
+                if (time >= timing.start - 1.0e-9 && time <= timing.end() + 1.0e-9) { times.push_back(time); }
+            }
         }
-    }
+    };
+    add(clip.properties);
+    for (const auto& effect : clip.effects) { add(effect.properties); }
     std::sort(times.begin(), times.end());
     times.erase(std::unique(times.begin(), times.end(), [](double a, double b) { return std::abs(a - b) < 1.0e-9; }), times.end());
     return times;
@@ -2168,34 +2193,32 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
 
 void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int height) const {
     const auto& project = processor.document.project();
-    const auto& track = project.tracks[static_cast<std::size_t>(row.track)];
     // A lane reads like a channel in the Graph: under its track's header,
     // as light as it, with the axis colour as a dot and on its keys.
     fillCard(g, y, height - bandGap, osci::Colours::surface(), osci::Colours::surfaceSunken());
-    // Named as the first clip keying it names it: a generator's numbers and
-    // a script's sliders are its own.
-    const auto keyed = std::find_if(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return clip.properties.contains(row.lane); });
-    const auto own = keyed != track.clips.end() ? motion::specFor(project, keyed->id, row.lane) : std::nullopt;
-    const auto specs = track.kind == motion::TrackKind::audio ? std::span<const motion::PropertySpec>(motion::audioPropertySpecs) : motion::objectPropertySpecs;
-    const auto* spec = own.has_value() ? &*own : motion::findPropertySpec(specs, row.lane);
-    const auto colour = spec != nullptr && !spec->axis.empty() ? motion::style::axisColour(spec->axis) : motion::style::key();
+    const auto colour = row.colour;
     const auto indent = std::min(64, row.depth * 16) + 30;
     g.setColour(colour.withAlpha(.85f));
     g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(indent) + 3.0f, y + (height - bandGap) * .5f}));
     g.setFont(motion::style::caption());
     g.setColour(osci::Colours::textMuted());
-    g.drawText(spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(row.lane), indent + 12, y, namesWidth - indent - 18, height - bandGap, juce::Justification::centredLeft);
+    g.drawText(row.label, indent + 12, y, namesWidth - indent - 18, height - bandGap, juce::Justification::centredLeft);
     juce::Graphics::ScopedSaveState scope(g);
     g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
     const auto centre = y + height * .5f;
-    for (const auto& clip : track.clips) {
-        const auto timing = clip.timing(project.tempo());
+    for (const auto owner : row.owners) {
+        const auto target = motion::findPropertyTarget(project, owner);
+        const auto* curve = target.has_value() ? target->curve(row.property) : nullptr;
+        const auto timing = target.has_value() ? target->clock() : motion::ClipTiming();
+        if (curve == nullptr || !curve->animated() || timing.rate == 0) { continue; }
+        // Tinted as what holds it: its clip, or the composition's slate.
+        const auto* clip = laneClip(project, owner);
+        const auto* track = clip != nullptr ? motion::findClipTrack(project, clip->id) : nullptr;
+        const auto tint = clip != nullptr && track != nullptr ? clipColour(*clip, *track) : motion::style::compositionClip();
         const auto left = timeX(timing.start), right = timeX(timing.end());
-        const auto found = clip.properties.find(row.lane);
-        if (found == clip.properties.end() || !found->second.animated() || timing.rate == 0) { continue; }
-        g.setColour(clipColour(clip, track).withAlpha(.18f));
+        g.setColour(tint.withAlpha(.18f));
         g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
-        const auto& keys = found->second.keyframes();
+        const auto& keys = curve->keyframes();
         // A faint value curve normalised to the lane shows each move's shape.
         if (keys.size() > 1) {
             const auto first = std::max(left, namesWidth), last = std::min(right, getWidth());
@@ -2203,28 +2226,37 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
             for (const auto& key : keys) { low = std::min(low, key.value); high = std::max(high, key.value); }
             const auto localAt = [&](int x) { return timing.localTime(scrollTime + (x - namesWidth) / pixelsPerSecond); };
             for (int x = first; x < last; x += 3) {
-                const auto value = found->second.evaluateBase(localAt(x));
+                const auto value = curve->evaluateBase(localAt(x));
                 low = std::min(low, value);
                 high = std::max(high, value);
             }
             if (high > low && last > first) {
                 juce::Path shape;
                 const auto yOf = [&](double value) { return static_cast<float>(y + height - 4 - (value - low) / (high - low) * (height - 8)); };
-                shape.startNewSubPath(static_cast<float>(first), yOf(found->second.evaluateBase(localAt(first))));
-                for (int x = first + 2; x < last; x += 2) { shape.lineTo(static_cast<float>(x), yOf(found->second.evaluateBase(localAt(x)))); }
+                shape.startNewSubPath(static_cast<float>(first), yOf(curve->evaluateBase(localAt(first))));
+                for (int x = first + 2; x < last; x += 2) { shape.lineTo(static_cast<float>(x), yOf(curve->evaluateBase(localAt(x)))); }
                 g.setColour(colour.withAlpha(.4f));
                 g.strokePath(shape, juce::PathStrokeType(1.0f));
             }
         }
         // Key shape encodes its outgoing interpolation, as in the Graph.
-        const auto behind = osci::Colours::surfaceSunken().interpolatedWith(clipColour(clip, track), .18f);
+        const auto behind = osci::Colours::surfaceSunken().interpolatedWith(tint, .18f);
         for (std::size_t k = 0; k < keys.size(); ++k) {
             const auto time = timing.projectTime(keys[k].time);
             // A key at the very start stays clear of the name column.
             const auto x = std::max(static_cast<float>(timeX(time)), static_cast<float>(namesWidth) + 4.5f);
-            motion::style::drawKey(g, {x, centre}, 4.5f, keys[k], colour, isKeySelected(clip.id, row.lane, keys[k].time), false, behind);
+            motion::style::drawKey(g, {x, centre}, 4.5f, keys[k], colour, isKeySelected(owner, row.property, keys[k].time), false, behind);
         }
     }
+}
+
+const motion::Clip* MotionTimelineView::laneClip(const motion::Project& project, motion::Id owner) {
+    for (const auto& track : project.tracks) {
+        for (const auto& clip : track.clips) {
+            if (clip.id == owner || std::any_of(clip.effects.begin(), clip.effects.end(), [owner](const auto& effect) { return effect.id == owner; })) { return &clip; }
+        }
+    }
+    return nullptr;
 }
 
 void MotionTimelineView::deleteSelectedClips(bool ripple) {
@@ -2260,6 +2292,10 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
     const auto height = heightOf(static_cast<std::size_t>(visible));
     if (row.isLane()) {
         paintLane(g, row, y, height);
+        return;
+    }
+    if (row.composition()) {
+        paintCompositionRow(g, y, height);
         return;
     }
     // Rows are flush, like the Graph's channel list: a hairline gap between
@@ -2301,9 +2337,13 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
         const auto* folder = motion::findGroup(project, row.id);
         if (folder != nullptr) {
             std::set<double> times;
-            for (const auto& [name, curve] : folder->properties) {
-                for (const auto& key : curve.keyframes()) { times.insert(key.time); }
-            }
+            const auto add = [&times](const motion::PropertyMap& properties) {
+                for (const auto& [name, curve] : properties) {
+                    for (const auto& key : curve.keyframes()) { times.insert(key.time); }
+                }
+            };
+            add(folder->properties);
+            for (const auto& effect : folder->effects) { add(effect.properties); }
             juce::Path ticks;
             double lastX = -10;
             for (const auto time : times) {
@@ -2466,8 +2506,32 @@ void MotionTimelineView::ensureTrackRows() const {
     scrollY = std::clamp(scrollY, 0, maximumScrollY());
 }
 
-std::vector<std::string> MotionTimelineView::animatedProperties(const motion::Track& track) {
-    std::vector<std::string> result;
+void MotionTimelineView::addEffectLanes(std::vector<Row>& lanes, const std::vector<const motion::EffectInstance*>& effects) {
+    for (const auto* effect : effects) {
+        const auto* definition = motion::effectDefinition(effect->type);
+        if (definition == nullptr) { continue; }
+        for (const auto& parameter : definition->parameters) {
+            const auto found = effect->properties.find(parameter.id);
+            if (found == effect->properties.end() || !found->second.animated()) { continue; }
+            const auto key = "effect:" + effect->name + ":" + parameter.id;
+            auto lane = std::find_if(lanes.begin(), lanes.end(), [&](const auto& item) { return item.lane == key; });
+            if (lane == lanes.end()) {
+                Row row;
+                row.lane = key;
+                row.property = parameter.id;
+                // Named as Properties' effect cards name them: the effect, then the number.
+                row.label = juce::String::fromUTF8(effect->name.c_str()) + motion::style::dot() + juce::String(parameter.name);
+                row.colour = motion::style::key();
+                lanes.push_back(std::move(row));
+                lane = lanes.end() - 1;
+            }
+            lane->owners.push_back(effect->id);
+        }
+    }
+}
+
+std::vector<MotionTimelineView::Row> MotionTimelineView::trackLanes(const motion::Project& project, const motion::Track& track) {
+    std::vector<Row> lanes;
     std::vector<motion::PropertySpec> specs;
     const auto base = track.kind == motion::TrackKind::audio ? std::span<const motion::PropertySpec>(motion::audioPropertySpecs) : motion::objectPropertySpecs;
     specs.assign(base.begin(), base.end());
@@ -2483,30 +2547,67 @@ std::vector<std::string> MotionTimelineView::animatedProperties(const motion::Tr
     }
     for (const auto& spec : specs) {
         const std::string id(spec.id);
-        const bool animated = std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {
+        // Shown while a clip keys it; every clip with it can take a key there.
+        Row lane;
+        std::optional<motion::Id> keyed;
+        for (const auto& clip : track.clips) {
             const auto found = clip.properties.find(id);
-            return found != clip.properties.end() && found->second.animated();
-        });
-        if (animated) { result.push_back(id); }
+            if (found == clip.properties.end()) { continue; }
+            lane.owners.push_back(clip.id);
+            if (!keyed.has_value() && found->second.animated()) { keyed = clip.id; }
+        }
+        if (!keyed.has_value()) { continue; }
+        lane.lane = id;
+        lane.property = id;
+        // Named as the first clip keying it names it: a generator's numbers
+        // and a script's sliders are its own.
+        const auto own = motion::specFor(project, *keyed, id);
+        const auto& named = own.has_value() ? *own : spec;
+        lane.label = juce::String(named.label.data(), named.label.size());
+        lane.colour = !named.axis.empty() ? motion::style::axisColour(named.axis) : motion::style::key();
+        lanes.push_back(std::move(lane));
     }
-    return result;
+    std::vector<const motion::EffectInstance*> effects;
+    for (const auto& effect : track.effects) { effects.push_back(&effect); }
+    for (const auto& clip : track.clips) {
+        for (const auto& effect : clip.effects) { effects.push_back(&effect); }
+    }
+    addEffectLanes(lanes, effects);
+    return lanes;
+}
+
+std::vector<MotionTimelineView::Row> MotionTimelineView::compositionLanes(const motion::Project& project) {
+    std::vector<Row> lanes;
+    std::vector<const motion::EffectInstance*> effects;
+    for (const auto& effect : project.effects) { effects.push_back(&effect); }
+    addEffectLanes(lanes, effects);
+    return lanes;
 }
 
 void MotionTimelineView::rebuildRows() const {
     const auto& project = processor.document.project();
     rows.clear();
-    std::erase_if(expandedTracks, [&](auto id) { return std::none_of(project.tracks.begin(), project.tracks.end(), [id](const auto& track) { return track.id == id; }); });
+    std::erase_if(expandedTracks, [&](auto id) { return id != compositionRow && std::none_of(project.tracks.begin(), project.tracks.end(), [id](const auto& track) { return track.id == id; }); });
+    const auto addLanes = [&](const motion::TrackRow& base, std::vector<Row> lanes) {
+        for (auto& lane : lanes) {
+            static_cast<motion::TrackRow&>(lane) = base;
+            rows.push_back(std::move(lane));
+        }
+    };
+    // The composition's effects first, as they act on everything below.
+    if (!project.effects.empty()) {
+        Row row;
+        row.id = compositionRow;
+        row.track = compositionTrack;
+        rows.push_back(row);
+        if (expandedTracks.contains(compositionRow)) { addLanes(row, compositionLanes(project)); }
+    }
     for (const auto& base : motion::trackRows(project, collapsedGroups)) {
         Row row;
         static_cast<motion::TrackRow&>(row) = base;
         rows.push_back(row);
         if (base.track < 0 || !expandedTracks.contains(base.id)) { continue; }
-        for (auto& property : animatedProperties(project.tracks[static_cast<std::size_t>(base.track)])) {
-            Row lane;
-            static_cast<motion::TrackRow&>(lane) = base;
-            lane.lane = std::move(property);
-            rows.push_back(std::move(lane));
-        }
+        addLanes(base, trackLanes(project, project.tracks[static_cast<std::size_t>(base.track)]));
     }
     layoutRows();
 }
@@ -2550,7 +2651,7 @@ int MotionTimelineView::visualRowAt(int y) const {
 
 int MotionTimelineView::trackAtY(int y) const {
     const auto row = visualRowAt(y);
-    return row >= 0 && row < static_cast<int>(rows.size()) && !rows[static_cast<std::size_t>(row)].isLane() ? rows[static_cast<std::size_t>(row)].track : -1;
+    return row >= 0 && row < static_cast<int>(rows.size()) && !rows[static_cast<std::size_t>(row)].isLane() ? std::max(-1, rows[static_cast<std::size_t>(row)].track) : -1;
 }
 
 motion::Id MotionTimelineView::groupAtY(int y) const {
@@ -2662,4 +2763,53 @@ void MotionTimelineView::seek(int x, juce::ModifierKeys modifiers) {
     const auto target = modifiers.isAltDown() ? std::optional<double>() : magnet(raw, project, {}, nullptr, false);
     processor.seek(std::clamp(target.value_or(raw), 0.0, project.duration));
     repaint();
+}
+
+void MotionTimelineView::showCompositionEffects() {
+    cancelGesture();
+    selectClip(0);
+    if (onShowCompositionEffects) { onShowCompositionEffects(); }
+}
+
+// The composition's effects as one bar across all of it, as an adjustment
+// layer would be: their names, and their keys along its foot as a clip's are.
+void MotionTimelineView::paintCompositionRow(juce::Graphics& g, int y, int height) const {
+    const auto& project = processor.document.project();
+    const auto cardHeight = height - bandGap;
+    fillCard(g, y, cardHeight, osci::Colours::surfaceRaised().interpolatedWith(motion::style::compositionClip(), .55f), std::nullopt);
+    juce::Graphics::ScopedSaveState scope(g);
+    g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
+    const auto bounds = juce::Rectangle<float>(static_cast<float>(timeX(0)), static_cast<float>(y), static_cast<float>(std::max(14, timeX(project.duration) - timeX(0))), static_cast<float>(cardHeight)).reduced(1, 3);
+    const auto base = motion::style::compositionClip();
+    const auto anyOn = std::any_of(project.effects.begin(), project.effects.end(), [](const auto& effect) { return effect.enabled; });
+    const auto opacity = anyOn ? 1.0f : .45f;
+    g.setColour(base.withAlpha(opacity));
+    g.fillRoundedRectangle(bounds, motion::style::radius);
+    g.setColour(base.brighter(.6f).withAlpha(opacity * .35f));
+    g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
+    // Named by its effects, in order; one switched off reads dimmer.
+    juce::StringArray names;
+    for (const auto& effect : project.effects) { names.add(juce::String::fromUTF8(effect.name.c_str()) + (effect.enabled ? juce::String() : juce::String(" (off)"))); }
+    const auto labelBounds = bounds.reduced(6, 0).withHeight(std::min(bounds.getHeight(), 18.0f));
+    // The name stays in view while the start scrolls away, as a clip's does.
+    const auto shown = labelBounds.withLeft(std::max(labelBounds.getX(), static_cast<float>(namesWidth) + 6.0f));
+    g.setFont(motion::style::body());
+    g.setColour(juce::Colours::white.withAlpha(opacity < 1.0f ? .7f : 1.0f));
+    g.drawText(names.joinIntoString(", "), shown, juce::Justification::centredLeft, true);
+    std::set<double> times;
+    for (const auto& effect : project.effects) {
+        for (const auto& [name, curve] : effect.properties) {
+            for (const auto& key : curve.keyframes()) { times.insert(key.time); }
+        }
+    }
+    juce::Path ticks;
+    double lastX = -10;
+    for (const auto time : times) {
+        const auto x = static_cast<double>(timeX(time));
+        if (x - lastX < 3 || x < namesWidth - 4 || x > getWidth() + 4) { continue; }
+        motion::style::addDiamond(ticks, {static_cast<float>(x), bounds.getBottom() - 4.0f}, 3.5f);
+        lastX = x;
+    }
+    g.setColour(motion::style::keyTick().withMultipliedAlpha(opacity));
+    g.fillPath(ticks);
 }

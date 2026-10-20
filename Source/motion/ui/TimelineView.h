@@ -17,13 +17,24 @@
 #include "DocumentMenu.h"
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
+    // The composition's own row, above the tracks while it has effects: they
+    // act on everything, as an adjustment layer spanning it would.
+    static constexpr int compositionTrack = -2;
+    static constexpr motion::Id compositionRow = std::numeric_limits<motion::Id>::max();
     struct Row : motion::TrackRow {
-        std::string lane; // Property id for a keyframe lane under its track.
+        // A keyframe lane under its track (or the composition's row): the keys
+        // of `property` on each of `owners` (clips, their effects, or the
+        // composition's effects), told apart from other lanes by `lane`.
+        std::string lane, property;
+        std::vector<motion::Id> owners;
+        juce::String label;
+        juce::Colour colour;
         bool isLane() const { return !lane.empty(); }
-        bool group() const { return track < 0 && lane.empty(); }
+        bool group() const { return track == -1 && lane.empty(); }
+        bool composition() const { return track == compositionTrack && lane.empty(); }
     };
     struct KeyRef {
-        motion::Id clip = 0;
+        motion::Id clip = 0; // Whose key: a clip, an effect, or another owner of keys.
         std::string property;
         double time = 0; // Content-local key time.
     };
@@ -37,6 +48,8 @@ public:
     std::function<void(double)> onAddCamera;
     std::function<void(motion::Id)> onSelection, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
     std::function<void()> onLoopSelection;
+    // The composition's effects row was clicked: show its effects.
+    std::function<void()> onShowCompositionEffects;
     std::function<void(const juce::String&)> onError;
     // The source Sources has chosen (0: none), and a hint said meanwhile:
     // double-clicking empty track space adds that source there.
@@ -298,6 +311,8 @@ private:
     motion::Id beamHover = 0;
     int beamPointer = 0;
     void paintLane(juce::Graphics& g, const Row& row, int y, int height) const;
+    // The clip a lane's owner is, or is an effect of; none for the composition's effects.
+    static const motion::Clip* laneClip(const motion::Project& project, motion::Id owner);
     bool isKeySelected(motion::Id clip, const std::string& property, double time) const {
         return std::any_of(selectedKeys.begin(), selectedKeys.end(), [&](const auto& key) { return key.clip == clip && key.property == property && motion::sameTime(key.time, time); });
     }
@@ -339,6 +354,7 @@ private:
     int cameraBandTop() const { return (showsMarkerBand() ? markerBandTop() + markerBandHeight : toolsHeight) + bandGap; }
     // One row: a track's or group's card and clips, or a keyframe lane.
     void paintRow(juce::Graphics& g, int visible);
+    void paintCompositionRow(juce::Graphics& g, int y, int height) const;
     void fillCard(juce::Graphics& g, int y, int height, juce::Colour header, std::optional<juce::Colour> lane) const;
     // Matches the add-track button above it.
     juce::Rectangle<int> addCameraBounds() const { return {namesWidth - 26, cameraBandTop(), 22, cameraBandHeight}; }
@@ -409,6 +425,8 @@ public:
     // Tracks and groups picked together by their headers (Cmd or Shift),
     // for grouping them in one go (Cmd+G).
     void groupSelectedTracks();
+    // Selects the composition, so Properties shows its effects.
+    void showCompositionEffects();
     // The selected clips into a new composition, used where they were
     // (Cmd+Shift+C, as After Effects' Pre-compose; Alt+G too, as Final Cut).
     void createCompositionFromSelection();
@@ -493,7 +511,13 @@ private:
     // destruction in refreshTracks(), outside paint and hit testing.
     void ensureTrackRows() const;
     // Lanes list every animated property on a track's clips, in schema order.
-    static std::vector<std::string> animatedProperties(const motion::Track& track);
+    // A track's keyframe lanes: its clips' animated properties, then their
+    // effects' animated parameters, each effect's under its name.
+    static std::vector<Row> trackLanes(const motion::Project& project, const motion::Track& track);
+    // A lane for each effect name and parameter keyed by any of `effects`.
+    static void addEffectLanes(std::vector<Row>& lanes, const std::vector<const motion::EffectInstance*>& effects);
+    // The composition's effects' animated parameters.
+    static std::vector<Row> compositionLanes(const motion::Project& project);
     void rebuildRows() const;
     // Row heights: lanes are fixed; tracks use their own height or the
     // default; groups use the default.

@@ -8,7 +8,7 @@
 // drawn at 18 px so their 2 px strokes land on whole device pixels on
 // high-density displays. One button draws them all, so toolbars match.
 namespace motion::icons {
-enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, autoKey, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search, solidView, link };
+enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, autoKey, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search, solidView, link, effects };
 
 inline const juce::Path& path(Icon icon) {
     static const auto paths = [] {
@@ -67,6 +67,8 @@ inline const juce::Path& path(Icon icon) {
         add(Icon::keyboard, "M20 7v10H4V7h16m0-2H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2zm0 3h2v2h-2zM8 8h2v2H8zm0 3h2v2H8zm-3 0h2v2H5zm0-3h2v2H5zm3 6h8v2H8zm6-3h2v2h-2zm0-3h2v2h-2zm3 3h2v2h-2zm0-3h2v2h-2z");
         add(Icon::search, "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z");
         add(Icon::close, "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z");
+        // A wand with sparkles: effects, which act on whatever they are put on.
+        add(Icon::effects, "M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z");
         // A chain link: a source read from a file on disk.
         add(Icon::link, "M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z");
         add(Icon::move, "M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z");

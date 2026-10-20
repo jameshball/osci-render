@@ -568,6 +568,18 @@ void MotionEditor::setUpTimeline() {
         });
     };
     timeline.onLoopSelection = [this] { loopSelection(); };
+    // The composition's effects row: Properties shows the composition, its
+    // effects scrolled to and marked.
+    timeline.onShowCompositionEffects = [this] {
+        select(0);
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        juce::MessageManager::callAsync([owner] {
+            if (owner == nullptr || !owner->effectStack.isShowing()) { return; }
+            osci::RevealOptions options;
+            options.margin = motion::style::padding;
+            owner->propertyInspector.reveal(owner->effectStack, options);
+        });
+    };
     timeline.canPaste = [this] { return !std::holds_alternative<std::monostate>(clipboard); };
     timeline.onCommand = [this](const juce::String& name) {
         for (const auto& command : commands) {

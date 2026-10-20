@@ -76,6 +76,24 @@ public:
         solo.setToggleState(track.solo, juce::dontSendNotification);
         lock.setToggleState(track.locked, juce::dontSendNotification);
     }
+    // The composition's own row: its effects, which act on everything. It
+    // can only show its key lanes; there is nothing to mute, lock or move.
+    void updateComposition(bool lanes, bool expanded) {
+        isComposition = true;
+        disclosure.setVisible(lanes);
+        disclosure.setToggleState(!expanded, juce::dontSendNotification);
+        disclosure.setName("Key lanes composition");
+        disclosure.setTitle("Key lanes of the composition's effects");
+        disclosure.setTooltip("Show or hide the effects' key lanes");
+        for (auto* control : std::initializer_list<juce::Component*> {&mute, &solo, &lock, &grip}) { control->setVisible(false); }
+        name.setEditable(false, false);
+        name.setFont(motion::style::body());
+        name.setText("Composition", juce::dontSendNotification);
+        name.setName("Composition effects");
+        name.setTitle("Composition effects");
+        name.setTooltip("Effects on everything in the composition: click to show them in Properties");
+        resized();
+    }
     // While dragged, the timeline draws the header in its lifted block above
     // the other rows; the header itself stays in place, unseen, to keep
     // receiving the drag.
@@ -94,12 +112,12 @@ public:
             button->setBounds(buttons.removeFromLeft(chip));
             buttons.removeFromLeft(spacing);
         }
-        // A group shows a folder before its name.
-        folderArea = isGroup ? bounds.removeFromLeft(18).toFloat() : juce::Rectangle<float>();
+        // A group shows a folder before its name; the composition its effects' glyph.
+        folderArea = isGroup || isComposition ? bounds.removeFromLeft(18).toFloat() : juce::Rectangle<float>();
         name.setBounds(bounds.reduced(4, 0).withSizeKeepingCentre(bounds.getWidth() - 8, 18));
     }
     void paintOverChildren(juce::Graphics& g) override {
-        if (!folderArea.isEmpty()) { motion::icons::draw(g, motion::icons::Icon::folder, folderArea, osci::Colours::text().withAlpha(.7f), 14.0f); }
+        if (!folderArea.isEmpty()) { motion::icons::draw(g, isComposition ? motion::icons::Icon::effects : motion::icons::Icon::folder, folderArea, osci::Colours::text().withAlpha(.7f), 14.0f); }
     }
     void mouseDown(const juce::MouseEvent& event) override {
         // Right-click anywhere on the header opens the track's menu.
@@ -146,7 +164,7 @@ public:
     // The grip's drag, in screen coordinates; `finished` on release.
     std::function<void(motion::Id, juce::Point<int>, bool finished)> onReorder;
 private:
-    bool isGroup = false, grabbing = false;
+    bool isGroup = false, isComposition = false, grabbing = false;
     juce::Rectangle<float> folderArea;
     int gripTravel = 0;
     class FoldButton : public juce::TextButton {

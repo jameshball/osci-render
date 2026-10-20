@@ -385,6 +385,11 @@ int MotionTimelineView::dropBoundary(motion::Id& group) const {
         if (!row.group()) {
             while (end < count && rows[static_cast<std::size_t>(end)].isLane()) { ++end; }
         }
+        // Tracks go below the composition's effects, never above them.
+        if (row.composition()) {
+            start = end;
+            continue;
+        }
         const auto top = rowY(start) - (start >= trackDrag->last ? trackDrag->height : 0);
         const auto height = rowY(end) - rowY(start);
         if (row.group() && centre >= top + height / 4 && centre < top + height * 3 / 4) {
