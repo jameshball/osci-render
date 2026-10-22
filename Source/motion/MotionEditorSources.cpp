@@ -245,16 +245,6 @@ void MotionEditor::chooseSourceFile() {
     });
 }
 
-void MotionEditor::chooseAudioFile() {
-    chooser = std::make_unique<juce::FileChooser>("Import audio", processor.getLastOpenedDirectory(), osci::files::audioWildcard());
-    const juce::Component::SafePointer<MotionEditor> owner(this);
-    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [owner](const juce::FileChooser& chosen) {
-        if (owner != nullptr && chosen.getResult().existsAsFile()) {
-            owner->openSourceFile(chosen.getResult());
-        }
-    });
-}
-
 void MotionEditor::showBlenderSettings(motion::Id id) {
     auto& document = processor.document;
     const auto& assets = document.mainProject().assets;

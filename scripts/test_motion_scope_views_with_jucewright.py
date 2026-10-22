@@ -51,8 +51,8 @@ try:
     step("import motif", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Motif.txt", "--class", "juce::Label", "--exact")
     step("save source", "press", "command + s", "--class", "MotionEditor")
-    step("open clip menu", "click", "--class", "MotionTimelineView", "--position", "300,68", "--button", "right")
-    step("create composition", "click", "--name", "Create composition from selection", "--role", "menuItem", "--exact")
+    step("open clip menu", "click", "--class", "MotionTimelineView", "--position", "264,68", "--button", "right")
+    step("create composition", "click", "--name", "Make composition", "--role", "menuItem", "--exact")
     step("save created composition", "press", "command + s", "--class", "MotionEditor")
     created = read_project(seed)
     assert len(created.findall("./composition/definition")) == 1

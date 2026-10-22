@@ -4,7 +4,8 @@
 #include "MotionIcons.h"
 
 // Blender-style tools inside the Scene: a vertical strip with the transform
-// tools, the motion path, fly navigation and framing.
+// tools, the motion path, fly navigation and framing, and Look through while
+// a camera is selected.
 class MotionSceneToolbar final : public motion::icons::ToolStrip {
 public:
     using Tool = motion::icons::Button;
@@ -27,7 +28,9 @@ public:
         lookThrough.setClickingTogglesState(true);
         lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");
         setGroups({{&move, &rotate, &scale, &anchor, &parts}, {&path, &faces, &fly, &frame}, {&lookThrough}});
-        lookThrough.setEnabled(false);
+        // Shown once a camera is selected (MotionEditor::refreshCameraTools).
+        lookThrough.setVisible(false);
+        resized();
     }
     Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale}, anchor {"Anchor tool", motion::icons::Icon::anchor}, parts {"Pick parts", motion::icons::Icon::parts};
     Tool lookThrough {"Look through camera", motion::icons::Icon::videocam};
@@ -39,7 +42,10 @@ public:
         for (auto* tool : {&path, &faces, &fly, &frame}) { tool->setVisible(!compact); }
         resized();
     }
-    int fullHeight() const { return cell * 10 + groupGap * 2 + inset * 2; }
+    int fullHeight() const {
+        const auto camera = lookThrough.isVisible() ? 1 : 0;
+        return cell * (9 + camera) + groupGap * (1 + camera) + inset * 2;
+    }
     bool compact = false;
 };
 
@@ -62,9 +68,11 @@ public:
     Tool box {"Box pick", motion::icons::Icon::box}, lasso {"Lasso pick", motion::icons::Icon::lasso}, connected {"Pick pieces", motion::icons::Icon::connected};
 };
 
-// The Scope's controls in the same floating strip, at its top right:
-// texture output, framing and beam settings, then the popout and full
-// screen. Video is made by Export, drawn offline, never recorded live.
+// The Scope's controls: texture output, framing and beam settings, then the
+// popout and full screen. Docked, they run across the Scope's header on its
+// own fill; full screen (or on a Scope too narrow for its header) they float
+// down the picture's top right as the Scene's strip does. Video is made by
+// Export, drawn offline, never recorded live.
 class MotionScopeToolbar final : public motion::icons::ToolStrip {
 public:
     using Tool = motion::icons::Button;
@@ -81,4 +89,39 @@ public:
     Tool textureOutput {"Share picture", motion::icons::Icon::cast};
     Tool canvas {"Output canvas", motion::icons::Icon::aspectRatio}, settings {"Scope settings", motion::icons::Icon::settings};
     Tool popout {"Pop out Scope", motion::icons::Icon::openInNew}, fullScreen {"Full screen Scope", motion::icons::Icon::fullscreen};
+    void setDocked(bool value) {
+        if (docked == value) { return; }
+        docked = value;
+        horizontal = value;
+        resized();
+    }
+    // How long it runs, docked or floating.
+    int extent() const { return horizontal ? preferredWidth() : preferredHeight(); }
+    void resized() override {
+        ToolStrip::resized();
+        if (!docked) { return; }
+        // As tall as the header's other controls (the undo buttons, the
+        // recording stopwatch).
+        for (auto* tool : tools()) {
+            if (tool->isVisible()) { tool->setBounds(tool->getX(), 3, cell, getHeight() - 6); }
+        }
+    }
+    void paint(juce::Graphics& g) override {
+        if (!docked) {
+            ToolStrip::paint(g);
+            return;
+        }
+        // The header shows through; hairlines part the groups.
+        g.setColour(motion::style::hairline());
+        juce::Component* previous = nullptr;
+        for (auto* tool : tools()) {
+            if (!tool->isVisible()) { continue; }
+            if (previous != nullptr && tool->getX() - previous->getRight() >= groupGap) { g.fillRect(static_cast<float>(previous->getRight() + groupGap / 2), tool->getY() + 4.0f, 1.0f, tool->getHeight() - 8.0f); }
+            previous = tool;
+        }
+    }
+
+private:
+    std::array<juce::Component*, 5> tools() { return {&textureOutput, &canvas, &settings, &popout, &fullScreen}; }
+    bool docked = false;
 };

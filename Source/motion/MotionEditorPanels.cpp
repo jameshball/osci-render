@@ -218,8 +218,13 @@ void MotionEditor::setUpLibrary() {
             result.image = icons::stroked(std::move(glyph), icons::ink());
             return result;
         };
+        // In groups: a file, one drawn or written here, one osci-motion makes,
+        // and one from elsewhere (another app, or an example).
+        menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder()));
+        menu.addSeparator();
         menu.addItem(item(AddMenuId::drawing, "Draw a shape...", icons::glyph::pencil()));
         menu.addItem(item(AddMenuId::newScript, "Write a script...", icons::glyph::braces()));
+        menu.addSeparator();
         // Sources made from a few numbers, by category, each with its picture.
         juce::PopupMenu generate;
         for (const auto category : {motion::GeneratorCategory::shape, motion::GeneratorCategory::curve, motion::GeneratorCategory::grid, motion::GeneratorCategory::solid}) {
@@ -265,8 +270,7 @@ void MotionEditor::setUpLibrary() {
             mirrors.addItem(std::move(entry));
         }
         menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
-        menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder()));
-        menu.addItem(item(AddMenuId::importAudio, "Import audio...", icons::glyph::wave()));
+        menu.addSeparator();
         // Live: what other apps send, drawn as it arrives, never prepared ahead.
         juce::PopupMenu live;
         live.addItem(item(AddMenuId::blenderSource, "Blender...", icons::glyph::live()));
@@ -314,7 +318,6 @@ void MotionEditor::setUpLibrary() {
                 return static_cast<std::size_t>(choice - first);
             };
             if (choice == AddMenuId::importFile) { owner->chooseSourceFile(); }
-            if (choice == AddMenuId::importAudio) { owner->chooseAudioFile(); }
             if (choice == AddMenuId::blenderSource) { owner->showBlenderSettings(); }
             if (choice == AddMenuId::drawing) { owner->showDrawingEditor(0); }
             if (choice == AddMenuId::newScript) { owner->newScript(); }
@@ -454,9 +457,6 @@ void MotionEditor::setUpProperties() {
     };
     // The owner's effects follow its properties.
     propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); }, "Effects");
-    inspectorTitle.setText("Properties", juce::dontSendNotification);
-    inspectorTitle.setFont(motion::style::title());
-    inspectorTitle.setBorderSize(juce::BorderSize<int>(0));
     propertyInspector.onPropertySelected = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, selectionIsCamera(), true); };
     propertyInspector.onModulate = [this](motion::Id id, const std::string& property) {
         selectCurveTarget(id, property, selectionIsCamera(), true);
@@ -478,7 +478,12 @@ void MotionEditor::setUpProperties() {
 void MotionEditor::setUpTimeline() {
     timelineDivider.setName("Resize timeline");
     previewDivider.setName("Resize preview panels");
-    for (auto* divider : {&timelineDivider, &previewDivider}) { divider->setQuiet(true); }
+    // Each overlaps the panels' edges either side of the 3 px gutter, so it
+    // is above them and easier to grab than the gutter alone.
+    for (auto* divider : {&timelineDivider, &previewDivider}) {
+        divider->setQuiet(true);
+        divider->toFront(false);
+    }
     styleTabs(timelineTabs);
     timeline.onEffectAdded = [this](motion::Id owner, motion::Id) { select(owner); };
     timelineTabs.setName("Timeline tabs");

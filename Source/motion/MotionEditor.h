@@ -151,8 +151,6 @@ private:
     // The settings of a live source of either kind.
     void showLiveSettings(motion::Id id);
     void chooseSourceFile();
-    // Import, offering audio files only.
-    void chooseAudioFile();
     bool importSourceFile(const juce::File& file, motion::Id relink, std::optional<std::pair<double, motion::Id>> placement = std::nullopt);
     void importSourceFiles(juce::Array<juce::File> files, std::optional<std::pair<double, motion::Id>> placement);
     void replaceSourceFile(motion::Id asset);
@@ -307,7 +305,8 @@ private:
         std::function<void()> action;
     };
     std::vector<Command> commands;
-    void addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action);
+    // `label` names it in its menu when that differs from its name (in a submenu).
+    void addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action, juce::String label = {});
     void registerCommands();
     void buildFileMenu(juce::PopupMenu& menu);
     bool fileMenuItemSelected(int id);
@@ -388,7 +387,6 @@ private:
     void refreshKeyPanel();
     MotionModulatorLibrary modulatorLibrary;
     osci::TabBar libraryTabs;
-    juce::Label inspectorTitle;
     osci::TabBar timelineTabs;
     MotionCurveList curveList;
     std::set<std::string> shownCurves, hiddenCurves;
@@ -453,24 +451,23 @@ private:
     void refreshUndo();
     // The menu bar's menus, in order, and ids clear of the menu model's own
     // (1-based per item) for the items added to them here.
-    enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, audioMenu, viewMenu, timingMenuIndex, helpMenu };
-    static constexpr int undoMenuId = 3001, redoMenuId = 3002, sampleRateMenuId = 3100, outputMenuId = 2000, importAudioMenuId = 3200;
+    enum MenuIndex { fileMenu, editMenu, clipMenu, transportMenu, viewMenu, timingMenuIndex, helpMenu };
+    static constexpr int undoMenuId = 3001, redoMenuId = 3002;
     // View > Interface size: everything drawn larger or smaller, saved as a preference.
     static constexpr int interfaceSizeMenuId = 3300, softwareRenderingMenuId = 3400;
     static constexpr std::array<float, 8> interfaceSizes { .8f, .9f, 1.0f, 1.1f, 1.25f, 1.5f, 1.75f, 2.0f };
     void setInterfaceSize(float scale, bool keepWindowSize);
-    // The rates a project can be drawn at, from what audio runs at to four
-    // times 192 kHz.
-    static constexpr std::array<double, 8> projectSampleRates {44100, 48000, 88200, 96000, 176400, 192000, 384000, 768000};
     // The add menu's items, and the first id of each list in it.
     struct AddMenuId {
-        static constexpr int importFile = 1, blenderSource = 2, drawing = 3, importAudio = 4, newScript = 5;
+        static constexpr int importFile = 1, blenderSource = 2, drawing = 3, newScript = 4;
         static constexpr int firstExample = 100, firstGenerator = 1000, firstLightPreset = 2000, firstMirror = 3000, firstTexture = 4000;
     };
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
-    juce::Label tempoValue, tempoLabel;
+    // The tempo as Composition settings write it: "120 BPM", or "121.35 BPM".
+    juce::Label tempoValue;
+    static juce::String tempoText(double bpm);
     // Tap tempo: taps preview the tempo; it commits once tapping pauses.
     juce::TextButton tapButton {"Tap"};
     motion::TapTempo tapTempo;
@@ -486,7 +483,6 @@ private:
     motion::Id soundtrackClip() const;
     void detectTempo();
     void tap();
-    bool compactTransport = false;
     juce::Label outputLabel;
     MotionOutputButton outputButton;
     juce::Component::SafePointer<MotionOutputPanel> outputPanel;

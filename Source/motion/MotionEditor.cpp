@@ -46,11 +46,9 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addChildComponent(graphSideViewport);
     addChildComponent(modulatorLibrary);
     addAndMakeVisible(tempoValue);
-    addAndMakeVisible(tempoLabel);
-    // The Scope's controls float over its top right, like the Scene's tools:
-    // inside it, which draws them into its picture, as over an OpenGL view on
-    // Windows nothing else would show.
-    visualiser.addAndMakeVisible(scopeTools);
+    // The Scope's tools sit in its header; resized() moves them into the
+    // picture when they float (full screen, or a header too narrow).
+    addAndMakeVisible(scopeTools);
     visualiser.addChildComponent(scopeTransport);
     scopeTransport.watch(visualiser);
     scopeTransport.onStart = [this] { seekAndReveal(0); };
@@ -58,6 +56,14 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     scopeTransport.onPlay = [this] { togglePlayback(); };
     scopeTransport.onSeek = [this](double time) { processor.seek(time); };
     scopeTransport.onSpeedMenu = [this](juce::Component& anchor) { showSpeedMenu(anchor); };
+    // Full screen, the tool strip shows and fades with the transport, and
+    // the pointer resting on it keeps both up.
+    scopeTransport.onFade = [this](float alpha, bool interactive) {
+        if (!scopeFullScreen) { return; }
+        scopeTools.setAlpha(alpha);
+        scopeTools.setInterceptsMouseClicks(interactive, interactive);
+    };
+    scopeTransport.holds = [this] { return scopeTools.isMouseOverOrDragging(true); };
     addAndMakeVisible(outputButton);
     addAndMakeVisible(outputLabel);
     addAndMakeVisible(loopButton);
@@ -79,7 +85,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     redoButton.onPopupMenu = [this] { osci::showUndoHistory(processor.getUndoManager(), true, redoButton, [this] { refreshUndo(); }); };
     addChildComponent(effectLibrary);
     addChildComponent(cancelExport);
-    addAndMakeVisible(inspectorTitle);
     addChildComponent(curveList);
     setUpMenus();
     setUpCompositionNavigation();
@@ -118,7 +123,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         // Up to the default from below it; past that, twice as fast.
         std::optional<double> higher;
         const auto wanted = rate < motion::Project::defaultSampleRate - .5 ? motion::Project::defaultSampleRate : rate * 2;
-        for (const auto candidate : projectSampleRates) {
+        for (const auto candidate : MotionCompositionPanel::sampleRates) {
             if (candidate > wanted - .5) { higher = candidate; break; }
         }
         auto popover = std::make_unique<motion::ui::BeamOverloadPopover>(rate, higher);
@@ -155,34 +160,6 @@ void MotionEditor::setUpMenus() {
     menus.addTopLevelMenu("File");
     menus.customMenuLogic = [this](juce::PopupMenu& menu, int index) {
         if (index == fileMenu) { buildFileMenu(menu); }
-        if (index == viewMenu && juce::JUCEApplicationBase::isStandaloneApp()) {
-            juce::PopupMenu sizes;
-            const auto current = juce::Desktop::getInstance().getGlobalScaleFactor();
-            for (std::size_t item = 0; item < interfaceSizes.size(); ++item) {
-                sizes.addItem(interfaceSizeMenuId + static_cast<int>(item), juce::String(juce::roundToInt(interfaceSizes[item] * 100)) + "%", true, std::abs(current - interfaceSizes[item]) < .001f);
-            }
-            menu.addSeparator();
-            menu.addSubMenu("Interface size", sizes);
-           #if JUCE_WINDOWS
-            // OBS's Window Capture (Automatic or BitBlt) shows Direct2D windows white.
-            menu.addItem(softwareRenderingMenuId, "Draw for screen capture (OBS)", true, usesSoftwareRendering());
-           #endif
-        }
-        if (index == audioMenu) {
-            menu.addItem(importAudioMenuId, "Import audio...");
-            menu.addSeparator();
-            // Named as the field beside the transport is.
-            menu.addItem(outputMenuId, "Output...");
-            // The project's own rate: what it is drawn and exported at.
-            juce::PopupMenu rates;
-            const auto current = processor.document.mainProject().sampleRate;
-            for (std::size_t index = 0; index < projectSampleRates.size(); ++index) {
-                const auto rate = projectSampleRates[index];
-                rates.addItem(sampleRateMenuId + static_cast<int>(index), juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + (rate == motion::Project::defaultSampleRate ? juce::String(" (default)") : juce::String()), true, std::abs(rate - current) < .5);
-            }
-            menu.addSubMenu("Sample rate", rates);
-            menu.addSeparator();
-        }
         if (index == timingMenuIndex) {
             menu = timingMenu();
             menu.setLookAndFeel(&motionLookAndFeel);
@@ -204,6 +181,22 @@ void MotionEditor::setUpMenus() {
             menu.addItem(redoItem);
         }
     };
+    // The window's own settings end View, beside Full screen.
+    menus.customMenuAfterLogic = [this](juce::PopupMenu& menu, int index) {
+        if (index != viewMenu || !juce::JUCEApplicationBase::isStandaloneApp()) {
+            return;
+        }
+        juce::PopupMenu sizes;
+        const auto current = juce::Desktop::getInstance().getGlobalScaleFactor();
+        for (std::size_t item = 0; item < interfaceSizes.size(); ++item) {
+            sizes.addItem(interfaceSizeMenuId + static_cast<int>(item), juce::String(juce::roundToInt(interfaceSizes[item] * 100)) + "%", true, std::abs(current - interfaceSizes[item]) < .001f);
+        }
+        menu.addSubMenu("Interface size", sizes);
+       #if JUCE_WINDOWS
+        // OBS's Window Capture (Automatic or BitBlt) shows Direct2D windows white.
+        menu.addItem(softwareRenderingMenuId, "Draw for screen capture (OBS)", true, usesSoftwareRendering());
+       #endif
+    };
     menus.customMenuSelectedLogic = [this](int id, int index) {
         if (index == viewMenu && id == softwareRenderingMenuId) {
             setSoftwareRendering(!usesSoftwareRendering());
@@ -212,22 +205,6 @@ void MotionEditor::setUpMenus() {
         }
         if (index == viewMenu && id >= interfaceSizeMenuId && id < interfaceSizeMenuId + static_cast<int>(interfaceSizes.size())) {
             setInterfaceSize(interfaceSizes[static_cast<std::size_t>(id - interfaceSizeMenuId)], true);
-            return true;
-        }
-        if (index == audioMenu && id == importAudioMenuId) {
-            chooseAudioFile();
-            return true;
-        }
-        if (index == audioMenu && id == outputMenuId) {
-            showOutputPanel();
-            return true;
-        }
-        // The rate is the project's: an edit, undone as one.
-        if (index == audioMenu && id >= sampleRateMenuId && id < sampleRateMenuId + static_cast<int>(projectSampleRates.size())) {
-            const auto rate = projectSampleRates[static_cast<std::size_t>(id - sampleRateMenuId)];
-            if (processor.document.mainProject().sampleRate != rate) {
-                processor.document.edit("Change the sample rate", [rate](motion::Project& project) { project.sampleRate = rate; });
-            }
             return true;
         }
         if (index == editMenu && (id == undoMenuId || id == redoMenuId)) {
@@ -240,13 +217,10 @@ void MotionEditor::setUpMenus() {
     menus.addTopLevelMenu("Edit");
     menus.addTopLevelMenu("Clip");
     menus.addTopLevelMenu("Transport");
-    menus.addTopLevelMenu("Audio");
-    menus.addStandaloneAudioSettingsMenuItem(audioMenu, processor, *this);
     menus.addTopLevelMenu("View");
     menus.addTopLevelMenu("Timing");
     menus.addTopLevelMenu("Help");
     registerCommands();
-    menus.addMenuItem(helpMenu, "Start screen...", [this] { showStartScreen(); });
     menus.addMenuItem(helpMenu, "Keyboard shortcuts...", [this] { showShortcuts(); }, motion::style::shortcutText("Cmd+/"));
     menus.addMenuSeparator(helpMenu);
     menus.addMenuItem(helpMenu, "About osci-motion", [this] {
@@ -267,7 +241,15 @@ void MotionEditor::setUpMenus() {
         about.onPrivacyAndTerms = [this] { openPrivacyAndTerms(); };
         showOverlay(AboutComponent::createOverlay(about));
     });
-    menus.addSupportMenuItems(helpMenu, processor, *this);
+    menus.addMenuItem(helpMenu, "License and updates...", [this] { openLicenseAndUpdates(); });
+    // Each shows its file in its folder, to send with a problem.
+    menus.beginSubMenu(helpMenu, "Troubleshooting");
+    menus.addMenuItem(helpMenu, "Show log file", [this] { processor.applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log").revealToUser(); });
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        menus.addMenuItem(helpMenu, "Show app settings file", [] { CommonAudioProcessor::getAppSettingsFile().revealToUser(); });
+    }
+    menus.addMenuItem(helpMenu, "Show global settings file", [this] { processor.globalSettings.getFile().revealToUser(); });
+    menus.endSubMenu(helpMenu);
     initialiseMenuBar(menus);
     menuBar.setLookAndFeel(&motionLookAndFeel);
 }
@@ -306,7 +288,7 @@ void MotionEditor::setUpTransport() {
     addAndMakeVisible(autoKeyButton);
     autoKeyButton.setClickingTogglesState(false);
     autoKeyButton.onColour = motion::style::error().withAlpha(.2f);
-    autoKeyButton.setTooltip("Auto-key: every change is keyed at the playhead");
+    autoKeyButton.setTooltip("Auto-key: off");
     autoKeyButton.onClick = [this] { setAutoKey(!autoKeyButton.getToggleState()); };
     processor.document.onEdited = [this](const motion::Project& before) { editRecorded(before); };
     startButton.onClick = [this] { seekAndReveal(0); };
@@ -314,10 +296,7 @@ void MotionEditor::setUpTransport() {
     timeLabel.setFont(motion::style::mono());
     timeLabel.setJustificationType(juce::Justification::centred);
     tempoValue.setFont(motion::style::body());
-    tempoLabel.setFont(motion::style::caption());
-    tempoLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     refreshTiming();
-    tempoLabel.setText("BPM", juce::dontSendNotification);
     timeLabel.setName("Timeline position");
     timeLabel.setEditable(false, true);
     timeLabel.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
@@ -344,23 +323,26 @@ void MotionEditor::setUpTransport() {
     tapButton.setTitle("Tap tempo");
     tapButton.setTooltip("Tap on the beat, four times or more, to set the tempo");
     tapButton.setWantsKeyboardFocus(false);
+    // Used least in the bar, so it is quiet: text until hovered.
+    motion::style::makeQuiet(tapButton);
     tapButton.onClick = [this] { tap(); };
     tempoValue.setName("Project tempo");
     tempoValue.setEditable(false, true);
     tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
     tempoValue.setJustificationType(juce::Justification::centred);
+    tempoValue.setBorderSize({0, 2, 0, 2});
     tempoValue.onTextChange = [this] {
-        const auto typed = motion::ui::parseNumber(tempoValue.getText());
+        const auto typed = motion::ui::parseNumber(tempoValue.getText(), "BPM");
         const auto value = typed.value_or(0);
         if (value < 1 || value > 1000) {
-            tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification);
+            tempoValue.setText(tempoText(processor.document.project().bpm), juce::dontSendNotification);
             statusBar.show("Enter a tempo between 1 and 1000 BPM.", MotionStatusBar::Kind::notice);
             return;
         }
         if (value != processor.document.project().bpm) {
             const auto result = processor.document.changeTempo(value);
             if (result.failed()) {
-                tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification);
+                tempoValue.setText(tempoText(processor.document.project().bpm), juce::dontSendNotification);
                 statusBar.show("Couldn't change the tempo: " + result.getErrorMessage());
             }
         }
@@ -368,6 +350,10 @@ void MotionEditor::setUpTransport() {
     exportBar.setName("Signal export progress");
     cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
     playButton.onClick = [this] { togglePlayback(); };
+}
+
+juce::String MotionEditor::tempoText(double bpm) {
+    return juce::String(bpm, bpm == std::round(bpm) ? 0 : 2) + " BPM";
 }
 
 MotionEditor::~MotionEditor() {
@@ -483,7 +469,14 @@ void MotionEditor::setScopeFullScreen(bool value) {
     if (value == scopeFullScreen) { return; }
     scopeFullScreen = value;
     scopeTransport.setVisible(value);
-    if (value) { scopeTransport.wake(); } else { scopeTransport.sleep(); }
+    if (value) {
+        scopeTransport.wake();
+    } else {
+        scopeTransport.sleep();
+        // Back in the header, the tool strip is always shown.
+        scopeTools.setAlpha(1.0f);
+        scopeTools.setInterceptsMouseClicks(true, true);
+    }
     scopeTools.fullScreen.setIcon(value ? motion::icons::Icon::fullscreenExit : motion::icons::Icon::fullscreen);
     scopeTools.fullScreen.setTooltip(value ? "Exit full screen (Esc)" : "Full screen");
     resized();
@@ -567,7 +560,7 @@ void MotionEditor::timerCallback() {
         const auto dot = motion::style::dot();
         // A short line of what is out of the ordinary, beside the rates; its
         // tooltip says the rest. The timeline's ruler shows the bake itself.
-        const auto rates = juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + dot + juce::String(beamRate, beamRate == std::floor(beamRate) ? 0 : 2) + " Hz beam";
+        const auto rates = MotionCompositionPanel::kilohertz(rate) + dot + MotionCompositionPanel::hertz(beamRate) + " beam";
         juce::StringArray line {rates}, details {rates};
         if (processor.document.project().scope.xyOnly) {
             line.add("XY only");
@@ -581,8 +574,8 @@ void MotionEditor::timerCallback() {
                 details.add("Simplified to fit: too much to draw in one cycle of the beam, so the shortest strokes are left out (a higher sample rate draws more)");
             }
         }
-        // What the frames are baked for, and how many are left: a count,
-        // which a percentage of a bake taking over most of its frames isn't.
+        // What the frames are baked for, and how many are left: the line only
+        // says a bake is on (the ruler shows how far), its tooltip the count.
         juce::StringArray baked;
         if (processor.hidesHiddenLines()) { baked.add("hidden lines removed"); }
         if (processor.lightsFrames()) { baked.add("lit"); }
@@ -592,11 +585,8 @@ void MotionEditor::timerCallback() {
         const auto remaining = processor.hiddenLinesRemaining();
         if (!baked.isEmpty()) {
             if (remaining.has_value()) {
-                const auto count = juce::String(static_cast<juce::int64>(*remaining));
-                juce::String grouped;
-                for (int index = 0; index < count.length(); ++index) { grouped << (index > 0 && (count.length() - index) % 3 == 0 ? "," : "") << count[index]; }
-                line.add("baking " + grouped + (*remaining == 1 ? " frame" : " frames"));
-                details.add("Baking " + grouped + (*remaining == 1 ? " frame" : " frames") + " (" + baked.joinIntoString(", ") + "), from the playhead on; a frame not yet baked draws every line");
+                line.add("baking");
+                details.add("Baking " + juce::String(static_cast<juce::int64>(*remaining)) + (*remaining == 1 ? " frame" : " frames") + " (" + baked.joinIntoString(", ") + "), from the playhead on; a frame not yet baked draws every line");
             } else {
                 details.add("Every frame baked: " + baked.joinIntoString(", "));
             }
@@ -644,7 +634,7 @@ void MotionEditor::timerCallback() {
     }
     if (timeLabel.isBeingEdited() && (positionEditGeneration != processor.document.scopeGeneration() || positionEditRevision != processor.document.revision())) { timeLabel.hideEditor(true); }
     if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification); }
-    if (!tempoValue.isBeingEdited() && !tappedBpm.has_value()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
+    if (!tempoValue.isBeingEdited() && !tappedBpm.has_value()) { tempoValue.setText(tempoText(processor.document.project().bpm), juce::dontSendNotification); }
     // A moving playhead repaints only its own columns of the time views, and a
     // slow full refresh (about 3 Hz) catches anything that changes without an
     // edit or a playhead move. Live Blender capture shows in the Scene, which
@@ -749,12 +739,18 @@ motion::Id MotionEditor::toolCamera() const {
     return selectionIsCamera() ? selection : 0;
 }
 
-// Look through follows the selection, the playhead and edits; a camera that
-// cannot be looked through says why.
+// Look through follows the selection, the playhead and edits: shown only
+// with a camera to look through, and a camera that cannot be looked through
+// says why.
 void MotionEditor::refreshCameraTools() {
     // The cog is lit while the Scope's properties are shown.
     scopeTools.settings.setToggleState(selection != 0 && selection == processor.document.project().beam.id, juce::dontSendNotification);
     const auto camera = toolCamera();
+    if (sceneTools.lookThrough.isVisible() != (camera != 0)) {
+        sceneTools.lookThrough.setVisible(camera != 0);
+        sceneTools.resized();
+        resized();
+    }
     const auto driven = camera != 0 && camera == composition.drivenCamera();
     const auto blocker = composition.driveBlocker(camera);
     sceneTools.lookThrough.setEnabled(driven || blocker.isEmpty());
@@ -843,7 +839,7 @@ void MotionEditor::select(motion::Id id) {
     // A free camera can be driven from the Scene until its button is released
     // or another camera is chosen.
     if (camera && composition.drivenCamera() != 0 && composition.drivenCamera() != id) { composition.setDrivenCamera(0); }
-    // Always in the strip, so they keep its size; usable with a camera selected.
+    // Look through shows with a camera selected.
     refreshCameraTools();
     selectCurveTarget(id, curvePropertyName, camera);
     refreshInspector();

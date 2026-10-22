@@ -54,12 +54,19 @@ def choose(item, submenu=None):
     if submenu is not None:
         step("open " + submenu, "click", "--name", submenu, "--role", "menuItem", "--exact")
     step("choose " + item, "click", "--name", item, "--role", "menuItem", "--exact")
-    # Meter and frame rate are edits; display and snapping are view options
-    # with no undo step.
-    if submenu in ("Meter", "Frame rate"):
-        wait_undo("Change meter" if submenu == "Meter" else "Change frame rate")
-    else:
-        command("wait", "--ms", 250)
+    # Display and snapping are view options with no undo step.
+    command("wait", "--ms", 250)
+
+
+def composition_setting(name, item, undo, reselect=True):
+    """Meter and frame rate are edits, made in Properties > Composition: shown
+    with nothing selected, then the cube's clip is selected again."""
+    step("select nothing", "click", "--class", "MotionTimelineView", "--position", "750,140")
+    command("wait-for-locator", "--name", name, "--exact")
+    step("choose " + item, "select-option", "--name", name, "--exact", "--text", item)
+    wait_undo(undo)
+    if reselect:
+        step("select the cube again", "click", "--class", "MotionTimelineView", "--position", "300,68")
 
 
 def position(expected):
@@ -104,7 +111,7 @@ try:
     choose("1 beat", "Beat grid")
     # The playhead moves freely: away from clip edges, keys, markers and the
     # loop, a ruler click is not pulled to the beat grid, even with snapping on.
-    step("seek between beats", "click", "--class", "MotionTimelineView", "--position", "250,12")
+    step("seek between beats", "click", "--class", "MotionTimelineView", "--position", "214,12")
     position("1.1.823")
     step("musical ruler screenshot", "screenshot", "--file", session.artifact_dir / "beat-timeline.png")
     choose("Seconds")
@@ -115,17 +122,17 @@ try:
     step("commit tempo", "press", "Return")
     # Typed positions read bars.beats under each tempo and meter.
     enter_position("1.2.000", "1.2.000")
-    choose("3/4", "Meter")
+    composition_setting("Composition meter", "3/4", "Change meter")
     enter_position("2.1.000", "2.1.000")
     choose("1/8 triplet", "Beat grid")
     enter_position("1.1.320", "1.1.320")
     step("key object", "click", "--name", "Key position", "--exact")
     step("show musical graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("musical graph screenshot", "screenshot", "--file", session.artifact_dir / "beat-graph.png")
-    choose("24 fps", "Frame rate")
-    choose("Frames")
     step("show frame timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
-    step("seek frame", "click", "--class", "MotionTimelineView", "--position", "280,12")
+    composition_setting("Composition frame rate", "24 fps", "Change frame rate", reselect=False)
+    choose("Frames")
+    step("seek frame", "click", "--class", "MotionTimelineView", "--position", "244,12")
     position("21f")
     step("frame ruler screenshot", "screenshot", "--file", session.artifact_dir / "frame-timeline.png")
     # Undo reverts the frame rate but keeps the display, like any view option.

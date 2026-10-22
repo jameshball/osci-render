@@ -27,6 +27,8 @@ void MotionEditor::saveLayout() {
 
 void MotionEditor::resized() {
     CommonPluginEditor::resized();
+    // One gutter between all panels; the dividers sit in theirs.
+    constexpr auto gutter = osci::PanelHeader::panelGap;
     auto area = getLocalBounds().reduced(3);
     auto top = area.removeFromTop(30);
     // Menus keep their natural width; the transport follows them.
@@ -51,9 +53,9 @@ void MotionEditor::resized() {
     top.removeFromRight(8);
     // Transport sits centred in the menu row, leaving the full height below
     // for the workspace.
-    // The transport goes compact (no BPM caption, tighter readout) before the
-    // Output picker would have to hide.
-    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 454 ? 454 : 374;
+    // The transport goes compact (a tighter readout) before the Output
+    // picker would have to hide.
+    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 424 ? 424 : 378;
     auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, transportWidth), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - transportWidth / 2));
     // What the audio interface plays sits with the other audio state (the
     // DSP meter), not in the Scope; without room it lives in the Audio menu.
@@ -74,22 +76,18 @@ void MotionEditor::resized() {
     endButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     speedButton.setBounds(transport.removeFromLeft(36).reduced(1, 4));
     loopButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
+    // Auto-key is an editing mode, not playback: a gap sets it apart.
+    transport.removeFromLeft(8);
     autoKeyButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
-    // Narrow windows drop the BPM caption and tighten the readouts so the
-    // timing menu never collapses to nothing.
-    const auto compact = transport.getWidth() < 258;
-    if (compact != compactTransport) {
-        compactTransport = compact;
-        refreshTiming();
-    }
+    // Narrow windows tighten the readout so the tempo never collapses to
+    // nothing.
+    const auto compact = transport.getWidth() < 236;
     transport.removeFromLeft(compact ? 4 : 8);
-    timeLabel.setBounds(transport.removeFromLeft(compact ? 92 : 118).reduced(0, 4));
+    timeLabel.setBounds(transport.removeFromLeft(compact ? 80 : 118).reduced(0, 4));
     transport.removeFromLeft(compact ? 4 : 8);
-    tempoValue.setBounds(transport.removeFromLeft(52).reduced(0, 4));
-    tempoLabel.setVisible(!compact);
-    tempoLabel.setBounds(transport.removeFromLeft(compact ? 4 : 34).withTrimmedLeft(compact ? 0 : 4));
+    tempoValue.setBounds(transport.removeFromLeft(64).reduced(0, 4));
     tapButton.setBounds(transport.removeFromLeft(38).reduced(1, 4));
-    area.removeFromTop(3);
+    area.removeFromTop(gutter);
     statusBar.setBounds(area.removeFromBottom(20));
     area.removeFromBottom(2);
     workspaceHeight = area.getHeight();
@@ -123,7 +121,8 @@ void MotionEditor::resized() {
     layoutGraphSide();
     graph.removeFromRight(2);
     curveEditor.setBounds(graph);
-    timelineDivider.setBounds(area.removeFromBottom(7));
+    // Each divider reaches 2 px into the panels either side, for an easier grab.
+    timelineDivider.setBounds(area.removeFromBottom(gutter).expanded(0, 2));
     // Side panels widen on large windows; the preview keeps the rest.
     const auto extra = std::max(0, getWidth() - 1440);
     // Wide enough for its three tabs (Sources, Effects, Modulators) side by side.
@@ -132,40 +131,50 @@ void MotionEditor::resized() {
     libraryTabs.setBounds(library.removeFromTop(30));
     effectLibrary.setBounds(library.reduced(4, 0));
     modulatorLibrary.setBounds(library);
-    importButton.setBounds(library.removeFromTop(42).reduced(8, 6).withTrimmedBottom(-2));
+    importButton.setBounds(library.removeFromTop(40).reduced(8, 0).withTrimmedTop(6).withTrimmedBottom(4));
     assetLibrary.setBounds(library.reduced(4, 0));
-    area.removeFromLeft(3);
+    area.removeFromLeft(gutter);
     inspectorBounds = area.removeFromRight(std::clamp(300 + extra * 3 / 20, 300, 420));
-    auto inspector = inspectorBounds;
-    inspectorHeader.setBounds(inspector.removeFromTop(30));
-    inspectorTitle.setBounds(inspectorHeader.getBounds().reduced(8, 3));
-    propertyInspector.setBounds(inspector);
-    area.removeFromRight(3);
+    // Properties names what it edits in the header it covers.
+    inspectorHeader.setBounds(inspectorBounds.withHeight(30));
+    propertyInspector.setBounds(inspectorBounds);
+    area.removeFromRight(gutter);
     previewWidth = area.getWidth();
-    auto editing = area.removeFromLeft(juce::roundToInt((previewWidth - 7) * previewFraction));
-    previewDivider.setBounds(area.removeFromLeft(7));
+    auto editing = area.removeFromLeft(juce::roundToInt((previewWidth - gutter) * previewFraction));
+    previewDivider.setBounds(area.removeFromLeft(gutter).expanded(2, 0));
     auto output = area;
     outputHeader.setBounds(output.removeFromTop(30));
-    // The header keeps the title; what remains of the visualiser's own bar
-    // (the recording stopwatch, an ffmpeg download) sits at its right.
-    const auto controlsWidth = visualiserControls != nullptr && visualiserControls->getParentComponent() == this ? visualiser.controlsPreferredWidth() + 4 : 0;
-    const auto titled = outputHeader.getWidth() - 8 >= 68 + controlsWidth;
-    outputTitle.setVisible(titled);
-    outputTitle.setBounds(outputHeader.getBounds().reduced(8, 3).withWidth(60));
-    auto monitorBounds = outputHeader.getBounds().withTrimmedLeft(titled ? 68 : 0).reduced(4, 3);
-    if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
-        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth()));
-        visualiserControls->setBounds(monitorBounds.removeFromRight(width).withSizeKeepingCentre(width, 24));
-        visualiserControls->toFront(false);
-    }
-
     output.removeFromTop(1);
     visualiser.setBounds(output);
-    // Mirrors the Scene's strip: 8 px in from the Scope's top right.
+    // The header has the title at its left; at its right the tools, then
+    // what remains of the visualiser's own bar (the recording stopwatch, an
+    // ffmpeg download). The title gives way first; on a Scope narrower still
+    // the tools float in its picture, as they do full screen.
     {
-        const auto room = output.getHeight() - 16;
-        scopeTools.setVisible(room >= scopeTools.preferredHeight() && output.getWidth() >= scopeTools.preferredWidth() + 16);
-        scopeTools.setBounds(output.getWidth() - 8 - scopeTools.preferredWidth(), 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
+        const auto controlsHere = visualiserControls != nullptr && visualiserControls->getParentComponent() == this;
+        const auto controlsWidth = controlsHere ? visualiser.controlsPreferredWidth() : 0;
+        auto bar = outputHeader.getBounds().reduced(4, 0);
+        const auto docked = !scopeFullScreen && bar.getWidth() >= scopeTools.extent() + (controlsHere ? controlsWidth + 4 : 0);
+        scopeTools.setDocked(docked);
+        // Floating, inside the Scope: over an OpenGL view on Windows nothing
+        // else would show.
+        auto& host = docked ? static_cast<juce::Component&>(*this) : static_cast<juce::Component&>(visualiser);
+        if (scopeTools.getParentComponent() != &host) { host.addAndMakeVisible(scopeTools); }
+        if (controlsHere) {
+            const auto width = std::min(controlsWidth, std::max(0, bar.getWidth()));
+            visualiserControls->setBounds(bar.removeFromRight(width).withSizeKeepingCentre(width, 24));
+            visualiserControls->toFront(false);
+            bar.removeFromRight(4);
+        }
+        if (docked) {
+            scopeTools.setBounds(bar.removeFromRight(scopeTools.extent()));
+        } else {
+            // 8 px in from the Scope's top right, as the Scene's strip is from its top left.
+            scopeTools.setBounds(output.getWidth() - 8 - scopeTools.preferredWidth(), 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
+        }
+        const auto titled = bar.getWidth() >= 68;
+        outputTitle.setVisible(titled);
+        outputTitle.setBounds(outputHeader.getBounds().reduced(8, 3).withWidth(60));
     }
     viewportBounds = editing;
     viewportHeader.setBounds(editing.removeFromTop(30));
@@ -189,12 +198,12 @@ void MotionEditor::resized() {
         sceneEditor->setBounds(viewportBounds);
         for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &partPickTools, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
     }
-    // Full screen, the Scope covers everything; its strip stays at the top
-    // right, with the recording stopwatch beside it.
+    // Full screen, the Scope covers everything; its strip floats at the top
+    // right and fades with the transport, with the recording stopwatch
+    // beside it, which stays.
     if (scopeFullScreen) {
         visualiser.setBounds(getLocalBounds());
         visualiser.toFront(false);
-        scopeTools.setVisible(true);
         scopeTools.setBounds(getWidth() - 8 - scopeTools.preferredWidth(), 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
         // The transport along the foot, as wide as reads well.
         const auto transportWidth = std::min(720, getWidth() - 32);

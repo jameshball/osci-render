@@ -4,8 +4,9 @@
 #include "MotionStyle.h"
 #include <functional>
 
-// The playback speed as a chip, as a video player shows it: 1×, or
-// highlighted when playing faster or slower. Clicking it offers the speeds.
+// The playback speed as a chip, as a video player shows it: 1×, or lit as
+// a toggled tool is when playing faster or slower. Clicking it offers the
+// speeds.
 class MotionSpeedChip final : public juce::TextButton {
 public:
     MotionSpeedChip() {
@@ -22,10 +23,10 @@ public:
     }
     void paintButton(juce::Graphics& g, bool over, bool down) override {
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour(!normal ? motion::style::accent().withAlpha(.25f) : juce::Colours::white.withAlpha(over || down ? .1f : 0.0f));
+        g.setColour(!normal ? motion::style::onFill() : juce::Colours::white.withAlpha(over || down ? .1f : 0.0f));
         g.fillRoundedRectangle(bounds, motion::style::radius);
         g.setFont(motion::style::heading());
-        g.setColour(!normal ? motion::style::accent().brighter(.4f) : osci::Colours::text().withAlpha(over ? .9f : .6f));
+        g.setColour(osci::Colours::text().withAlpha(!normal ? 1.0f : over ? .9f : .6f));
         g.drawText(getButtonText(), bounds, juce::Justification::centred, false);
     }
 
@@ -34,7 +35,7 @@ private:
 };
 
 // The full-screen Scope's transport, along its foot as a video player's is:
-// to the start, play or pause, to the end, a bar to seek through the whole
+// go to start, play or pause, go to end, a bar to seek through the whole
 // composition (its loop shaded), the time, and the speed. It shows while the
 // pointer moves over the picture and fades once it rests, so the picture is
 // all there is the rest of the time. A child of the Scope, so an OpenGL view
@@ -43,8 +44,8 @@ class MotionScopeTransport final : public juce::Component, private juce::Timer {
 public:
     MotionScopeTransport() {
         setName("Full-screen transport");
-        start.setTooltip("To the start (Home)");
-        end.setTooltip("To the end (End)");
+        start.setTooltip("Go to start (Home)");
+        end.setTooltip("Go to end (End)");
         play.setTooltip("Play / pause (Space)");
         for (auto* button : std::initializer_list<juce::Button*> {&start, &play, &end, &speed}) {
             button->setWantsKeyboardFocus(false);
@@ -69,6 +70,12 @@ public:
     std::function<void()> onStart, onEnd, onPlay;
     std::function<void(double)> onSeek;
     std::function<void(juce::Component&)> onSpeedMenu;
+    // As it fades in and out, and starts or stops taking clicks, so the
+    // full-screen Scope's tool strip can follow.
+    std::function<void(float alpha, bool interactive)> onFade;
+    // True while the pointer rests on something else that keeps it shown
+    // (that tool strip).
+    std::function<bool()> holds;
 
     struct State {
         double position = 0, duration = 0, loopStart = 0, loopEnd = 0, speed = 1;
@@ -91,14 +98,13 @@ public:
     // The pointer moved over the picture: show, and fade again once it rests.
     void wake() {
         lastActivity = juce::Time::getMillisecondCounterHiRes();
-        setInterceptsMouseClicks(true, true);
+        show(getAlpha(), true);
         if (!isTimerRunning()) { startTimerHz(60); }
     }
     // Gone with full screen: hidden at once, ready to fade in next time.
     void sleep() {
         stopTimer();
-        setAlpha(0.0f);
-        setInterceptsMouseClicks(false, false);
+        show(0.0f, false);
         scrubbing = false;
         hovered = false;
     }
@@ -120,12 +126,13 @@ public:
             g.fillRoundedRectangle(juce::Rectangle<float>(from, centre - 2.0f, std::max(2.0f, to - from), 4.0f), 2.0f);
         }
         const auto head = xOf(shownPosition());
-        g.setColour(motion::style::accent());
+        g.setColour(juce::Colours::white.withAlpha(.6f));
         g.fillRoundedRectangle(rail.withRight(head), 2.0f);
         const auto grown = scrubbing || hovered;
         g.setColour(juce::Colours::white);
         g.fillEllipse(juce::Rectangle<float>(grown ? 12.0f : 9.0f, grown ? 12.0f : 9.0f).withCentre({head, centre}));
-        g.setFont(motion::style::caption());
+        // Fixed-width digits, so the time doesn't shift as it plays.
+        g.setFont(motion::style::monoCaption());
         g.setColour(osci::Colours::text().withAlpha(.85f));
         g.drawText(state.time, timeArea(), juce::Justification::centredRight, false);
         g.setColour(osci::Colours::textMuted());
@@ -167,16 +174,19 @@ public:
 private:
     void timerCallback() override {
         // Held up while the pointer is on it or seeking; otherwise two seconds.
-        if (hovered || scrubbing) { lastActivity = juce::Time::getMillisecondCounterHiRes(); }
+        if (hovered || scrubbing || (holds && holds())) { lastActivity = juce::Time::getMillisecondCounterHiRes(); }
         const auto idle = juce::Time::getMillisecondCounterHiRes() - lastActivity;
         const auto target = idle < 2000 ? 1.0f : 0.0f;
         const auto alpha = getAlpha();
         const auto next = target > alpha ? std::min(1.0f, alpha + .2f) : std::max(0.0f, alpha - .06f);
-        if (next != alpha) { setAlpha(next); }
-        if (next == 0.0f && target == 0.0f) {
-            setInterceptsMouseClicks(false, false);
-            stopTimer();
-        }
+        const auto gone = next == 0.0f && target == 0.0f;
+        if (next != alpha || gone) { show(next, !gone); }
+        if (gone) { stopTimer(); }
+    }
+    void show(float alpha, bool interactive) {
+        setAlpha(alpha);
+        setInterceptsMouseClicks(interactive, interactive);
+        if (onFade) { onFade(alpha, interactive); }
     }
     // Where the bar runs: between the buttons and the time, the length and the speed.
     juce::Rectangle<float> trackArea() const {
@@ -223,8 +233,8 @@ private:
         juce::Point<int> last {-100, -100};
     } pointer {*this};
     juce::Component::SafePointer<juce::Component> watched;
-    static constexpr float timeWidth = 52.0f;
-    motion::icons::Button start {"To the start", motion::icons::Icon::start}, play {"Play", motion::icons::Icon::play}, end {"To the end", motion::icons::Icon::end};
+    static constexpr float timeWidth = 60.0f;
+    motion::icons::Button start {"Go to start", motion::icons::Icon::start}, play {"Play", motion::icons::Icon::play}, end {"Go to end", motion::icons::Icon::end};
     MotionSpeedChip speed;
     State state;
     double lastActivity = 0, scrubTime = 0;

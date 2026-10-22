@@ -77,13 +77,13 @@ try:
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
     if gain is None or float(gain["value"]) != 1:
         raise RuntimeError("Audio gain inspector missing or incorrect")
-    step("reject audio onto visual lane", "drag", "--class", "MotionTimelineView", "--position", "300,108", "--dx", 0, "--dy", -40)
+    step("reject audio onto visual lane", "drag", "--class", "MotionTimelineView", "--position", "264,108", "--dx", 0, "--dy", -40)
     wait_undo("Import audio")
-    step("move soundtrack", "drag", "--class", "MotionTimelineView", "--position", "300,108", "--dx", 70, "--dy", 0)
+    step("move soundtrack", "drag", "--class", "MotionTimelineView", "--position", "264,108", "--dx", 70, "--dy", 0)
     wait_undo("Move clip")
     step("undo soundtrack move", "click", "--name", "Undo", "--exact")
     step("waveform workspace screenshot", "screenshot", "--file", session.artifact_dir / "soundtrack-workspace.png")
-    step("seek into soundtrack", "click", "--class", "MotionTimelineView", "--position", "325,12")
+    step("seek into soundtrack", "click", "--class", "MotionTimelineView", "--position", "289,12")
     step("key soundtrack gain", "click", "--name", "Key gain", "--exact")
     wait_undo("Key gain")
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
@@ -112,10 +112,10 @@ try:
     step("output panel screenshot", "screenshot", "--source", "native", "--file", session.artifact_dir / "output-panel.png")
     step("close output", "click", "--name", "Close output", "--exact")
     # Every Output choice exports, whatever the device has room for; the
-    # project's audio too, now there is some.
+    # project's sound too, now there is some.
     step("open file menu", "click", "--name", "File", "--exact")
     step("open export audio", "click", "--name", "Export audio", "--exact")
-    for choice in ("Audio...", "Beam XY...", "Beam XYZ (3 ch)...", "Beam XYZ, inverted Z (3 ch)...", "Beam XYRGB (5 ch)..."):
+    for choice in ("Sound...", "Beam XY...", "Beam XYZ (3 ch)...", "Beam XYZ, inverted Z (3 ch)...", "Beam XYRGB (5 ch)..."):
         item = find(snapshot(), lambda node: choice in (node.get("name"), node.get("title")))
         # A disabled item has no menu item role.
         if item is None or item.get("role") != "menuItem":

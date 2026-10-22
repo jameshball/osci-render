@@ -52,7 +52,7 @@ public:
     }
     std::function<void()> onHeightChanged;
     bool hasClip() const { return findClip() != nullptr; }
-    int preferredHeight() const { return hasClip() ? motion::style::inspector::headingHeight + 2 * motion::style::inspector::row + (status.isVisible() ? 30 : 0) + 4 : 0; }
+    int preferredHeight() const { return hasClip() ? motion::style::inspector::headingHeight + motion::style::gap + 2 * motion::style::inspector::row + (status.isVisible() ? 30 : 0) + 4 : 0; }
     void refresh() {
         if (editGeneration != processor.document.generation() || editRevision != processor.document.revision()) { discardEditors(); }
         const auto* clip = findClip();
@@ -82,6 +82,8 @@ public:
         // What clock the clip keeps qualifies the heading: "Timing  ignores tempo".
         title.setBounds(heading);
         details.setBounds(heading.withTrimmedLeft(juce::roundToInt(juce::TextLayout::getStringWidth(title.getFont(), title.getText())) + 8));
+        // Rows a gap below the heading, as Properties' sections have them.
+        area.removeFromTop(motion::style::gap);
         motion::style::inspector::layoutFields(area, captions, {&values[0], &values[1], &values[2], &values[3]});
         status.setBounds(area.removeFromTop(30));
     }

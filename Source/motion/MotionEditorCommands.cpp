@@ -7,9 +7,9 @@ bool canSplitClip(const motion::Clip* clip, double time, const motion::Tempo& bp
 }
 }
 
-// Menu 0 (File) is built by buildFileMenu, so its commands only bind keys.
-void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action) {
-    if (menu != 0) { menus.addMenuItem(menu, name, action, motion::style::shortcutText(shortcut)); }
+// File is built by buildFileMenu, so its commands only bind keys.
+void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action, juce::String label) {
+    if (menu != fileMenu) { menus.addMenuItem(menu, label.isNotEmpty() ? label : name, action, motion::style::shortcutText(shortcut)); }
     commands.push_back({menu, std::move(name), std::move(shortcut), key, std::move(action)});
 }
 
@@ -46,11 +46,15 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Import source...", 1005, "Cmd+I"));
     menu.addSeparator();
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        menu.addItem(1009, "Audio settings...");
+        menu.addSeparator();
+    }
     // One export at a time. Audio as each Output choice plays it, whatever
     // the audio device has room for.
     juce::PopupMenu audio;
     using Mode = MotionProcessor::OutputMode;
-    const std::pair<Mode, const char*> exports[] {{Mode::soundtrack, "Audio"}, {Mode::xy, "Beam XY"}, {Mode::xyz, "Beam XYZ (3 ch)"}, {Mode::xyzInverted, "Beam XYZ, inverted Z (3 ch)"}, {Mode::xyrgb, "Beam XYRGB (5 ch)"}};
+    const std::pair<Mode, const char*> exports[] {{Mode::soundtrack, "Sound"}, {Mode::xy, "Beam XY"}, {Mode::xyz, "Beam XYZ (3 ch)"}, {Mode::xyzInverted, "Beam XYZ, inverted Z (3 ch)"}, {Mode::xyrgb, "Beam XYRGB (5 ch)"}};
     for (const auto& [mode, name] : exports) {
         audio.addItem(firstExportAudioId + static_cast<int>(mode), juce::String(name) + "...", mode != Mode::soundtrack || soundtrackClip() != 0);
     }
@@ -81,6 +85,7 @@ bool MotionEditor::fileMenuItemSelected(int id) {
         case 1005: chooseSourceFile(); return true;
         case 1007: exportVideo(); return true;
         case 1008: showStartScreen(); return true;
+        case 1009: openAudioSettings(); return true;
         default: return false;
     }
 }
@@ -88,41 +93,27 @@ bool MotionEditor::fileMenuItemSelected(int id) {
 void MotionEditor::registerCommands() {
     const auto command = juce::ModifierKeys::commandModifier;
     const auto shift = juce::ModifierKeys::shiftModifier;
-    menus.addMenuSeparator(1);
-    addCommand(1, "Cut", juce::KeyPress('x', command, 0), "Cmd+X", [this] { copySelection(true); });
-    addCommand(1, "Copy", juce::KeyPress('c', command, 0), "Cmd+C", [this] { copySelection(false); });
-    addCommand(1, "Paste", juce::KeyPress('v', command, 0), "Cmd+V", [this] { pasteClipboard(); });
-    addCommand(1, "Delete", juce::KeyPress(), "Delete", [this] {
+    const auto alt = juce::ModifierKeys::altModifier;
+    // A command in File only binds its key, as File is built by buildFileMenu.
+    constexpr int keyOnly = fileMenu;
+    menus.addMenuSeparator(editMenu);
+    addCommand(editMenu, "Cut", juce::KeyPress('x', command, 0), "Cmd+X", [this] { copySelection(true); });
+    addCommand(editMenu, "Copy", juce::KeyPress('c', command, 0), "Cmd+C", [this] { copySelection(false); });
+    addCommand(editMenu, "Paste", juce::KeyPress('v', command, 0), "Cmd+V", [this] { pasteClipboard(); });
+    addCommand(editMenu, "Delete", juce::KeyPress(), "Delete", [this] {
         if (graphShown()) { curveEditor.deleteSelected(); } else { timeline.deleteSelection(); }
     });
     // Cut, Copy and Delete act on what the shown editor has selected: the
     // Graph's keys, or the timeline's keys or clips. Paste needs a copy.
     const auto anySelection = [this] { return graphShown() ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
-    for (const auto* name : {"Cut", "Copy", "Delete"}) { menus.setMenuItemEnabled(1, name, anySelection); }
-    menus.setMenuItemEnabled(1, "Paste", [this] { return !std::holds_alternative<std::monostate>(clipboard); });
-    menus.addMenuSeparator(1);
-    addCommand(1, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] {
+    for (const auto* name : {"Cut", "Copy", "Delete"}) { menus.setMenuItemEnabled(editMenu, name, anySelection); }
+    menus.setMenuItemEnabled(editMenu, "Paste", [this] { return !std::holds_alternative<std::monostate>(clipboard); });
+    menus.addMenuSeparator(editMenu);
+    addCommand(editMenu, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] {
         if (graphShown()) { curveEditor.selectAllKeys(); } else { timeline.selectAll(); }
     });
-    // After Effects' Easy Ease, on the selected keys of the visible editor.
-    const auto ease = [this](bool in, bool out) {
-        const auto graph = graphShown();
-        const auto selected = graph ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys();
-        if (!selected) {
-            statusBar.show("Select keys to ease.", MotionStatusBar::Kind::notice);
-            return;
-        }
-        // Smooth keys already ease at their ends, so say what happened.
-        const auto eased = graph ? curveEditor.easeSelected(in, out) : timeline.easeSelectedKeys(in, out);
-        const juce::String what = in && out ? "Easy ease" : (in ? "Easy ease in" : "Easy ease out");
-        statusBar.show(eased ? what + " applied: the keys stop with a third of each segment as influence." : "The selected keys already ease that way.", MotionStatusBar::Kind::notice);
-    };
-    menus.addMenuSeparator(1);
-    addCommand(1, "Easy ease", juce::KeyPress(juce::KeyPress::F9Key), "F9", [ease] { ease(true, true); });
-    addCommand(1, "Easy ease in", juce::KeyPress(juce::KeyPress::F9Key, shift, 0), "Shift+F9", [ease] { ease(true, false); });
-    addCommand(1, "Easy ease out", juce::KeyPress(juce::KeyPress::F9Key, command | shift, 0), "Cmd+Shift+F9", [ease] { ease(false, true); });
-    addCommand(2, "Split at playhead", juce::KeyPress('k', command, 0), "Cmd+K", [this] { splitAtPlayhead(); });
-    addCommand(2, "Duplicate", juce::KeyPress('d', command, 0), "Cmd+D", [this] {
+    addCommand(clipMenu, "Split at playhead", juce::KeyPress('k', command, 0), "Cmd+K", [this] { splitAtPlayhead(); });
+    addCommand(clipMenu, "Duplicate", juce::KeyPress('d', command, 0), "Cmd+D", [this] {
         std::vector<motion::Id> duplicates;
         const auto clips = timeline.copiedClips();
         std::vector<motion::Id> ids;
@@ -135,98 +126,124 @@ void MotionEditor::registerCommands() {
         if (result.failed()) { statusBar.show("Couldn't duplicate: " + result.getErrorMessage()); return; }
         timeline.selectClips(duplicates);
     });
-    addCommand(2, "Group tracks", juce::KeyPress('g', command, 0), "Cmd+G", [this] { timeline.groupSelectedTracks(); });
+    addCommand(clipMenu, "Group tracks", juce::KeyPress('g', command, 0), "Cmd+G", [this] { timeline.groupSelectedTracks(); });
     // After Effects' Pre-compose keys; Final Cut's and CapCut's Alt+G works too.
-    addCommand(2, "Create composition from selection", juce::KeyPress('c', command | shift, 0), "Cmd+Shift+C", [this] { timeline.createCompositionFromSelection(); });
-    addCommand(0, "Create composition from selection", juce::KeyPress('g', juce::ModifierKeys::altModifier, 0), {}, [this] { timeline.createCompositionFromSelection(); });
-    menus.addMenuSeparator(2);
+    addCommand(clipMenu, "Make composition", juce::KeyPress('c', command | shift, 0), "Cmd+Shift+C", [this] { timeline.createCompositionFromSelection(); });
+    addCommand(keyOnly, "Make composition", juce::KeyPress('g', alt, 0), {}, [this] { timeline.createCompositionFromSelection(); });
+    menus.addMenuSeparator(clipMenu);
     // After Effects conventions: [ and ] move the clip's start or end to the
     // playhead; Alt+[ and Alt+] trim it there.
-    addCommand(2, "Move clip start to playhead", juce::KeyPress('[', 0, 0), "[", [this] { placeClipAtPlayhead(true, false); });
-    addCommand(2, "Move clip end to playhead", juce::KeyPress(']', 0, 0), "]", [this] { placeClipAtPlayhead(false, false); });
-    addCommand(2, "Trim clip start to playhead", juce::KeyPress('[', juce::ModifierKeys::altModifier, 0), "Alt+[", [this] { placeClipAtPlayhead(true, true); });
-    addCommand(2, "Trim clip end to playhead", juce::KeyPress(']', juce::ModifierKeys::altModifier, 0), "Alt+]", [this] { placeClipAtPlayhead(false, true); });
-    addCommand(2, "Show key lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
-    menus.addMenuSeparator(2);
-    const auto alt = juce::ModifierKeys::altModifier;
-    for (const auto& [letter, group, name] : std::initializer_list<std::tuple<char, const char*, const char*>> {
-             {'p', "Position", "Key position"}, {'r', "Rotation", "Key rotation"}, {'s', "Scale", "Key scale"}, {'c', "Colour", "Key colour"}, {'t', "Opacity", "Key opacity"}}) {
+    addCommand(clipMenu, "Move start to playhead", juce::KeyPress('[', 0, 0), "[", [this] { placeClipAtPlayhead(true, false); });
+    addCommand(clipMenu, "Move end to playhead", juce::KeyPress(']', 0, 0), "]", [this] { placeClipAtPlayhead(false, false); });
+    addCommand(clipMenu, "Trim start to playhead", juce::KeyPress('[', alt, 0), "Alt+[", [this] { placeClipAtPlayhead(true, true); });
+    addCommand(clipMenu, "Trim end to playhead", juce::KeyPress(']', alt, 0), "Alt+]", [this] { placeClipAtPlayhead(false, true); });
+    menus.addMenuSeparator(clipMenu);
+    addCommand(clipMenu, "Show key lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
+    // Key: each group Properties shows, named in the menu by the group alone.
+    const std::array<std::tuple<char, const char*, const char*>, 5> keyed {{{'p', "Position", "Key position"}, {'r', "Rotation", "Key rotation"}, {'s', "Scale", "Key scale"}, {'c', "Colour", "Key colour"}, {'t', "Opacity", "Key opacity"}}};
+    menus.beginSubMenu(clipMenu, "Key");
+    for (const auto& [letter, group, name] : keyed) {
         const juce::String groupName(group);
-        addCommand(2, name, juce::KeyPress(letter, alt | shift, 0), "Alt+Shift+" + juce::String::charToString(letter).toUpperCase(), [this, groupName] {
+        addCommand(clipMenu, name, juce::KeyPress(letter, alt | shift, 0), "Alt+Shift+" + juce::String::charToString(letter).toUpperCase(), [this, groupName] {
             if (!propertyInspector.toggleGroupKeys(groupName)) { statusBar.show("Select a clip or camera with " + groupName.toLowerCase() + " to key it."); }
-        });
-        menus.setMenuItemEnabled(2, name, [this, groupName] { return propertyInspector.showsGroup(groupName); });
+        }, groupName);
+        menus.setMenuItemEnabled(clipMenu, groupName, [this, groupName] { return propertyInspector.showsGroup(groupName); });
     }
+    menus.endSubMenu(clipMenu);
+    menus.setMenuItemEnabled(clipMenu, "Key", [this, keyed] {
+        return std::any_of(keyed.begin(), keyed.end(), [this](const auto& entry) { return propertyInspector.showsGroup(std::get<1>(entry)); });
+    });
+    // After Effects' Easy Ease, on the selected keys of the visible editor.
+    const auto keysSelected = [this] { return graphShown() ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys(); };
+    const auto ease = [this, keysSelected](bool in, bool out) {
+        if (!keysSelected()) {
+            statusBar.show("Select keys to ease.", MotionStatusBar::Kind::notice);
+            return;
+        }
+        // Smooth keys already ease at their ends, so say what happened.
+        const auto eased = graphShown() ? curveEditor.easeSelected(in, out) : timeline.easeSelectedKeys(in, out);
+        const juce::String what = in && out ? "Easy ease" : (in ? "Easy ease in" : "Easy ease out");
+        statusBar.show(eased ? what + " applied: the keys stop with a third of each segment as influence." : "The selected keys already ease that way.", MotionStatusBar::Kind::notice);
+    };
+    menus.beginSubMenu(clipMenu, "Easy ease");
+    addCommand(clipMenu, "Easy ease", juce::KeyPress(juce::KeyPress::F9Key), "F9", [ease] { ease(true, true); }, "In and out");
+    addCommand(clipMenu, "Easy ease in", juce::KeyPress(juce::KeyPress::F9Key, shift, 0), "Shift+F9", [ease] { ease(true, false); }, "In");
+    addCommand(clipMenu, "Easy ease out", juce::KeyPress(juce::KeyPress::F9Key, command | shift, 0), "Cmd+Shift+F9", [ease] { ease(false, true); }, "Out");
+    menus.endSubMenu(clipMenu);
+    menus.setMenuItemEnabled(clipMenu, "Easy ease", keysSelected);
     // The Clip menu's commands act on the selection; with none they say so
     // when their keys are pressed, and show it in the menu first.
-    menus.setMenuItemEnabled(2, "Split at playhead", [this] { return canSplitAtPlayhead(); });
-    menus.setMenuItemEnabled(2, "Group tracks", [this] { return timeline.canGroupTracks(); });
-    for (const auto* name : {"Duplicate", "Show key lanes"}) { menus.setMenuItemEnabled(2, name, [this] { return timeline.hasSelectedClips(); }); }
-    for (const auto* name : {"Move clip start to playhead", "Move clip end to playhead", "Trim clip start to playhead", "Trim clip end to playhead"}) {
-        menus.setMenuItemEnabled(2, name, [this] { return clipSelected(); });
+    menus.setMenuItemEnabled(clipMenu, "Split at playhead", [this] { return canSplitAtPlayhead(); });
+    menus.setMenuItemEnabled(clipMenu, "Group tracks", [this] { return timeline.canGroupTracks(); });
+    for (const auto* name : {"Duplicate", "Show key lanes"}) { menus.setMenuItemEnabled(clipMenu, name, [this] { return timeline.hasSelectedClips(); }); }
+    for (const auto* name : {"Move start to playhead", "Move end to playhead", "Trim start to playhead", "Trim end to playhead"}) {
+        menus.setMenuItemEnabled(clipMenu, name, [this] { return clipSelected(); });
     }
 
-    addCommand(3, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { togglePlayback(); });
-    addCommand(3, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { seekAndReveal(0); });
-    addCommand(3, "Go to end", juce::KeyPress(juce::KeyPress::endKey), "End", [this] { seekAndReveal(processor.document.project().duration); });
-    addCommand(3, "Previous frame", juce::KeyPress(juce::KeyPress::leftKey), "Left", [this] { stepFrames(-1); });
-    addCommand(3, "Next frame", juce::KeyPress(juce::KeyPress::rightKey), "Right", [this] { stepFrames(1); });
-    addCommand(3, "Back ten frames", juce::KeyPress(juce::KeyPress::leftKey, shift, 0), "Shift+Left", [this] { stepFrames(-10); });
-    addCommand(3, "Forward ten frames", juce::KeyPress(juce::KeyPress::rightKey, shift, 0), "Shift+Right", [this] { stepFrames(10); });
-    addCommand(3, "Previous key or marker", juce::KeyPress('j', 0, 0), "J", [this] { jumpToKey(false); });
-    addCommand(3, "Next key or marker", juce::KeyPress('k', 0, 0), "K", [this] { jumpToKey(true); });
-    addCommand(3, "Previous edit point", juce::KeyPress(juce::KeyPress::upKey), "Up", [this] { jumpToEdit(false); });
-    addCommand(3, "Next edit point", juce::KeyPress(juce::KeyPress::downKey), "Down", [this] { jumpToEdit(true); });
-    menus.addMenuSeparator(3);
-    addCommand(3, "Loop playback", juce::KeyPress('l', 0, 0), "L", [this] { toggleLoop(); });
+    addCommand(transportMenu, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { togglePlayback(); });
+    addCommand(transportMenu, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { seekAndReveal(0); });
+    addCommand(transportMenu, "Go to end", juce::KeyPress(juce::KeyPress::endKey), "End", [this] { seekAndReveal(processor.document.project().duration); });
+    menus.addMenuSeparator(transportMenu);
+    addCommand(transportMenu, "Previous frame", juce::KeyPress(juce::KeyPress::leftKey), "Left", [this] { stepFrames(-1); });
+    addCommand(transportMenu, "Next frame", juce::KeyPress(juce::KeyPress::rightKey), "Right", [this] { stepFrames(1); });
+    addCommand(transportMenu, "Back ten frames", juce::KeyPress(juce::KeyPress::leftKey, shift, 0), "Shift+Left", [this] { stepFrames(-10); });
+    addCommand(transportMenu, "Forward ten frames", juce::KeyPress(juce::KeyPress::rightKey, shift, 0), "Shift+Right", [this] { stepFrames(10); });
+    menus.addMenuSeparator(transportMenu);
+    addCommand(transportMenu, "Previous key or marker", juce::KeyPress('j', 0, 0), "J", [this] { jumpToKey(false); });
+    addCommand(transportMenu, "Next key or marker", juce::KeyPress('k', 0, 0), "K", [this] { jumpToKey(true); });
+    addCommand(transportMenu, "Previous edit point", juce::KeyPress(juce::KeyPress::upKey), "Up", [this] { jumpToEdit(false); });
+    addCommand(transportMenu, "Next edit point", juce::KeyPress(juce::KeyPress::downKey), "Down", [this] { jumpToEdit(true); });
+    menus.addMenuSeparator(transportMenu);
+    addCommand(transportMenu, "Loop playback", juce::KeyPress('l', 0, 0), "L", [this] { toggleLoop(); });
+    addCommand(transportMenu, "Set loop start at playhead", juce::KeyPress('i', 0, 0), "I", [this] { setLoopEdge(true); });
+    addCommand(transportMenu, "Set loop end at playhead", juce::KeyPress('o', 0, 0), "O", [this] { setLoopEdge(false); });
+    addCommand(transportMenu, "Loop selected clips", juce::KeyPress('l', shift, 0), "Shift+L", [this] { loopSelection(); });
+    menus.addMenuSeparator(transportMenu);
     // As a video player's: > faster, < slower.
     // macOS reports Shift+. as >; Windows reports the . key with Shift. A layout
     // with its own < and > key (AZERTY) types them without Shift.
-    addCommand(3, "Play faster", juce::KeyPress('>', shift, 0), ">", [this] { changeSpeed(1); });
-    addCommand(3, "Play slower", juce::KeyPress('<', shift, 0), "<", [this] { changeSpeed(-1); });
-    addCommand(0, "Play faster", juce::KeyPress('>', 0, 0), {}, [this] { changeSpeed(1); });
-    addCommand(0, "Play slower", juce::KeyPress('<', 0, 0), {}, [this] { changeSpeed(-1); });
+    addCommand(transportMenu, "Play faster", juce::KeyPress('>', shift, 0), ">", [this] { changeSpeed(1); });
+    addCommand(transportMenu, "Play slower", juce::KeyPress('<', shift, 0), "<", [this] { changeSpeed(-1); });
+    addCommand(keyOnly, "Play faster", juce::KeyPress('>', 0, 0), {}, [this] { changeSpeed(1); });
+    addCommand(keyOnly, "Play slower", juce::KeyPress('<', 0, 0), {}, [this] { changeSpeed(-1); });
    #if JUCE_WINDOWS
-    addCommand(0, "Play faster", juce::KeyPress('.', shift, 0), {}, [this] { changeSpeed(1); });
-    addCommand(0, "Play slower", juce::KeyPress(',', shift, 0), {}, [this] { changeSpeed(-1); });
+    addCommand(keyOnly, "Play faster", juce::KeyPress('.', shift, 0), {}, [this] { changeSpeed(1); });
+    addCommand(keyOnly, "Play slower", juce::KeyPress(',', shift, 0), {}, [this] { changeSpeed(-1); });
    #endif
-    addCommand(3, "Set loop start at playhead", juce::KeyPress('i', 0, 0), "I", [this] { setLoopEdge(true); });
-    addCommand(3, "Set loop end at playhead", juce::KeyPress('o', 0, 0), "O", [this] { setLoopEdge(false); });
-    addCommand(3, "Loop selected clips", juce::KeyPress('l', shift, 0), "Shift+L", [this] { loopSelection(); });
-    // View: what the lower panel shows, zoom, follow and track height.
-    menus.addMenuSeparator(5);
-    addCommand(5, "Show Timeline", juce::KeyPress('1', juce::ModifierKeys::altModifier, 0), "Alt+1", [this] { timelineTabs.setSelectedIndex(0); });
-    addCommand(5, "Show Graph", juce::KeyPress('2', juce::ModifierKeys::altModifier, 0), "Alt+2", [this] { timelineTabs.setSelectedIndex(1); });
-    menus.addMenuSeparator(5);
+    // View: what the lower panel shows, zoom, follow and track height, then
+    // the window (its size added when the menu opens).
+    addCommand(viewMenu, "Show Timeline", juce::KeyPress('1', alt, 0), "Alt+1", [this] { timelineTabs.setSelectedIndex(0); });
+    addCommand(viewMenu, "Show Graph", juce::KeyPress('2', alt, 0), "Alt+2", [this] { timelineTabs.setSelectedIndex(1); });
+    menus.addMenuSeparator(viewMenu);
     // Zoom acts on whichever lower panel is showing.
     const auto zoom = [this](double factor) {
         if (curveEditor.isVisible()) { curveEditor.zoomTime(curveEditor.getWidth() * .5f, factor); curveEditor.repaint(); return; }
         timeline.zoomBy(factor);
     };
-    addCommand(5, "Zoom in", juce::KeyPress('=', command, 0), "Cmd+=", [zoom] { zoom(1.5); });
-    addCommand(5, "Zoom out", juce::KeyPress('-', command, 0), "Cmd+-", [zoom] { zoom(1 / 1.5); });
-    addCommand(5, "Fit timeline to composition", juce::KeyPress(), "F", [this] { timeline.fitProject(); });
-    addCommand(5, "Taller tracks", juce::KeyPress('=', command | shift, 0), "Cmd+Shift+=", [this] { timeline.setDefaultTrackHeight(timeline.layout().trackHeight + 8); });
-    addCommand(5, "Shorter tracks", juce::KeyPress('-', command | shift, 0), "Cmd+Shift+-", [this] { timeline.setDefaultTrackHeight(timeline.layout().trackHeight - 8); });
-    menus.addToggleMenuItem(5, "Follow playhead", [this] {
+    addCommand(viewMenu, "Zoom in", juce::KeyPress('=', command, 0), "Cmd+=", [zoom] { zoom(1.5); });
+    addCommand(viewMenu, "Zoom out", juce::KeyPress('-', command, 0), "Cmd+-", [zoom] { zoom(1 / 1.5); });
+    addCommand(viewMenu, "Fit timeline to composition", juce::KeyPress(), "F", [this] { timeline.fitProject(); });
+    addCommand(viewMenu, "Taller tracks", juce::KeyPress('=', command | shift, 0), "Cmd+Shift+=", [this] { timeline.setDefaultTrackHeight(timeline.layout().trackHeight + 8); });
+    addCommand(viewMenu, "Shorter tracks", juce::KeyPress('-', command | shift, 0), "Cmd+Shift+-", [this] { timeline.setDefaultTrackHeight(timeline.layout().trackHeight - 8); });
+    menus.addToggleMenuItem(viewMenu, "Follow playhead", [this] {
         auto layout = timeline.layout();
         layout.follow = !layout.follow;
         timeline.setLayout(layout);
         saveLayout();
     }, [this] { return timeline.layout().follow; });
-    menus.addMenuSeparator(5);
+    menus.addMenuSeparator(viewMenu);
    #if JUCE_MAC
     const juce::String fullScreenKeys = "Ctrl+Cmd+F";
-    commands.push_back({5, "Full screen", fullScreenKeys, juce::KeyPress('f', command | juce::ModifierKeys::ctrlModifier, 0), [this] { toggleFullScreen(); }});
+    commands.push_back({viewMenu, "Full screen", fullScreenKeys, juce::KeyPress('f', command | juce::ModifierKeys::ctrlModifier, 0), [this] { toggleFullScreen(); }});
    #else
     const juce::String fullScreenKeys = "F11";
    #endif
-    menus.addToggleMenuItem(5, "Full screen", [this] { toggleFullScreen(); }, [this] { return isFullScreen(); }, motion::style::shortcutText(fullScreenKeys));
-    menus.addMenuItem(5, "Reset window size and position", [this] { resetWindowSizeAndPosition(); });
-    menus.addMenuSeparator(5);
-    addCommand(5, "Keyboard shortcuts...", juce::KeyPress('/', command, 0), "Cmd+/", [this] { showShortcuts(); });
+    menus.addToggleMenuItem(viewMenu, "Full screen", [this] { toggleFullScreen(); }, [this] { return isFullScreen(); }, motion::style::shortcutText(fullScreenKeys));
+    menus.addMenuItem(viewMenu, "Reset window size and position", [this] { resetWindowSizeAndPosition(); });
     // File items live in the File menu built by buildFileMenu; these bind keys.
-    addCommand(0, "Import source...", juce::KeyPress('i', command, 0), "Cmd+I", [this] { chooseSourceFile(); });
+    addCommand(keyOnly, "Import source...", juce::KeyPress('i', command, 0), "Cmd+I", [this] { chooseSourceFile(); });
+    // In Help; its key is listed with File's.
+    addCommand(keyOnly, "Keyboard shortcuts", juce::KeyPress('/', command, 0), "Cmd+/", [this] { showShortcuts(); });
 }
 
 void MotionEditor::copySelection(bool cut) {
@@ -335,6 +352,7 @@ void MotionEditor::seekAndReveal(double time) {
 // four bars from the playhead's bar.
 void MotionEditor::setAutoKey(bool on) {
     autoKeyButton.setToggleState(on, juce::dontSendNotification);
+    autoKeyButton.setTooltip(on ? "Auto-key: on" : "Auto-key: off");
     autoKeyButton.tint = on ? std::optional<juce::Colour>(motion::style::error()) : std::nullopt;
     autoKeyButton.repaint();
     timeline.setAutoKey(on);
@@ -575,15 +593,15 @@ void MotionEditor::splitAtPlayhead() {
 void MotionEditor::showShortcuts() {
     using Overlay = MotionShortcutsOverlay;
     std::vector<Overlay::Section> sections;
-    const std::array<std::pair<int, const char*>, 5> menuOrder {{{3, "Transport"}, {1, "Edit"}, {2, "Clip and keys"}, {5, "View"}, {0, "File"}}};
+    const std::array<std::pair<int, const char*>, 5> menuOrder {{{transportMenu, "Transport"}, {editMenu, "Edit"}, {clipMenu, "Clip and keys"}, {viewMenu, "View"}, {fileMenu, "File"}}};
     for (const auto& [menu, title] : menuOrder) {
         Overlay::Section section {title, {}};
-        if (menu == 0) {
+        if (menu == fileMenu) {
             for (const auto& [keys, action] : std::initializer_list<std::pair<const char*, const char*>> {{"Cmd+N", "New project"}, {"Cmd+O", "Open project"}, {"Cmd+S", "Save project"}, {"Cmd+Shift+S", "Save project as"}}) {
                 section.entries.push_back({keys, action});
             }
         }
-        if (menu == 1) {
+        if (menu == editMenu) {
             section.entries.push_back({"Cmd+Z", "Undo"});
             section.entries.push_back({"Cmd+Shift+Z", "Redo"});
             section.entries.push_back({"Right-click Undo / Redo", "Go back or on several steps"});
@@ -774,9 +792,9 @@ void MotionEditor::refreshTiming() {
     curveEditor.repaint();
 }
 
-// The menu bar's Timing menu.
-static const std::array<double, 8> timingRates { 24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120 };
-
+// The menu bar's Timing menu. Meter, frame rate and the beam's frequency
+// are set in Properties > Composition, whose fields come here through
+// applyTiming.
 juce::PopupMenu MotionEditor::timingMenu() {
     const auto& project = processor.document.project();
     juce::PopupMenu menu;
@@ -796,18 +814,6 @@ juce::PopupMenu MotionEditor::timingMenu() {
     juce::PopupMenu beatGrid;
     for (std::size_t i = 0; i < names.size(); ++i) { beatGrid.addItem(300 + static_cast<int>(i), names[i], true, std::abs(project.snapBeats - snapDivision(static_cast<int>(i))) < 1.0e-9); }
     menu.addSubMenu("Beat grid", beatGrid, project.timeDisplay == motion::TimeDisplay::beats);
-    juce::PopupMenu meter;
-    for (const auto beats : { 2, 3, 4, 5, 6, 7 }) { meter.addItem(400 + beats, juce::String(beats) + "/4", true, project.beatsPerBar == beats); }
-    menu.addSubMenu("Meter", meter);
-    const std::array<const char*, 8> rateNames { "23.976 fps", "24 fps", "25 fps", "29.97 fps", "30 fps", "50 fps", "60 fps", "120 fps" };
-    juce::PopupMenu frames;
-    for (std::size_t i = 0; i < timingRates.size(); ++i) { frames.addItem(500 + static_cast<int>(i), rateNames[i], true, std::abs(project.frameRate - timingRates[i]) < 1.0e-9); }
-    menu.addSubMenu("Frame rate", frames);
-    juce::PopupMenu beam;
-    for (const auto& [id, text] : MotionCompositionPanel::beamChoices(processor.document.mainProject().frameRate)) {
-        beam.addItem(id, text, true, id - MotionCompositionPanel::beamCommand == processor.document.mainProject().beamCycles);
-    }
-    menu.addSubMenu("Beam frequency", beam);
     return menu;
 }
 
@@ -859,7 +865,7 @@ bool MotionEditor::applyTiming(int result) {
         return true;
     }
     if (result >= 500 && result < 508) {
-        const auto rate = timingRates[static_cast<std::size_t>(result - 500)];
+        const auto rate = MotionCompositionPanel::rates[static_cast<std::size_t>(result - 500)];
         if (std::abs(current.frameRate - rate) >= 1.0e-9) { processor.document.edit("Change frame rate", [rate](motion::Project& state) { state.frameRate = rate; }); }
         return true;
     }
@@ -875,7 +881,7 @@ void MotionEditor::tap() {
     tapButton.setButtonText(tapTempo.count() > 1 ? juce::String(static_cast<int>(tapTempo.count())) : "Tap");
     if (bpm.has_value()) {
         tappedBpm = bpm;
-        tempoValue.setText(juce::String(*bpm, 1), juce::dontSendNotification);
+        tempoValue.setText(tempoText(*bpm), juce::dontSendNotification);
     }
     if (tapCommit == nullptr) {
         tapCommit = std::make_unique<juce::TimedCallback>([this] {
@@ -916,7 +922,7 @@ void MotionEditor::detectTempo() {
     const auto asset = clip != nullptr ? motion::findAsset(project.assets, clip->asset) : nullptr;
     const auto audio = asset != nullptr ? asset->audio : nullptr;
     if (audio == nullptr || processor.document.editingComposition() != 0) {
-        statusBar.show(audio == nullptr ? "Import some audio first (Audio > Import audio)." : "Tempo is set on the main composition. Go back to it first.");
+        statusBar.show(audio == nullptr ? "Import some audio first: drop a file or use File > Import source." : "Tempo is set on the main composition. Go back to it first.");
         return;
     }
     detectingTempo = true;

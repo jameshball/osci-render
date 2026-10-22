@@ -117,8 +117,10 @@ try:
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
     timeline = find(lambda n: n.get("class") == "MotionTimelineView")["bounds"]
     step("fit", "press", "F", "--class", "MotionTimelineView")
-    pps = (timeline["w"] - 220 - 20) / 8.0
-    x_of = lambda t: 220 + round(t * pps)
+    pps = (timeline["w"] - 184 - 20) / 8.0
+    x_of = lambda t: 184 + round(t * pps)
+    # Look through camera is in the Scene's strip only with a camera selected.
+    assert find(lambda n: n.get("name") == "Look through camera" and n.get("role") == "button" and n.get("visible", True)) is None, "Look through camera shows with no camera selected"
     # Between cuts the Cameras band shows the first camera; clicking selects it.
     step("select camera", "click", "--class", "MotionTimelineView", "--position", f"{x_of(4)},39")
     command("wait-for-locator", "--name", "Key rotation", "--exact")

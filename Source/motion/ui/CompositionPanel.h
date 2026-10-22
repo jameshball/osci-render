@@ -1,40 +1,36 @@
 #pragma once
 
 #include "../MotionProcessor.h"
-#include "TypedNumber.h"
 #include "MotionStyle.h"
 #include "../render/CompositionRenderer.h"
 #include <array>
 #include <functional>
 
 // With nothing selected, Properties shows the composition's own settings:
-// how long it runs, its frame rate, tempo and meter, in the same two-column
-// rows as a clip's timing; and for the project itself, what it is about, as
-// the start screen shows it under its name.
+// how long it runs, its frame rate and meter, and the project's beam and
+// sample rate, in the same two-column rows as a clip's timing; and for the
+// project itself, what it is about, as the start screen shows it under its
+// name. Both sections open as Properties' own do.
 class MotionCompositionPanel final : public juce::Component {
 public:
     explicit MotionCompositionPanel(MotionProcessor& owner) : processor(owner) {
         setName("Composition settings");
         motion::style::inspector::styleHeading(title, "Timing");
         addAndMakeVisible(title);
-        const std::array<const char*, 5> labels {"Duration", "Rate", "Tempo", "Meter", "Beam"};
+        const std::array<const char*, 5> labels {"Duration", "Frames", "Meter", "Samples", "Beam"};
         for (std::size_t index = 0; index < captions.size(); ++index) {
             motion::style::inspector::styleCaption(captions[index], labels[index]);
             addAndMakeVisible(captions[index]);
         }
-        for (auto [field, name, tip] : {std::tuple {&length, "Composition duration", "Never shorter than its last clip"},
-                                        std::tuple {&tempo, "Composition tempo", "Tempo at the start; changes on the ruler take over from there"}}) {
-            field->setName(name);
-            field->setTitle(name);
-            field->setTooltip(tip);
-            field->setEditable(false, true);
-            field->setJustificationType(juce::Justification::centredRight);
-            field->setFont(motion::style::body());
-            field->setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
-            addAndMakeVisible(*field);
-        }
+        length.setName("Composition duration");
+        length.setTitle("Composition duration");
+        length.setTooltip("Never shorter than its last clip. In the ruler's units; add s for seconds");
+        length.setEditable(false, true);
+        length.setJustificationType(juce::Justification::centredRight);
+        length.setFont(motion::style::body());
+        length.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
+        addAndMakeVisible(length);
         length.onTextChange = [this] { if (!updating) { applyLength(); } };
-        tempo.onTextChange = [this] { if (!updating) { applyTempo(); } };
         frameRate.setName("Composition frame rate");
         const std::array<const char*, 8> rateNames {"23.976 fps", "24 fps", "25 fps", "29.97 fps", "30 fps", "50 fps", "60 fps", "120 fps"};
         for (std::size_t index = 0; index < rateNames.size(); ++index) { frameRate.addItem(rateNames[index], 500 + static_cast<int>(index)); }
@@ -51,6 +47,14 @@ public:
             combo->onChange = [this, combo] { if (!updating && onTiming) { onTiming(combo->getSelectedId()); } };
             addAndMakeVisible(*combo);
         }
+        // What the project is drawn and exported at: the beam's time to draw.
+        sampleRate.setName("Composition sample rate");
+        sampleRate.setTitle("Sample rate");
+        sampleRate.setTooltip("What the project is drawn and exported at (" + kilohertz(motion::Project::defaultSampleRate) + " by default). A higher rate gives the beam time to draw more each cycle.");
+        for (std::size_t index = 0; index < sampleRates.size(); ++index) { sampleRate.addItem(kilohertz(sampleRates[index]), static_cast<int>(index) + 1); }
+        motion::style::styleField(sampleRate);
+        sampleRate.onChange = [this] { if (!updating) { applySampleRate(); } };
+        addAndMakeVisible(sampleRate);
         motion::style::inspector::styleHeading(aboutTitle, "About");
         addChildComponent(aboutTitle);
         about.setName("Project description");
@@ -76,14 +80,19 @@ public:
         addChildComponent(about);
     }
 
-    // The Timing menu's own command ids, so both change things the same way.
+    // Meter, frame rate and beam as applyTiming's command ids, which the
+    // Timing menu's display and snapping items share.
     std::function<void(int)> onTiming;
     std::function<void(const juce::String&)> onError;
     std::function<void()> onHeightChanged;
     static constexpr std::array<double, 8> rates {24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120};
-    // The Timing menu's ids for the beam's frequency: Auto, then 1 to 8 cycles a frame.
+    // The ids for the beam's frequency: Auto, then 1 to 8 cycles a frame.
     static constexpr int beamCommand = 800, beamChoiceCount = motion::Project::mostBeamCycles;
+    // The rates a project can be drawn at, from what audio runs at to four
+    // times 192 kHz.
+    static constexpr std::array<double, 8> sampleRates {44100, 48000, 88200, 96000, 176400, 192000, 384000, 768000};
     static juce::String hertz(double value) { return juce::String(value, value == std::floor(value) ? 0 : 2) + " Hz"; }
+    static juce::String kilohertz(double rate) { return juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz"; }
     static std::vector<std::pair<int, juce::String>> beamChoices(double frameRate) {
         std::vector<std::pair<int, juce::String>> choices;
         choices.emplace_back(beamCommand, "Auto" + motion::style::dot() + hertz(motion::beamCycleRate(frameRate)));
@@ -107,8 +116,8 @@ public:
         if (!shown) {
             return 0;
         }
-        const auto timing = motion::style::inspector::headingHeight + 3 * motion::style::inspector::row + 10;
-        return timing + (aboutShown ? aboutGap + motion::style::inspector::headingHeight + aboutHeight + 10 : 0);
+        const auto timing = headingBlock + 3 * motion::style::inspector::row;
+        return timing + (aboutShown ? aboutGap + ruleGap + headingBlock + aboutHeight : 0) + 10;
     }
     void refresh() {
         if (!shown) { return; }
@@ -127,8 +136,8 @@ public:
         }
         const auto& project = processor.document.project();
         updating = true;
-        if (!length.isBeingEdited()) { length.setText(juce::String(project.duration, 3) + "s", juce::dontSendNotification); }
-        if (!tempo.isBeingEdited()) { tempo.setText(juce::String(project.bpm, project.bpm == std::round(project.bpm) ? 0 : 2) + " BPM", juce::dontSendNotification); }
+        // As the clip's Timing reads a duration: in the ruler's units.
+        if (!length.isBeingEdited()) { length.setText(juce::String(project.timeGrid().durationLabel(0, project.duration)), juce::dontSendNotification); }
         int rate = 0;
         for (std::size_t index = 0; index < rates.size(); ++index) { if (std::abs(project.frameRate - rates[index]) < 1.0e-9) { rate = 500 + static_cast<int>(index); } }
         frameRate.setSelectedId(rate, juce::dontSendNotification);
@@ -139,22 +148,42 @@ public:
         beam.clear(juce::dontSendNotification);
         for (const auto& [id, text] : beamChoices(main.frameRate)) { beam.addItem(text, id); }
         beam.setSelectedId(beamCommand + main.beamCycles, juce::dontSendNotification);
+        int sampleRateId = 0;
+        for (std::size_t index = 0; index < sampleRates.size(); ++index) {
+            if (std::abs(main.sampleRate - sampleRates[index]) < .5) { sampleRateId = static_cast<int>(index) + 1; }
+        }
+        sampleRate.setSelectedId(sampleRateId, juce::dontSendNotification);
+        if (sampleRateId == 0) { sampleRate.setText(kilohertz(main.sampleRate), juce::dontSendNotification); }
         updating = false;
     }
     void resized() override {
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
-        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter, &beam});
+        area.removeFromTop(motion::style::gap);
+        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &meter, &sampleRate, &beam});
         area.removeFromTop(aboutGap);
+        aboutRule = area.getY();
+        area.removeFromTop(ruleGap);
         aboutTitle.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
-        area.removeFromTop(4);
-        const motion::style::PropertyGrid grid(area.getWidth());
-        about.setBounds(area.removeFromTop(aboutHeight).withWidth(grid.value + grid.column));
+        area.removeFromTop(motion::style::gap);
+        // Nothing to key beside it, so it takes the whole width.
+        about.setBounds(area.removeFromTop(aboutHeight));
         fitAbout();
+        repaint();
+    }
+    void paint(juce::Graphics& g) override {
+        if (aboutShown) {
+            g.setColour(motion::style::hairline());
+            g.fillRect(0, aboutRule, getWidth(), 1);
+        }
     }
 
 private:
-    static constexpr int aboutGap = 14;
+    // As Properties opens a section: a rule after the rows above, then the
+    // heading clear of it, then the rows a gap below.
+    static constexpr int aboutGap = motion::style::padding + motion::style::gap, ruleGap = 10;
+    static constexpr int headingBlock = motion::style::inspector::headingHeight + motion::style::gap;
+    int aboutRule = 0;
     // The field grows with what is written, two lines to seven.
     int aboutHeight = 46;
     void fitAbout() {
@@ -176,8 +205,9 @@ private:
         }
     }
     void applyLength() {
-        const auto value = motion::ui::parseNumber(length.getText(), "s");
         auto& document = processor.document;
+        const auto grid = document.project().timeGrid();
+        const auto value = grid.parseDuration(length.getText().trim().toStdString(), 0);
         double lastClip = 0;
         for (const auto& track : document.project().tracks) {
             for (const auto& clip : track.clips) { lastClip = std::max(lastClip, clip.timing(document.project().tempo()).end()); }
@@ -185,7 +215,9 @@ private:
         // At least one frame: anything shorter has nothing to draw.
         const auto rate = document.project().frameRate;
         const auto frame = rate > 0 ? 1.0 / rate : 1.0 / 60.0;
-        if (!value.has_value() || *value < frame - 1.0e-9 || *value > 24 * 3600) {
+        if (!value.has_value()) {
+            if (onError) { onError("Enter a length like the ruler shows (" + juce::String(grid.durationLabel(0, document.project().duration)) + "), or seconds with s."); }
+        } else if (*value < frame - 1.0e-9 || *value > 24 * 3600) {
             if (onError) { onError("Enter a length from one frame (" + juce::String(frame, 3) + " s) to 24 hours."); }
         } else if (*value < lastClip - 1.0e-9) {
             if (onError) { onError("The composition runs at least to its last clip (" + juce::String(lastClip, 2) + " s)."); }
@@ -194,22 +226,21 @@ private:
         }
         refresh();
     }
-    void applyTempo() {
-        const auto value = motion::ui::parseNumber(tempo.getText(), "BPM");
-        if (!value.has_value() || *value < 1 || *value > 1000) {
-            if (onError) { onError("Enter a tempo between 1 and 1000 BPM."); }
-        } else if (*value != processor.document.project().bpm) {
-            const auto result = processor.document.changeTempo(*value);
-            if (result.failed() && onError) { onError(result.getErrorMessage()); }
+    // The project's, so every composition in it: one undo step.
+    void applySampleRate() {
+        const auto index = sampleRate.getSelectedId() - 1;
+        if (index < 0 || index >= static_cast<int>(sampleRates.size())) { return; }
+        const auto rate = sampleRates[static_cast<std::size_t>(index)];
+        if (std::abs(processor.document.mainProject().sampleRate - rate) >= .5) {
+            processor.document.edit("Change the sample rate", [rate](motion::Project& project) { project.sampleRate = rate; });
         }
-        refresh();
     }
 
     MotionProcessor& processor;
     bool shown = false, updating = false;
     bool aboutShown = false;
-    juce::Label title, length, tempo, aboutTitle;
+    juce::Label title, length, aboutTitle;
     juce::TextEditor about;
     std::array<juce::Label, 5> captions;
-    juce::ComboBox frameRate, meter, beam;
+    juce::ComboBox frameRate, meter, beam, sampleRate;
 };
