@@ -43,10 +43,9 @@ public:
         value.setVisible(fields);
         if (fields) {
             if (!time.field.isEditing()) { time.field.setValue(single->first); }
-            if (spec.id != valueSpecId) {
-                valueSpecId = std::string(spec.id);
-                value.field.setSpec(spec);
-            }
+            // Every time: an id can have another range on another target
+            // (a point light's Intensity goes higher than an ambient one's).
+            value.field.setSpec(spec);
             if (!value.field.isEditing()) { value.field.setValue(single->second); }
             time.field.setEnabled(editable);
             value.field.setEnabled(editable);
@@ -87,6 +86,5 @@ private:
     MotionInterpolationBar interpolation;
     motion::ui::LabelledScrub time, value;
     juce::String title {"Key"};
-    std::string valueSpecId;
     bool fields = false;
 };

@@ -270,7 +270,11 @@ private:
     // Keeps the time under `x` fixed while zooming.
     void zoomAround(int x, double factor);
     // Zoomed out no further than the whole timeline twice over; in, to 500 px a second.
-    double clampZoom(double value) const { return std::clamp(value, std::max(1, getWidth() - namesWidth) / (2 * std::max(1.0, contentEnd())), 500.0); }
+    double clampZoom(double value) const {
+        // A short composition on a wide timeline fits twice over beyond 500.
+        const auto lowest = std::min(500.0, std::max(1, getWidth() - namesWidth) / (2 * std::max(1.0, contentEnd())));
+        return std::clamp(value, lowest, 500.0);
+    }
     void userScrolled();
     // Vertical zoom: every row without its own height, keeping the row under
     // the pointer in place.

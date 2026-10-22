@@ -69,9 +69,11 @@ void MotionTimelineView::setSelection(motion::Id id) {
 void MotionTimelineView::pickTrack(motion::Id id, juce::ModifierKeys mods) {
     auto picked = selectedTracks;
     if (picked.empty() && selected != 0 && std::any_of(rows.begin(), rows.end(), [this](const auto& row) { return !row.isLane() && row.id == selected; })) { picked.insert(selected); }
+    // A deleted anchor, or one hidden in a collapsed group, would never end the range.
+    const auto anchorListed = trackAnchor != 0 && std::any_of(rows.begin(), rows.end(), [this](const auto& row) { return !row.isLane() && row.id == trackAnchor; });
     if (mods.isCommandDown()) {
         if (picked.contains(id) && picked.size() > 1) { picked.erase(id); } else { picked.insert(id); }
-    } else if (mods.isShiftDown() && trackAnchor != 0) {
+    } else if (mods.isShiftDown() && anchorListed) {
         // Every header between the first picked and this one, as listed.
         picked.clear();
         bool inside = false;
@@ -84,7 +86,7 @@ void MotionTimelineView::pickTrack(motion::Id id, juce::ModifierKeys mods) {
     } else {
         picked = {id};
     }
-    if (!mods.isShiftDown()) { trackAnchor = id; }
+    if (!mods.isShiftDown() || !anchorListed) { trackAnchor = id; }
     selectedTracks = picked;
     selectClip(picked.contains(id) ? id : *picked.begin());
     selectedTracks = picked.size() > 1 ? picked : std::set<motion::Id>();

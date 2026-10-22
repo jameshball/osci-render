@@ -123,7 +123,11 @@ void MotionPropertyInspector::refresh() {
     const auto modes = currentModes();
     motionModes = modes.has_value();
     auto signature = editable ? juce::String(static_cast<int>(found->camera)) + juce::String(static_cast<int>(found->beam)) + juce::String(static_cast<int>(found->isAudio)) + juce::String(static_cast<int>(motionModes)) : juce::String();
-    signature << ":" << static_cast<int>(specList.size());
+    // Every spec, not only how many: two Lua clips can read different sliders,
+    // and each fractal has its own default depth.
+    for (const auto& spec : specList) {
+        signature << ":" << juce::String(spec.id.data(), spec.id.size()) << "=" << spec.minimum << "," << spec.maximum << "," << spec.defaultValue << "," << spec.step;
+    }
     // Two generators with as many parameters still differ.
     if (editable) {
         const auto* generator = targetGenerator();
