@@ -205,13 +205,12 @@ private:
     std::size_t held = 0;
 };
 
-// A clip's drawing of an L-system, a frame per frame of its content where
-// its depth changes; frames of the same depth share a drawing.
+// A clip's drawing of an L-system, a frame per frame of its content (fewer
+// over long content: contentFrames) where its depth changes; frames of the
+// same depth share a drawing.
 template <typename DepthAt>
 std::shared_ptr<const PreparedSource> clipSource(const juce::String& source, double contentEnd, double frameRate, DepthAt&& depthAt) {
-    constexpr std::size_t maximumFrames = 3600;
-    const auto rate = std::isfinite(frameRate) && frameRate > 0 ? frameRate : 60.0;
-    const auto count = std::clamp<std::size_t>(std::isfinite(contentEnd) && contentEnd > 0 ? static_cast<std::size_t>(std::floor(contentEnd * rate)) + 1 : 1, 1, maximumFrames);
+    const auto [rate, count] = contentFrames(contentEnd, frameRate, 3600);
     std::vector<std::shared_ptr<const PreparedDrawing>> frames;
     frames.reserve(count);
     double previous = -1;

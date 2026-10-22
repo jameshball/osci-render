@@ -2,6 +2,7 @@
 
 #include "FrameTiming.h"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -95,6 +96,9 @@ public:
     double duration() const { return static_cast<double>(frames) / rate; }
     std::size_t pointsPerFrame() const { return stride; }
     const std::vector<PointSample>& data() const { return points; }
+    // These frames and no others, for as long as the program runs: what a
+    // bake's fingerprints know them by, as PreparedDrawing::serial().
+    std::uint64_t serial() const { return identity; }
 
     // Negative local times wrap into the final source frame, matching PreparedSource.
     std::size_t frameIndex(double seconds) const {
@@ -165,6 +169,10 @@ private:
         return darkPrefix[offset + stride] != darkPrefix[offset + start]
             || darkPrefix[offset + end - stride] != darkPrefix[offset];
     }
+    const std::uint64_t identity = [] {
+        static std::atomic<std::uint64_t> next {1};
+        return next.fetch_add(1, std::memory_order_relaxed);
+    }();
     const double rate;
     const std::size_t frames, stride;
     const bool explicitColour;

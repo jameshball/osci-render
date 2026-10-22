@@ -58,12 +58,21 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
     plan.name = asset.name;
     plan.script = asset.data.toString();
     plan.settings = asset.bakeSettings;
-    // Cover the clip's content, within the source frame budget.
+    // Cover the clip's content, within the source frame budget: content
+    // longer than the budget is baked at a lower frame rate, its frames
+    // spread to its end rather than looping back to its start.
     const auto timing = clip.timing(tempo);
     const auto contentEnd = timing.localTime(timing.end());
-    const auto longest = static_cast<double>(maximumSourceFrames) / plan.settings.frameRate;
-    plan.settings.duration = std::clamp(std::max(plan.settings.duration, contentEnd), 1.0 / plan.settings.frameRate, longest);
-    plan.settings.duration = std::floor(plan.settings.duration * plan.settings.frameRate) / plan.settings.frameRate;
+    const auto wanted = std::isfinite(contentEnd) ? std::max(plan.settings.duration, contentEnd) : plan.settings.duration;
+    const auto budget = static_cast<double>(maximumSourceFrames);
+    if (wanted * plan.settings.frameRate > budget) {
+        plan.settings.frameRate = (budget - 1) / wanted;
+        // Half a frame short of the budget, so frameCount() rounds up to it.
+        plan.settings.duration = (budget - 0.5) / plan.settings.frameRate;
+    } else {
+        plan.settings.duration = std::max(wanted, 1.0 / plan.settings.frameRate);
+        plan.settings.duration = std::floor(plan.settings.duration * plan.settings.frameRate) / plan.settings.frameRate;
+    }
     juce::MemoryOutputStream key;
     key.writeString(asset.bakeKey);
     key.writeDouble(plan.settings.duration);

@@ -800,6 +800,7 @@ struct PreparedComposition {
             hiddenLines->reflects = reflective;
             hiddenLines->restyles = restyled;
             hiddenLines->hatches = hatches;
+            hiddenLines->beamRate = beamRate;
         }
     }
 

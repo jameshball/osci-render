@@ -75,6 +75,8 @@ public:
     // What it bakes: lines a camera hides, light from lights, reflections,
     // surfaces drawn other than by their edges, hatching, or any of them.
     bool hides = true, lights = false, reflects = false, restyles = false, hatches = false;
+    // The beam's cycles a second, which size the hatching drawn in one.
+    double beamRate = 60;
     // How the Scope draws, which shapes how lines are cut.
     ScopeProfile scope;
 
@@ -147,7 +149,7 @@ public:
     void inherit(const Bake& previous) {
         if (previous.rate != rate || previous.samples != samples || !(previous.reach == reach) || previous.hides != hides || previous.lights != lights
             || previous.reflects != reflects || previous.restyles != restyles || previous.hatches != hatches
-            || !(previous.scope == scope)) {
+            || (hatches && previous.beamRate != beamRate) || !(previous.scope == scope)) {
             return;
         }
         for (std::size_t index = 0; index < previous.count; ++index) {

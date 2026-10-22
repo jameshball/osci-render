@@ -68,6 +68,54 @@ public:
             expectEquals(static_cast<int>(plain.clips.front().source->drawingAt(0)->shapeCount()), 14, "drawn from its own value");
         }
 
+        beginTest("A keyed clip longer than its frames allow follows its keys to its end, not back to its start");
+        {
+            // Five points for 100 s, then nine: two minutes of content, past
+            // the 3600 frames a minute at 60 fps holds.
+            const auto& star = *motion::findGenerator("star");
+            const auto pointsAt = [&](double seconds) {
+                std::vector<double> values;
+                for (const auto& spec : star.parameters) { values.push_back(spec.id == "generator.points" ? (seconds < 100 ? 5.0 : 9.0) : spec.defaultValue); }
+                return values;
+            };
+            const auto source = motion::generator::clipSource(star, 120, 60, pointsAt);
+            expect(source->frameCount() <= 3600, "within the frames a source may hold");
+            const auto shapesAt = [&](double seconds) { return static_cast<int>(source->drawingAt(source->frameIndex(seconds))->shapeCount()); };
+            expectEquals(shapesAt(10), 10, "five points early on");
+            expectEquals(shapesAt(70), 10, "still five past the first minute");
+            expectEquals(shapesAt(110), 18, "nine points once the key is reached, not the start's five again");
+            expectEquals(shapesAt(119.99), 18, "nine to the end");
+            const auto shortSource = motion::generator::clipSource(star, 2, 60, pointsAt);
+            expect(shortSource->frameRate() == 60 && shortSource->frameCount() == 1, "a short still clip is as it was: one frame");
+            const auto frames = motion::contentFrames(2, 60, 3600);
+            expect(frames.rate == 60 && frames.count == 121, "a short clip has a frame a frame of its content");
+
+            // A Lua clip's sliders, baked over two minutes, likewise.
+            auto lua = std::make_shared<motion::Asset>();
+            lua->id = 9;
+            lua->name = "Sliders.lua";
+            lua->extension = ".lua";
+            lua->bakeKey = "sliders";
+            lua->data.append("return {0, 0}", 13);
+            motion::Project project;
+            project.duration = 180;
+            auto clip = motion::Document::makeClip(10, *lua, 0);
+            clip.duration = 120;
+            clip.properties["slider.a"].setKey({0, 0, motion::Interpolation::linear});
+            clip.properties["slider.a"].setKey({120, 1, motion::Interpolation::linear});
+            const auto plan = motion::luaSliderPlan(*lua, clip, project);
+            expect(plan.has_value());
+            if (plan.has_value()) {
+                const auto count = plan->settings.frameCount();
+                expect(count == motion::maximumSourceFrames, "the bake fills the frames a source may hold: " + juce::String(static_cast<int>(count)));
+                expect(static_cast<double>(count) / plan->settings.frameRate > 120, "and they reach the clip's end");
+                expect(plan->settings.validate().empty(), juce::String(plan->settings.validate()));
+            }
+            clip.duration = 2;
+            const auto shortPlan = motion::luaSliderPlan(*lua, clip, project);
+            expect(shortPlan.has_value() && shortPlan->settings.frameRate == 60 && shortPlan->settings.duration == 5, "a short clip bakes as it did");
+        }
+
         beginTest("A modulator drives a generator's parameter");
         {
             auto project = generatorProject("polygon");

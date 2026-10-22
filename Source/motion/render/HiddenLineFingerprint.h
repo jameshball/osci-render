@@ -50,10 +50,11 @@ public:
             add(lines.edges, lines.outline, lines.detail, lines.patterns[static_cast<std::size_t>(surface::Pattern::noise)] > 0 ? lines.noiseTurn : 0.0);
             for (const auto amount : lines.patterns) { add(amount); }
             // The drawing it shows (frames that repeat one are the same), or
-            // for a point source the frame.
+            // for a point source the frame and which frames they are.
             const auto frame = clip.source != nullptr ? clip.source->frameIndex(clip.localTime(time)) : 0;
             const auto* drawing = clip.source != nullptr ? clip.source->drawingAt(frame) : nullptr;
-            add(drawing != nullptr ? static_cast<double>(drawing->serial()) : -2.0 - static_cast<double>(frame));
+            const auto* points = clip.source != nullptr ? clip.source->pointFrames() : nullptr;
+            add(drawing != nullptr ? static_cast<double>(drawing->serial()) : -2.0 - static_cast<double>(frame), points != nullptr ? static_cast<double>(points->serial()) : 0.0);
             addStage(clip, time);
             for (const auto& ancestor : clip.ancestors) { addStage(ancestor, time); }
         }

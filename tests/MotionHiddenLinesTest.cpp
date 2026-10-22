@@ -423,6 +423,55 @@ public:
             expect(!(first == second), "a turning cube does not");
         }
 
+        beginTest("A point source's fingerprint knows which frames it draws, not just which frame");
+        {
+            // A ring beside the cube, then the same project with its source replaced.
+            const auto ringAsset = [this](float radius) {
+                std::vector<motion::PointSample> ring;
+                for (int index = 0; index < 64; ++index) {
+                    const auto angle = index * 2 * juce::MathConstants<double>::pi / 64;
+                    ring.push_back({static_cast<float>(std::cos(angle)) * radius, 0.0f, static_cast<float>(std::sin(angle)) * radius, 1.0f, 0.0f, 0.0f});
+                }
+                auto frames = motion::PreparedPointFrames::create(30, 1, ring.size(), std::move(ring));
+                expect(frames.source != nullptr, juce::String(frames.error));
+                auto points = std::make_shared<motion::Asset>();
+                points->id = 3;
+                points->name = "Ring.lua";
+                points->extension = ".lua";
+                points->source = std::make_shared<motion::PreparedSource>(frames.source);
+                return points;
+            };
+            auto project = cubeProject(true);
+            project.assets.push_back(ringAsset(.9f));
+            auto clip = motion::Document::makeClip(21, *project.assets.back(), 0);
+            clip.duration = 2;
+            motion::Track track;
+            track.id = 11;
+            track.insert(clip, project.tempo());
+            project.tracks.push_back(track);
+            auto edited = project;
+            edited.assets.back() = ringAsset(.5f);
+            const motion::PreparedComposition before(project), again(project), replaced(edited);
+            motion::hidden::Fingerprint first, second, third;
+            first.take(before, 1);
+            second.take(again, 1);
+            third.take(replaced, 1);
+            expect(first == second, "the same frames prepared again depend on the same");
+            expect(!(first == third), "a replaced source does not");
+        }
+
+        beginTest("A bake takes over hatching only from a bake of the same beam frequency");
+        {
+            motion::hidden::Bake before(nullptr, 10, 1, {}), same(nullptr, 10, 1, {}), faster(nullptr, 10, 1, {});
+            for (auto* bake : {&before, &same, &faster}) { bake->hatches = true; }
+            faster.beamRate = before.beamRate * 4;
+            before.publish(0, std::make_shared<const motion::hidden::Frame>(), 7);
+            same.inherit(before);
+            faster.inherit(before);
+            expect(same.inherited(7) != nullptr, "the same beam frequency takes the frame over");
+            expect(faster.inherited(7) == nullptr, "another bakes its hatching afresh");
+        }
+
         beginTest("A bake claims frames from its focus on, follows it, and finds a frame given back");
         {
             motion::hidden::Bake bake(nullptr, 10, 1, {});

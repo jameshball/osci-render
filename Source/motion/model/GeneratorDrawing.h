@@ -106,16 +106,12 @@ private:
 };
 
 // A generator clip's frames, one a frame of its content from its start to
-// `contentEnd` at `frameRate`, with `valuesAt(seconds)` its parameters' values
-// then. Frames whose values match share a drawing, and a clip whose values
-// never change has a single frame.
+// `contentEnd` at `frameRate` (fewer over long content: contentFrames), with
+// `valuesAt(seconds)` its parameters' values then. Frames whose values match
+// share a drawing, and a clip whose values never change has a single frame.
 template <typename ValuesAt>
 std::shared_ptr<const PreparedSource> clipSource(const GeneratorDefinition& definition, double contentEnd, double frameRate, ValuesAt&& valuesAt) {
-    constexpr std::size_t maximumFrames = 3600;
-    const auto rate = std::isfinite(frameRate) && frameRate > 0 ? frameRate : 60.0;
-    // Clamped as a double first: a far end (from a damaged project) is out of std::size_t's range.
-    const auto whole = std::isfinite(contentEnd) && contentEnd > 0 ? std::min(std::floor(contentEnd * rate), static_cast<double>(maximumFrames)) : 0.0;
-    const auto count = std::clamp<std::size_t>(static_cast<std::size_t>(whole) + 1, 1, maximumFrames);
+    const auto [rate, count] = contentFrames(contentEnd, frameRate, 3600);
     std::vector<std::shared_ptr<const PreparedDrawing>> frames;
     frames.reserve(count);
     std::vector<double> previous;
