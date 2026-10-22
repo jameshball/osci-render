@@ -7,12 +7,14 @@
 #include <vector>
 
 // Runs a processor at a rate of its own choosing (an osci-motion project's),
-// whatever the audio device runs at. What it makes is resampled down to the
-// device's rate times the largest power of two at or under it, then filtered
+// whatever the audio device runs at. What it makes is resampled up to the
+// device's rate times the smallest power of two at or over it, then filtered
 // down to the device by JUCE's oversampler; a rate that is such a multiple
-// exactly needs only the second step. Content the first step folds over lands
-// above the device's band, where the second step removes it. The processor
-// generates its signal (osci-motion draws it): its input is silence.
+// exactly needs only the second step. Resampling up folds nothing over (its own
+// images stay below about -30 dB), so the oversampler does the band-limiting.
+// Only past its largest factor does the first step bring the rate down, and
+// then a low-pass first removes what would fold into the device's band. The
+// processor generates its signal (osci-motion draws it): its input is silence.
 class ProjectRateAdapter {
 public:
     static constexpr double lowestRate = 22050.0, highestRate = 768000.0;
@@ -24,10 +26,17 @@ public:
         numChannels = juce::jmax(1, channels);
         maxDeviceBlockSize = juce::jmax(1, maxDeviceBlock);
         factor = 1;
-        while (factor < largestFactor && deviceRate * factor * 2 <= processingSampleRate * (1 + 1.0e-9)) { factor *= 2; }
-        // Below the device's rate the signal is resampled up, as it is down.
+        while (factor < largestFactor && deviceRate * factor < processingSampleRate * (1 - 1.0e-9)) { factor *= 2; }
         speed = deviceRate > 0 ? processingSampleRate / (deviceRate * factor) : 1.0;
         exact = std::abs(speed - 1.0) < 1.0e-9;
+        // Past the largest factor the first step decimates, folding what is
+        // above half its rate back down: a fourth-order Butterworth at twice the
+        // device's rate (two sections) keeps it out of the device's band.
+        prefiltered = speed > 1.0 + 1.0e-9;
+        prefilters = std::make_unique<juce::IIRFilter[]>((size_t) (2 * numChannels));
+        for (int index = 0; prefiltered && index < 2 * numChannels; ++index) {
+            prefilters[(size_t) index].setCoefficients(juce::IIRCoefficients::makeLowPass(processingSampleRate, 2 * deviceRate, index % 2 == 0 ? 0.54119610 : 1.30656296));
+        }
         if (factor > 1) {
             oversampler = std::make_unique<juce::dsp::Oversampling<float>>((size_t) numChannels, (size_t) stagesOf(factor),
                 juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, false, true);
@@ -49,6 +58,7 @@ public:
     void reset() noexcept {
         if (oversampler != nullptr) { oversampler->reset(); }
         for (int channel = 0; interpolators != nullptr && channel < numChannels; ++channel) { interpolators[(size_t) channel].reset(); }
+        for (int index = 0; prefilters != nullptr && index < 2 * numChannels; ++index) { prefilters[(size_t) index].reset(); }
         pendingCount = 0;
         pending.clear();
         internalMidi.clear();
@@ -81,6 +91,7 @@ public:
             block.clear();
             processInternal(block, internalMidi);
             internalMidi.clear();
+            for (int index = 0; prefiltered && index < 2 * numChannels; ++index) { prefilters[(size_t) index].processSamples(block.getWritePointer(index / 2), count); }
             for (int channel = 0; channel < numChannels; ++channel) { pending.copyFrom(channel, pendingCount, block, channel, 0, count); }
             pendingCount += count;
             processed += count;
@@ -122,10 +133,11 @@ private:
     static constexpr int lookAhead = 6, guard = 16;
 
     double deviceSampleRate = 0, processingSampleRate = 0, speed = 1;
-    bool exact = true;
+    bool exact = true, prefiltered = false;
     int factor = 1, numChannels = 1, maxDeviceBlockSize = 1, maxProcessingBlockSize = 1, latencySamples = 0, pendingCount = 0;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
     std::unique_ptr<juce::LagrangeInterpolator[]> interpolators;
+    std::unique_ptr<juce::IIRFilter[]> prefilters;
     juce::AudioBuffer<float> pending, made, direct;
     juce::MidiBuffer internalMidi;
 };

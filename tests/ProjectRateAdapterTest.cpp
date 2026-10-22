@@ -9,7 +9,7 @@ public:
     ProjectRateAdapterTest() : juce::UnitTest("Project rate adapter", "Motion") {}
 
     void runTest() override {
-        for (const auto [device, rate] : {std::pair {44100.0, 192000.0}, std::pair {48000.0, 192000.0}, std::pair {48000.0, 44100.0}, std::pair {44100.0, 768000.0}}) {
+        for (const auto [device, rate] : {std::pair {44100.0, 192000.0}, std::pair {48000.0, 192000.0}, std::pair {48000.0, 44100.0}, std::pair {44100.0, 768000.0}, std::pair {48000.0, 88200.0}, std::pair {22050.0, 768000.0}}) {
             beginTest("A tone made at " + juce::String(rate) + " Hz plays as the same tone at " + juce::String(device) + " Hz");
             ProjectRateAdapter adapter;
             adapter.prepare(device, rate, 512, 2);
@@ -44,6 +44,32 @@ public:
             expectWithinAbsoluteError(peak, .5, .03);
             // It makes the project's rate's worth of samples for the time played.
             expectWithinAbsoluteError(static_cast<double>(made) / static_cast<double>(heard.size()), rate / device, rate / device * .01);
+        }
+
+        // Rates just over a power of two times the device's, and past the
+        // largest factor: a tone above the device's band must not fold into it
+        // (folded, it comes back at about its own size; the resampler's images
+        // leave it under -30 dB).
+        for (const auto [device, rate, tone] : {std::tuple {48000.0, 88200.0, 30000.0}, std::tuple {48000.0, 176400.0, 80000.0}, std::tuple {22050.0, 768000.0, 350000.0}}) {
+            beginTest("A " + juce::String(tone) + " Hz tone made at " + juce::String(rate) + " Hz is not heard at " + juce::String(device) + " Hz");
+            ProjectRateAdapter adapter;
+            adapter.prepare(device, rate, 512, 2);
+            std::int64_t made = 0;
+            juce::AudioBuffer<float> block(2, 512);
+            juce::MidiBuffer midi;
+            float peak = 0;
+            for (int round = 0; round * 512 < static_cast<int>(device); ++round) {
+                adapter.process(block, midi, [&](juce::AudioBuffer<float>& internal, juce::MidiBuffer&) {
+                    for (int sample = 0; sample < internal.getNumSamples(); ++sample) {
+                        const auto value = static_cast<float>(.5 * std::sin(2 * juce::MathConstants<double>::pi * tone * static_cast<double>(made++) / rate));
+                        internal.setSample(0, sample, value);
+                        internal.setSample(1, sample, -value);
+                    }
+                });
+                // Past the filters' start.
+                if (round >= 8) { peak = std::max(peak, block.getMagnitude(0, 0, 512)); }
+            }
+            expectLessThan(peak, .02f);
         }
 
         beginTest("Brightness brought down to the device stays from dark to full");
