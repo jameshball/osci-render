@@ -597,7 +597,7 @@ void MotionEditor::showShortcuts() {
         {"Drag empty space", "Select clips (Shift adds)"}, {"Shift+click a clip", "Select every clip from the last one clicked (Cmd too: add them)"}, {"Cmd+click a clip", "Add or remove it"}, {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"},
         {"Double-click a lane", "Add a key"}, {"Alt+Left / Right", "Nudge the selected keys, or else clips, a frame (Shift: ten)"}}});
     sections.push_back({"Scrolling and zoom (timeline, graph)", {{"Wheel / two fingers", "Pan (Shift: horizontal)"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
-        {"Alt+wheel", "Track height, value range or key height"}}});
+        {"Alt+wheel", "Track height, value range or key height"}, {"Middle-drag", "Grab and move the view"}}});
     sections.push_back({"Graph", {{"Double-click", "Add a key"}, {"Drag a box", "Select keys (Shift adds)"}, {"Drag box edges", "Scale key times"},
         {"F / Shift+F", "Frame all curves / this curve"}, {"Right-click a key", "Interpolation and easing"}, {"Drag the time axis", "Scrub"},
         {"Alt+arrows", "Nudge the selected keys (Shift: further)"}, {"Right-click a curve's name", "Show or hide curves"}}});

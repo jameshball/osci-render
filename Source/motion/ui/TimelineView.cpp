@@ -1,4 +1,5 @@
 #include "TimelineView.h"
+#include "GrabCursor.h"
 #include "TimeRuler.h"
 
 MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : processor(ownerProcessor) {
@@ -959,6 +960,12 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     grabKeyboardFocus();
     ensureTrackRows();
     cancelGesture();
+    // The middle button grabs the view anywhere, as it moves the Scene's.
+    if (event.mods.isMiddleButtonDown()) {
+        gesture = Pan {event.getPosition(), scrollTime, scrollY};
+        setMouseCursor(motion::grabbingCursor());
+        return;
+    }
     if (onNamesEdge(event) && event.mods.isLeftButtonDown()) {
         gesture = NamesResize {};
         return;
@@ -1477,6 +1484,17 @@ void MotionTimelineView::scrollAtEdge() {
 }
 
 void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
+    const auto* pan = active<Pan>();
+    if (pan != nullptr) {
+        const auto visible = std::max(1, getWidth() - namesWidth) / pixelsPerSecond;
+        const auto latest = std::max(0.0, contentEnd() - visible);
+        scrollTime = std::clamp(pan->scrollTime - (event.x - pan->down.x) / pixelsPerSecond, 0.0, std::max(latest, pan->scrollTime));
+        scrollY = std::clamp(pan->scrollY - (event.y - pan->down.y), 0, maximumScrollY());
+        userScrolled();
+        resized();
+        repaint();
+        return;
+    }
     followEdge(event);
     if (active<BeamDrag>() != nullptr) { beamDragged(event); return; }
     if (active<BarDrag>() != nullptr) { barDragged(event); return; }
@@ -1722,6 +1740,11 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
 }
 
 void MotionTimelineView::mouseUp(const juce::MouseEvent&) {
+    if (active<Pan>() != nullptr) {
+        gesture = {};
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        return;
+    }
     edgeScroll.stopTimer();
     edgeEvent.reset();
     snapGuide.reset();

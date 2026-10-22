@@ -292,6 +292,9 @@ private:
     std::set<std::string> hiddenCurves;
     motion::ui::PlayheadFollow follow;
     bool scrubbing = false;
+    // Middle-dragging grabs the view: time sideways, values up and down.
+    struct Pan { juce::Point<float> down; double viewStart, viewEnd, low, high; };
+    std::optional<Pan> pan;
     double viewStart = 0.0, viewEnd = 1.0;
     double low = -1.0, high = 1.0;
 };

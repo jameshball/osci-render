@@ -646,8 +646,10 @@ private:
     struct Scrub {};
     // Dragging the names column's edge resizes it.
     struct NamesResize {};
+    // Middle-dragging grabs the view: time follows sideways, tracks up and down.
+    struct Pan { juce::Point<int> down; double scrollTime; int scrollY; };
     // The one gesture under way, if any; starting another replaces it.
-    std::variant<std::monostate, ClipDrag, KeyDrag, BeamDrag, LoopDrag, BarDrag, HeightDrag, CutDrag, CameraKeyDrag, TrackDrag, MarkerDrag, Scrub, NamesResize, KeyMarquee, ClipMarquee> gesture;
+    std::variant<std::monostate, ClipDrag, KeyDrag, BeamDrag, LoopDrag, BarDrag, HeightDrag, CutDrag, CameraKeyDrag, TrackDrag, MarkerDrag, Scrub, NamesResize, Pan, KeyMarquee, ClipMarquee> gesture;
     template <typename T> T* active() { return std::get_if<T>(&gesture); }
     template <typename T> const T* active() const { return std::get_if<T>(&gesture); }
     // The clip or marker drag under way, if either is.

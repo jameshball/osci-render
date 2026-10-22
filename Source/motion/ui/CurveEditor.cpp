@@ -1,5 +1,6 @@
 #include <limits>
 #include "CurveEditor.h"
+#include "GrabCursor.h"
 #include "TimeRuler.h"
 #include "MenuIcons.h"
 
@@ -522,6 +523,12 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
     grabKeyboardFocus();
     cancelDrag();
     snapGuide.reset();
+    // The middle button grabs the view anywhere, as on the timeline and in the Scene.
+    if (event.mods.isMiddleButtonDown()) {
+        pan = Pan {event.position, viewStart, viewEnd, low, high};
+        setMouseCursor(motion::grabbingCursor());
+        return;
+    }
     const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
     const auto* curve = findCurve(clip, propertyName);
     if (curve == nullptr) {
@@ -700,6 +707,19 @@ void MotionCurveEditor::scrubTo(float x, juce::ModifierKeys modifiers) {
 }
 
 void MotionCurveEditor::mouseDrag(const juce::MouseEvent& event) {
+    if (pan.has_value()) {
+        const auto area = plot();
+        const auto seconds = -(event.position.x - pan->down.x) / std::max(1.0f, area.getWidth()) * (pan->viewEnd - pan->viewStart);
+        const auto shift = (event.position.y - pan->down.y) / std::max(1.0f, area.getHeight()) * (pan->high - pan->low);
+        userView = true;
+        follow.userMoved();
+        setView(pan->viewStart + seconds, pan->viewEnd + seconds);
+        low = pan->low + shift;
+        high = pan->high + shift;
+        normalizeValueRange();
+        repaint();
+        return;
+    }
     if (scrubbing) { scrubTo(event.position.x, event.mods); return; }
     if (marquee.has_value()) {
         // The box selects across every curve of the group (added to what was
@@ -798,6 +818,11 @@ void MotionCurveEditor::mouseDrag(const juce::MouseEvent& event) {
 }
 
 void MotionCurveEditor::mouseUp(const juce::MouseEvent&) {
+    if (pan.has_value()) {
+        pan.reset();
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        return;
+    }
     if (scrubbing) { scrubbing = false; return; }
     snapGuide.reset();
     if (marquee.has_value()) {
