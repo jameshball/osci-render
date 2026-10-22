@@ -66,7 +66,7 @@ try:
     source = tile("Swirl")["bounds"]
     target = find(tree, lambda node: node.get("class") == "MotionTimelineView")["bounds"]
     step("drag effect onto clip", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
-         target["x"] + 280, target["y"] + 68, "--steps", 20)
+         target["x"] + 244, target["y"] + 68, "--steps", 20)
     wait_undo("Add Swirl")
     step("set effect amount", "set-value", "--component-name", "Effect swirl", "--exact", "0.22")
     wait_undo("Change effect parameter")
@@ -93,7 +93,7 @@ try:
     wait_undo("Add Rotate")
     step("rotate track", "set-value", "--component-name", "Effect rotateZ", "--exact", "0.2")
     # With nothing selected, effects apply to the whole composition.
-    step("select nothing", "click", "--class", "MotionTimelineView", "--position", "750,140")
+    step("select nothing", "click", "--class", "MotionTimelineView", "--position", "714,140")
     command("wait-for-value", "--component-name", "Inspector title", "--value", "Composition")
     step("add composition ripple", "click", tile("Ripple")["ref"], "--click-count", 2)
     wait_undo("Add Ripple")

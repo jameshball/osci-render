@@ -101,7 +101,7 @@ try:
     time.sleep(1.5)
     whole = lit_on_scope("whole.png")
     # The cube's clip, on the first track under the Cameras band.
-    step("select cube", "click", "--class", "MotionTimelineView", "--position", "400,65")
+    step("select cube", "click", "--class", "MotionTimelineView", "--position", "364,65")
     # Solid is a choice in its Surface: its faces then hide what is behind them.
     solid = None
     for _ in range(25):

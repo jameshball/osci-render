@@ -106,8 +106,8 @@ try:
     session.wait_for_undo("Key points")
     timeline = find(lambda n: n.get("class") == "MotionTimelineView")["bounds"]
     step("fit", "press", "F", "--class", "MotionTimelineView")
-    pps = (timeline["w"] - 220 - 20) / 8.0
-    step("playhead to 2 s", "click", "--class", "MotionTimelineView", "--position", f"{220 + round(2 * pps)},12")
+    pps = (timeline["w"] - 184 - 20) / 8.0
+    step("playhead to 2 s", "click", "--class", "MotionTimelineView", "--position", f"{184 + round(2 * pps)},12")
     step("three points", "set-value", field("generator.points")["ref"], "3")
     session.wait_for_undo("Change Points")
     time.sleep(1)

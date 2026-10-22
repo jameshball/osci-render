@@ -167,7 +167,7 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     // The layout the editor keeps between sessions.
     struct Layout {
-        int namesWidth = 220, trackHeight = 32;
+        int namesWidth = 184, trackHeight = 32;
         bool follow = true; // Page-follow the playhead during playback.
     };
     Layout layout() const { return {namesWidth, defaultTrackHeight, followEnabled}; }
@@ -189,7 +189,7 @@ private:
     // Track names column; drag its edge to resize, within these (and half the
     // timeline's width).
     static constexpr int narrowestNames = 150, widestNames = 420;
-    int namesWidth = 220;
+    int namesWidth = 184;
     // The resize handle is the strip just inside the names column, so clicks
     // on keys and clips at the start of the timeline are never taken.
     bool onNamesEdge(const juce::MouseEvent& event) const { return event.y >= rulerHeight && event.x >= namesWidth - 5 && event.x < namesWidth; }
@@ -237,8 +237,9 @@ private:
     bool effectDragActive = false;
     std::uint64_t previewedRevision = 0;
     // Overlay scroll bars: vertical for rows, horizontal for time (Premiere
-    // style: drag the thumb to scroll, its ends to zoom).
-    static constexpr int barSize = 8, scrollStrip = barSize + 4;
+    // style: drag the thumb to scroll, its ends to zoom). They take the
+    // pointer across barSize but are drawn restingBar thick until hovered.
+    static constexpr int barSize = 8, restingBar = 4, scrollStrip = barSize + 4;
     double timelineSpan() const;
     // Where the composition or its last clip ends.
     double contentEnd() const;
@@ -353,6 +354,9 @@ private:
     // Bands and rows are cards with rounded left ends, inset from the panel
     // edge and separated by one small gap.
     static constexpr int toolsHeight = 26, bandGap = 1, markerBandHeight = 22, cardInset = 4;
+    // Where a top-level track's name starts; the bands' captions and the key
+    // lanes' labels start in line with it.
+    static constexpr int nameX = cardInset + MotionTrackHeader::nameInset;
     static constexpr float cardRadius = 3.0f;
     int markerBandTop() const { return toolsHeight + bandGap; }
     int cameraBandTop() const { return (showsMarkerBand() ? markerBandTop() + markerBandHeight : toolsHeight) + bandGap; }
@@ -453,7 +457,7 @@ private:
     void toggleTrack(motion::Id id, bool solo);
     void placeTrack(motion::Id id, int boundary, motion::Id group);
     void placeGroup(motion::Id id, int boundary, motion::Id parent);
-    // Dragging a track by its grip: the track lifts and follows the pointer,
+    // Dragging a track by its header: the track lifts and follows the pointer,
     // the rows around it ease aside to open the place it will land, and on
     // release it settles there.
     struct TrackDrag {
@@ -533,8 +537,13 @@ private:
     int trackIndex(motion::Id id) const;
     int trackHeight(int track) const;
     void layoutRows() const;
-    // Rows end above the horizontal scroll strip.
-    int viewHeight() const { return std::max(0, getHeight() - rulerHeight - scrollStrip); }
+    // Rows end above the horizontal scroll bar's strip, while it is shown.
+    int viewHeight() const { return std::max(0, getHeight() - rulerHeight - (horizontalBarShown() ? scrollStrip : 0)); }
+    // The horizontal bar comes and goes as the view's span changes: the rows
+    // give up its strip or take it back, keeping the scroll in range.
+    void fitRowsToBar() {
+        if (headerArea.getHeight() != viewHeight()) { resized(); }
+    }
     // Room below the last track for the Add track button and for dropping
     // new tracks, without pushing whole rows off the last page.
     static constexpr int addTrackGap = 4, addTrackHeight = 24, bottomRoom = addTrackGap + addTrackHeight + 12;
@@ -663,6 +672,7 @@ private:
     }
     // A clip or marker drag, or a scrub: what cancelGesture() ends.
     bool clipGesture() const { return active<ClipDrag>() != nullptr || active<MarkerDrag>() != nullptr || active<Scrub>() != nullptr; }
+    // The clip, or group row, under the pointer: its beam share shows.
     motion::Id hoveredClip = 0;
     int hoveredEdge = -1;
 };

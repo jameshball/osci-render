@@ -63,7 +63,8 @@ def visible_header(tree, name):
     node = track(tree, name)
     assert node is not None, "Layer not exposed: " + name
     bounds, area = node["bounds"], timeline(tree)
-    # Rows end above the 12px horizontal scroll strip.
+    # Rows end above the 12px strip of the horizontal scroll bar, which a
+    # 180-second project always shows here.
     assert bounds["y"] >= area["y"] + 26 and bounds["y"] + bounds["h"] <= area["y"] + area["h"] - 12, (name, bounds, area)
     return node
 
@@ -113,9 +114,9 @@ try:
     full_rows, partial = divmod(area["h"] - 48 - 12, 32)
     assert partial >= 4, "Fixture needs a partially visible bottom row"
     # Fit uses a 20px right margin and the project's 180-second duration.
-    pps = (area["w"] - 220 - 20) / 180
+    pps = (area["w"] - 184 - 20) / 180
     row_y = 48 + full_rows * 32 + partial // 2
-    middle = 220 + round(2.5 * pps)
+    middle = 184 + round(2.5 * pps)
     step("move partial-row clip horizontally", "drag", "--class", "MotionTimelineView", "--position", f"{middle},{row_y}", "--dx", "100", "--dy", "0", "--steps", "12")
     step("save partial-row edit", "press", "command + s", "--class", "MotionEditor")
     moved_data = project.read_bytes()

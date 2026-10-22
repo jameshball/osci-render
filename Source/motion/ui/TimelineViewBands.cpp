@@ -32,7 +32,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
     fillCard(g, top, cameraBandHeight, osci::Colours::surfaceRaised(), osci::Colours::surfaceRaised().darker(.15f));
     g.setColour(osci::Colours::textMuted());
     g.setFont(motion::style::caption());
-    g.drawText("Cameras", cardInset + 8, top, namesWidth - 40, cameraBandHeight, juce::Justification::centredLeft);
+    g.drawText("Cameras", nameX, top, addCameraBounds().getX() - 2 - nameX, cameraBandHeight, juce::Justification::centredLeft);
     // The plus adds a camera at the playhead, drawn like an icon button.
     const auto add = addCameraBounds().toFloat();
     if (addHover) {

@@ -72,8 +72,8 @@ try:
     if len(rows) != 2:
         raise RuntimeError("Two generators should make two tracks: " + str(rows))
     step("fit", "press", "F", "--class", "MotionTimelineView")
-    pps = (timeline["w"] - 220 - 20) / 8.0
-    x_of = lambda t: 220 + round(t * pps)
+    pps = (timeline["w"] - 184 - 20) / 8.0
+    x_of = lambda t: 184 + round(t * pps)
     before = durations()
     if before != [5.0, 5.0]:
         raise RuntimeError("Each generator clip starts five seconds long: " + str(before))

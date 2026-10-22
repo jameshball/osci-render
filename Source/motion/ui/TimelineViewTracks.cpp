@@ -45,7 +45,7 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
         menu.addSubMenu("Light preset", presets);
     }
     menu.addSeparator();
-    menu.addItem(motion::style::menuItem("Create composition from selection", 4, "Cmd+Shift+C").setEnabled(!locked && !selectedClips.empty()));
+    menu.addItem(motion::style::menuItem("Make composition", 4, "Cmd+Shift+C").setEnabled(!locked && !selectedClips.empty()));
     if (definition != 0) { menu.addItem(5, "Open composition"); menu.addItem(6, "Make composition unique", !locked); }
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
         if (result >= 39 && result < 40 + static_cast<int>(motion::lightPresets.size())) {

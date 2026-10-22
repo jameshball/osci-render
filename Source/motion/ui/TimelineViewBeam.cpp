@@ -69,6 +69,12 @@ std::optional<juce::Rectangle<float>> MotionTimelineView::groupBeamArea(motion::
 }
 
 void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::Rectangle<float> area, juce::Rectangle<float> body, float opacity) const {
+    const auto* beamDrag = active<BeamDrag>();
+    const auto lit = beamHover == id || (beamDrag != nullptr && beamDrag->id == id);
+    const auto chosen = id == selected || selectedClips.contains(id);
+    // At rest a clip is a plain bar: its share shows under the pointer or on
+    // the selection, and a badge by its name flags a Beam other than 1x.
+    if (!lit && !chosen && hoveredClip != id) { return; }
     const auto* cache = ensureBeamShares();
     if (cache == nullptr) { return; }
     const auto left = std::max(area.getX(), static_cast<float>(namesWidth)), right = std::min(area.getRight(), static_cast<float>(getWidth()));
@@ -93,8 +99,6 @@ void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::
     }
     fill.lineTo(right, area.getBottom());
     fill.closeSubPath();
-    const auto* beamDrag = active<BeamDrag>();
-    const auto lit = beamHover == id || (beamDrag != nullptr && beamDrag->id == id);
     const auto& project = processor.document.project();
     const auto target = motion::findPropertyTarget(project, id);
     const auto* curve = target.has_value() ? target->curve("beam") : nullptr;
@@ -108,7 +112,6 @@ void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::
         // they light up to be dragged.
         g.setColour(juce::Colours::white.withAlpha((lit ? .13f : .075f) * opacity));
         g.fillPath(fill);
-        const auto chosen = id == selected || selectedClips.contains(id);
         if (!lit && !chosen) { return; }
         const auto ink = lit ? motion::style::accent().withAlpha(opacity) : juce::Colours::white.withAlpha(.5f * opacity);
         g.setColour(ink);

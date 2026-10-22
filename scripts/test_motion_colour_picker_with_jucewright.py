@@ -80,7 +80,7 @@ try:
     session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Colour study", "--timeout-ms", 60000)
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
-    step("select clip", "click", "--class", "MotionTimelineView", "--position", "300,64")
+    step("select clip", "click", "--class", "MotionTimelineView", "--position", "264,64")
     command("wait-for-locator", "--name", "Colour swatch", "--exact")
     step("swatch", "screenshot", "--file", session.artifact_dir / "colour-swatch.png", "--scale", 2)
     step("open picker", "click", "--name", "Colour swatch", "--exact")

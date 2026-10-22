@@ -48,18 +48,6 @@ def header(label):
     raise RuntimeError("Missing timeline header " + label)
 
 
-def named(prefix):
-    for node in nodes(snapshot()):
-        if str(node.get("componentName", "")).startswith(prefix):
-            return node
-    raise RuntimeError("Missing " + prefix)
-
-
-def middle(node):
-    bounds = node["bounds"]
-    return [bounds["x"] + bounds["w"] // 2, bounds["y"] + bounds["h"] // 2]
-
-
 def field(label):
     for node in nodes(snapshot()):
         if node.get("componentName") == label:
@@ -85,11 +73,11 @@ try:
     step("grouped screenshot", "screenshot", "--file", session.artifact_dir / "grouped.png", "--scale", "2")
     group_name = groups[0]["value"]
     group_id = groups[0]["componentName"].removeprefix("Track name ")
-    # The group's grip carries it, with both its tracks, below the teapot.
-    grip = middle(named("Reorder track " + group_id))
+    # Dragging the group's header carries it, with both its tracks, below the teapot.
+    group = header(group_name)
     teapot = header("teapot.obj")
     below = max(teapot[1], header("cube.obj")[1], header("cat.svg")[1]) + 60
-    step("drag the group down", "drag-xy", grip[0], grip[1], grip[0], below, "--steps", 12)
+    step("drag the group down", "drag-xy", group[0], group[1], group[0], below, "--steps", 12)
     session.wait_for_undo("Move group")
     if not header(group_name)[1] > header("teapot.obj")[1] or not header("cube.obj")[1] > header("teapot.obj")[1] or not header("cat.svg")[1] > header("teapot.obj")[1]:
         raise RuntimeError("The group and its tracks should move below the teapot together")

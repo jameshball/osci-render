@@ -17,6 +17,9 @@ MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : proces
         processor.document.changeView([](motion::Composition& state) { state.gridSnap = !state.gridSnap; });
     };
     snapButton.setClickingTogglesState(false);
+    // A switch rather than a sixth tool: on, its glyph brightens with no fill
+    // behind it, so a filled square only ever marks the tool in use.
+    snapButton.onColour = juce::Colours::transparentBlack;
     addAndMakeVisible(snapButton);
     // The editing tools, as in Premiere's tool strip.
     for (auto [button, value, tip] : {std::tuple {&selectTool, Tool::move, "Select, move and trim (V)"}, std::tuple {&slipTool, Tool::slip, "Slip: move the content inside a clip (S)"},
@@ -32,8 +35,9 @@ MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : proces
     headerArea.setInterceptsMouseClicks(false, true);
     addAndMakeVisible(headerArea);
     // Add track sits under the last track and scrolls with the list. Its
-    // plus lines up with the grips above, its text with the track names.
-    addTrack.leading = 18;
+    // plus lines up with the fold triangles above, its text with the track
+    // names.
+    addTrack.leading = MotionTrackHeader::edge + MotionTrackHeader::foldWidth / 2 - static_cast<int>(addTrack.iconSize) / 2;
     addTrack.gap = 3;
     headerArea.addAndMakeVisible(addTrack);
     setWantsKeyboardFocus(true);
@@ -316,6 +320,7 @@ void MotionTimelineView::revealTime(double seconds) {
     const auto visible = std::max(1, getWidth() - namesWidth - 20) / pixelsPerSecond;
     if (seconds < scrollTime || seconds > scrollTime + visible) {
         scrollTime = std::max(0.0, seconds - visible * .5);
+        fitRowsToBar();
         repaint();
     }
 }
@@ -329,7 +334,13 @@ void MotionTimelineView::setTool(Tool next) {
 
 // The tool strip shows the tool in use and whether snapping is on.
 void MotionTimelineView::updateToolButtons() {
-    snapButton.setToggleState(processor.document.project().gridSnap, juce::dontSendNotification);
+    const auto snap = processor.document.project().gridSnap;
+    const auto glyph = snap ? osci::Colours::text() : osci::Colours::textMuted().withAlpha(.6f);
+    if (snapButton.tint != glyph) {
+        snapButton.tint = glyph;
+        snapButton.repaint();
+    }
+    snapButton.setToggleState(snap, juce::dontSendNotification);
     selectTool.setToggleState(tool == Tool::move, juce::dontSendNotification);
     slipTool.setToggleState(tool == Tool::slip, juce::dontSendNotification);
     stretchTool.setToggleState(tool == Tool::stretch, juce::dontSendNotification);
@@ -755,9 +766,11 @@ void MotionTimelineView::paintBake(juce::Graphics& g) const {
     const auto first = std::max(strip.getX(), timeX(0));
     const auto last = std::min(strip.getRight(), timeX(bake->timeOf(bake->frameCount())));
     using State = motion::hidden::Bake::State;
+    // Neutral, so it never reads as a loop or a selection: the frames being
+    // baked brightest, those baked dimmer, those waiting faintest.
     const auto colour = [opacity](State state) {
-        const auto base = state == State::done ? motion::style::accent().withAlpha(.75f) : osci::Colours::text().withAlpha(state == State::baking ? .55f : .16f);
-        return base.withMultipliedAlpha(static_cast<float>(opacity));
+        const auto alpha = state == State::done ? .35f : state == State::baking ? .6f : .12f;
+        return osci::Colours::text().withAlpha(alpha * static_cast<float>(opacity));
     };
     // Each column shows the least done of its frames; runs of one state are
     // one rectangle.
@@ -870,7 +883,8 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     if (showsMarkerBand()) {
         g.setColour(osci::Colours::textMuted());
         g.setFont(motion::style::caption());
-        g.drawText(processor.document.project().tempoChanges != nullptr ? "Markers / tempo" : "Markers", cardInset + 8, markerBandTop(), namesWidth - 24, markerBandHeight, juce::Justification::centredLeft);
+        // Tempo changes label themselves on their flags.
+        g.drawText("Markers", nameX, markerBandTop(), namesWidth - nameX - 12, markerBandHeight, juce::Justification::centredLeft);
         const auto& project = processor.document.project();
         if (project.tempoChanges != nullptr) {
             const auto tempo = project.tempo();
@@ -938,8 +952,11 @@ void MotionTimelineView::paint(juce::Graphics& g) {
             g.fillRect(0, rowY(row) + heightOf(static_cast<std::size_t>(row)) - 2, getWidth(), 2);
         }
     }
-    g.setColour(osci::Colours::veryDark().darker(.25f));
-    g.fillRect(0, getHeight() - scrollStrip, getWidth(), scrollStrip);
+    // The horizontal bar's strip, under the time area only, while it is shown.
+    if (horizontalBarShown()) {
+        g.setColour(osci::Colours::veryDark().darker(.25f));
+        g.fillRect(namesWidth, getHeight() - scrollStrip, getWidth() - namesWidth, scrollStrip);
+    }
     paintScrollBars(g);
     // A box being dragged to pick clips or keys, over every row it crosses.
     const auto* clipMarquee = active<ClipMarquee>();
@@ -952,8 +969,11 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         g.drawRect(*box);
     }
     paintPlayhead(g);
-    if (tracks.empty()) {
-        g.setColour(osci::Colours::text().withAlpha(0.55f));
+    // The Scene's hint is the empty editor's one call to action; this one
+    // answers a source dragged over an empty timeline.
+    if (tracks.empty() && dropPosition.has_value() && dropAssetId != 0) {
+        g.setColour(osci::Colours::textMuted());
+        g.setFont(motion::style::caption());
         g.drawText("Drop sources here", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);
     }
 }
@@ -1184,7 +1204,7 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
         tip = juce::String(clip->name) + "\n" + grid.positionLabel(timing.start) + " - " + grid.positionLabel(timing.end()) + "  (" + grid.durationLabel(timing.start, timing.end()) + ")";
     }
     if (getTooltip() != tip) { setTooltip(tip); }
-    const auto hovered = clip != nullptr ? clip->id : 0;
+    const auto hovered = clip != nullptr ? clip->id : event.x >= namesWidth ? groupAtY(event.y) : 0;
     if (hovered != hoveredClip) { hoveredClip = hovered; repaint(); }
     const auto inBand = inCameraBand(event.y) && event.x >= namesWidth;
     const auto* hoveredCut = inBand ? cutAt(event.getPosition()) : nullptr;
@@ -1243,15 +1263,22 @@ juce::Rectangle<int> MotionTimelineView::verticalThumb() const {
 }
 
 void MotionTimelineView::paintScrollBars(juce::Graphics& g) const {
-    const auto draw = [&](juce::Rectangle<int> bar, juce::Rectangle<int> thumb, bool hot) {
-        g.setColour(juce::Colours::white.withAlpha(.04f));
-        g.fillRoundedRectangle(bar.toFloat(), barSize * .5f);
+    // At rest only a slim thumb along the outer edge, clear of the clips'
+    // ends and trim grips; hovered or dragged, the full bar and its track.
+    const auto draw = [&](juce::Rectangle<int> bar, juce::Rectangle<int> thumb, bool hot, bool horizontal) {
+        if (hot) {
+            g.setColour(juce::Colours::white.withAlpha(.04f));
+            g.fillRoundedRectangle(bar.toFloat(), barSize * .5f);
+        } else {
+            thumb = horizontal ? thumb.removeFromBottom(restingBar) : thumb.removeFromRight(restingBar);
+        }
         g.setColour(juce::Colours::white.withAlpha(hot ? .4f : .2f));
-        g.fillRoundedRectangle(thumb.toFloat(), barSize * .5f);
+        g.fillRoundedRectangle(thumb.toFloat(), (hot ? barSize : restingBar) * .5f);
     };
-    const auto grabbed = active<BarDrag>() != nullptr;
-    if (horizontalBarShown()) { draw(horizontalBar(), horizontalThumb(), grabbed || hoveredBar == 1); }
-    if (verticalBarShown()) { draw(verticalBar(), verticalThumb(), grabbed || hoveredBar == 2); }
+    const auto* drag = active<BarDrag>();
+    const auto vertical = drag != nullptr && drag->mode == BarDrag::Mode::scrollRows;
+    if (horizontalBarShown()) { draw(horizontalBar(), horizontalThumb(), (drag != nullptr && !vertical) || hoveredBar == 1, true); }
+    if (verticalBarShown()) { draw(verticalBar(), verticalThumb(), vertical || hoveredBar == 2, false); }
 }
 
 int MotionTimelineView::barAt(juce::Point<int> point) const {
@@ -1898,6 +1925,7 @@ void MotionTimelineView::zoomAround(int x, double factor) {
 void MotionTimelineView::userScrolled() {
     viewAnimation.stopTimer();
     follow.userMoved();
+    fitRowsToBar();
 }
 
 void MotionTimelineView::scaleTrackHeights(int y, double factor) {
@@ -1942,6 +1970,7 @@ void MotionTimelineView::followPlayhead(double time, bool playing) {
     const auto visible = x >= namesWidth && x <= getWidth() - 16;
     if (!follow.update(playing, visible) || !followEnabled || clipGesture() || getWidth() <= namesWidth) { return; }
     scrollTime = std::max(0.0, time - 16 / pixelsPerSecond);
+    fitRowsToBar();
     repaint();
 }
 
@@ -2195,12 +2224,6 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
         const auto font = g.getCurrentFont();
         const auto textWidth = juce::TextLayout::getStringWidth(font, label);
         const auto fill = (hovered ? base.brighter(.1f) : base).withAlpha(opacity);
-        // The name sits on the clip's own colour, so the beam share's edge
-        // below never runs through it.
-        if (!audio) {
-            g.setColour(fill);
-            g.fillRoundedRectangle(labelBounds.withX(labelBounds.getX() - 3).withWidth(std::min(textWidth + 6, labelBounds.getWidth() + 3)).withSizeKeepingCentre(std::min(textWidth + 6, labelBounds.getWidth() + 3), font.getHeight() + 2), 3);
-        }
         // A muted track's names stay legible (3:1 or better) while its fills dim.
         g.setColour(juce::Colours::white.withAlpha((active ? 1.0f : .88f) * std::max(opacity, .6f)));
         g.drawText(label, labelBounds.withWidth(std::max(labelBounds.getWidth(), 2000.0f)), juce::Justification::centredLeft, false);
@@ -2230,7 +2253,8 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
     // as light as it, with the axis colour as a dot and on its keys.
     fillCard(g, y, height - bandGap, osci::Colours::surface(), osci::Colours::surfaceSunken());
     const auto colour = row.colour;
-    const auto indent = std::min(64, row.depth * 16) + 30;
+    // The label starts where its track's name does, the dot just before it.
+    const auto indent = std::min(64, row.depth * 16) + nameX - 12;
     g.setColour(colour.withAlpha(.85f));
     g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(indent) + 3.0f, y + (height - bandGap) * .5f}));
     g.setFont(motion::style::caption());
@@ -2357,7 +2381,7 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
     for (int level = 0; level < std::min(row.depth, 4); ++level) {
         g.setColour(motion::style::compositionClip().brighter(.7f).withAlpha(.75f));
         // Under the group's fold triangle.
-        g.fillRect(cardInset + 10 + level * 16, y - bandGap, 2, height);
+        g.fillRect(cardInset + MotionTrackHeader::edge + MotionTrackHeader::foldWidth / 2 - 1 + level * 16, y - bandGap, 2, height);
     }
     if (index < 0) {
         g.setColour(motion::style::compositionClip().withAlpha(0.45f));

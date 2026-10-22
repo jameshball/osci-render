@@ -70,25 +70,26 @@ try:
     step("commit track name", "press", "Return")
     wait_undo("Rename track")
     tree = snapshot()
-    grip = find(tree, lambda node: node.get("componentName") == "Reorder track " + track_id)["bounds"]
+    # A track moves by dragging its header, here by its name.
+    name = find(tree, lambda node: node.get("componentName") == "Track name " + track_id)["bounds"]
     timeline = find(tree, lambda node: node.get("class") == "MotionTimelineView")["bounds"]
-    step("reorder layers", "drag-xy", grip["x"] + grip["w"] // 2, grip["y"] + grip["h"] // 2,
+    step("reorder layers", "drag-xy", name["x"] + name["w"] // 2, name["y"] + name["h"] // 2,
          timeline["x"] + 20, timeline["y"] + 109, "--steps", 20)
     wait_undo("Reorder track")
-    after = find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + track_id)["bounds"]
-    if after["y"] <= grip["y"]:
+    after = find(snapshot(), lambda node: node.get("componentName") == "Track name " + track_id)["bounds"]
+    if after["y"] <= name["y"]:
         raise RuntimeError("Track header did not move down")
     step("undo reorder", "click", "--name", "Undo", "--exact")
-    restored = find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + track_id)["bounds"]
-    if restored["y"] != grip["y"]:
+    restored = find(snapshot(), lambda node: node.get("componentName") == "Track name " + track_id)["bounds"]
+    if restored["y"] != name["y"]:
         raise RuntimeError("Track order did not restore")
-    step("track actions", "click", "--component-name", "Reorder track " + track_id, "--exact")
+    step("track actions", "click", "--component-name", "Track name " + track_id, "--exact", "--button", "right")
     step("delete populated track", "click", "--name", "Delete track", "--role", "menuItem", "--exact")
     wait_undo("Delete track")
-    if find(snapshot(), lambda node: node.get("componentName") == "Reorder track " + track_id) is not None:
+    if find(snapshot(), lambda node: node.get("componentName") == "Track name " + track_id) is not None:
         raise RuntimeError("Deleted track header remains")
     step("undo track deletion", "click", "--name", "Undo", "--exact")
-    command("wait-for-locator", "--component-name", "Reorder track " + track_id, "--exact")
+    command("wait-for-locator", "--component-name", "Track name " + track_id, "--exact")
     step("tracks screenshot", "screenshot", "--file", session.artifact_dir / "track-controls.png")
     print("Motion track controls smoke passed", flush=True)
 finally:

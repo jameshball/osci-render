@@ -110,7 +110,7 @@ try:
     # Detection switches the ruler to bars in the same step, and the clip's
     # timing (in Properties) then shows bars.beats.
     assert tree.get("timeDisplay") == "2", tree.attrib
-    step("select soundtrack", "click", "--class", "MotionTimelineView", "--position", "450,64")
+    step("select soundtrack", "click", "--class", "MotionTimelineView", "--position", "414,64")
     command("wait", "--ms", 300)
     tree = json.loads(command("snapshot", "--json", "--full"))
     start = next((node for node in nodes(tree) if node.get("componentName") == "Clip start" and node.get("visible")), None)
@@ -126,7 +126,7 @@ try:
     bpm = float(saved().get("bpm"))
     assert 60 <= bpm <= 200 and abs(bpm - 128) > 0.5, bpm
     # A new tempo change that glides in from the previous tempo.
-    step("ruler menu", "click", "--class", "MotionTimelineView", "--position", "950,12", "--button", "right")
+    step("ruler menu", "click", "--class", "MotionTimelineView", "--position", "914,12", "--button", "right")
     step("add tempo", "click", "--name", "Add tempo change here...", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Tempo change BPM", "--timeout-ms", 10000)
     step("bpm", "fill", "--name", "Tempo change BPM", "--class", "juce::TextEditor", "--exact", "90")

@@ -33,17 +33,15 @@ public:
         lock.setOnColour(motion::style::trackLock());
         // Off, a switch is just its letter or glyph; on, it fills.
         for (auto* chip : {&mute, &solo, &lock}) { chip->quiet = true; }
-        setRepaintsOnMouseActivity(true);
         // The glyph matches the M and S letters' height.
         lock.iconSize = 10.0f;
-        // A click opens the menu; a drag moves the track instead. The open
-        // hand says so; a tooltip window would reset the cursor on macOS.
-        grip.onClick = [this] { if (gripTravel < 4 && onMenu) { onMenu(id); } };
-        grip.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
-        grip.addMouseListener(this, false);
-        for (auto* child : std::initializer_list<juce::Component*> { &name, &mute, &solo, &grip }) { addAndMakeVisible(child); }
+        // The padlock shows only on a locked track or the row under the
+        // pointer, which every part of the header reports.
+        addMouseListener(&hover, true);
+        for (auto* child : std::initializer_list<juce::Component*> { &name, &mute, &solo }) { addAndMakeVisible(child); }
         addChildComponent(lock);
     }
+    ~MotionTrackHeader() override { removeMouseListener(&hover); }
     void update(const motion::Track& track, bool group = false, bool collapsed = false, bool lanes = false, bool expanded = false) {
         if (isGroup != group) {
             isGroup = group;
@@ -65,16 +63,15 @@ public:
         name.setName("Track name " + juce::String(track.id));
         mute.setName("Mute track " + juce::String(track.id));
         solo.setName("Solo track " + juce::String(track.id));
-        grip.setName("Reorder track " + juce::String(track.id));
         name.setTitle(label);
         mute.setTitle("Mute " + label);
         solo.setTitle("Solo " + label);
-        grip.setTitle("Reorder " + label);
         lock.setName("Lock track " + juce::String(track.id));
         lock.setTitle("Lock " + label);
         mute.setToggleState(track.muted, juce::dontSendNotification);
         solo.setToggleState(track.solo, juce::dontSendNotification);
         lock.setToggleState(track.locked, juce::dontSendNotification);
+        showLock();
     }
     // The composition's own row: its effects, which act on everything. It
     // can only show its key lanes; there is nothing to mute, lock or move.
@@ -85,7 +82,7 @@ public:
         disclosure.setName("Key lanes composition");
         disclosure.setTitle("Key lanes of the composition's effects");
         disclosure.setTooltip("Show or hide the effects' key lanes");
-        for (auto* control : std::initializer_list<juce::Component*> {&mute, &solo, &lock, &grip}) { control->setVisible(false); }
+        for (auto* control : std::initializer_list<juce::Component*> {&mute, &solo, &lock}) { control->setVisible(false); }
         name.setEditable(false, false);
         name.setFont(motion::style::body());
         name.setText("Composition", juce::dontSendNotification);
@@ -98,12 +95,14 @@ public:
     // the other rows; the header itself stays in place, unseen, to keep
     // receiving the drag.
     void setLifted(bool value) { setAlpha(value ? 0.0f : 1.0f); }
-    // One compact line: [fold/lanes] [grip] name ... [M][S][L]
+    // Where the name's text starts, from the header's left edge: the timeline
+    // starts its band captions and lane labels there too.
+    static constexpr int edge = 3, foldWidth = 14, namePad = 4, nameInset = edge + foldWidth + namePad;
+    // One compact line: [fold/lanes] name ... [M][S][L]
     void resized() override {
         // Controls stay on one top line however tall the row is.
-        auto bounds = getLocalBounds().removeFromTop(std::min(getHeight(), 28)).reduced(3, 0);
-        disclosure.setBounds(bounds.removeFromLeft(16));
-        grip.setBounds(bounds.removeFromLeft(14));
+        auto bounds = getLocalBounds().removeFromTop(std::min(getHeight(), 28)).reduced(edge, 0);
+        disclosure.setBounds(bounds.removeFromLeft(foldWidth));
         // Three fixed 18 px slots, so every row's switches line up; a group
         // leaves its lock slot empty.
         constexpr int chip = 18, spacing = 1;
@@ -114,7 +113,7 @@ public:
         }
         // A group shows a folder before its name; the composition its effects' glyph.
         folderArea = isGroup || isComposition ? bounds.removeFromLeft(18).toFloat() : juce::Rectangle<float>();
-        name.setBounds(bounds.reduced(4, 0).withSizeKeepingCentre(bounds.getWidth() - 8, 18));
+        name.setBounds(bounds.reduced(namePad, 0).withSizeKeepingCentre(bounds.getWidth() - 2 * namePad, 18));
     }
     void paintOverChildren(juce::Graphics& g) override {
         if (!folderArea.isEmpty()) { motion::icons::draw(g, isComposition ? motion::icons::Icon::effects : motion::icons::Icon::folder, folderArea, osci::Colours::text().withAlpha(.7f), 14.0f); }
@@ -122,51 +121,64 @@ public:
     void mouseDown(const juce::MouseEvent& event) override {
         // Right-click anywhere on the header opens the track's menu.
         if (event.mods.isPopupMenu()) {
+            travel = -1;
             if (onMenu) { onMenu(id); }
             return;
         }
-        if (event.eventComponent == &grip) { gripTravel = 0; }
+        travel = event.mods.isLeftButtonDown() ? 0 : -1;
         // Anywhere on the header but its buttons selects the track or group.
-        if ((event.eventComponent == &name || event.eventComponent == this) && onSelect) { onSelect(id, event.mods); }
+        if (onSelect) { onSelect(id, event.mods); }
     }
-    // Dragging the grip moves the track, or a group with all it holds: the
-    // timeline lifts it and slides the other rows aside.
+    // Dragging the header, by its name or the space around it, moves the
+    // track, or a group with all it holds: the timeline lifts it and slides
+    // the other rows aside. A press that moves less than 4 px stays a click.
     void mouseDrag(const juce::MouseEvent& event) override {
-        if (event.eventComponent != &grip) { return; }
-        gripTravel = std::max(gripTravel, event.getDistanceFromDragStart());
-        if (gripTravel >= 4 && onReorder) {
-            // The hand closes on the track while it is carried.
-            if (!grabbing) {
-                grabbing = true;
-                grip.setMouseCursor(motion::grabbingCursor());
-                grip.updateMouseCursor();
-            }
-            onReorder(id, event.getScreenPosition(), false);
-        }
+        if (travel < 0 || !onReorder) { return; }
+        travel = std::max(travel, event.getDistanceFromDragStart());
+        if (travel < 4) { return; }
+        // The hand closes on the track while it is carried.
+        if (!carried) { carry(true); }
+        onReorder(id, event.getScreenPosition(), false);
     }
     void mouseUp(const juce::MouseEvent& event) override {
-        if (grabbing) {
-            grabbing = false;
-            grip.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
-            grip.updateMouseCursor();
-        }
-        if (event.eventComponent != &grip || gripTravel < 4) { return; }
-        // The button has already ignored this release as a click; later
-        // clicks (or an accessibility press) open the menu again.
-        gripTravel = 0;
+        travel = -1;
+        if (!carried) { return; }
+        carry(false);
         if (onReorder) { onReorder(id, event.getScreenPosition(), true); }
+    }
+    // Screen readers reach the menu that a right-click opens.
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override {
+        return std::make_unique<juce::AccessibilityHandler>(*this, juce::AccessibilityRole::group, juce::AccessibilityActions().addAction(juce::AccessibilityActionType::showMenu, [this] { if (onMenu) { onMenu(id); } }));
     }
     const motion::Id id;
     std::function<void(motion::Id, std::string)> onRename;
     std::function<void(motion::Id)> onMute, onSolo, onMenu, onCollapse, onLanes, onLock;
     // Cmd adds or removes the track from a selection; Shift takes a run.
     std::function<void(motion::Id, juce::ModifierKeys)> onSelect;
-    // The grip's drag, in screen coordinates; `finished` on release.
+    // The header's drag, in screen coordinates; `finished` on release.
     std::function<void(motion::Id, juce::Point<int>, bool finished)> onReorder;
 private:
-    bool isGroup = false, isComposition = false, grabbing = false;
+    bool isGroup = false, isComposition = false, carried = false;
     juce::Rectangle<float> folderArea;
-    int gripTravel = 0;
+    // How far the pointer has moved since a left press; -1 with none.
+    int travel = -1;
+    void carry(bool value) {
+        carried = value;
+        const auto cursor = value ? motion::grabbingCursor() : juce::MouseCursor(juce::MouseCursor::NormalCursor);
+        for (auto* part : std::initializer_list<juce::Component*> { this, &name }) {
+            part->setMouseCursor(cursor);
+            part->updateMouseCursor();
+        }
+    }
+    // Hidden, an unlocked padlock still takes clicks and keeps its slot, so
+    // M and S stay in line.
+    void showLock() { lock.setAlpha(lock.getToggleState() || isMouseOver(true) ? 1.0f : 0.0f); }
+    struct Hover final : juce::MouseListener {
+        explicit Hover(MotionTrackHeader& owner) : header(owner) {}
+        void mouseEnter(const juce::MouseEvent&) override { header.showLock(); }
+        void mouseExit(const juce::MouseEvent&) override { header.showLock(); }
+        MotionTrackHeader& header;
+    } hover {*this};
     class FoldButton : public juce::TextButton {
         void paintButton(juce::Graphics& g, bool over, bool) override {
             g.setColour(osci::Colours::text().withAlpha(over ? 1.0f : 0.65f));
@@ -178,19 +190,6 @@ private:
         }
     } disclosure;
     juce::Label name;
-    class ReorderHandle : public juce::TextButton {
-        void paintButton(juce::Graphics& g, bool over, bool down) override {
-            // Only while the row is under the pointer: a column of grips is noise.
-            const auto* row = getParentComponent();
-            if (!over && !down && (row == nullptr || !row->isMouseOver(true))) { return; }
-            g.setColour(osci::Colours::text().withAlpha(over || down ? 0.9f : 0.4f));
-            for (int row = -1; row <= 1; ++row) {
-                for (int column = 0; column < 2; ++column) {
-                    g.fillEllipse(getWidth() * 0.5f - 4 + column * 5, getHeight() * 0.5f - 1 + row * 5, 2, 2);
-                }
-            }
-        }
-    } grip;
     motion::ui::Chip lock {"Lock", motion::icons::Icon::lock};
     motion::ui::Chip mute {"M"}, solo {"S"};
 };

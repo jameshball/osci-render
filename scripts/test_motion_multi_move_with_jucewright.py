@@ -83,7 +83,7 @@ try:
     scene = next(n["bounds"] for n in nodes(tree) if n.get("class") == "MotionCompositionView")
     rows = sorted(n["bounds"]["y"] + n["bounds"]["h"] // 2 - timeline["y"] for n in nodes(tree) if n.get("class") == "MotionTrackHeader")
     step("fit", "press", "F", "--class", "MotionTimelineView")
-    x = 220 + round(2 * (timeline["w"] - 240) / 8.0)
+    x = 184 + round(2 * (timeline["w"] - 184 - 20) / 8.0)
     step("select star", "click", "--class", "MotionTimelineView", "--position", f"{x},{rows[0]}")
     step("select both", "press", "command + a", "--class", "MotionTimelineView")
     before = values("position.x")
