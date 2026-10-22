@@ -44,6 +44,12 @@ MotionProcessor::MotionProcessor()
         // The project's rate, resampled to the device as it plays, and its
         // export frame as the Scope's canvas.
         setProcessingSampleRate(document.mainProject().sampleRate);
+        // Without an audio device (none, or one that failed to open) nothing
+        // prepares, so the project's rate is used as it would be prepared.
+        const auto projectRate = document.mainProject().sampleRate;
+        if (!devicePrepared.load() && supportsInternalSampleRateOverride() && projectRate > 0) {
+            requestedSampleRate.store(juce::jlimit(ProjectRateAdapter::lowestRate, ProjectRateAdapter::highestRate, projectRate));
+        }
         const auto& exporting = document.mainProject().exportSettings;
         const VisualiserRenderSize frame {exporting.width, exporting.height};
         if (!(recordingParameters.getCanvasSize() == frame)) { recordingParameters.setCanvasSize(frame); }
@@ -123,6 +129,7 @@ void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlo
     audioSample = motion::sampleIndex(audioTime, sampleRate).value_or(0);
     oscillatorSample = audioSample;
     requestedSampleRate.store(sampleRate);
+    devicePrepared.store(true);
     triggerAsyncUpdate();
     transitionGuard.begin();
 }

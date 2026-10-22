@@ -286,9 +286,9 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
             detail += motion::style::dot() + juce::String(asset.source->duration(), 1) + " s";
         }
-        // Its linked file wasn't found: its edit button finds it again.
+        // Its linked file wasn't found, or changed: its edit button finds it again.
         if (asset.missing) {
-            detail = "File missing";
+            detail = asset.linked.existsAsFile() ? "File changed" : "File missing";
             graphics.setColour(motion::style::error());
         }
     }

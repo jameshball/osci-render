@@ -3,6 +3,7 @@
 #include "CaptureEnding.h"
 #include "LiveSourceFrames.h"
 #include "TextureSource.h"
+#include "../import/BakedSourceArchive.h"
 #include "../import/RasterBeamBuilder.h"
 #include "../model/Document.h"
 #include <osci_texture_interop/osci_texture_interop.h>
@@ -14,6 +15,9 @@ namespace motion {
 // arrived, from the start of the capture, and why it ended if by itself.
 struct TextureCapture {
     static constexpr std::size_t maximumBytes = 192 * 1024 * 1024;
+    // What it is saved as, packed: room to spare in a baked source's archive,
+    // since each frame is packed on its own to measure it.
+    static constexpr std::uint64_t maximumPackedBytes = BakedSourceArchive::maximumCompressedBytes / 8 * 7;
     static constexpr double frameRate = 30;
     double duration = 0;
     std::size_t pointsPerFrame = 0;
@@ -22,9 +26,32 @@ struct TextureCapture {
     std::size_t bytes = 0;
     CaptureEnding ending = CaptureEnding::none;
 
-    // At a steady rate, each frame what had arrived by then.
+    // The steady frames `seconds` of it make.
+    static std::uint64_t steadyFrames(double seconds) { return static_cast<std::uint64_t>(std::max(1.0, std::ceil(seconds * frameRate))); }
+    // Takes a frame that arrived `time` seconds in, and how small it packs
+    // (0 for a blank one), unless what it's saved as would then not fit.
+    // A frame shows from the first steady frame at or after it arrived until
+    // the next takes over, and the archive can't fold one repeat into the
+    // next (deflate looks back only 32 KiB), so each repeat costs it again.
+    bool add(double time, std::vector<PointSample>&& frame, std::size_t packedSize) {
+        const auto start = times.empty() ? std::uint64_t {0} : std::max(lastStart, static_cast<std::uint64_t>(std::ceil(time * frameRate)));
+        const auto settledThen = packed + lastPacked * (start - lastStart);
+        if (start >= mostFrames(settledThen, start, packedSize)) { return false; }
+        bytes += frame.size() * sizeof(PointSample);
+        times.push_back(time);
+        frames.push_back(std::move(frame));
+        packed = settledThen;
+        lastStart = start;
+        lastPacked = packedSize;
+        return true;
+    }
+    // Whether `seconds` of it fill all a saved capture can hold.
+    bool full(double seconds) const { return steadyFrames(seconds) >= mostFrames(packed, lastStart, lastPacked); }
+
+    // At a steady rate, each frame what had arrived by then. A capture that
+    // ran on past what it can hold (by a moment) keeps what fits.
     PreparedPointFrames::Result steady() const {
-        const auto count = static_cast<std::uint64_t>(std::max(1.0, std::ceil(duration * frameRate)));
+        const auto count = std::min(steadyFrames(duration), mostFrames(packed, lastStart, lastPacked));
         const auto error = PreparedPointFrames::validate(frameRate, count, pointsPerFrame);
         if (!error.empty()) { return {nullptr, error}; }
         std::vector<PointSample> points;
@@ -42,6 +69,22 @@ struct TextureCapture {
         }
         return PreparedPointFrames::create(frameRate, count, pointsPerFrame, std::move(points));
     }
+
+private:
+    // The most steady frames it can save, packed: `settled` bytes before
+    // frame `start`, then `each` for every frame from there.
+    std::uint64_t mostFrames(std::uint64_t settled, std::uint64_t start, std::uint64_t each) const {
+        auto most = std::min<std::uint64_t>(PreparedPointFrames::maximumFrames, PreparedPointFrames::maximumBytes / sizeof(PointSample) / std::max<std::size_t>(1, pointsPerFrame));
+        if (settled > maximumPackedBytes) {
+            most = std::min(most, start);
+        } else if (each > 0) {
+            most = std::min(most, start + (maximumPackedBytes - settled) / each);
+        }
+        return std::max<std::uint64_t>(1, most);
+    }
+    // Packed bytes of the steady frames before the newest arrival's first,
+    // which is `lastStart`, and how small that one packs.
+    std::uint64_t packed = 0, lastStart = 0, lastPacked = 0;
 };
 
 // One shared picture: received on its own GL thread and fitted small at
@@ -66,13 +109,15 @@ public:
     void connect(const osci::texture::SourceInfo& source) {
         disconnect();
         sourceId = source.opaqueId;
-        stopped.store(false);
+        // Its own flag: the grabber may post that it stopped or failed after
+        // it (or this) is gone, and only to this connection.
+        stopped = std::make_shared<std::atomic<bool>>(false);
         grabber = std::make_unique<osci::texture::OpenGLTextureFrameGrabber>(source);
         // Frames flow once it has started (it says so with its first).
         grabber->inputStarted = [](juce::String, int, int) {};
         grabber->frameReady = [this](const std::vector<std::uint8_t>& rgba, int width, int height, bool bottomUp) { received(rgba, width, height, bottomUp); };
-        grabber->inputStopped = [this] { stopped.store(true); };
-        grabber->inputFailed = [this](juce::String) { stopped.store(true); };
+        grabber->inputStopped = [flag = stopped] { flag->store(true); };
+        grabber->inputFailed = [flag = stopped](juce::String) { flag->store(true); };
         grabber->start();
     }
     void disconnect() {
@@ -84,8 +129,8 @@ public:
     void letGo() { grabber = nullptr; }
     // Which sender it receives from: one instance of it, while it lasts.
     const juce::String& connectedTo() const { return sourceId; }
-    bool connected() const { return grabber != nullptr && !stopped.load(); }
-    bool stoppedSending() const { return grabber != nullptr && stopped.load(); }
+    bool connected() const { return grabber != nullptr && !stopped->load(); }
+    bool stoppedSending() const { return grabber != nullptr && stopped->load(); }
     std::uint64_t tracedFrames() const { return traced.load(); }
     std::shared_ptr<const PreparedSource> frame() const {
         const juce::SpinLock::ScopedLockType lock(latestLock);
@@ -106,6 +151,7 @@ public:
     }
     std::unique_ptr<TextureCapture> finishCapture() {
         const juce::SpinLock::ScopedLockType lock(captureLock);
+        limitLocked();
         if (capture != nullptr && capture->ending == CaptureEnding::none) { capture->duration = now() - captureStart; }
         return std::move(capture);
     }
@@ -114,6 +160,12 @@ public:
     void endCapture(CaptureEnding why) {
         const juce::SpinLock::ScopedLockType lock(captureLock);
         endLocked(why);
+    }
+    // Stops recording once it holds all it can be saved with: frames that
+    // arrive slowly, or a still picture, still fill it as time passes.
+    void limitCapture() {
+        const juce::SpinLock::ScopedLockType lock(captureLock);
+        limitLocked();
     }
     bool capturing() const {
         const juce::SpinLock::ScopedLockType lock(captureLock);
@@ -131,6 +183,10 @@ public:
 
 private:
     static double now() { return juce::Time::getMillisecondCounterHiRes() / 1000.0; }
+    // Ends a capture that holds all it can be saved with, now.
+    void limitLocked() {
+        if (capture != nullptr && capture->ending == CaptureEnding::none && capture->full(now() - captureStart)) { endLocked(CaptureEnding::size); }
+    }
     void endLocked(CaptureEnding why) {
         if (capture == nullptr || capture->ending != CaptureEnding::none) { return; }
         capture->ending = why;
@@ -184,6 +240,8 @@ private:
                 latest = source;
             }
             traced.fetch_add(1);
+            // Measured outside the lock, so the message thread never waits on it.
+            const auto packed = !kept.empty() && capturing() ? packedSize(kept) : 0;
             const juce::SpinLock::ScopedLockType lock(captureLock);
             if (capture == nullptr || capture->ending != CaptureEnding::none) { continue; }
             const auto bytes = kept.size() * sizeof(PointSample);
@@ -191,20 +249,32 @@ private:
                 endLocked(capture->bytes + bytes > TextureCapture::maximumBytes ? CaptureEnding::size : CaptureEnding::updates);
                 continue;
             }
-            capture->times.push_back(now() - captureStart);
-            capture->frames.push_back(std::move(kept));
-            capture->bytes += bytes;
+            // A frame of another size is saved blank.
+            const auto blank = kept.size() != capture->pointsPerFrame;
+            if (!capture->add(now() - captureStart, std::move(kept), blank ? 0 : packed)) {
+                endLocked(CaptureEnding::size);
+                continue;
+            }
+            limitLocked();
         }
+    }
+    // How small a frame packs on its own, as its saved capture is packed.
+    std::size_t packedSize(const std::vector<PointSample>& frame) {
+        const auto size = frame.size() * sizeof(PointSample);
+        packing.resize(compressBound(static_cast<uLong>(size)));
+        auto packedBytes = static_cast<uLongf>(packing.size());
+        const auto status = compress2(packing.data(), &packedBytes, reinterpret_cast<const Bytef*>(frame.data()), static_cast<uLong>(size), 6);
+        return status == Z_OK ? static_cast<std::size_t>(packedBytes) : size;
     }
 
     std::unique_ptr<osci::texture::OpenGLTextureFrameGrabber> grabber;
-    std::atomic<bool> stopped {false};
+    std::shared_ptr<std::atomic<bool>> stopped = std::make_shared<std::atomic<bool>>(false);
     juce::String sourceId;
     std::atomic<bool> stopping {false};
     std::atomic<int> dimension {RasterSettings().resolution};
     mutable juce::SpinLock settingsLock, fitLock, pendingLock, latestLock, captureLock;
     RasterSettings settings;
-    std::vector<std::uint8_t> scratch, pending;
+    std::vector<std::uint8_t> scratch, pending, packing;
     int pendingSize = 0;
     bool hasPending = false;
     juce::WaitableEvent wake;
@@ -240,6 +310,7 @@ public:
         const auto* session = findSession(asset->liveIdentity);
         const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
         if (session != nullptr && session->input->capturing()) { return "Recording" + dot + juce::String(juce::roundToInt(session->input->captureSeconds())) + " s"; }
+        if (session == nullptr && sessions.size() >= maximumInputs) { return "osci-motion receives at most 16 live pictures at once. Remove one to receive this one."; }
         if (session == nullptr || !session->input->connected()) {
             return "Waiting for " + (sender.has_value() ? sender->describe() : juce::String("the app")) + " to share its picture";
         }
@@ -369,6 +440,7 @@ private:
             }
             // Its sender gone (stopped, or let go above): a capture ends there.
             if (!found->input->connected()) { found->input->endCapture(CaptureEnding::disconnected); }
+            found->input->limitCapture();
             if (!look || found->input->connected() || !available()) { continue; }
             if (!sharing.has_value()) { sharing = osci::texture::listOpenGLSources(); }
             const auto match = std::find_if(sharing->begin(), sharing->end(), [&](const auto& source) {

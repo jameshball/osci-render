@@ -25,8 +25,12 @@ public:
                     return juce::Result::fail("Another Blender source is using this port. Choose a different port.");
                 }
             }
+            // Only those listening count: a stopped one holds at most its frozen frame.
+            const auto listeningNow = std::count_if(sessions.begin(), sessions.end(), [](const auto& item) { return active(item.input->status().state); });
+            if (session == nullptr || !active(session->input->status().state)) {
+                if (static_cast<std::size_t>(listeningNow) >= maximumInputs) { return juce::Result::fail("osci-motion listens to at most 16 Blender sources at once. Stop listening on one first."); }
+            }
             if (session == nullptr) {
-                if (sessions.size() >= maximumInputs) { return juce::Result::fail("osci-motion listens to at most 16 Blender sources at once. Stop listening on one first."); }
                 sessions.push_back({asset->liveIdentity, asset->blenderSettings.port, std::make_unique<PreparedBlenderInput>()});
                 session = &sessions.back();
             }

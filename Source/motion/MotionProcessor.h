@@ -108,6 +108,9 @@ private:
     std::unique_ptr<motion::CompositionPreparationWorker> preparationWorker;
     std::uint64_t preparationRevision = 0, acceptedPreparationRevision = 0;
     std::atomic<double> requestedSampleRate {48000};
+    // Whether an audio device has prepared it yet; until then the project's
+    // rate stands in for the rate the device would prepare.
+    std::atomic<bool> devicePrepared {false};
     double preparationSampleRate = 48000;
     motion::hidden::Reach preparationReach;
     juce::String preparationError;

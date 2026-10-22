@@ -988,7 +988,8 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         }
         if (asset->missing) {
             const auto what = asset->audio != nullptr ? "silent" : asset->bakedData.getSize() > 0 && asset->source != nullptr && asset->source->pointFrames() != nullptr ? "drawn from the frames the project keeps" : "drawing nothing";
-            notes.note(juce::String("Linked file not found, kept ") + what + " until it's back or replaced", asset->name + " (" + asset->linked.getFullPathName() + ")");
+            const auto why = asset->linked.existsAsFile() ? "Linked file changed since it was prepared, kept " : "Linked file not found, kept ";
+            notes.note(juce::String(why) + what + " until it's prepared again or replaced", asset->name + " (" + asset->linked.getFullPathName() + ")");
         }
         project.assets.push_back(std::move(asset));
     }

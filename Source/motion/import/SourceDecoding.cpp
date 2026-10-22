@@ -64,6 +64,8 @@ juce::String videoBakeKey(const Asset& asset) {
     });
 }
 
+juce::Result keepMissing(Asset& asset, std::atomic<double>* progress);
+
 // A source kept with a baked cache: the saved cache when its key matches,
 // or `bake()` run afresh and archived. Either way the frames must have the
 // shape the asset's settings ask for.
@@ -72,6 +74,10 @@ juce::Result prepareBaked(Asset& asset, const juce::String& key, const std::func
     PreparedPointFrames::Result prepared;
     juce::MemoryBlock archive;
     if (asset.bakedData.getSize() > 0) {
+        // A linked file changed since (touched or copied, so its time or
+        // size is new): kept with the frames the project holds, as if
+        // missing, until it's found and prepared again.
+        if (asset.bakeKey != key && asset.isLinked()) { return keepMissing(asset, progress); }
         if (asset.bakeKey != key) { return juce::Result::fail("The source's cache does not match its contents and settings. Prepare it again."); }
         prepared = BakedSourceArchive::decode(asset.bakedData);
     } else {
