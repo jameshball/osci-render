@@ -13,14 +13,13 @@ namespace motion::style {
 inline constexpr int gap = 4;
 inline constexpr int padding = 8;
 inline constexpr int controlHeight = 24;
-inline constexpr float radius = 3.0f;
-inline constexpr float panelRadius = 5.0f;
 // The three corner radii: small for swatches, key glyphs and the segments
 // inside a control; control for buttons, fields, combos, chips, menu items
 // and library rows; panel for panels, popovers and floating strips.
 inline constexpr float radiusSmall = 2.0f, radiusControl = 4.0f, radiusPanel = 6.0f;
 // The three icon sizes: toolbars and row actions, labelled buttons, and
-// chips. A badge or a lock in a narrow column may be smaller.
+// chips. A badge or a lock in a narrow column may be smaller, and an empty
+// state's illustration larger.
 inline constexpr float iconLarge = 18.0f, iconMedium = 16.0f, iconSmall = 14.0f;
 
 // osci-motion's own green, as in its icon and logo (osci-render's and
@@ -261,7 +260,7 @@ struct PropertyGrid {
 
 inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
     g.setColour(osci::Colours::surface());
-    g.fillRoundedRectangle(bounds.toFloat(), panelRadius);
+    g.fillRoundedRectangle(bounds.toFloat(), radiusPanel);
 }
 // A panel floating over a page, outlined like the popovers.
 inline void fillFloatingPanel(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour fill) {
@@ -273,7 +272,7 @@ inline void fillFloatingPanel(juce::Graphics& g, juce::Rectangle<float> bounds, 
 // The dark well behind a thumbnail or preview.
 inline void fillWell(juce::Graphics& g, juce::Rectangle<float> bounds) {
     g.setColour(juce::Colours::black.withAlpha(.35f));
-    g.fillRoundedRectangle(bounds, radius);
+    g.fillRoundedRectangle(bounds, radiusControl);
 }
 // Every scrolling view: a thin quiet scrollbar, and its content fading out
 // into the surface behind it at an edge with more beyond it.
@@ -285,8 +284,6 @@ inline void fadeScrolling(osci::ScrollFadeViewport& viewport, juce::Colour behin
 }
 // Popovers sit a step above the panel they point at.
 inline juce::Colour popoverSurface() { return juce::Colour(0xff202126); }
-// A tile's fill as the pointer fades over it.
-inline juce::Colour cardFill(float hover) { return osci::Colours::veryDark().interpolatedWith(osci::Colours::surfaceRaised(), hover); }
 
 // The libraries' rows (Sources, Effects, Modulators) look alike: a face 40 px
 // tall every 44 px, a 36 px picture in a well 8 px in, then the name with
@@ -382,11 +379,11 @@ inline void drawDiamond(juce::Graphics& g, juce::Point<float> centre, float radi
 inline void paintComboBox(juce::Graphics& g, int width, int height, juce::ComboBox& box) {
     const auto bounds = juce::Rectangle<float>(0, 0, static_cast<float>(width), static_cast<float>(height));
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
-    g.fillRoundedRectangle(bounds, radius);
+    g.fillRoundedRectangle(bounds, radiusControl);
     const auto hover = box.isEnabled() && box.isMouseOver(true);
     if (hover || box.hasKeyboardFocus(true)) {
         g.setColour(box.hasKeyboardFocus(true) ? accent().withAlpha(.8f) : osci::Colours::outlineSubtle().withAlpha(.8f));
-        g.drawRoundedRectangle(bounds.reduced(.5f), radius, 1.0f);
+        g.drawRoundedRectangle(bounds.reduced(.5f), radiusControl, 1.0f);
     }
     const auto centre = juce::Point<float>(static_cast<float>(width) - 12.0f, static_cast<float>(height) * .5f);
     juce::Path chevron;
@@ -427,6 +424,10 @@ public:
         // Selected text: a muted accent behind white, not bright green.
         setColour(juce::TextEditor::highlightColourId, accent().withAlpha(.35f));
         setColour(juce::TextEditor::highlightedTextColourId, juce::Colours::white);
+        // Focus and progress in motion's green, not the shared accent.
+        setColour(juce::TextEditor::focusedOutlineColourId, accent());
+        setColour(juce::ProgressBar::foregroundColourId, accent());
+        setColour(juce::PopupMenu::highlightedBackgroundColourId, accent());
         // Scroll thumbs are quiet grey everywhere, never as bright as text.
         setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
     }
@@ -506,6 +507,8 @@ class DialogLookAndFeel final : public osci::OverlayLookAndFeel {
 public:
     DialogLookAndFeel() {
         setColour(juce::TextEditor::highlightColourId, accent().withAlpha(.35f));
+        setColour(juce::TextEditor::focusedOutlineColourId, accent().withAlpha(.9f));
+        setColour(juce::PopupMenu::highlightedBackgroundColourId, accent());
         setColour(juce::TextEditor::highlightedTextColourId, juce::Colours::white);
         setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
     }

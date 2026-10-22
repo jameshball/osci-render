@@ -114,7 +114,7 @@ void MotionDrawingEditor::paint(juce::Graphics& g) {
     if (selectedStroke >= 0 && selectedStroke < static_cast<int>(drawing.strokes.size())) { paintAnchors(g, drawing.strokes[static_cast<std::size_t>(selectedStroke)], true); }
     if (activeStroke >= 0 && activeStroke < static_cast<int>(drawing.strokes.size())) { paintAnchors(g, drawing.strokes[static_cast<std::size_t>(activeStroke)], false); }
     if (snapTarget.has_value()) {
-        g.setColour(osci::Colours::accentColor().brighter(.4f));
+        g.setColour(motion::style::accent().brighter(.4f));
         g.drawEllipse(juce::Rectangle<float>(14, 14).withCentre(toScreen(*snapTarget)), 1.5f);
     }
 }
@@ -399,7 +399,7 @@ void MotionDrawingEditor::paintAnchors(juce::Graphics& g, const motion::drawing:
             }
         }
         const auto box = juce::Rectangle<float>(8, 8).withCentre(centre);
-        g.setColour(selected ? osci::Colours::accentColor().brighter(.4f) : juce::Colours::black);
+        g.setColour(selected ? motion::style::accent().brighter(.4f) : juce::Colours::black);
         if (anchor.smooth) { g.fillEllipse(box); } else { g.fillRect(box); }
         g.setColour(juce::Colours::white);
         if (anchor.smooth) { g.drawEllipse(box, 1.2f); } else { g.drawRect(box, 1.2f); }

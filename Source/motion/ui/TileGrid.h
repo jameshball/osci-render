@@ -101,8 +101,11 @@ private:
             const auto on = getToggleState();
             const auto hover = fade.value();
             const auto bounds = getLocalBounds().toFloat();
-            const auto radius = motion::style::radius + 1.0f;
-            g.setColour(on ? motion::style::accentFill().withMultipliedAlpha(1 + hover) : motion::style::cardFill(hover));
+            const auto radius = motion::style::radiusControl;
+            g.setColour(on ? motion::style::accentFill().withMultipliedAlpha(1 + hover) : osci::Colours::veryDark());
+            g.fillRoundedRectangle(bounds, radius);
+            // Every button's wash; an on tile's own fill brightens instead.
+            g.setColour(motion::style::wash(on ? 0.0f : hover, down));
             g.fillRoundedRectangle(bounds, radius);
             g.setColour(on ? motion::style::accentStrong().withMultipliedAlpha(1.2f + .6f * hover) : juce::Colours::white.withAlpha(.06f + .1f * hover));
             g.drawRoundedRectangle(bounds.reduced(.5f), radius, on ? 1.2f : 1.0f);
@@ -110,7 +113,7 @@ private:
             if (look == Look::chips) {
                 // A small icon, then the name.
                 auto area = getLocalBounds().reduced(motion::style::padding, 0);
-                const auto icon = area.removeFromLeft(14).toFloat().withSizeKeepingCentre(14, 14).translated(0, down ? .5f : 0);
+                const auto icon = area.removeFromLeft(static_cast<int>(motion::style::iconSmall)).toFloat().withSizeKeepingCentre(motion::style::iconSmall, motion::style::iconSmall).translated(0, down ? .5f : 0);
                 g.setColour(ink);
                 g.strokePath(choice.picture.lines, juce::PathStrokeType(1.1f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
                     juce::AffineTransform::scale(icon.getWidth() * .5f).translated(icon.getCentre()));

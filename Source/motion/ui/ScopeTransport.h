@@ -23,8 +23,8 @@ public:
     }
     void paintButton(juce::Graphics& g, bool over, bool down) override {
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour(!normal ? motion::style::onFill() : juce::Colours::white.withAlpha(over || down ? .1f : 0.0f));
-        g.fillRoundedRectangle(bounds, motion::style::radius);
+        g.setColour(!normal ? motion::style::onFill() : motion::style::wash(over ? 1.0f : 0.0f, down));
+        g.fillRoundedRectangle(bounds, motion::style::radiusControl);
         g.setFont(motion::style::heading());
         g.setColour(osci::Colours::text().withAlpha(!normal ? 1.0f : over ? .9f : .6f));
         g.drawText(getButtonText(), bounds, juce::Justification::centred, false);

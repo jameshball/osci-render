@@ -71,9 +71,9 @@ private:
             const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::body(), text)) + 12;
             const auto cap = area.removeFromRight(width).withSizeKeepingCentre(width, 18).toFloat();
             g.setColour(osci::Colours::surfaceRaised().brighter(.08f));
-            g.fillRoundedRectangle(cap, motion::style::radius);
+            g.fillRoundedRectangle(cap, motion::style::radiusControl);
             g.setColour(motion::style::hairline());
-            g.drawRoundedRectangle(cap.reduced(.5f), motion::style::radius, 1.0f);
+            g.drawRoundedRectangle(cap.reduced(.5f), motion::style::radiusControl, 1.0f);
             g.setColour(osci::Colours::text());
             g.drawText(text, cap, juce::Justification::centred, false);
         }

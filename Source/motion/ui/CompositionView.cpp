@@ -261,9 +261,9 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     paintGeneratorHandles(g);
     if (marquee.has_value()) {
         const auto region = marqueeRegion();
-        g.setColour(osci::Colours::accentColor().withAlpha(.08f));
+        g.setColour(motion::style::accent().withAlpha(.08f));
         g.fillPath(region);
-        g.setColour(osci::Colours::accentColor().withAlpha(.7f));
+        g.setColour(motion::style::accent().withAlpha(.7f));
         const float dashes[] {4.0f, 3.0f};
         juce::Path dashed;
         juce::PathStrokeType(1.0f).createDashedStroke(dashed, region, dashes, 2);
@@ -1525,12 +1525,12 @@ void MotionCompositionView::paintOverChildren(juce::Graphics& g) {
     if (effectDrag) {
         // Over empty space the whole Scene is the target.
         const auto everything = dropHover.has_value() && *dropHover == 0;
-        g.setColour(osci::Colours::accentColor().withAlpha(everything ? .9f : .3f));
-        g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(2.0f), motion::style::panelRadius, everything ? 2.0f : 1.0f);
+        g.setColour(motion::style::accent().withAlpha(everything ? .9f : .3f));
+        g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(2.0f), motion::style::radiusPanel, everything ? 2.0f : 1.0f);
         if (everything) {
             auto label = getLocalBounds().removeFromBottom(30).withSizeKeepingCentre(110, 22);
-            g.setColour(osci::Colours::accentColor().withAlpha(.85f));
-            g.fillRoundedRectangle(label.toFloat(), motion::style::radius + 2);
+            g.setColour(motion::style::accent().withAlpha(.85f));
+            g.fillRoundedRectangle(label.toFloat(), motion::style::radiusControl);
             g.setColour(juce::Colours::white);
             g.setFont(motion::style::body());
             g.drawText("Everything", label, juce::Justification::centred, false);
@@ -1543,7 +1543,7 @@ void MotionCompositionView::paintOverChildren(juce::Graphics& g) {
         auto strip = getLocalBounds().removeFromBottom(26).reduced(8, 3);
         strip = strip.withSizeKeepingCentre(std::min(strip.getWidth(), juce::GlyphArrangement::getStringWidthInt(motion::style::body(), help) + 24), strip.getHeight());
         g.setColour(osci::Colours::veryDark().withAlpha(.85f));
-        g.fillRoundedRectangle(strip.toFloat(), 4);
+        g.fillRoundedRectangle(strip.toFloat(), motion::style::radiusPanel);
         g.setColour(osci::Colours::textMuted());
         g.setFont(motion::style::body());
         g.drawFittedText(help, strip.reduced(8, 0), juce::Justification::centred, 1);

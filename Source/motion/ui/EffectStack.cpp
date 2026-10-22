@@ -113,13 +113,13 @@ void MotionEffectStack::paint(juce::Graphics& g) {
         g.drawText("Also applied", stagesCaption, juce::Justification::centredLeft, false);
     }
     if (!dropZone.isEmpty()) {
-        g.setColour(osci::Colours::accentColor().withAlpha(dropHover ? .18f : .07f));
-        g.fillRoundedRectangle(dropZone.toFloat(), motion::style::radius);
+        g.setColour(motion::style::accent().withAlpha(dropHover ? .18f : .07f));
+        g.fillRoundedRectangle(dropZone.toFloat(), motion::style::radiusControl);
         const float dashes[] {4.0f, 3.0f};
         juce::Path outline, dashed;
-        outline.addRoundedRectangle(dropZone.toFloat().reduced(.5f), motion::style::radius);
+        outline.addRoundedRectangle(dropZone.toFloat().reduced(.5f), motion::style::radiusControl);
         juce::PathStrokeType(1.0f).createDashedStroke(dashed, outline, dashes, 2);
-        g.setColour(osci::Colours::accentColor().withAlpha(dropHover ? .9f : .45f));
+        g.setColour(motion::style::accent().withAlpha(dropHover ? .9f : .45f));
         g.fillPath(dashed);
     }
 }
@@ -191,7 +191,7 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
     name = effect == nullptr ? juce::String() : juce::String(effect->name);
     setName(name + " effect");
     setRepaintsOnMouseActivity(true);
-    close.iconSize = 14.0f;
+    close.iconSize = motion::style::iconSmall;
     close.onClick = [this] { juce::MessageManager::callAsync([safe = juce::Component::SafePointer<Card>(this)] { if (safe != nullptr) { safe->stack.remove(safe->id); } }); };
     addAndMakeVisible(close);
     power.onClick = [this] { stack.setEnabled(id, power.getToggleState()); };
@@ -300,13 +300,13 @@ void MotionEffectStack::Card::paint(juce::Graphics& g) {
     const auto bounds = getLocalBounds().toFloat();
     // A raised card with a hairline edge, so it reads clearly against the panel.
     g.setColour(osci::Colours::surfaceRaised().withAlpha(.6f));
-    g.fillRoundedRectangle(bounds, motion::style::radius + 1);
+    g.fillRoundedRectangle(bounds, motion::style::radiusControl);
     g.setColour(motion::style::hairline());
-    g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
+    g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radiusControl, 1.0f);
     const auto header = getLocalBounds().removeFromTop(headerHeight);
     if (isMouseOver(true) && getMouseXYRelative().y < headerHeight) {
         g.setColour(motion::style::hoverFill());
-        g.fillRoundedRectangle(header.toFloat(), motion::style::radius + 1);
+        g.fillRoundedRectangle(header.toFloat(), motion::style::radiusControl);
     }
     // The fold triangle: down when open, right when folded.
     juce::Path triangle;

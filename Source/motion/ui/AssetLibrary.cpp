@@ -101,7 +101,9 @@ void MotionAssetLibrary::revealAsset(motion::Id id) {
     for (std::size_t row = 0; row < assets.size() + definitions.size(); ++row) {
         if (assetId(static_cast<int>(row)) == id) {
             list.selectRow(static_cast<int>(row), true);
-            osci::revealRow(list, static_cast<int>(row));
+            osci::RevealOptions options;
+            options.colour = motion::style::accent();
+            osci::revealRow(list, static_cast<int>(row), options);
             return;
         }
     }

@@ -231,7 +231,7 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
         if (panel.isEmpty()) { continue; }
         juce::Path corners;
         corners.addRectangle(panel.toFloat());
-        corners.addRoundedRectangle(panel.toFloat(), motion::style::panelRadius);
+        corners.addRoundedRectangle(panel.toFloat(), motion::style::radiusPanel);
         corners.setUsingNonZeroWinding(false);
         graphics.fillPath(corners);
     }
@@ -239,8 +239,8 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
     const auto panel = focusedPanel();
     if (!panel.isEmpty()) {
         // Which panel the keyboard acts on, quietly: an outline, not a frame.
-        graphics.setColour(osci::Colours::accentColor().withAlpha(.22f));
-        graphics.drawRoundedRectangle(panel.toFloat().reduced(.5f), motion::style::panelRadius, 1.0f);
+        graphics.setColour(motion::style::accent().withAlpha(.22f));
+        graphics.drawRoundedRectangle(panel.toFloat().reduced(.5f), motion::style::radiusPanel, 1.0f);
     }
 }
 

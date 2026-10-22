@@ -52,7 +52,7 @@ public:
 
     void paint(juce::Graphics& g) override {
         g.setColour(osci::Colours::veryDark());
-        g.fillRoundedRectangle(getLocalBounds().toFloat(), motion::style::radius + 1.0f);
+        g.fillRoundedRectangle(getLocalBounds().toFloat(), motion::style::radiusControl);
         g.setColour(motion::style::hairline());
         g.fillRect(static_cast<float>(ease.getX()) - 1.0f, 6.0f, 1.0f, height - 12.0f);
     }
@@ -76,11 +76,11 @@ private:
             const auto lit = getToggleState();
             if (lit || over || down) {
                 g.setColour(lit ? motion::style::onFill().withMultipliedAlpha(down ? 1.3f : 1.0f) : (down ? motion::style::pressFill() : motion::style::restFill()));
-                g.fillRoundedRectangle(bounds, motion::style::radius);
+                g.fillRoundedRectangle(bounds, motion::style::radiusSmall);
             }
             if (mixed && !lit) {
                 g.setColour(juce::Colours::white.withAlpha(.3f));
-                g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
+                g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radiusSmall, 1.0f);
             }
             const auto colour = !isEnabled() ? osci::Colours::textMuted().withAlpha(.35f) : lit ? juce::Colours::white : osci::Colours::text().withAlpha(over ? 1.0f : .7f);
             motion::ui::drawSegmentGlyph(g, motion::ui::interpolationGlyph(bounds.withSizeKeepingCentre(14.0f, 12.0f), interpolation), colour);
@@ -92,7 +92,7 @@ private:
             const auto bounds = getLocalBounds().toFloat().reduced(1.0f, 0.0f);
             if (over || down) {
                 g.setColour(down ? motion::style::pressFill() : motion::style::restFill());
-                g.fillRoundedRectangle(bounds, motion::style::radius);
+                g.fillRoundedRectangle(bounds, motion::style::radiusSmall);
             }
             g.setColour(!isEnabled() ? osci::Colours::textMuted().withAlpha(.35f) : osci::Colours::text().withAlpha(over ? 1.0f : .8f));
             g.setFont(motion::style::caption());

@@ -35,7 +35,7 @@ inline juce::StringArray roles(OutputMode mode) {
     return {};
 }
 inline juce::Colour soundColour() { return style::waveform(); }
-inline juce::Colour beamColour() { return osci::Colours::accentColor(); }
+inline juce::Colour beamColour() { return motion::style::accent(); }
 // A beam output's letter in what it carries: red, green and blue in their
 // own colours, so the colour's R never reads as the sound's right.
 inline juce::Colour roleColour(const juce::String& role, bool beam) {
@@ -74,10 +74,10 @@ public:
         using namespace motion::ui::output;
         const auto bounds = getLocalBounds().toFloat();
         g.setColour(osci::Colours::surfaceRaised().brighter(down ? .08f : 0.0f));
-        g.fillRoundedRectangle(bounds, motion::style::radius);
+        g.fillRoundedRectangle(bounds, motion::style::radiusControl);
         if (highlighted || hasKeyboardFocus(true)) {
-            g.setColour(hasKeyboardFocus(true) ? osci::Colours::accentColor().withAlpha(.8f) : osci::Colours::outlineSubtle().withAlpha(.8f));
-            g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
+            g.setColour(hasKeyboardFocus(true) ? motion::style::accent().withAlpha(.8f) : osci::Colours::outlineSubtle().withAlpha(.8f));
+            g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radiusControl, 1.0f);
         }
         // Each part after its own colour's dot, as the panel's outputs show
         // them; short of room, the sound's name goes (its dot says it).
@@ -403,15 +403,15 @@ private:
             }
             if (colour.has_value()) {
                 g.setColour(colour->withAlpha(.22f));
-                g.fillRoundedRectangle(cell, 4.0f);
+                g.fillRoundedRectangle(cell, motion::style::radiusControl);
                 g.setColour(colour->withAlpha(.9f));
-                g.drawRoundedRectangle(cell.reduced(.5f), 4.0f, 1.0f);
+                g.drawRoundedRectangle(cell.reduced(.5f), motion::style::radiusControl, 1.0f);
                 g.setFont(motion::style::heading());
                 g.setColour(roleColour(role, colour == beamColour()));
                 g.drawText(role, cell, juce::Justification::centred);
             } else {
                 g.setColour(osci::Colours::outlineSubtle().withAlpha(.4f));
-                g.drawRoundedRectangle(cell.reduced(.5f), 4.0f, 1.0f);
+                g.drawRoundedRectangle(cell.reduced(.5f), motion::style::radiusControl, 1.0f);
             }
             g.setFont(motion::style::caption());
             g.setColour(osci::Colours::textMuted().withAlpha(colour.has_value() ? 1.0f : .55f));

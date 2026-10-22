@@ -106,9 +106,9 @@ public:
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
         g.setColour(juce::Colours::black);
-        g.fillRoundedRectangle(bounds, style::radius + 1);
+        g.fillRoundedRectangle(bounds, style::radiusControl);
         g.setColour(style::hairline());
-        g.drawRoundedRectangle(bounds.reduced(.5f), style::radius + 1, 1.0f);
+        g.drawRoundedRectangle(bounds.reduced(.5f), style::radiusControl, 1.0f);
         // The drawing leaves room at the foot for its caption.
         const auto side = std::min(bounds.getWidth(), bounds.getHeight() - 20) - 24;
         const auto square = juce::Rectangle<float>(side, side).withCentre({bounds.getCentreX(), bounds.getY() + 12 + side * .5f});

@@ -331,7 +331,7 @@ public:
         if (progress) {
             g.setColour(motion::style::hairline());
             g.fillRoundedRectangle(bar, bar.getHeight() * .5f);
-            g.setColour(osci::Colours::accentColor().withAlpha(.8f));
+            g.setColour(motion::style::accent().withAlpha(.8f));
             g.fillRoundedRectangle(bar.withWidth(bar.getWidth() * static_cast<float>(std::clamp(shown, 0.0, 1.0))), bar.getHeight() * .5f);
         }
     }

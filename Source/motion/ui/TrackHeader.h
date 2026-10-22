@@ -116,7 +116,7 @@ public:
         name.setBounds(bounds.reduced(namePad, 0).withSizeKeepingCentre(bounds.getWidth() - 2 * namePad, 18));
     }
     void paintOverChildren(juce::Graphics& g) override {
-        if (!folderArea.isEmpty()) { motion::icons::draw(g, isComposition ? motion::icons::Icon::effects : motion::icons::Icon::folder, folderArea, osci::Colours::text().withAlpha(.7f), 14.0f); }
+        if (!folderArea.isEmpty()) { motion::icons::draw(g, isComposition ? motion::icons::Icon::effects : motion::icons::Icon::folder, folderArea, osci::Colours::text().withAlpha(.7f), motion::style::iconSmall); }
     }
     void mouseDown(const juce::MouseEvent& event) override {
         // Right-click anywhere on the header opens the track's menu.

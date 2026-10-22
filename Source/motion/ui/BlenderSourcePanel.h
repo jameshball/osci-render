@@ -103,7 +103,7 @@ public:
         // grey offline, red on a problem.
         const auto text = status.getText();
         const auto colour = error.isNotEmpty() ? motion::style::error()
-            : text.startsWith("Connected") ? osci::Colours::accentColor()
+            : text.startsWith("Connected") ? motion::style::accent()
             : text.startsWith("Listening") ? motion::style::marker()
             : osci::Colours::textMuted().withAlpha(.5f);
         g.setColour(colour);

@@ -125,9 +125,9 @@ inline void paintHint(juce::Graphics& g, juce::Point<float> at, const juce::Stri
     if (pill.getRight() > within.getRight() - 4) { pill.setX(at.x - 12.0f - width); }
     if (pill.getY() < within.getY() + 4 || pill.intersects(avoid)) { pill.setY(at.y + 10.0f); }
     g.setColour(osci::Colours::surfaceRaised().withAlpha(.94f));
-    g.fillRoundedRectangle(pill, 6.0f);
+    g.fillRoundedRectangle(pill, motion::style::radiusPanel);
     g.setColour(motion::style::hairline());
-    g.drawRoundedRectangle(pill.reduced(.5f), 6.0f, 1.0f);
+    g.drawRoundedRectangle(pill.reduced(.5f), motion::style::radiusPanel, 1.0f);
     g.setColour(osci::Colours::text());
     g.setFont(motion::style::caption());
     g.drawText(text, pill, juce::Justification::centred, false);

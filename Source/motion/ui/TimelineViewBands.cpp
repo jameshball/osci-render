@@ -37,9 +37,9 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
     const auto add = addCameraBounds().toFloat();
     if (addHover) {
         g.setColour(motion::style::hoverFill());
-        g.fillRoundedRectangle(add, motion::style::radius + 1);
+        g.fillRoundedRectangle(add, motion::style::radiusControl);
     }
-    motion::icons::draw(g, motion::icons::Icon::add, add, addHover ? osci::Colours::text() : osci::Colours::text().withAlpha(.72f), 16.0f);
+    motion::icons::draw(g, motion::icons::Icon::add, add, addHover ? osci::Colours::text() : osci::Colours::text().withAlpha(.72f), motion::style::iconMedium);
     // The selected camera's keys show in the band; names start clear of a
     // key at their start.
     const auto keysShown = std::any_of(project.cameras.begin(), project.cameras.end(), [this](const auto& item) { return item.id == selected; });
@@ -67,10 +67,10 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
         const auto bounds = cutBounds(cut);
         if (bounds.isEmpty()) { continue; }
         g.setColour(cameraColour(project, cut.camera).withAlpha(cut.id == selectedCut ? 1.0f : .85f));
-        g.fillRoundedRectangle(bounds.toFloat(), 3.0f);
+        g.fillRoundedRectangle(bounds.toFloat(), motion::style::radiusControl);
         if (cut.id == selectedCut || cut.camera == selected) {
-            g.setColour(osci::Colours::accentColor());
-            g.drawRoundedRectangle(bounds.toFloat().reduced(.5f), 3.0f, 1.2f);
+            g.setColour(motion::style::accent());
+            g.drawRoundedRectangle(bounds.toFloat().reduced(.5f), motion::style::radiusControl, 1.2f);
         }
         g.setColour(osci::Colours::text());
         g.drawText(cameraName(cut.camera), bounds.withTrimmedLeft(nameInset).withTrimmedRight(6), juce::Justification::centredLeft, true);

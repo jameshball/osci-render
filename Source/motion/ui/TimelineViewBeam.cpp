@@ -105,7 +105,7 @@ void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::
     {
         juce::Graphics::ScopedSaveState state(g);
         juce::Path shape;
-        shape.addRoundedRectangle(body, motion::style::radius);
+        shape.addRoundedRectangle(body, motion::style::radiusControl);
         g.reduceClipRegion(shape);
         // Like a waveform: a quiet fill. The selected object shows its edge
         // and keys, as Premiere shows a selected clip's rubber band; hovered,
@@ -153,9 +153,9 @@ void MotionTimelineView::paintBeamLabel(juce::Graphics& g) const {
     g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, viewHeight());
     const auto& [pill, text] = *beamLabel;
     g.setColour(osci::Colours::veryDark().withAlpha(.92f));
-    g.fillRoundedRectangle(pill, 4);
+    g.fillRoundedRectangle(pill, motion::style::radiusControl);
     g.setColour(motion::style::accent().withAlpha(.5f));
-    g.drawRoundedRectangle(pill.reduced(.5f), 4, 1.0f);
+    g.drawRoundedRectangle(pill.reduced(.5f), motion::style::radiusControl, 1.0f);
     g.setColour(osci::Colours::text());
     g.setFont(motion::style::caption());
     g.drawText(text, pill, juce::Justification::centred, false);

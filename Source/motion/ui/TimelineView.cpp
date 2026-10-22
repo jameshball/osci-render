@@ -25,13 +25,13 @@ MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : proces
     for (auto [button, value, tip] : {std::tuple {&selectTool, Tool::move, "Select, move and trim (V)"}, std::tuple {&slipTool, Tool::slip, "Slip: move the content inside a clip (S)"},
                                       std::tuple {&stretchTool, Tool::stretch, "Stretch: change a clip's length and speed together (R)"}, std::tuple {&rippleTool, Tool::ripple, "Ripple trim: trimming moves the clips after it (B)"}}) {
         button->setTooltip(tip);
-        button->iconSize = 16.0f;
+        button->iconSize = motion::style::iconMedium;
         button->onClick = [this, value] {
             setTool(value);
         };
         addAndMakeVisible(button);
     }
-    snapButton.iconSize = 16.0f;
+    snapButton.iconSize = motion::style::iconMedium;
     headerArea.setInterceptsMouseClicks(false, true);
     addAndMakeVisible(headerArea);
     // Add track sits under the last track and scrolls with the list. Its
@@ -491,12 +491,12 @@ void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
         if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = trackAtY(dropPosition->y); }
         const auto group = groupAtY(dropPosition->y);
         if (group != 0) {
-            g.setColour(osci::Colours::accentColor());
+            g.setColour(motion::style::accent());
             g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), heightAt(visualRowAt(dropPosition->y)), 2);
         } else if (row >= 0 && row < static_cast<int>(tracks.size()) && tracks[row].kind == motion::TrackKind::visual && (clip != nullptr || dropPosition->x < namesWidth)) {
             const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, trackY(row), namesWidth, trackHeight(row));
-            g.setColour(osci::Colours::accentColor());
-            g.drawRoundedRectangle(bounds.toFloat().reduced(2), 4, 2);
+            g.setColour(motion::style::accent());
+            g.drawRoundedRectangle(bounds.toFloat().reduced(2), motion::style::radiusControl, 2);
         }
     } else {
         const auto row = trackAtY(dropPosition->y);
@@ -525,11 +525,11 @@ void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
         if (row < 0 && allowed) {
             // The header column shows that a track will be created.
             auto header = juce::Rectangle<float>(4.0f, static_cast<float>(slotY) + 3.0f, static_cast<float>(namesWidth) - 9.0f, static_cast<float>(defaultTrackHeight) - 6.0f);
-            g.setColour(osci::Colours::accentColor().withAlpha(.12f));
-            g.fillRoundedRectangle(header, motion::style::radius);
-            g.setColour(osci::Colours::accentColor().withAlpha(.7f));
-            g.drawRoundedRectangle(header.reduced(.5f), motion::style::radius, 1.0f);
-            motion::icons::draw(g, motion::icons::Icon::add, header.removeFromLeft(26.0f), osci::Colours::accentColor().brighter(.3f), 14.0f);
+            g.setColour(motion::style::accent().withAlpha(.12f));
+            g.fillRoundedRectangle(header, motion::style::radiusControl);
+            g.setColour(motion::style::accent().withAlpha(.7f));
+            g.drawRoundedRectangle(header.reduced(.5f), motion::style::radiusControl, 1.0f);
+            motion::icons::draw(g, motion::icons::Icon::add, header.removeFromLeft(26.0f), motion::style::accent().brighter(.3f), motion::style::iconSmall);
             g.setFont(motion::style::body());
             g.setColour(osci::Colours::text());
             g.drawText(audio ? "New audio track" : "New track", header, juce::Justification::centredLeft, true);
@@ -537,9 +537,9 @@ void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
         juce::Graphics::ScopedSaveState scope(g);
         g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
         g.setColour((allowed ? motion::style::accent() : motion::style::error()).withAlpha(0.2f));
-        g.fillRoundedRectangle(bounds, 4);
+        g.fillRoundedRectangle(bounds, motion::style::radiusControl);
         g.setColour(allowed ? motion::style::accent() : motion::style::error());
-        g.drawRoundedRectangle(bounds, 4, 1);
+        g.drawRoundedRectangle(bounds, motion::style::radiusControl, 1);
         g.drawText(allowed ? (audio ? "Add audio" : definition != definitions.end() ? "Add composition" : "Add object") : (recursive ? "Cannot contain itself" : correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
     }
 }
@@ -560,7 +560,7 @@ void MotionTimelineView::paintOverChildren(juce::Graphics& g) {
     const auto block = juce::Rectangle<int>(0, top, getWidth(), trackDrag->height - bandGap);
     const auto shape = [&block](float inset) {
         juce::Path path;
-        path.addRoundedRectangle(block.toFloat().reduced(inset), cardRadius);
+        path.addRoundedRectangle(block.toFloat().reduced(inset), motion::style::radiusControl);
         return path;
     };
     // A wide soft shadow and a tight one, so the block reads as lifted
@@ -585,7 +585,7 @@ void MotionTimelineView::paintOverChildren(juce::Graphics& g) {
         g.setOrigin(headerArea.getPosition() + header->getPosition());
         header->paintEntireComponent(g, true);
     }
-    g.setColour(osci::Colours::accentColor().withAlpha(.55f));
+    g.setColour(motion::style::accent().withAlpha(.55f));
     g.strokePath(shape(.75f), juce::PathStrokeType(1.5f));
     // The scroll bars and playhead stay on top, as over any other row.
     paintScrollBars(g);
@@ -852,8 +852,8 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         paintRow(g, visible);
         if (dragging && trackDrag->group != 0 && rows[static_cast<std::size_t>(visible)].group() && rows[static_cast<std::size_t>(visible)].id == trackDrag->group) {
             // The group it will join.
-            g.setColour(osci::Colours::accentColor().withAlpha(.7f));
-            g.drawRoundedRectangle(juce::Rectangle<float>(0.0f, static_cast<float>(rowY(visible)), static_cast<float>(getWidth()), static_cast<float>(heightOf(static_cast<std::size_t>(visible)) - bandGap)).reduced(.75f), cardRadius, 1.5f);
+            g.setColour(motion::style::accent().withAlpha(.7f));
+            g.drawRoundedRectangle(juce::Rectangle<float>(0.0f, static_cast<float>(rowY(visible)), static_cast<float>(getWidth()), static_cast<float>(heightOf(static_cast<std::size_t>(visible)) - bandGap)).reduced(.75f), motion::style::radiusControl, 1.5f);
         }
     }
     g.restoreState();
@@ -863,9 +863,9 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
         const auto area = blocked->toFloat().reduced(1, 3);
         g.setColour(motion::style::error().withAlpha(.2f));
-        g.fillRoundedRectangle(area, 4);
+        g.fillRoundedRectangle(area, motion::style::radiusControl);
         g.setColour(motion::style::error());
-        g.drawRoundedRectangle(area, 4, 1.2f);
+        g.drawRoundedRectangle(area, motion::style::radiusControl, 1.2f);
         g.setFont(motion::style::caption());
         g.drawText("Overlaps", area.reduced(8, 0), juce::Justification::centredLeft, true);
     }
@@ -873,10 +873,10 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     if (effectDragActive) {
         juce::Graphics::ScopedSaveState outlines(g);
         g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
-        g.setColour(osci::Colours::accentColor().withAlpha(.35f));
+        g.setColour(motion::style::accent().withAlpha(.35f));
         for (int index = 0; index < static_cast<int>(tracks.size()); ++index) {
             if (tracks[static_cast<std::size_t>(index)].kind != motion::TrackKind::visual) { continue; }
-            for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) { g.drawRoundedRectangle(clipBounds(clip, index).toFloat().reduced(1.5f), 4, 1.0f); }
+            for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) { g.drawRoundedRectangle(clipBounds(clip, index).toFloat().reduced(1.5f), motion::style::radiusControl, 1.0f); }
         }
     }
     paintDropPreview(g);
@@ -920,7 +920,7 @@ void MotionTimelineView::paint(juce::Graphics& g) {
             // The staff, then the name on a small tag beside it.
             const auto tag = bounds.toFloat().withTrimmedLeft(2).reduced(0, 3);
             juce::Path flag;
-            flag.addRoundedRectangle(tag.getX(), tag.getY(), tag.getWidth(), tag.getHeight(), 3.0f, 3.0f, false, true, false, true);
+            flag.addRoundedRectangle(tag.getX(), tag.getY(), tag.getWidth(), tag.getHeight(), motion::style::radiusControl, motion::style::radiusControl, false, true, false, true);
             g.setColour(colour.withAlpha(marker.id == selectedMarker ? 0.34f : 0.16f));
             g.fillPath(flag);
             g.setColour(colour);
@@ -934,7 +934,7 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     if (snapGuide.has_value()) {
         const auto x = timeX(*snapGuide);
         if (x >= namesWidth && x <= getWidth()) {
-            g.setColour(osci::Colours::accentColor().withAlpha(.75f));
+            g.setColour(motion::style::accent().withAlpha(.75f));
             const float dashes[] {4.0f, 3.0f};
             g.drawDashedLine(juce::Line<float>(static_cast<float>(x), static_cast<float>(rulerHeight), static_cast<float>(x), static_cast<float>(getHeight())), dashes, 2, 1.0f);
         }
@@ -948,7 +948,7 @@ void MotionTimelineView::paint(juce::Graphics& g) {
             row = found != rows.end() ? static_cast<int>(found - rows.begin()) : -1;
         }
         if (row >= 0 && row < static_cast<int>(rows.size())) {
-            g.setColour(osci::Colours::accentColor().withAlpha(.8f));
+            g.setColour(motion::style::accent().withAlpha(.8f));
             g.fillRect(0, rowY(row) + heightOf(static_cast<std::size_t>(row)) - 2, getWidth(), 2);
         }
     }
@@ -963,9 +963,9 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     const auto* keyMarquee = active<KeyMarquee>();
     for (const auto* box : {clipMarquee != nullptr ? &clipMarquee->area : nullptr, keyMarquee != nullptr ? &keyMarquee->area : nullptr}) {
         if (box == nullptr) { continue; }
-        g.setColour(osci::Colours::accentColor().withAlpha(.1f));
+        g.setColour(motion::style::accent().withAlpha(.1f));
         g.fillRect(*box);
-        g.setColour(osci::Colours::accentColor().withAlpha(.6f));
+        g.setColour(motion::style::accent().withAlpha(.6f));
         g.drawRect(*box);
     }
     paintPlayhead(g);
@@ -1355,14 +1355,14 @@ void MotionTimelineView::paintLoop(juce::Graphics& g) const {
     const auto bounds = loopBounds();
     if (bounds.isEmpty()) { return; }
     const auto on = processor.document.project().looping;
-    const auto colour = on ? osci::Colours::accentColor() : osci::Colours::textMuted();
+    const auto colour = on ? motion::style::accent() : osci::Colours::textMuted();
     if (on) {
         g.setColour(colour.withAlpha(.05f));
         g.fillRect(bounds.getX(), rulerHeight, bounds.getWidth(), getHeight() - rulerHeight);
     }
     // One opaque shape (bar and end brackets), so nothing overlaps.
     juce::Path brace;
-    brace.addRoundedRectangle(bounds.toFloat(), 2.0f);
+    brace.addRoundedRectangle(bounds.toFloat(), motion::style::radiusSmall);
     brace.addRectangle(static_cast<float>(bounds.getX()), static_cast<float>(loopTop - 4), 2.0f, static_cast<float>(loopHeight + 4));
     brace.addRectangle(static_cast<float>(bounds.getRight() - 2), static_cast<float>(loopTop - 4), 2.0f, static_cast<float>(loopHeight + 4));
     brace.setUsingNonZeroWinding(true);
@@ -2137,13 +2137,13 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
     // Hovering lifts it, brightens its edge and shows the trim grips.
     const auto hovered = clip.id == hoveredClip && !active;
     g.setColour((hovered ? base.brighter(.1f) : base).withAlpha(opacity));
-    g.fillRoundedRectangle(bounds, motion::style::radius);
+    g.fillRoundedRectangle(bounds, motion::style::radiusControl);
     if (active) {
         g.setColour(motion::style::accent().withAlpha(opacity));
-        g.drawRoundedRectangle(bounds.reduced(.75f), motion::style::radius, 1.5f);
+        g.drawRoundedRectangle(bounds.reduced(.75f), motion::style::radiusControl, 1.5f);
     } else {
         g.setColour(base.brighter(.6f).withAlpha(opacity * (hovered ? .75f : .35f)));
-        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
+        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radiusControl, 1.0f);
     }
     // Too narrow for anything but its colour.
     if (bounds.getWidth() < 14) { return; }
@@ -2841,9 +2841,9 @@ void MotionTimelineView::paintCompositionRow(juce::Graphics& g, int y, int heigh
     const auto anyOn = std::any_of(project.effects.begin(), project.effects.end(), [](const auto& effect) { return effect.enabled; });
     const auto opacity = anyOn ? 1.0f : .45f;
     g.setColour(base.withAlpha(opacity));
-    g.fillRoundedRectangle(bounds, motion::style::radius);
+    g.fillRoundedRectangle(bounds, motion::style::radiusControl);
     g.setColour(base.brighter(.6f).withAlpha(opacity * .35f));
-    g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
+    g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radiusControl, 1.0f);
     // Named by its effects, in order; one switched off reads dimmer.
     juce::StringArray names;
     for (const auto& effect : project.effects) { names.add(juce::String::fromUTF8(effect.name.c_str()) + (effect.enabled ? juce::String() : juce::String(" (off)"))); }

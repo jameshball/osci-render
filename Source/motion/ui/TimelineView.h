@@ -357,7 +357,6 @@ private:
     // Where a top-level track's name starts; the bands' captions and the key
     // lanes' labels start in line with it.
     static constexpr int nameX = cardInset + MotionTrackHeader::nameInset;
-    static constexpr float cardRadius = 3.0f;
     int markerBandTop() const { return toolsHeight + bandGap; }
     int cameraBandTop() const { return (showsMarkerBand() ? markerBandTop() + markerBandHeight : toolsHeight) + bandGap; }
     // One row: a track's or group's card and clips, or a keyframe lane.

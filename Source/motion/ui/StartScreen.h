@@ -144,7 +144,7 @@ public:
     }
     // The search field's glass, over its fill.
     void paintOverChildren(juce::Graphics& g) override {
-        icons::draw(g, icons::Icon::search, search.getBounds().toFloat().removeFromLeft(28).translated(2, 0), osci::Colours::textMuted().withAlpha(.8f), 16.0f);
+        icons::draw(g, icons::Icon::search, search.getBounds().toFloat().removeFromLeft(28).translated(2, 0), osci::Colours::textMuted().withAlpha(.8f), style::iconMedium);
     }
     void resized() override {
         auto area = getLocalBounds();
@@ -269,15 +269,15 @@ private:
             const auto hover = fade.value();
             if (lead) {
                 g.setColour(style::accentFill().withMultipliedAlpha(1.0f + hover));
-                g.fillRoundedRectangle(area, 8.0f);
+                g.fillRoundedRectangle(area, style::radiusControl);
             }
             if (hover > 0 || down) {
                 g.setColour((down ? style::pressFill() : style::hoverFill()).withMultipliedAlpha(down ? 1.0f : hover));
-                g.fillRoundedRectangle(area, 8.0f);
+                g.fillRoundedRectangle(area, style::radiusControl);
             }
             auto content = area.reduced(12, 0);
             const auto glyph = content.removeFromLeft(18);
-            icons::draw(g, icon, glyph.withHeight(36.0f).withY(area.getY() + (detail.isNotEmpty() ? 5.0f : 0.0f)), lead ? style::accent() : osci::Colours::text().withAlpha(.6f + .3f * hover), 18.0f);
+            icons::draw(g, icon, glyph.withHeight(36.0f).withY(area.getY() + (detail.isNotEmpty() ? 5.0f : 0.0f)), lead ? style::accent() : osci::Colours::text().withAlpha(.6f + .3f * hover), style::iconLarge);
             content.removeFromLeft(12);
             g.setFont(style::caption());
             g.setColour(osci::Colours::textMuted().withAlpha(.55f + .35f * hover));
@@ -519,7 +519,7 @@ private:
             if (!emptyRecents.isEmpty()) {
                 const auto box = emptyRecents.toFloat().reduced(.5f);
                 juce::Path outline;
-                outline.addRoundedRectangle(box, 10.0f);
+                outline.addRoundedRectangle(box, style::radiusPanel);
                 juce::Path dashed;
                 const float dashes[] {4.0f, 4.0f};
                 juce::PathStrokeType(1.0f).createDashedStroke(dashed, outline, dashes, 2);
@@ -611,7 +611,7 @@ private:
         }
         void paintCard(juce::Graphics& g, const Placed& place, float lit, bool chosen, float appear) {
             const auto& card = *place.card;
-            constexpr float corner = 10.0f;
+            constexpr float corner = style::radiusPanel;
             auto area = place.bounds.toFloat().translated(0, (1.0f - appear) * 12.0f - 2.0f * lit);
             const auto picture = area.removeFromTop(static_cast<float>(place.pictureHeight));
             if (appear < 1.0f) { g.beginTransparencyLayer(appear); }

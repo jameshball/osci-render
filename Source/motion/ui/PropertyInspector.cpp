@@ -85,6 +85,10 @@ void MotionPropertyInspector::setHeading(std::optional<std::pair<juce::String, j
 
 void MotionPropertyInspector::reveal(juce::Component& component, osci::RevealOptions options) {
     layoutContent();
+    // Marked in motion's green, not the shared accent.
+    if (!options.colour.has_value()) {
+        options.colour = motion::style::accent();
+    }
     osci::reveal(component, std::move(options));
 }
 
@@ -288,8 +292,8 @@ void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
             if (!child->isVisible()) { continue; }
             if (child->getProperties().contains("routeProperties") && dynamic_cast<motion::ui::ScrubField*>(child) != nullptr) {
                 const auto area = getLocalArea(child, child->getLocalBounds()).toFloat();
-                g.setColour(osci::Colours::accentColor().withAlpha(child == dropTarget.getComponent() ? .95f : .35f));
-                g.drawRoundedRectangle(area.reduced(.5f), motion::style::radius, child == dropTarget.getComponent() ? 2.0f : 1.0f);
+                g.setColour(motion::style::accent().withAlpha(child == dropTarget.getComponent() ? .95f : .35f));
+                g.drawRoundedRectangle(area.reduced(.5f), motion::style::radiusControl, child == dropTarget.getComponent() ? 2.0f : 1.0f);
             }
             outline(*child);
         }
@@ -297,8 +301,8 @@ void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
     outline(content);
     auto* row = dropTarget.getComponent();
     if (row != nullptr && dynamic_cast<motion::ui::ScrubField*>(row) == nullptr) {
-        g.setColour(osci::Colours::accentColor().withAlpha(.9f));
-        g.drawRoundedRectangle(getLocalArea(row, row->getLocalBounds()).toFloat().expanded(2), motion::style::radius + 1, 2.0f);
+        g.setColour(motion::style::accent().withAlpha(.9f));
+        g.drawRoundedRectangle(getLocalArea(row, row->getLocalBounds()).toFloat().expanded(2), motion::style::radiusControl, 2.0f);
     }
 }
 
@@ -334,9 +338,9 @@ MotionPropertyInspector::Swatch::Swatch() : juce::Button("Colour swatch") {
 void MotionPropertyInspector::Swatch::paintButton(juce::Graphics& g, bool highlighted, bool) {
     const auto bounds = getLocalBounds().toFloat().reduced(.5f);
     g.setColour(colour);
-    g.fillRoundedRectangle(bounds, motion::style::radius);
+    g.fillRoundedRectangle(bounds, motion::style::radiusSmall);
     g.setColour(juce::Colours::white.withAlpha(highlighted ? .5f : .22f));
-    g.drawRoundedRectangle(bounds, motion::style::radius, 1.0f);
+    g.drawRoundedRectangle(bounds, motion::style::radiusSmall, 1.0f);
 }
 
 void MotionPropertyInspector::Swatch::setColour(juce::Colour value) {

@@ -120,7 +120,7 @@ private:
                 // Material's eye: open when the curve is drawn, struck through when not.
                 const auto shown = getToggleState();
                 const auto alpha = isEnabled() ? (over ? 1.0f : shown ? .7f : .3f) : .3f;
-                motion::icons::draw(g, shown ? motion::icons::Icon::visibility : motion::icons::Icon::visibilityOff, getLocalBounds().toFloat(), osci::Colours::text().withAlpha(alpha), 13.0f);
+                motion::icons::draw(g, shown ? motion::icons::Icon::visibility : motion::icons::Icon::visibilityOff, getLocalBounds().toFloat(), osci::Colours::text().withAlpha(alpha), motion::style::iconSmall);
             }
         } eye;
         std::function<void()> onClick, onMenu;

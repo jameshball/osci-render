@@ -16,8 +16,8 @@ public:
         editor.setFont(motion::style::body());
         editor.setJustification(juce::Justification::centredRight);
         editor.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
-        editor.setColour(juce::TextEditor::outlineColourId, osci::Colours::accentColor().withAlpha(.6f));
-        editor.setColour(juce::TextEditor::focusedOutlineColourId, osci::Colours::accentColor());
+        editor.setColour(juce::TextEditor::outlineColourId, motion::style::accent().withAlpha(.6f));
+        editor.setColour(juce::TextEditor::focusedOutlineColourId, motion::style::accent());
         editor.setIndents(4, 3);
         editor.addListener(this);
         addChildComponent(editor);
@@ -59,10 +59,10 @@ public:
         const auto bounds = getLocalBounds().toFloat();
         // A driven value is tinted in the colour of what drives it.
         g.setColour(accent.has_value() ? fill.interpolatedWith(*accent, isEnabled() ? .2f : .1f) : fill);
-        g.fillRoundedRectangle(bounds, motion::style::radius);
+        g.fillRoundedRectangle(bounds, motion::style::radiusControl);
         if (hovered || dragging || hasKeyboardFocus(false)) {
-            g.setColour((hasKeyboardFocus(false) ? osci::Colours::accentColor() : osci::Colours::outlineSubtle()).withAlpha(.8f));
-            g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
+            g.setColour((hasKeyboardFocus(false) ? motion::style::accent() : osci::Colours::outlineSubtle()).withAlpha(.8f));
+            g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radiusControl, 1.0f);
         }
         // Clear of a caption laid over it (see style::captionWidth): a value
         // too long for the rest is shortened rather than run into it.

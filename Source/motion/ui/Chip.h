@@ -28,9 +28,11 @@ public:
             paintContent(g, bounds, osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .6f));
             return;
         }
-        g.setColour(active ? on : (highlighted || down ? osci::Colours::surfaceRaised().brighter(.15f) : osci::Colours::veryDark()));
+        g.setColour(active ? on : osci::Colours::veryDark());
         g.fillRoundedRectangle(bounds, style::radiusControl);
         if (!active) {
+            g.setColour(style::wash(highlighted ? 1.0f : 0.0f, down));
+            g.fillRoundedRectangle(bounds, style::radiusControl);
             // An outline marks it as a toggle, not a heading.
             g.setColour(juce::Colours::white.withAlpha(highlighted ? .28f : .16f));
             g.drawRoundedRectangle(bounds.reduced(.5f), style::radiusControl, 1.0f);

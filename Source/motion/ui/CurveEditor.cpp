@@ -348,16 +348,16 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     }
     if (snapGuide.has_value()) {
         const auto guide = std::round(timeX(*snapGuide)) + .5f;
-        g.setColour(osci::Colours::accentColor().withAlpha(.75f));
+        g.setColour(motion::style::accent().withAlpha(.75f));
         const float dashes[] {4.0f, 3.0f};
         g.drawDashedLine(juce::Line<float>(guide, area.getY(), guide, area.getBottom()), dashes, 2, 1.0f);
     }
     const auto box = selectionBox(*clip);
     if (box.has_value()) {
-        g.setColour(osci::Colours::accentColor().withAlpha(.03f));
-        g.fillRoundedRectangle(box->area, 4.0f);
-        g.setColour(osci::Colours::accentColor().withAlpha(.5f));
-        g.drawRoundedRectangle(box->area.reduced(.5f), 4.0f, 1.0f);
+        g.setColour(motion::style::accent().withAlpha(.03f));
+        g.fillRoundedRectangle(box->area, motion::style::radiusControl);
+        g.setColour(motion::style::accent().withAlpha(.5f));
+        g.drawRoundedRectangle(box->area.reduced(.5f), motion::style::radiusControl, 1.0f);
         for (const auto right : {false, true}) {
             if (!hasGrips(*box)) { break; }
             const auto grip = scaleHandle(*box, right);
@@ -365,15 +365,15 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
             // Slim accent pills on the box's edges, white while grabbed or hovered.
             g.setColour(osci::Colours::veryDark());
             g.fillRoundedRectangle(grip.expanded(1.0f), 2.5f);
-            g.setColour(active ? juce::Colours::white : osci::Colours::accentColor().brighter(.15f));
+            g.setColour(active ? juce::Colours::white : motion::style::accent().brighter(.15f));
             g.fillRoundedRectangle(grip, 1.5f);
         }
     }
     if (marquee.has_value()) {
-        g.setColour(osci::Colours::accentColor().withAlpha(.07f));
-        g.fillRoundedRectangle(*marquee, 2.0f);
-        g.setColour(osci::Colours::accentColor().withAlpha(.5f));
-        g.drawRoundedRectangle(marquee->reduced(.5f), 2.0f, 1.0f);
+        g.setColour(motion::style::accent().withAlpha(.07f));
+        g.fillRoundedRectangle(*marquee, motion::style::radiusSmall);
+        g.setColour(motion::style::accent().withAlpha(.5f));
+        g.drawRoundedRectangle(marquee->reduced(.5f), motion::style::radiusSmall, 1.0f);
     }
     g.restoreState();
     const auto x = playheadX();

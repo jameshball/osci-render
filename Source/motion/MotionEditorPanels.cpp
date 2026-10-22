@@ -17,7 +17,7 @@ void styleTabs(osci::TabBar& tabs) {
     tabs.setColour(osci::TabBar::backgroundColourId, osci::Colours::veryDark());
     tabs.setColour(osci::TabBar::textColourId, osci::Colours::textMuted());
     tabs.setColour(osci::TabBar::selectedTextColourId, osci::Colours::text());
-    tabs.setColour(osci::TabBar::indicatorColourId, osci::Colours::accentColor());
+    tabs.setColour(osci::TabBar::indicatorColourId, motion::style::accent());
 }
 }
 
