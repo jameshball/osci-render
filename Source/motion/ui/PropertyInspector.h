@@ -112,8 +112,42 @@ private:
         // Hovered, a diamond with no keys yet opens into "Animate", saying
         // what it does; a property's first key pulses once round it.
         void paintOverChildren(juce::Graphics& g) override;
-        void mouseEnter(const juce::MouseEvent& event) override { hoverKey(event, true); }
-        void mouseExit(const juce::MouseEvent& event) override { hoverKey(event, false); }
+        // A diamond with no keys recedes, and the modulate glyph shows only
+        // while the row is hovered, a modulator is dragged, or the row is
+        // driven, keeping its column so the values never shift: the rows
+        // that are keyed or driven stand out.
+        Row() {
+            key.restAlpha = .45f;
+            modulate.showsOff = false;
+            addMouseListener(&hover, true);
+        }
+        ~Row() override { removeMouseListener(&hover); }
+        // The pointer over the row or anything in it. A listener of its own,
+        // not the row, so wheel events still pass up once to the scroller.
+        struct Hover final : juce::MouseListener {
+            explicit Hover(Row& owner) : row(owner) {}
+            void mouseEnter(const juce::MouseEvent& event) override {
+                row.hoverKey(event, true);
+                row.showModulate();
+            }
+            void mouseExit(const juce::MouseEvent& event) override {
+                row.hoverKey(event, false);
+                row.showModulate();
+            }
+            Row& row;
+        };
+        Hover hover {*this};
+        void setModulatorDrag(bool active) {
+            modulatorDrag = active;
+            showModulate();
+        }
+        void showModulate() {
+            const auto shown = modulatorDrag || isMouseOver(true);
+            if (modulate.showsOff == shown) { return; }
+            modulate.showsOff = shown;
+            modulate.repaint();
+        }
+        bool modulatorDrag = false;
         void hoverKey(const juce::MouseEvent& event, bool over) {
             if (event.eventComponent != &key || keyHovered == over) { return; }
             keyHovered = over;
@@ -220,7 +254,11 @@ private:
     osci::ScrollFadeViewport viewport;
     // Scrolled, the rows slide under the heading: a rule marks where.
     Content content;
+    // The panel's header: what is edited (renamed by double-click for a
+    // camera), and its kind at the right; "Properties" with nothing to edit.
     juce::Label title, kind;
+    static constexpr int headerHeight = osci::PanelHeader::height;
+    void layoutHeader();
     std::vector<std::unique_ptr<Row>> rows;
     // The innermost field or row under `point` that a modulator can drive.
     juce::Component* routeTargetAt(juce::Point<int> point);

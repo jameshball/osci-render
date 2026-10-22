@@ -5,8 +5,8 @@
 #include <optional>
 
 // osci-motion's icons: Material Design glyphs (Apache 2.0) on a 24 px grid,
-// drawn at 18 px so their 2 px strokes land on whole device pixels on
-// high-density displays. One button draws them all, so toolbars match.
+// drawn at the named sizes (style::iconLarge and smaller), on whole pixels.
+// One button draws them all, so toolbars match.
 namespace motion::icons {
 enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, autoKey, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search, solidView, link, effects };
 
@@ -146,7 +146,7 @@ inline const juce::Path& path(Icon icon) {
 }
 
 // Draws the icon's 24 px grid into `area` at `size` px, on whole pixels.
-inline void draw(juce::Graphics& g, Icon icon, juce::Rectangle<float> area, juce::Colour colour, float size = 18.0f) {
+inline void draw(juce::Graphics& g, Icon icon, juce::Rectangle<float> area, juce::Colour colour, float size = style::iconLarge) {
     const auto box = area.withSizeKeepingCentre(size, size);
     const auto origin = juce::Point<float>(std::round(box.getX()), std::round(box.getY()));
     g.setColour(colour);
@@ -168,17 +168,17 @@ public:
             repaint();
         }
     }
-    float iconSize = 18.0f;
+    float iconSize = style::iconLarge;
     void buttonStateChanged() override { fade.follow(*this); }
     void paintButton(juce::Graphics& g, bool, bool down) override {
         const auto bounds = getLocalBounds().toFloat().reduced(1.0f);
         const auto on = getToggleState();
         if (on) {
             g.setColour(onColour.withMultipliedAlpha(down ? 1.3f : 1.0f));
-            g.fillRoundedRectangle(bounds, motion::style::radius + 1);
+            g.fillRoundedRectangle(bounds, style::radiusControl);
         } else if (fade.value() > 0.0f || down) {
-            g.setColour(juce::Colours::white.withAlpha(down ? .14f : .08f * fade.value()));
-            g.fillRoundedRectangle(bounds, motion::style::radius + 1);
+            g.setColour(style::wash(fade.value(), down));
+            g.fillRoundedRectangle(bounds, style::radiusControl);
         }
         const auto idle = osci::Colours::text().withAlpha(.72f);
         const auto colour = tint.has_value() ? *tint : on ? juce::Colours::white : idle.interpolatedWith(osci::Colours::text(), fade.value());
@@ -209,8 +209,8 @@ public:
     void paintButton(juce::Graphics& g, bool, bool down) override {
         const auto bounds = getLocalBounds().toFloat();
         if (fade.value() > 0.0f || down) {
-            g.setColour(juce::Colours::white.withAlpha(down ? .12f : .06f * fade.value()));
-            g.fillRoundedRectangle(bounds, motion::style::radius + 1);
+            g.setColour(style::wash(fade.value(), down));
+            g.fillRoundedRectangle(bounds, style::radiusControl);
         }
         const auto colour = osci::Colours::textMuted().interpolatedWith(osci::Colours::text(), fade.value()).withMultipliedAlpha(isEnabled() ? 1.0f : .35f);
         auto area = getLocalBounds().withTrimmedLeft(leading);
@@ -220,7 +220,7 @@ public:
         g.setFont(motion::style::body());
         g.drawText(getButtonText(), area, juce::Justification::centredLeft, false);
     }
-    float iconSize = 16.0f;
+    float iconSize = style::iconMedium;
     // Space before the icon, between it and the text, and after the text.
     int leading = 6, gap = 5, trailing = 8;
 private:

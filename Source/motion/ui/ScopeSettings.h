@@ -66,8 +66,9 @@ public:
         auto* screen = parameters.screenOverlay;
         // The shared parameter calls no overlay "Empty"; here it is "None".
         for (int id = 1; id <= screen->max.load(); ++id) { overlay.addItem(id == static_cast<int>(ScreenOverlay::Empty) ? juce::String("None") : screen->getText(screen->getNormalisedValue(static_cast<float>(id))), id); }
-        overlay.setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
-        overlay.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+        motion::style::styleField(overlay);
+        // Its value sits at the right of the value columns, like the values below it.
+        overlay.setJustificationType(juce::Justification::centredRight);
         overlay.onChange = [this] {
             if (updating) { return; }
             processor.lastUndoParamId = {};

@@ -65,9 +65,11 @@ private:
     mutable std::vector<Thumbnail> thumbnails;
 
     void paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const;
-    // Where a row's picture is, and the badge in its corner saying its file is
+    // A row's face (what hover and selection fill), lined up with Add source;
+    // where its picture is, and the badge in its corner saying its file is
     // linked from disk.
-    static juce::Rectangle<int> thumbnailArea(int width, int height) { return juce::Rectangle<int>(0, 0, width, height).reduced(4, 2).reduced(8, 3).removeFromLeft(36).withSizeKeepingCentre(34, 34); }
+    static juce::Rectangle<int> rowFace(int width, int height) { return juce::Rectangle<int>(width, height).reduced(4, motion::style::gap / 2); }
+    static juce::Rectangle<int> thumbnailArea(int width, int height) { return motion::style::libraryRow::pictureArea(rowFace(width, height)); }
     static juce::Rectangle<float> linkBadge(int width, int height) {
         const auto picture = thumbnailArea(width, height).toFloat();
         return juce::Rectangle<float>(12, 12).withCentre(picture.getBottomRight() - juce::Point<float>(3, 3));

@@ -35,22 +35,22 @@ public:
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
         g.setColour(fill);
-        g.fillRoundedRectangle(bounds, style::radius + 1);
+        g.fillRoundedRectangle(bounds, style::radiusControl);
         const auto hover = isMouseOver(true) ? segmentAt(getMouseXYRelative().x) : -1;
         for (int index = 0; index < labels.size(); ++index) {
             const auto segment = segmentBounds(index).toFloat();
             // Disabled, the choice still shows, faintly, with no edge to press.
             if (index == selected && !isEnabled()) {
                 g.setColour(style::hoverFill());
-                g.fillRoundedRectangle(segment, style::radius);
+                g.fillRoundedRectangle(segment, style::radiusSmall);
             } else if (index == selected) {
                 g.setColour(osci::Colours::surfaceRaised().brighter(.12f));
-                g.fillRoundedRectangle(segment, style::radius);
+                g.fillRoundedRectangle(segment, style::radiusSmall);
                 g.setColour(style::hairline());
-                g.drawRoundedRectangle(segment.reduced(.5f), style::radius, 1.0f);
+                g.drawRoundedRectangle(segment.reduced(.5f), style::radiusSmall, 1.0f);
             } else if (index == hover && isEnabled()) {
                 g.setColour(style::hoverFill());
-                g.fillRoundedRectangle(segment, style::radius);
+                g.fillRoundedRectangle(segment, style::radiusSmall);
             }
             g.setFont(compact ? style::caption() : style::body());
             const auto alpha = !isEnabled() ? (index == selected ? .5f : .25f) : index == selected ? 1.0f : index == hover ? .9f : .62f;
@@ -59,7 +59,7 @@ public:
         }
         if (hasKeyboardFocus(false)) {
             g.setColour(style::accent().withAlpha(.6f));
-            g.drawRoundedRectangle(bounds.reduced(.5f), style::radius + 1, 1.0f);
+            g.drawRoundedRectangle(bounds.reduced(.5f), style::radiusControl, 1.0f);
         }
     }
     void mouseDown(const juce::MouseEvent& event) override {

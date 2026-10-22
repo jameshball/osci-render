@@ -9,7 +9,7 @@
 MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(document), list("Motion assets", this) {
     setName("Asset library");
     list.setComponentID("motion.assets");
-    list.setRowHeight(46);
+    list.setRowHeight(motion::style::libraryRow::pitch);
     list.setMultipleSelectionEnabled(false);
     list.setColour(juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     list.setOutlineThickness(0);
@@ -22,7 +22,7 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     cancelImport.setButtonText("Cancel import");
     cancelImport.onClick = [this] { if (onCancelImport) { onCancelImport(); } };
     addChildComponent(cancelImport);
-    edit.iconSize = 18.0f;
+    edit.iconSize = motion::style::iconLarge;
     edit.onClick = [this] {
         const auto row = hoveredRow;
         list.selectRow(row);
@@ -35,7 +35,6 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     search.setName("Search sources");
     search.setTextToShowWhenEmpty("Search sources", osci::Colours::textMuted());
     search.setFont(motion::style::body());
-    search.setIndents(0, 5);
     motion::style::styleField(search);
     search.onTextChange = [this] { refresh(); };
     search.onEscapeKey = [this] { search.clear(); refresh(); };
@@ -64,6 +63,13 @@ void MotionAssetLibrary::setImportStatus(const juce::String& message) {
 
 void MotionAssetLibrary::refresh() {
     const auto selectedId = assetId(list.getSelectedRow());
+    // With nothing to search, no search field: the list stays blank under Add source.
+    const auto searchable = !document.project().assets.empty() || !document.mainProject().definitions.empty();
+    if (searchable != search.isVisible()) {
+        if (!searchable) { search.clear(); }
+        search.setVisible(searchable);
+        resized();
+    }
     const auto filter = search.getText().trim();
     assets.clear();
     definitions.clear();
@@ -134,8 +140,11 @@ juce::String MotionAssetLibrary::getTooltipForRow(int row) {
 
 void MotionAssetLibrary::resized() {
     auto area = getLocalBounds();
-    search.setBounds(area.removeFromTop(26).reduced(4, 1));
-    area.removeFromTop(4);
+    if (search.isVisible()) {
+        // Lined up with Add source above it and the rows below.
+        search.setBounds(area.removeFromTop(motion::style::controlHeight).reduced(4, 0));
+        area.removeFromTop(motion::style::gap);
+    }
     if (cancelImport.isVisible()) {
         cancelImport.setBounds(area.removeFromBottom(30).reduced(6, 2));
     }
@@ -199,15 +208,14 @@ void MotionAssetLibrary::placeEdit() {
     edit.toFront(false);
 }
 
+// An empty project's list is blank: the Scene's hint says what to do. A
+// search that finds nothing says so.
 void MotionAssetLibrary::paint(juce::Graphics& graphics) {
-    if (assets.empty() && definitions.empty()) {
-        graphics.setColour(osci::Colours::text().withAlpha(0.6f));
-        graphics.setFont(motion::style::body());
-        // Empty, or nothing found: which says what to do.
-        const auto filter = search.getText().trim();
-        const auto message = filter.isEmpty() ? juce::String("Drop files here") : "No sources match " + juce::String::fromUTF8("\xe2\x80\x9c") + filter + juce::String::fromUTF8("\xe2\x80\x9d");
-        graphics.drawFittedText(message, list.getBounds().reduced(12), juce::Justification::centred, 3);
-    }
+    const auto filter = search.getText().trim();
+    if (!assets.empty() || !definitions.empty() || filter.isEmpty()) { return; }
+    graphics.setColour(osci::Colours::text().withAlpha(0.6f));
+    graphics.setFont(motion::style::body());
+    graphics.drawFittedText("No sources match " + juce::String::fromUTF8("\xe2\x80\x9c") + filter + juce::String::fromUTF8("\xe2\x80\x9d"), list.getBounds().reduced(12), juce::Justification::centred, 3);
 }
 
 void MotionAssetLibrary::selectedRowsChanged(int row) {
@@ -232,67 +240,59 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     if (!validRow(row)) {
         return;
     }
-    auto bounds = juce::Rectangle<int>(0, 0, width, height).reduced(4, 2);
-    if (selected) {
-        // The one selected-row look: a neutral lift and an accent bar.
-        graphics.setColour(osci::Colours::surfaceRaised());
-        graphics.fillRoundedRectangle(bounds.toFloat(), motion::style::radius);
-        graphics.setColour(motion::style::accent());
-        graphics.fillRect(bounds.withWidth(2).reduced(0, 5));
-    } else if (row == hoveredRow) {
-        graphics.setColour(motion::style::hoverFill());
-        graphics.fillRoundedRectangle(bounds.toFloat(), motion::style::radius);
-    }
-    bounds.reduce(8, 3);
+    namespace libraryRow = motion::style::libraryRow;
+    const auto face = rowFace(width, height);
+    libraryRow::paintFace(graphics, face.toFloat(), row == hoveredRow ? 1.0f : 0.0f, selected);
     // A small picture of the source, like a project panel thumbnail.
     paintThumbnail(graphics, row, thumbnailArea(width, height));
-    bounds.removeFromLeft(44);
     // A file linked rather than held: a link in the picture's corner.
     if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->isLinked()) {
         const auto badge = linkBadge(width, height);
         graphics.setColour(osci::Colours::surface());
         graphics.fillEllipse(badge.expanded(1));
+        // A badge's glyph, smaller than any button's.
         motion::icons::draw(graphics, motion::icons::Icon::link, badge, osci::Colours::text().withAlpha(.8f), 12.0f);
     }
-    // The edit button covers the selected row's end.
-    const auto hovered = row == hoveredRow && addable(row);
-    if (row == hoveredRow && editLabel(row).isNotEmpty()) { bounds.setRight(width - 72); }
-    if (hovered) {
+    auto text = libraryRow::textArea(face);
+    // The edit button covers the hovered row's end.
+    if (row == hoveredRow && editLabel(row).isNotEmpty()) { text.setRight(width - 72); }
+    if (row == hoveredRow && addable(row)) {
         const auto add = addArea(width, height).toFloat();
-        bounds.setRight(std::min(bounds.getRight(), juce::roundToInt(add.getX()) - 4));
+        text.setRight(std::min(text.getRight(), juce::roundToInt(add.getX()) - 4));
         // Drawn as the edit button beside it is drawn when hovered.
-        graphics.setColour(juce::Colours::white.withAlpha(.08f));
-        graphics.fillRoundedRectangle(add.reduced(1.0f), motion::style::radius + 1);
-        motion::icons::draw(graphics, motion::icons::Icon::add, add, osci::Colours::text().withAlpha(.72f), 18.0f);
+        graphics.setColour(motion::style::hoverFill());
+        graphics.fillRoundedRectangle(add.reduced(1.0f), motion::style::radiusControl);
+        motion::icons::draw(graphics, motion::icons::Icon::add, add, osci::Colours::text().withAlpha(.72f), motion::style::iconLarge);
     }
-    graphics.setColour(osci::Colours::text());
-    graphics.setFont(motion::style::body());
-    // The name as the timeline and renaming show it, file extension and all.
-    graphics.drawText(getNameForRow(row), bounds.removeFromTop(20), juce::Justification::centredLeft);
-    graphics.setColour(osci::Colours::text().withAlpha(0.55f));
-    graphics.setFont(motion::style::caption());
-    juce::String detail;
+    // Only what the picture and the name don't already say.
+    juce::StringArray detail;
+    auto detailColour = osci::Colours::text().withAlpha(0.55f);
     if (definitionRow(row)) {
         const auto& definition = *definitions[static_cast<std::size_t>(row) - assets.size()];
         const auto clip = motion::Document::makeCompositionClip(0, definition, 0);
-        detail = "Composition" + motion::style::dot() + juce::String(clip.duration, 1) + " s";
+        detail.add("Composition");
+        detail.add(juce::String(clip.duration, 1) + " s");
     } else {
         const auto& asset = *assets[static_cast<std::size_t>(row)];
-        detail = motion::ui::sourceKind(asset);
+        // A generator's picture shows what it is.
+        const auto kind = motion::generatorOf(asset) != nullptr ? juce::String() : motion::ui::sourceKind(asset);
+        if (kind.isNotEmpty() && !kind.equalsIgnoreCase(asset.name)) { detail.add(kind); }
         // A model kept at its file's size says so (its settings say how
         // much fitting it would scale it).
-        if (modelRow(row) && asset.originalSize) { detail += motion::style::dot() + "unscaled"; }
+        if (modelRow(row) && asset.originalSize) { detail.add("unscaled"); }
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
-            detail += motion::style::dot() + juce::String(asset.source->duration(), 1) + " s";
+            detail.add(juce::String(asset.source->duration(), 1) + " s");
         }
         // Its linked file wasn't found, or changed: its edit button finds it again.
         if (asset.missing) {
-            detail = asset.linked.existsAsFile() ? "File changed" : "File missing";
-            graphics.setColour(motion::style::error());
+            detail.clearQuick();
+            detail.add(asset.linked.existsAsFile() ? "File changed" : "File missing");
+            detailColour = motion::style::error();
         }
     }
-    graphics.drawText(detail, bounds, juce::Justification::centredLeft);
+    // The name as the timeline and renaming show it, file extension and all.
+    libraryRow::paintText(graphics, text, getNameForRow(row), detail.joinIntoString(motion::style::dot()), detailColour);
 }
 
 juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {

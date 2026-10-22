@@ -123,7 +123,6 @@ public:
     void paint(juce::Graphics& g) override { g.fillAll(osci::Colours::surface()); }
 
 private:
-    static constexpr int cardHeight = 40;
     // The modulator as a card: what it does, its name and how much it drives.
     class Card final : public juce::Component {
     public:

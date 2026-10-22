@@ -39,8 +39,9 @@ MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : proce
     viewport.setViewedComponent(&content, false);
     motion::style::fadeScrolling(viewport);
     addAndMakeVisible(viewport);
+    // Title and kind sit in the panel's 30 px header, on the Scene's and
+    // Scope's baseline.
     title.setFont(motion::style::title());
-    title.setColour(juce::Label::textColourId, osci::Colours::text());
     title.setName("Inspector title");
     title.setBorderSize({});
     kind.setBorderSize({});
@@ -99,7 +100,6 @@ void MotionPropertyInspector::setTarget(motion::Id id) {
 void MotionPropertyInspector::setSelectionCount(std::size_t count) {
     if (count == selectionCount) { return; }
     selectionCount = count;
-    resized();
     refresh();
 }
 
@@ -159,13 +159,20 @@ void MotionPropertyInspector::refresh() {
     }
     title.setEditable(false, editable && found->camera);
     title.setTooltip(editable && found->camera ? "Double-click to rename" : juce::String());
-    if (!title.isBeingEdited()) { title.setText(editable ? juce::String(found->name.data(), found->name.size()) : heading.has_value() ? heading->first : juce::String(), juce::dontSendNotification); }
+    // With nothing to name, the panel's own name, quietly.
+    const auto unnamed = !editable && !heading.has_value();
+    title.setColour(juce::Label::textColourId, unnamed ? osci::Colours::textMuted() : osci::Colours::text());
+    if (!title.isBeingEdited()) { title.setText(editable ? juce::String(found->name.data(), found->name.size()) : heading.has_value() ? heading->first : juce::String("Properties"), juce::dontSendNotification); }
     // With several clips selected the header says so; edits apply to the
     // one named.
     const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->beam ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : sourceKind(target);
-    kind.setText(editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText, juce::dontSendNotification);
+    const auto shownKind = editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText;
+    if (shownKind != kind.getText()) {
+        kind.setText(shownKind, juce::dontSendNotification);
+        layoutHeader();
+    }
     // Children repaint their own changes; only the empty message is painted here.
-    const auto wasEmpty = std::exchange(empty, !editable && !heading.has_value());
+    const auto wasEmpty = std::exchange(empty, unnamed);
     if (empty != wasEmpty) { repaint(); }
     refreshValues();
 }
@@ -225,6 +232,7 @@ void MotionPropertyInspector::refreshValues() {
 
 void MotionPropertyInspector::setModulatorDrag(bool active) {
     modulatorDrag = active;
+    for (auto& row : rows) { row->setModulatorDrag(active); }
     if (!active) {
         dropTarget = nullptr;
         if (previewingRoute && onRoutePreview) { onRoutePreview(std::nullopt); }
@@ -299,16 +307,22 @@ void MotionPropertyInspector::paint(juce::Graphics& g) {
     g.setColour(osci::Colours::textMuted());
     g.setFont(motion::style::body());
     g.drawFittedText("Select an object, group, audio clip or camera to edit its properties.",
-        getLocalBounds().withTrimmedTop(40).reduced(motion::style::padding * 2, 0).removeFromTop(60), juce::Justification::topLeft, 3);
+        getLocalBounds().withTrimmedTop(headerHeight + 6).reduced(motion::style::padding * 2, 0).removeFromTop(60), juce::Justification::topLeft, 3);
 }
 
 void MotionPropertyInspector::resized() {
-    auto area = getLocalBounds();
-    auto header = area.removeFromTop(34).reduced(motion::style::padding, 0);
-    kind.setBounds(header.removeFromRight(selectionCount > 1 ? 110 : 60));
-    title.setBounds(header);
-    viewport.setBounds(area);
+    layoutHeader();
+    viewport.setBounds(getLocalBounds().withTrimmedTop(headerHeight));
     layoutContent();
+}
+
+// The kind as wide as its text; the title has the rest.
+void MotionPropertyInspector::layoutHeader() {
+    auto header = getLocalBounds().removeFromTop(headerHeight).reduced(motion::style::padding, 3);
+    const auto kindWidth = kind.getText().isEmpty() ? 0 : juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::caption(), kind.getText())));
+    kind.setBounds(header.removeFromRight(std::min(kindWidth, header.getWidth() / 2)));
+    header.removeFromRight(kindWidth > 0 ? motion::style::padding : 0);
+    title.setBounds(header);
 }
 
 MotionPropertyInspector::Swatch::Swatch() : juce::Button("Colour swatch") {
@@ -484,7 +498,6 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             // Keys are neutral: filled on a key, outlined off one.
             row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
             row->key.setTitle(row->key.getName());
-            row->key.addMouseListener(row.get(), false);
             row->previous.setName("Previous " + row->group.toLowerCase() + " key");
             row->next.setName("Next " + row->group.toLowerCase() + " key");
             row->previous.setTooltip("Go to the previous key");

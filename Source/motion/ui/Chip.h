@@ -19,30 +19,34 @@ public:
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
         const auto bounds = getLocalBounds().toFloat().reduced(.5f);
         const auto active = getToggleState();
+        if (!active && !showsOff) { return; }
         if (quiet && !active) {
             if (highlighted || down) {
-                g.setColour(down ? motion::style::pressFill() : motion::style::restFill());
-                g.fillRoundedRectangle(bounds, style::radius);
+                g.setColour(style::wash(1.0f, down));
+                g.fillRoundedRectangle(bounds, style::radiusControl);
             }
             paintContent(g, bounds, osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .6f));
             return;
         }
         g.setColour(active ? on : (highlighted || down ? osci::Colours::surfaceRaised().brighter(.15f) : osci::Colours::veryDark()));
-        g.fillRoundedRectangle(bounds, style::radius);
+        g.fillRoundedRectangle(bounds, style::radiusControl);
         if (!active) {
             // An outline marks it as a toggle, not a heading.
             g.setColour(juce::Colours::white.withAlpha(highlighted ? .28f : .16f));
-            g.drawRoundedRectangle(bounds.reduced(.5f), style::radius, 1.0f);
+            g.drawRoundedRectangle(bounds.reduced(.5f), style::radiusControl, 1.0f);
         }
         paintContent(g, bounds, active ? onContent : osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .85f));
     }
 
-    float iconSize = 13.0f;
+    float iconSize = style::iconSmall;
     // The glyph or word when on: white on the accent; a modulation chip's
     // lilac on a faint lilac fill says what drives the value.
     juce::Colour onContent = juce::Colours::white;
     // Just the content until hovered or on: a column of these stays light.
     bool quiet = false;
+    // Off, drawn at all: an owner can keep it out of sight until wanted (a
+    // row's modulate glyph while the row is hovered). On, it always shows.
+    bool showsOff = true;
 
 private:
     void setUp() {

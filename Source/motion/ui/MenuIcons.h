@@ -5,10 +5,11 @@
 #include "InterpolationGlyph.h"
 
 // Pictures beside menu items. Each is drawn in a 96-unit square that is the
-// whole icon, so every icon in a menu scales alike, with lines fine enough to
-// stay crisp once the menu shrinks it to the item's height (about 16 px).
+// whole icon, so every icon in a menu scales alike. Shrunk to the item's
+// height (about 16 px), a line is a little over a pixel, near the toolbar
+// glyphs' weight, and stays inside the square past the margin.
 namespace motion::ui::menu_icons {
-inline constexpr float size = 96, margin = 6, line = 5;
+inline constexpr float size = 96, margin = 6, line = 7;
 
 // Shapes drawn in order over the square. A menu fits an icon by what it
 // draws, so an unseen square under them makes every icon the same size, as
@@ -124,17 +125,6 @@ inline juce::Path folder() {
     path.closeSubPath();
     path.startNewSubPath(8, 38);
     path.lineTo(88, 38);
-    return fitted(path);
-}
-// A waveform: audio.
-inline juce::Path wave() {
-    juce::Path path;
-    const float heights[] {14, 30, 52, 30, 64, 40, 22, 46, 18};
-    for (int index = 0; index < 9; ++index) {
-        const auto x = 12.0f + static_cast<float>(index) * 9.0f, half = heights[index] * .5f;
-        path.startNewSubPath(x, 48 - half);
-        path.lineTo(x, 48 + half);
-    }
     return fitted(path);
 }
 // A point sending in both directions: a source that arrives live.

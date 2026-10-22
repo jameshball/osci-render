@@ -17,13 +17,11 @@ public:
             tiles.push_back(std::move(tile));
             names.add(juce::String(definition.name.data(), definition.name.size()));
         }
-        // The same search field as Assets.
+        // The same search field as Sources'.
         search.setName("Search effects");
         search.setTextToShowWhenEmpty("Search effects", osci::Colours::textMuted());
         search.setFont(motion::style::body());
-        search.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
-        search.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
-        search.setIndents(8, 5);
+        motion::style::styleField(search);
         search.onTextChange = [this] { resized(); };
         search.onEscapeKey = [this] { search.clear(); resized(); };
         addAndMakeVisible(search);
@@ -33,27 +31,29 @@ public:
     }
     std::function<void(const std::string&)> onInsert;
     void resized() override {
+        // The search sits in the top slot every library tab shares, where
+        // Add source and Add modulator sit in theirs; the rows line up with
+        // Sources'.
         auto area = getLocalBounds();
         area.removeFromTop(6);
-        search.setBounds(area.removeFromTop(26).reduced(4, 1));
-        area.removeFromTop(2);
+        search.setBounds(area.removeFromTop(motion::style::controlHeight).reduced(4, 0));
+        area.removeFromTop(motion::style::gap);
         viewport.setBounds(area);
         const auto width = viewport.getMaximumVisibleWidth();
         const auto query = search.getText().trim();
-        int y = motion::style::gap;
+        int y = 0;
         for (std::size_t index = 0; index < tiles.size(); ++index) {
             auto& tile = tiles[index];
             const auto shown = query.isEmpty() || names[static_cast<int>(index)].containsIgnoreCase(query);
             tile->setVisible(shown);
             if (!shown) { continue; }
-            tile->setBounds(motion::style::gap, y, width - 2 * motion::style::gap, tileHeight);
-            y += tileHeight + motion::style::gap;
+            tile->setBounds(juce::Rectangle<int>(0, y, width, motion::style::libraryRow::pitch).reduced(4, motion::style::gap / 2));
+            y += motion::style::libraryRow::pitch;
         }
         content.setSize(width, y);
     }
 
 private:
-    static constexpr int tileHeight = 44;
     class Tile final : public juce::Component {
     public:
         Tile(MotionEffectLibrary& library, const motion::EffectDefinition& effect) : owner(library), definition(effect) {
@@ -64,14 +64,10 @@ private:
             buildThumbnail();
         }
         void paint(juce::Graphics& g) override {
+            namespace libraryRow = motion::style::libraryRow;
             const auto hover = fade.value();
-            const auto bounds = getLocalBounds().toFloat();
-            g.setColour(motion::style::cardFill(hover));
-            g.fillRoundedRectangle(bounds, motion::style::radius + 1);
-            g.setColour(osci::Colours::accentColor().withAlpha(.1f + .35f * hover));
-            g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
-            auto area = getLocalBounds().reduced(motion::style::gap);
-            const auto thumb = area.removeFromLeft(area.getHeight()).toFloat();
+            libraryRow::paintFace(g, getLocalBounds().toFloat(), hover, false);
+            const auto thumb = libraryRow::pictureArea(getLocalBounds()).toFloat();
             motion::style::fillWell(g, thumb);
             const auto transform = juce::AffineTransform::scale(thumb.getWidth() * .5f, -thumb.getHeight() * .5f).translated(thumb.getCentre());
             if (!before.isEmpty()) {
@@ -80,10 +76,7 @@ private:
             }
             g.setColour(tint.withAlpha(.55f + .45f * hover));
             g.strokePath(thumbnail, juce::PathStrokeType(1.0f), transform);
-            area.removeFromLeft(motion::style::padding);
-            g.setColour(osci::Colours::text());
-            g.setFont(motion::style::body());
-            g.drawText(getName(), area, juce::Justification::centredLeft, true);
+            libraryRow::paintText(g, libraryRow::textArea(getLocalBounds()), getName(), {}, {});
         }
         void mouseEnter(const juce::MouseEvent&) override { fade.setTarget(true); }
         void mouseExit(const juce::MouseEvent&) override { fade.setTarget(false); }

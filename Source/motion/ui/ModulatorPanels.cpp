@@ -111,7 +111,7 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
     };
     content.addAndMakeVisible(name);
     remove.setName("Delete modulator");
-    remove.iconSize = 16.0f;
+    remove.iconSize = motion::style::iconMedium;
     remove.onClick = [this] {
         if (selected == 0) { return; }
         report(processor.document.removeModulator(selected));
@@ -215,16 +215,14 @@ void MotionModulatorLibrary::refresh() {
 void MotionModulatorLibrary::resized() {
     viewport.setBounds(getLocalBounds());
     const auto width = viewport.getMaximumVisibleWidth();
-    // The add button sits exactly where Assets' Add source does.
+    // The add button sits exactly where Sources' Add source does, and the
+    // cards line up with Sources' rows.
     auto area = juce::Rectangle<int>(0, 0, width, 100000).reduced(motion::style::padding, 0).withTrimmedTop(6);
     addButton.setBounds(area.removeFromTop(30));
+    area.removeFromTop(motion::style::gap);
     emptyHint.setVisible(cards.empty());
-    if (cards.empty()) { emptyHint.setBounds(area.removeFromTop(120).withTrimmedTop(16)); }
-    area.removeFromTop(cards.empty() ? 0 : 6);
-    for (auto& card : cards) {
-        card->setBounds(area.removeFromTop(cardHeight));
-        area.removeFromTop(motion::style::gap);
-    }
+    if (cards.empty()) { emptyHint.setBounds(area.removeFromTop(120).withTrimmedTop(12)); }
+    for (auto& card : cards) { card->setBounds(area.removeFromTop(motion::style::libraryRow::pitch).reduced(0, motion::style::gap / 2)); }
     const auto* modulator = current();
     if (modulator != nullptr) {
         area.removeFromTop(motion::style::padding * 2);
@@ -279,27 +277,17 @@ MotionModulatorLibrary::Card::Card(MotionModulatorLibrary& library, const motion
     setTitle(juce::String(modulator.name) + " modulator");
 }
 
+// Like a Sources row: its wave in the picture, its name over what it drives.
 void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
+    namespace libraryRow = motion::style::libraryRow;
     const auto active = modulator.id == owner.selected;
     const auto hover = fade.value();
-    const auto bounds = getLocalBounds().toFloat();
-    g.setColour(active ? osci::Colours::surfaceRaised() : motion::style::cardFill(hover));
-    g.fillRoundedRectangle(bounds, motion::style::radius + 1);
-    if (active) {
-        g.setColour(motion::style::accent().withAlpha(.7f));
-        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
-    }
-    auto area = getLocalBounds().reduced(motion::style::gap + 2, motion::style::gap);
-    const auto picture = area.removeFromLeft(44).toFloat();
+    libraryRow::paintFace(g, getLocalBounds().toFloat(), hover, active);
+    const auto picture = libraryRow::pictureArea(getLocalBounds()).toFloat();
     motion::style::fillWell(g, picture);
-    motion::ui::paintModulatorShape(g, modulator, picture.reduced(5, 7), motion::style::key().withAlpha(.6f + .4f * (active ? 1.0f : hover)), 1.2f);
-    area.removeFromLeft(motion::style::padding);
-    g.setFont(motion::style::caption());
-    g.setColour(routes == 0 ? osci::Colours::textMuted().withAlpha(.7f) : motion::style::result());
-    g.drawText(routes == 0 ? juce::String("Drives nothing yet") : routes == 1 ? juce::String("Drives 1 property") : "Drives " + juce::String(routes) + " properties", area.removeFromBottom(area.getHeight() / 2), juce::Justification::topLeft, true);
-    g.setFont(motion::style::body());
-    g.setColour(osci::Colours::text());
-    g.drawText(juce::String(modulator.name), area, juce::Justification::bottomLeft, true);
+    motion::ui::paintModulatorShape(g, modulator, picture.reduced(5, 9), motion::style::key().withAlpha(.6f + .4f * (active ? 1.0f : hover)), 1.2f);
+    const auto drives = routes == 0 ? juce::String("Drives nothing yet") : routes == 1 ? juce::String("Drives 1 property") : "Drives " + juce::String(routes) + " properties";
+    libraryRow::paintText(g, libraryRow::textArea(getLocalBounds()), juce::String(modulator.name), drives, routes == 0 ? osci::Colours::textMuted().withAlpha(.7f) : motion::style::result());
 }
 
 void MotionModulatorLibrary::Card::mouseDrag(const juce::MouseEvent& event) {
@@ -319,8 +307,8 @@ MotionModulatorLibrary::ShapeButton::ShapeButton(const juce::String& text, motio
 void MotionModulatorLibrary::ShapeButton::paintButton(juce::Graphics& g, bool, bool down) {
     const auto bounds = getLocalBounds().toFloat();
     const auto on = getToggleState();
-    g.setColour(on ? motion::style::onFill().withMultipliedAlpha(down ? 1.3f : 1.0f) : down ? motion::style::pressFill() : juce::Colours::white.withAlpha(.04f + .05f * fade.value()));
-    g.fillRoundedRectangle(bounds, motion::style::radius);
+    g.setColour(on ? motion::style::onFill().withMultipliedAlpha(down ? 1.3f : 1.0f) : down ? motion::style::pressFill() : motion::style::hoverFill().withMultipliedAlpha(1.0f + fade.value()));
+    g.fillRoundedRectangle(bounds, motion::style::radiusControl);
     motion::ui::paintModulatorShape(g, shape, bounds.reduced(5, 8), on ? juce::Colours::white : osci::Colours::text().withAlpha(.6f + .4f * fade.value()), 1.3f);
 }
 

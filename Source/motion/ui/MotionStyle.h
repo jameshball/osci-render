@@ -15,12 +15,21 @@ inline constexpr int padding = 8;
 inline constexpr int controlHeight = 24;
 inline constexpr float radius = 3.0f;
 inline constexpr float panelRadius = 5.0f;
-// Every button, whatever surface it sits on.
-inline constexpr float buttonRadius = 4.0f;
+// The three corner radii: small for swatches, key glyphs and the segments
+// inside a control; control for buttons, fields, combos, chips, menu items
+// and library rows; panel for panels, popovers and floating strips.
+inline constexpr float radiusSmall = 2.0f, radiusControl = 4.0f, radiusPanel = 6.0f;
+// The three icon sizes: toolbars and row actions, labelled buttons, and
+// chips. A badge or a lock in a narrow column may be smaller.
+inline constexpr float iconLarge = 18.0f, iconMedium = 16.0f, iconSmall = 14.0f;
 
+// osci-motion's own green, as in its icon and logo (osci-render's and
+// sosci's too).
+inline juce::Colour brand() { return juce::Colour(0xff56d836); }
 // Green means one thing: what is selected or focused, and the one action a
-// panel exists for. A switch, tool or toggle that is on is neutral.
-inline juce::Colour accent() { return osci::Colours::accentColor(); }
+// panel exists for. A switch, tool or toggle that is on is neutral. It is
+// the brand's green, so there is one green in the editing UI.
+inline juce::Colour accent() { return brand(); }
 // The wash behind a selected row, region or choice.
 inline juce::Colour accentFill() { return accent().withAlpha(.12f); }
 // The primary action's fill.
@@ -34,6 +43,9 @@ inline juce::Colour hoverFill() { return juce::Colours::white.withAlpha(.05f); }
 inline juce::Colour restFill() { return juce::Colours::white.withAlpha(.07f); }
 inline juce::Colour hairline() { return juce::Colours::white.withAlpha(.08f); }
 inline juce::Colour pressFill() { return juce::Colours::white.withAlpha(.12f); }
+// Every button's wash: the hover fill as the pointer fades in (`hover`
+// from 0 to 1), the press fill while held.
+inline juce::Colour wash(float hover, bool down) { return down ? pressFill() : hoverFill().withMultipliedAlpha(hover); }
 // The time and value grids behind the timeline and the Graph: the snap
 // grid's fine lines, the labelled ticks', and the Graph's zero.
 inline juce::Colour gridMinor() { return juce::Colours::white.withAlpha(.03f); }
@@ -46,7 +58,8 @@ inline juce::Colour gridZero() { return juce::Colours::white.withAlpha(.12f); }
 // body: values, names, menus, buttons, pickers and editors.
 // caption: field labels, hints, secondary details and the ruler.
 // heading: section headings in Properties, popovers and forms.
-// mono: the position readout and code.
+// mono: the position readout and code; monoCaption: the full-screen
+// Scope's time, at caption size.
 // display: the app's name on the start screen, and nothing else.
 // The separator between short facts, as in the status bar.
 inline juce::String dot() { return juce::String::fromUTF8(" \xc2\xb7 "); }
@@ -73,14 +86,15 @@ inline void tooltipWhenCut(juce::Label& label) {
 inline juce::Font heading() { return juce::Font(juce::FontOptions(11.0f, juce::Font::bold)); }
 inline juce::Font display() { return juce::Font(juce::FontOptions(19.0f, juce::Font::bold)); }
 inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)); }
+inline juce::Font monoCaption() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 11.0f, juce::Font::plain)); }
 // A shortcut written "Cmd+Shift+F9" as the platform shows it: ⇧⌘F9 on macOS,
-// Ctrl+Shift+F9 elsewhere, with arrow keys as arrows (⇧←). Mouse gestures
-// ("Alt+wheel") keep their words.
+// Ctrl+Shift+F9 elsewhere, with arrow keys as arrows (⇧←) and Delete as ⌫.
+// Mouse gestures ("Alt+wheel") keep their words.
 inline juce::String shortcutText(const juce::String& raw) {
    #if JUCE_MAC
     if (raw.containsIgnoreCase("wheel") || raw.containsIgnoreCase("drag") || raw.containsIgnoreCase("click") || raw.contains(" ")) { return raw.replace("Cmd", juce::String::fromUTF8("\u2318")); }
     const auto arrow = [](const juce::String& key) {
-        for (const auto& [word, glyph] : std::initializer_list<std::pair<const char*, const char*>> {{"Left", "\u2190"}, {"Right", "\u2192"}, {"Up", "\u2191"}, {"Down", "\u2193"}}) {
+        for (const auto& [word, glyph] : std::initializer_list<std::pair<const char*, const char*>> {{"Left", "\u2190"}, {"Right", "\u2192"}, {"Up", "\u2191"}, {"Down", "\u2193"}, {"Delete", "\u232b"}}) {
             if (key == word) { return juce::String::fromUTF8(glyph); }
         }
         return key;
@@ -107,10 +121,6 @@ inline juce::PopupMenu::Item menuItem(const juce::String& text, int id, const ju
     return item;
 }
 
-
-// osci-motion's own green, as in its icon and logo (osci-render's and
-// sosci's too): the mark on the start screen, and nothing in the editing UI.
-inline juce::Colour brand() { return juce::Colour(0xff56d836); }
 // The beam's phosphor green: traces, previews and the playhead. Keys are
 // neutral (or their axis' colour) so they never read as selected.
 inline juce::Colour key() { return juce::Colour(0xff72de98); }
@@ -256,9 +266,9 @@ inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
 // A panel floating over a page, outlined like the popovers.
 inline void fillFloatingPanel(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour fill) {
     g.setColour(fill);
-    g.fillRoundedRectangle(bounds, panelRadius + 1);
+    g.fillRoundedRectangle(bounds, radiusPanel);
     g.setColour(hairline());
-    g.drawRoundedRectangle(bounds.reduced(.5f), panelRadius + 1, 1.0f);
+    g.drawRoundedRectangle(bounds.reduced(.5f), radiusPanel, 1.0f);
 }
 // The dark well behind a thumbnail or preview.
 inline void fillWell(juce::Graphics& g, juce::Rectangle<float> bounds) {
@@ -273,10 +283,45 @@ inline void fadeScrolling(osci::ScrollFadeViewport& viewport, juce::Colour behin
     viewport.setFadeHeight(32);
     viewport.setColour(osci::scrollFadeOverlayBackgroundColourId, behind);
 }
-// A library card's fill as the pointer fades over it.
 // Popovers sit a step above the panel they point at.
 inline juce::Colour popoverSurface() { return juce::Colour(0xff202126); }
+// A tile's fill as the pointer fades over it.
 inline juce::Colour cardFill(float hover) { return osci::Colours::veryDark().interpolatedWith(osci::Colours::surfaceRaised(), hover); }
+
+// The libraries' rows (Sources, Effects, Modulators) look alike: a face 40 px
+// tall every 44 px, a 36 px picture in a well 8 px in, then the name with
+// any detail under it. Nothing is behind a row at rest; the pointer washes
+// it, and a selected one lifts with an accent bar down its left edge.
+namespace libraryRow {
+inline constexpr int pitch = 44, face = pitch - gap, picture = 36, inset = 8;
+inline juce::Rectangle<int> pictureArea(juce::Rectangle<int> faceBounds) { return faceBounds.withTrimmedLeft(inset).withWidth(picture).withSizeKeepingCentre(picture, picture); }
+inline juce::Rectangle<int> textArea(juce::Rectangle<int> faceBounds) { return faceBounds.withTrimmedLeft(inset + picture + padding); }
+// `hover` from 0 to 1.
+inline void paintFace(juce::Graphics& g, juce::Rectangle<float> faceBounds, float hover, bool selected) {
+    if (selected) {
+        g.setColour(osci::Colours::surfaceRaised());
+        g.fillRoundedRectangle(faceBounds, radiusControl);
+        g.setColour(accent());
+        g.fillRect(faceBounds.withWidth(2.0f).reduced(0.0f, 5.0f));
+    } else if (hover > 0.0f) {
+        g.setColour(hoverFill().withMultipliedAlpha(hover));
+        g.fillRoundedRectangle(faceBounds, radiusControl);
+    }
+}
+// The name alone sits centred; with a detail, the two lines share the face.
+inline void paintText(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& name, const juce::String& detail, juce::Colour detailColour) {
+    g.setColour(osci::Colours::text());
+    g.setFont(body());
+    if (detail.isEmpty()) {
+        g.drawText(name, area, juce::Justification::centredLeft, true);
+        return;
+    }
+    g.drawText(name, area.removeFromTop(area.getHeight() / 2 + 2), juce::Justification::bottomLeft, true);
+    g.setColour(detailColour);
+    g.setFont(caption());
+    g.drawText(detail, area, juce::Justification::topLeft, true);
+}
+}
 // Many diamonds share one path, filled once.
 inline void addDiamond(juce::Path& path, juce::Point<float> centre, float radius) {
     path.startNewSubPath(centre.x, centre.y - radius);
@@ -340,7 +385,7 @@ inline void paintComboBox(juce::Graphics& g, int width, int height, juce::ComboB
     g.fillRoundedRectangle(bounds, radius);
     const auto hover = box.isEnabled() && box.isMouseOver(true);
     if (hover || box.hasKeyboardFocus(true)) {
-        g.setColour(box.hasKeyboardFocus(true) ? osci::Colours::accentColor().withAlpha(.8f) : osci::Colours::outlineSubtle().withAlpha(.8f));
+        g.setColour(box.hasKeyboardFocus(true) ? accent().withAlpha(.8f) : osci::Colours::outlineSubtle().withAlpha(.8f));
         g.drawRoundedRectangle(bounds.reduced(.5f), radius, 1.0f);
     }
     const auto centre = juce::Point<float>(static_cast<float>(width) - 12.0f, static_cast<float>(height) * .5f);
@@ -361,16 +406,16 @@ inline void paintButtonBackground(juce::Graphics& g, juce::Button& button, juce:
     if (!button.isEnabled()) {
         if (colour.isTransparent()) { return; }
         g.setColour(hairline());
-        g.drawRoundedRectangle(bounds.reduced(.5f), buttonRadius, 1.0f);
+        g.drawRoundedRectangle(bounds.reduced(.5f), radiusControl, 1.0f);
         return;
     }
     if (colour.isTransparent()) {
         if (!down && !highlighted) { return; }
-        g.setColour(down ? pressFill() : hoverFill());
+        g.setColour(wash(1.0f, down));
     } else {
         g.setColour(down ? colour.brighter(.25f) : highlighted ? colour.brighter(.12f) : colour);
     }
-    g.fillRoundedRectangle(bounds, buttonRadius);
+    g.fillRoundedRectangle(bounds, radiusControl);
 }
 
 // Routes the editor's menus, buttons and pickers through the type styles.
@@ -380,7 +425,7 @@ public:
     LookAndFeel() {
         setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
         // Selected text: a muted accent behind white, not bright green.
-        setColour(juce::TextEditor::highlightColourId, osci::Colours::accentColor().withAlpha(.35f));
+        setColour(juce::TextEditor::highlightColourId, accent().withAlpha(.35f));
         setColour(juce::TextEditor::highlightedTextColourId, juce::Colours::white);
         // Scroll thumbs are quiet grey everywhere, never as bright as text.
         setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
@@ -394,8 +439,8 @@ public:
     // Quiet like the transport's icons until hovered; an open menu lifts.
     void drawMenuBarItem(juce::Graphics& g, int width, int height, int, const juce::String& text, bool over, bool open, bool, juce::MenuBarComponent& bar) override {
         if (open || (over && bar.isEnabled())) {
-            g.setColour(open ? pressFill() : hairline());
-            g.fillRoundedRectangle(juce::Rectangle<float>(static_cast<float>(width), static_cast<float>(height)).reduced(0.0f, 4.0f), radius + 1);
+            g.setColour(wash(1.0f, open));
+            g.fillRoundedRectangle(juce::Rectangle<float>(static_cast<float>(width), static_cast<float>(height)).reduced(0.0f, 4.0f), radiusControl);
         }
         g.setColour(osci::Colours::text().withAlpha(bar.isEnabled() ? (open || over ? 1.0f : .72f) : .4f));
         g.setFont(body());
@@ -425,16 +470,18 @@ public:
         g.strokePath(path, juce::PathStrokeType(1.0f));
     }
     int getCallOutBoxBorderSize(const juce::CallOutBox&) override { return 16; }
-    float getCallOutBoxCornerSize(const juce::CallOutBox&) override { return panelRadius + 1.0f; }
+    float getCallOutBoxCornerSize(const juce::CallOutBox&) override { return radiusPanel; }
     void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override { paintComboBox(g, width, height, box); }
     // Combo text keeps the field inset, starts clear of a caption laid over
-    // it (see captionWidth) and stops clear of the arrow.
+    // it (see captionWidth) and stops clear of the chevron, as a dialog's does.
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
         PluginLookAndFeel::positionComboBoxText(box, label);
         const auto caption = static_cast<int>(box.getProperties()[motion::style::captionWidth]);
         const auto left = (caption > 0 ? 6 + caption : 8) - getLabelBorderSize(label).getLeft();
-        label.setBounds(left, 1, juce::jmax(1, box.getWidth() - 18 - left), box.getHeight() - 2);
+        label.setBounds(left, 1, juce::jmax(1, box.getWidth() - chevronClearance - left), box.getHeight() - 2);
     }
+    // Where combo text ends, short of the box's right edge.
+    static constexpr int chevronClearance = 24;
     // Tick boxes keep body text and one tick size at any height.
     void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button, bool highlighted, bool down) override {
         constexpr float tick = 14.0f;
@@ -458,7 +505,7 @@ namespace motion::style {
 class DialogLookAndFeel final : public osci::OverlayLookAndFeel {
 public:
     DialogLookAndFeel() {
-        setColour(juce::TextEditor::highlightColourId, osci::Colours::accentColor().withAlpha(.35f));
+        setColour(juce::TextEditor::highlightColourId, accent().withAlpha(.35f));
         setColour(juce::TextEditor::highlightedTextColourId, juce::Colours::white);
         setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
     }
@@ -470,7 +517,7 @@ public:
     // Combo text starts where a dialog field's text does.
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
         osci::OverlayLookAndFeel::positionComboBoxText(box, label);
-        label.setBounds(fieldIndent - label.getBorderSize().getLeft(), 1, juce::jmax(1, box.getWidth() - 24 - fieldIndent + label.getBorderSize().getLeft()), box.getHeight() - 2);
+        label.setBounds(fieldIndent - label.getBorderSize().getLeft(), 1, juce::jmax(1, box.getWidth() - style::LookAndFeel::chevronClearance - fieldIndent + label.getBorderSize().getLeft()), box.getHeight() - 2);
     }
     static constexpr int fieldIndent = 8;
 };
