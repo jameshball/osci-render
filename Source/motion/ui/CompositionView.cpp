@@ -299,7 +299,7 @@ const std::vector<MotionCompositionView::ScreenPiece>& MotionCompositionView::sc
     // moves and as edits are made.
     auto latest = askForLighting(time) && scenePreview != nullptr ? scenePreview->latest() : nullptr;
     if (latest != nullptr && latest->revision < lightingSince) { latest.reset(); }
-    const PiecesKey key {preparedSerial, live.get(), latest.get(), time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, selected, getWidth(), getHeight(), solidView};
+    const PiecesKey key {preparedSerial, live.get(), latest.get(), time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, selected, getWidth(), getHeight(), solidView, partMode};
     if (pieceKey == key) { return pieceCache; }
     pieceKey = key;
     // Held so a later set of live frames cannot reuse this one's address.
@@ -1246,6 +1246,8 @@ std::map<motion::Id, MotionCompositionView::Picked> MotionCompositionView::parts
         if (drawing == nullptr) { continue; }
         auto& states = inside[piece.clip];
         states.resize(drawing->shapeCount(), -1);
+        // Numbered by the source's shapes: a lit drawing's (outside part mode) are numbered as it cut them.
+        if (static_cast<std::size_t>(piece.shape) >= states.size()) { continue; }
         auto& state = states[static_cast<std::size_t>(piece.shape)];
         // Anything the area crosses is picked, as the object marquee picks.
         const auto crossed = rectangular ? bounds.intersects(piece.line)

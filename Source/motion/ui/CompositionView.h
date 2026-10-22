@@ -216,7 +216,7 @@ private:
         double time, x, y, z, yaw, pitch, fov;
         motion::Id selected;
         int width, height;
-        bool solid;
+        bool solid, parts;
         bool operator==(const PiecesKey&) const = default;
     };
     bool solidView = true;

@@ -4,6 +4,35 @@
 #include "MotionStyle.h"
 #include <functional>
 
+// The playback speed as a chip, as a video player shows it: 1×, or
+// highlighted when playing faster or slower. Clicking it offers the speeds.
+class MotionSpeedChip final : public juce::TextButton {
+public:
+    MotionSpeedChip() {
+        setName("Playback speed");
+        setTooltip("Playback speed (< and > to change it)");
+        setSpeed(1.0);
+    }
+    static juce::String text(double speed) {
+        return (speed == 0.25 ? juce::String::fromUTF8("\xc2\xbc") : speed == 0.5 ? juce::String::fromUTF8("\xc2\xbd") : juce::String(static_cast<int>(speed))) + juce::String::fromUTF8("\xc3\x97");
+    }
+    void setSpeed(double speed) {
+        normal = speed == 1.0;
+        setButtonText(text(speed));
+    }
+    void paintButton(juce::Graphics& g, bool over, bool down) override {
+        const auto bounds = getLocalBounds().toFloat();
+        g.setColour(!normal ? motion::style::accent().withAlpha(.25f) : juce::Colours::white.withAlpha(over || down ? .1f : 0.0f));
+        g.fillRoundedRectangle(bounds, motion::style::radius);
+        g.setFont(motion::style::heading());
+        g.setColour(!normal ? motion::style::accent().brighter(.4f) : osci::Colours::text().withAlpha(over ? .9f : .6f));
+        g.drawText(getButtonText(), bounds, juce::Justification::centred, false);
+    }
+
+private:
+    bool normal = true;
+};
+
 // The full-screen Scope's transport, along its foot as a video player's is:
 // to the start, play or pause, to the end, a bar to seek through the whole
 // composition (its loop shaded), the time, and the speed. It shows while the
@@ -17,8 +46,6 @@ public:
         start.setTooltip("To the start (Home)");
         end.setTooltip("To the end (End)");
         play.setTooltip("Play / pause (Space)");
-        speed.setName("Playback speed");
-        speed.setTooltip("Playback speed (< and > to change it)");
         for (auto* button : std::initializer_list<juce::Button*> {&start, &play, &end, &speed}) {
             button->setWantsKeyboardFocus(false);
             addAndMakeVisible(button);
@@ -27,7 +54,6 @@ public:
         end.onClick = [this] { if (onEnd) { onEnd(); } };
         play.onClick = [this] { if (onPlay) { onPlay(); } };
         speed.onClick = [this] { if (onSpeedMenu) { onSpeedMenu(speed); } };
-        speed.setButtonText(speedText(1.0));
         // On its buttons is still on it.
         for (auto* button : std::initializer_list<juce::Component*> {&start, &play, &end, &speed}) { button->addMouseListener(&buttonHover, false); }
         setAlpha(0.0f);
@@ -58,11 +84,8 @@ public:
             play.setIcon(state.playing ? motion::icons::Icon::pause : motion::icons::Icon::play);
             play.setTooltip(state.playing ? "Pause (Space)" : "Play (Space)");
         }
-        speed.setButtonText(speedText(state.speed));
+        speed.setSpeed(state.speed);
         repaint();
-    }
-    static juce::String speedText(double speed) {
-        return (speed == 0.25 ? juce::String::fromUTF8("\xc2\xbc") : speed == 0.5 ? juce::String::fromUTF8("\xc2\xbd") : juce::String(static_cast<int>(speed))) + juce::String::fromUTF8("\xc3\x97");
     }
 
     // The pointer moved over the picture: show, and fade again once it rests.
@@ -178,19 +201,6 @@ private:
         repaint();
     }
 
-    class SpeedChip final : public juce::TextButton {
-    public:
-        void paintButton(juce::Graphics& g, bool over, bool down) override {
-            const auto bounds = getLocalBounds().toFloat();
-            const auto changed = getButtonText() != MotionScopeTransport::speedText(1.0);
-            g.setColour((changed ? motion::style::accent().withAlpha(.25f) : juce::Colours::white.withAlpha(over || down ? .1f : 0.0f)));
-            g.fillRoundedRectangle(bounds, motion::style::radius);
-            g.setFont(motion::style::heading());
-            g.setColour(changed ? motion::style::accent().brighter(.4f) : osci::Colours::text().withAlpha(over ? .9f : .6f));
-            g.drawText(getButtonText(), bounds, juce::Justification::centred, false);
-        }
-    };
-
     struct ButtonHover final : juce::MouseListener {
         explicit ButtonHover(MotionScopeTransport& owner) : transport(owner) {}
         void mouseEnter(const juce::MouseEvent&) override { transport.hovered = true; transport.wake(); }
@@ -215,7 +225,7 @@ private:
     juce::Component::SafePointer<juce::Component> watched;
     static constexpr float timeWidth = 52.0f;
     motion::icons::Button start {"To the start", motion::icons::Icon::start}, play {"Play", motion::icons::Icon::play}, end {"To the end", motion::icons::Icon::end};
-    SpeedChip speed;
+    MotionSpeedChip speed;
     State state;
     double lastActivity = 0, scrubTime = 0;
     bool scrubbing = false, hovered = false;

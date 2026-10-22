@@ -432,6 +432,7 @@ private:
     motion::icons::Button startButton { "Go to start", motion::icons::Icon::start };
     motion::icons::Button endButton { "Go to end", motion::icons::Icon::end };
     motion::icons::Button loopButton { "Loop playback", motion::icons::Icon::loop };
+    MotionSpeedChip speedButton;
     // Auto-key: a change animates, from where its clip starts to the
     // playhead, without asking (off when osci-motion opens).
     motion::icons::Button autoKeyButton { "Auto-key", motion::icons::Icon::autoKey };

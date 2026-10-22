@@ -489,6 +489,7 @@ private:
             }
             const juce::Component::SafePointer<Grid> safe(this);
             const auto chosenCard = card;
+            menu.setLookAndFeel(&getLookAndFeel());
             menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea({event.getScreenX(), event.getScreenY(), 1, 1}), [safe, chosenCard](int choice) {
                 if (safe == nullptr) {
                     return;

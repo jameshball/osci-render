@@ -53,7 +53,7 @@ void MotionEditor::resized() {
     // for the workspace.
     // The transport goes compact (no BPM caption, tighter readout) before the
     // Output picker would have to hide.
-    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 418 ? 418 : 338;
+    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 454 ? 454 : 374;
     auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, transportWidth), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - transportWidth / 2));
     // What the audio interface plays sits with the other audio state (the
     // DSP meter), not in the Scope; without room it lives in the Audio menu.
@@ -72,6 +72,7 @@ void MotionEditor::resized() {
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     playButton.setBounds(transport.removeFromLeft(32).reduced(1, 3));
     endButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
+    speedButton.setBounds(transport.removeFromLeft(36).reduced(1, 4));
     loopButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     autoKeyButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     // Narrow windows drop the BPM caption and tighten the readouts so the
@@ -224,18 +225,6 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
         corners.addRoundedRectangle(panel.toFloat(), motion::style::panelRadius);
         corners.setUsingNonZeroWinding(false);
         graphics.fillPath(corners);
-    }
-    // Not at normal speed: a badge on Play says how fast, so it's never forgotten.
-    const auto speed = processor.playbackSpeed.load();
-    if (speed != 1.0) {
-        const auto text = MotionScopeTransport::speedText(speed);
-        graphics.setFont(motion::style::heading());
-        const auto width = juce::GlyphArrangement::getStringWidth(graphics.getCurrentFont(), text) + 6.0f;
-        const auto badge = juce::Rectangle<float>(width, 12.0f).withPosition(static_cast<float>(playButton.getRight()) - width + 3.0f, static_cast<float>(playButton.getY()) - 3.0f);
-        graphics.setColour(motion::style::accent());
-        graphics.fillRoundedRectangle(badge, 6.0f);
-        graphics.setColour(juce::Colours::black);
-        graphics.drawText(text, badge, juce::Justification::centred, false);
     }
     if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return; }
     const auto panel = focusedPanel();

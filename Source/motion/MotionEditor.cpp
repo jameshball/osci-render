@@ -61,6 +61,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addAndMakeVisible(outputButton);
     addAndMakeVisible(outputLabel);
     addAndMakeVisible(loopButton);
+    addAndMakeVisible(speedButton);
+    speedButton.setWantsKeyboardFocus(false);
+    speedButton.onClick = [this] { showSpeedMenu(speedButton); };
+    speedButton.setSpeed(processor.playbackSpeed.load());
     addAndMakeVisible(tapButton);
     removeChildComponent(&undoRedoControls);
     for (auto* button : {&undoButton, &redoButton}) { addAndMakeVisible(*button); }
@@ -1257,7 +1261,7 @@ void MotionEditor::showSpeedMenu(juce::Component& anchor) {
     const auto current = processor.playbackSpeed.load();
     for (std::size_t index = 0; index < MotionProcessor::playbackSpeeds.size(); ++index) {
         const auto speed = MotionProcessor::playbackSpeeds[index];
-        menu.addItem(static_cast<int>(index) + 1, MotionScopeTransport::speedText(speed) + (speed == 1.0 ? juce::String("  Normal") : juce::String()), true, speed == current);
+        menu.addItem(static_cast<int>(index) + 1, MotionSpeedChip::text(speed) + (speed == 1.0 ? juce::String("  Normal") : juce::String()), true, speed == current);
     }
     menu.setLookAndFeel(&motionLookAndFeel);
     const juce::Component::SafePointer<MotionEditor> owner(this);
@@ -1279,8 +1283,8 @@ void MotionEditor::changeSpeed(int steps) {
 
 void MotionEditor::refreshSpeed() {
     const auto speed = processor.playbackSpeed.load();
-    const auto text = MotionScopeTransport::speedText(speed);
-    playButton.setTooltip("Play / pause (Space)" + (speed != 1.0 ? motion::style::dot() + "at " + text : juce::String()));
+    const auto text = MotionSpeedChip::text(speed);
+    speedButton.setSpeed(speed);
     statusBar.show(speed == 1.0 ? juce::String("Back to normal speed.") : "Speed " + text + ": < and > change it; exports always play at normal speed.", MotionStatusBar::Kind::notice);
     repaint();
 }
