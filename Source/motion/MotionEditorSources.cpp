@@ -182,7 +182,8 @@ void MotionEditor::loadProject(const juce::File& file, bool example) {
     };
     projectLoadOverlay = overlay.get();
     showOverlay(std::move(overlay));
-    imports.addJob([owner, task, file, generation, revision, example] {
+    // Its own thread: a load never waits behind imports into the current project.
+    projectLoads.addJob([owner, task, file, generation, revision, example] {
         auto result = juce::Result::fail("Project loading cancelled.");
         if (!task->cancelled.load()) {
             try {
@@ -441,7 +442,7 @@ juce::Result MotionEditor::keepLiveCapture(motion::Id id) {
         } catch (const std::exception& error) { result = juce::Result::fail("Couldn't keep the capture: " + juce::String(error.what())); }
         juce::MessageManager::callAsync([owner, id, identity, generation, task, asset, result, why] {
             if (owner == nullptr) { return; }
-            std::erase(owner->pendingImports, task);
+            owner->importEnded(task);
             if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
             auto& document = owner->processor.document;
             const auto& sources = document.mainProject().assets;
@@ -533,10 +534,16 @@ void MotionEditor::showNextPreparationSettings() {
         return;
     }
     // A video's settings show one of its frames, which needs FFmpeg first.
+    // Until it's here, the queued videos wait aside (asked about once), so
+    // the sources behind them go on; FFmpeg arriving brings them back.
     if (video) {
         const juce::Component::SafePointer<MotionEditor> owner(this);
         if (!ffmpegReady([owner] { if (owner != nullptr) { owner->showNextPreparationSettings(); } })) {
-            preparationRequests.push_front(std::move(request));
+            videosAwaitingFFmpeg.push_back(std::move(request));
+            const auto isVideo = [](const SourceRequest& queued) { return osci::files::isVideo(queued.replacement != nullptr ? queued.replacement->extension : queued.file.getFileExtension()); };
+            std::copy_if(preparationRequests.begin(), preparationRequests.end(), std::back_inserter(videosAwaitingFFmpeg), isVideo);
+            std::erase_if(preparationRequests, isVideo);
+            showNextPreparationSettings();
             return;
         }
     }
@@ -547,16 +554,18 @@ void MotionEditor::showNextPreparationSettings() {
     } else if (!video) {
         request.file.loadFileAsData(data);
     }
+    // A source edited, or relinked to this file, starts from its own settings.
+    const auto previous = request.replacement != nullptr ? request.replacement : request.relink != 0 ? motion::findAsset(processor.document.mainProject().assets, request.relink) : nullptr;
     if (raster) {
         // A video's frame is traced from the file, or the bytes of the source
         // it replaces, when FFmpeg is already here.
-        auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video, name,
+        auto panel = std::make_unique<MotionRasterSettingsPanel>(previous != nullptr ? previous->rasterSettings : motion::RasterSettings(), video, name,
             std::move(data), processor.document.project().scope.xyOnly, request.replacement != nullptr ? request.replacement->linked : request.file,
             processor.getFFmpegFile().existsAsFile() ? processor.getFFmpegFile() : juce::File());
         imagePanel = panel.get();
         content = std::move(panel);
     } else if (fractal) {
-        const auto initialDepth = request.fractalDepth.value_or(request.replacement != nullptr ? request.replacement->fractalDepth : 3);
+        const auto initialDepth = request.fractalDepth.value_or(previous != nullptr ? previous->fractalDepth : 3);
         auto panel = std::make_unique<MotionFractalSettingsPanel>(initialDepth, name, data.toString());
         fractalPanel = panel.get();
         content = std::move(panel);
@@ -611,9 +620,11 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     asset->extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension().toLowerCase();
     asset->bakeSettings = settings;
     asset->rasterSettings = rasterSettings;
-    asset->fractalDepth = request.fractalDepth.value_or(request.replacement != nullptr ? request.replacement->fractalDepth : 3);
-    asset->originalSize = request.originalSize.value_or(request.replacement != nullptr && request.replacement->originalSize);
-    asset->textSettings = request.textSettings.value_or(request.replacement != nullptr ? request.replacement->textSettings : motion::TextSettings());
+    // A source relinked to another file keeps its settings, as an edited one does.
+    const auto previous = request.replacement != nullptr ? request.replacement : request.relink != 0 ? motion::findAsset(processor.document.mainProject().assets, request.relink) : nullptr;
+    asset->fractalDepth = request.fractalDepth.value_or(previous != nullptr ? previous->fractalDepth : 3);
+    asset->originalSize = request.originalSize.value_or(previous != nullptr && previous->originalSize);
+    asset->textSettings = request.textSettings.value_or(previous != nullptr ? previous->textSettings : motion::TextSettings());
     const auto time = request.time;
     const auto generation = request.generation;
     auto task = std::make_shared<ImportState>();
@@ -668,15 +679,12 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             if (owner == nullptr) {
                 return;
             }
-            std::erase(owner->pendingImports, task);
-            juce::MessageManager::callAsync([owner] {
-                if (owner == nullptr || !owner->pendingImports.empty() || !owner->queuedTextAnimation.has_value()) { return; }
-                const auto queued = *owner->queuedTextAnimation;
-                owner->queuedTextAnimation.reset();
-                if (queued.generation != owner->processor.document.generation()) { owner->textAnimation.clearPending(); return; }
-                if (owner->textAnimation.onApply) { owner->textAnimation.onApply(queued.asset, queued.settings); }
-            });
-            if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
+            owner->importEnded(task);
+            // A text animation change that won't be applied stops showing.
+            if (task->cancelled.load() || owner->processor.document.generation() != generation) {
+                owner->textAnimation.clearPending();
+                return;
+            }
             if (result.failed()) {
                 owner->textAnimation.clearPending();
                 // A new script that fails reopens with its code, as an edit
@@ -721,6 +729,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                     const auto gone = std::none_of(assets.begin(), assets.end(), [&](const auto& item) { return item->id == request.replacement->id; });
                     owner->statusBar.show(gone ? "The source was removed while it was being edited, so the edit wasn't applied."
                                                : "The source changed while baking. Its previous result has been kept.", MotionStatusBar::Kind::warning);
+                    owner->textAnimation.clearPending();
                     return;
                 }
                 asset->id = request.replacement->id;
@@ -769,6 +778,26 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             owner->select(clip.id);
         });
     });
+}
+
+void MotionEditor::importEnded(const std::shared_ptr<ImportState>& task) {
+    std::erase(pendingImports, task);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    juce::MessageManager::callAsync([owner] {
+        if (owner == nullptr || !owner->pendingImports.empty() || !owner->queuedTextAnimation.has_value()) { return; }
+        const auto queued = *owner->queuedTextAnimation;
+        owner->queuedTextAnimation.reset();
+        if (queued.generation != owner->processor.document.generation()) { owner->textAnimation.clearPending(); return; }
+        if (owner->textAnimation.onApply) { owner->textAnimation.onApply(queued.asset, queued.settings); }
+    });
+}
+
+void MotionEditor::cancelImports() {
+    for (const auto& task : pendingImports) { task->cancelled.store(true); }
+    if (queuedTextAnimation.has_value()) {
+        queuedTextAnimation.reset();
+        textAnimation.clearPending();
+    }
 }
 
 void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset, std::string_view named, const motion::PropertyMap& settings) {

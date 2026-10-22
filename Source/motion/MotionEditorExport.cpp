@@ -110,8 +110,11 @@ bool MotionEditor::ffmpegReady(std::function<void()> resume) {
                                         [self, resume] {
                                             if (self == nullptr) { return; }
                                             self->statusBar.show("FFmpeg is ready.", MotionStatusBar::Kind::notice);
+                                            // Videos set aside for it go first, then any dropped while it came.
+                                            auto& waiting = self->videosAwaitingFFmpeg;
+                                            self->preparationRequests.insert(self->preparationRequests.begin(), waiting.begin(), waiting.end());
+                                            waiting.clear();
                                             resume();
-                                            // Videos dropped while it came wait for it too.
                                             self->showNextPreparationSettings();
                                         });
 #else

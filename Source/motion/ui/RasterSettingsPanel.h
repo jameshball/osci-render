@@ -135,6 +135,7 @@ public:
         }
         const auto rows = isVideo ? 7 : 6;
         setSize(widthFor(hasPreview() ? bodyHeight(rows) : 0), heightFor(rows));
+        liveApplied = settings;
         refresh();
     }
 
@@ -173,6 +174,9 @@ private:
     static constexpr motion::PropertySpec frameRateSpec {"frameRate", "Frame rate", "", "", 1, 120, 30, .5, 3, " fps"};
     bool hasPreview() const { return live.has_value() || (isVideo ? still != nullptr : data.getSize() > 0); }
     std::optional<Live> live;
+    // The settings last given to the live picture: its own at first (its
+    // shading aside, which only a Hilbert curve uses).
+    motion::RasterSettings liveApplied;
     juce::TextButton record;
     juce::String recordError;
     std::shared_ptr<const motion::PreparedSource> shownFrame;
@@ -328,7 +332,12 @@ private:
         settings = next;
         if (!hasPreview()) { return; }
         if (live.has_value()) {
-            if (live->onChange) { live->onChange(settings); }
+            // Each change applied is an undo step, so opening the sheet, or
+            // choosing what is already applied, applies nothing.
+            if (live->onChange && !same(liveApplied, settings)) {
+                liveApplied = settings;
+                live->onChange(settings);
+            }
             recordError.clear();
             return;
         }

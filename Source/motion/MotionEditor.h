@@ -157,6 +157,8 @@ private:
     void importSourceFiles(juce::Array<juce::File> files, std::optional<std::pair<double, motion::Id>> placement);
     void replaceSourceFile(motion::Id asset);
     std::deque<SourceRequest> preparationRequests;
+    // Videos waiting for FFmpeg, out of the queue so the rest can go on.
+    std::vector<SourceRequest> videosAwaitingFFmpeg;
     bool preparationSettingsOpen = false;
     struct ProjectLoad {
         std::atomic<bool> cancelled {false};
@@ -506,6 +508,8 @@ private:
     std::vector<std::string> curveProperties;
     bool cameraCurve = false;
     juce::ThreadPool imports { 1 };
+    // A project opens on its own thread, not behind a long import.
+    juce::ThreadPool projectLoads { 1 };
     struct ImportState {
         bool capture = false;
         std::atomic<bool> cancelled { false };
@@ -514,6 +518,11 @@ private:
         std::uint64_t generation = 0;
     };
     std::vector<std::shared_ptr<ImportState>> pendingImports;
+    // An import ended, however it ended: a text animation change waiting for
+    // it goes ahead.
+    void importEnded(const std::shared_ptr<ImportState>& task);
+    // Every import stops, and so does a text animation change waiting for one.
+    void cancelImports();
     // The live source settings open, if any, and whose.
     juce::Component::SafePointer<motion::ui::Sheet> liveSettings;
     motion::Id liveSettingsId = 0;

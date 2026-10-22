@@ -99,10 +99,14 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     if (std::abs(size - 1.0f) > .001f) { setInterfaceSize(size, false); }
     sliderBakes.onStatus = [this](const juce::String& text, bool error) {
         statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice);
-        // An export asked for while they baked goes ahead once they're done.
-        if (afterSliderBakes == nullptr || (!error && sliderBakes.busy())) { return; }
+        // A failed bake abandons an export that waited for it.
+        if (error) { afterSliderBakes = nullptr; }
+    };
+    // An export asked for while they baked goes ahead once they're done,
+    // even when the last one was cancelled rather than finished.
+    sliderBakes.onIdle = [this] {
+        if (afterSliderBakes == nullptr) { return; }
         auto resume = std::exchange(afterSliderBakes, nullptr);
-        if (error) { return; }
         const juce::Component::SafePointer<MotionEditor> self(this);
         juce::MessageManager::callAsync([self, resume] { if (self != nullptr) { resume(); } });
     };
@@ -404,6 +408,7 @@ MotionEditor::~MotionEditor() {
     for (const auto& task : pendingImports) { task->cancelled.store(true); }
     if (projectLoad != nullptr) { projectLoad->cancelled.store(true); }
     imports.removeAllJobs(true, -1);
+    projectLoads.removeAllJobs(true, -1);
     if (exportState != nullptr) { exportState->cancelled.store(true); }
     exports.removeAllJobs(true, -1);
     menuBar.setModel(nullptr);
@@ -637,7 +642,7 @@ void MotionEditor::timerCallback() {
         playButton.setName(playing ? "Pause" : "Play");
         playButton.setTitle(playButton.getName());
     }
-    if (timeLabel.isBeingEdited() && (positionEditGeneration != processor.document.generation() || positionEditRevision != processor.document.revision())) { timeLabel.hideEditor(true); }
+    if (timeLabel.isBeingEdited() && (positionEditGeneration != processor.document.scopeGeneration() || positionEditRevision != processor.document.revision())) { timeLabel.hideEditor(true); }
     if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification); }
     if (!tempoValue.isBeingEdited() && !tappedBpm.has_value()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
     // A moving playhead repaints only its own columns of the time views, and a
@@ -712,7 +717,7 @@ void MotionEditor::refreshFromDocument() {
     refreshOutputChoices();
     if (curveList.isVisible()) { refreshCurveList(); }
     if (processor.document.editingComposition() == 0) { scopeHistory.clear(); }
-    if (scopeLabel.isBeingEdited() && scopeNameGeneration != processor.document.generation()) { scopeLabel.hideEditor(true); }
+    if (scopeLabel.isBeingEdited() && scopeNameGeneration != processor.document.scopeGeneration()) { scopeLabel.hideEditor(true); }
     if (!scopeLabel.isBeingEdited()) { scopeLabel.setText(processor.document.project().name, juce::dontSendNotification); }
     juce::String parentName = "Main";
     if (!scopeHistory.empty() && scopeHistory.back().scope != 0) {
@@ -1002,6 +1007,10 @@ void MotionEditor::offerHatchingForXY() {
 bool MotionEditor::keyPressed(const juce::KeyPress& key) {
     // While the start screen is up, keys are its alone.
     if (startScreen != nullptr) { return startScreen->handleKey(key); }
+    // Behind a sheet (opening a project, a question, settings) the project
+    // stays as the sheet found it: its shortcuts wait, and the key stops
+    // here rather than reaching the window's shortcuts.
+    if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return true; }
     if (scopeFullScreen && key == juce::KeyPress::escapeKey) {
         setScopeFullScreen(false);
         return true;

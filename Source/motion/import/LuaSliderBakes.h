@@ -28,6 +28,9 @@ public:
     // Coalesces bursts of change messages (drags, previews) into one scan.
     void requestUpdate() { startTimer(150); }
     std::function<void(const juce::String&, bool)> onStatus;
+    // Called when the last bake ends, however it ended (baked, failed,
+    // cancelled or no longer wanted).
+    std::function<void()> onIdle;
 
     using Plan = LuaSliderPlan;
     // A plan's frames, baked on this thread; null (and why) if they can't be.
@@ -152,6 +155,7 @@ private:
                 const auto current = jobs.find(job->plan.clip);
                 if (current == jobs.end() || current->second != job) { return; }
                 jobs.erase(current);
+                const juce::ScopeGuard idle {[this] { if (jobs.empty() && onIdle) { onIdle(); } }};
                 if (job->cancelled.load()) { return; }
                 if (bake == nullptr) {
                     // Remembered, so a broken script is not re-run on every edit.

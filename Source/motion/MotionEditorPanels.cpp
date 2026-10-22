@@ -387,9 +387,7 @@ void MotionEditor::setUpLibrary() {
         preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), found});
         showNextPreparationSettings();
     };
-    assetLibrary.onCancelImport = [this] {
-        for (const auto& task : pendingImports) { task->cancelled.store(true); }
-    };
+    assetLibrary.onCancelImport = [this] { cancelImports(); };
 }
 
 void MotionEditor::setUpProperties() {
