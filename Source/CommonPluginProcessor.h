@@ -218,8 +218,6 @@ public:
     
 protected:
     void notifyAudioFileChanged();
-    // The log a crash is written to (standalone only).
-    static juce::File& crashLogFile();
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;

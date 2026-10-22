@@ -15,6 +15,13 @@
 
 #include <cmath>
 
+#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
+ #include <execinfo.h>
+ #include <fcntl.h>
+ #include <signal.h>
+ #include <unistd.h>
+#endif
+
 namespace
 {
     osci::LicenseManager::Config makeLicenseManagerConfig() {
@@ -22,6 +29,52 @@ namespace
         config.productSlug = osci::currentProduct().slug;
         return config;
     }
+
+#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
+    // The log, opened before any crash: a signal handler may not allocate or
+    // open files, as the heap may be what broke.
+    int crashLogDescriptor = -1;
+
+    void writeToCrashLog(const char* text, size_t length) {
+        if (::write(crashLogDescriptor, text, length) < 0) {
+            return;
+        }
+    }
+
+    // Called by JUCE's signal handler with the signal. Only async-signal-safe
+    // calls: the stack goes to the log, then the app dies of the signal itself
+    // rather than JUCE's SIGKILL, so the OS still writes its crash report.
+    void handleCrash(void* context) {
+        const auto signum = static_cast<int>(reinterpret_cast<juce::pointer_sized_int>(context));
+        if (crashLogDescriptor >= 0) {
+            static constexpr char header[] = "\n==== " JucePlugin_Name " crashed, signal ";
+            const char number[] = {static_cast<char>('0' + signum / 10 % 10), static_cast<char>('0' + signum % 10)};
+            static constexpr char footer[] = " ====\n";
+            writeToCrashLog(header, sizeof(header) - 1);
+            writeToCrashLog(number, sizeof(number));
+            writeToCrashLog(footer, sizeof(footer) - 1);
+            void* frames[128];
+            ::backtrace_symbols_fd(frames, ::backtrace(frames, 128), crashLogDescriptor);
+        }
+        ::signal(signum, SIG_DFL);
+        sigset_t signals;
+        sigemptyset(&signals);
+        sigaddset(&signals, signum);
+        ::pthread_sigmask(SIG_UNBLOCK, &signals, nullptr);
+        ::raise(signum);
+    }
+
+    void installCrashHandler(const juce::File& log) {
+        if (crashLogDescriptor >= 0) {
+            return;
+        }
+        crashLogDescriptor = ::open(log.getFullPathName().toRawUTF8(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
+        // backtrace() can load a library the first time it runs: not in the handler.
+        void* frame[1];
+        ::backtrace(frame, 1);
+        juce::SystemStats::setApplicationCrashHandler(handleCrash);
+    }
+#endif
 }
 
 //==============================================================================
@@ -95,18 +148,14 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     }
 
     // A standalone app that crashes leaves where it crashed at the end of its
-    // log. A plugin leaves crash handling to its host.
+    // log, and the OS its crash report. A plugin leaves crash handling to its
+    // host. Not on Windows, where JUCE's handler would end the process before
+    // Windows Error Reporting sees the crash.
+#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        crashLogFile() = applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log");
-        juce::SystemStats::setApplicationCrashHandler([](void*) {
-            juce::FileOutputStream log(crashLogFile());
-            if (log.openedOk()) {
-                log << "\n==== " << JucePlugin_Name << " crashed at " << juce::Time::getCurrentTime().toString(true, true, true, true) << " ====\n"
-                    << juce::SystemStats::getStackBacktrace() << "\n";
-                log.flush();
-            }
-        });
+        installCrashHandler(applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log"));
     }
+#endif
 
     globalSettings = osci::SettingsStore::forProductGlobals (JucePlugin_Name);
 
@@ -464,11 +513,6 @@ const juce::String CommonAudioProcessor::getProgramName(int index) {
 }
 
 void CommonAudioProcessor::changeProgramName(int index, const juce::String& newName) {}
-
-juce::File& CommonAudioProcessor::crashLogFile() {
-    static juce::File file;
-    return file;
-}
 
 void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     juce::Logger::writeToLog("prepareToPlay: sampleRate=" + juce::String(sampleRate)
