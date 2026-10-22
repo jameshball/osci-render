@@ -16,6 +16,12 @@ namespace {
 #if OSCI_PREMIUM
 const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
 #endif
+// Full screen is kept on the standalone window, which outlives an editor that
+// Create New Project replaces.
+constexpr const char* fullScreenProperty = "osciFullScreen";
+#if JUCE_WINDOWS
+constexpr const char* windowedBoundsProperty = "osciWindowedBounds";
+#endif
 }
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
@@ -511,8 +517,8 @@ void CommonPluginEditor::resetWindowSizeAndPosition() {
     auto* standaloneWindow = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (standaloneWindow != nullptr) {
         standaloneWindow->setFullScreen(false);
+        standaloneWindow->getProperties().remove(fullScreenProperty);
     }
-    fullScreen = false;
     setSize(defaultEditorWidth, defaultEditorHeight);
     auto* window = getTopLevelComponent();
     if (window != nullptr && window != this) {
@@ -790,11 +796,12 @@ void CommonPluginEditor::toggleFullScreen() {
 #if JUCE_WINDOWS
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !fullScreen;
+        const bool fullScreen = !isFullScreen();
+        window->getProperties().set(fullScreenProperty, fullScreen);
 
         if (fullScreen) {
             // Store the current window bounds before going fullscreen
-            windowedBounds = window->getBounds();
+            window->getProperties().set(windowedBoundsProperty, window->getBounds().toString());
 
             // Get the display that contains the window
             auto& displays = juce::Desktop::getInstance().getDisplays();
@@ -808,6 +815,7 @@ void CommonPluginEditor::toggleFullScreen() {
         } else {
             // Restore the previous windowed bounds
             window->setFullScreen(false);
+            const auto windowedBounds = juce::Rectangle<int>::fromString(window->getProperties()[windowedBoundsProperty].toString());
             if (!windowedBounds.isEmpty()) {
                 window->setBounds(windowedBounds);
             }
@@ -816,8 +824,7 @@ void CommonPluginEditor::toggleFullScreen() {
 #else
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !window->isFullScreen();
-        window->setFullScreen(fullScreen);
+        window->setFullScreen(!window->isFullScreen());
     }
 #endif
 }
@@ -825,7 +832,8 @@ void CommonPluginEditor::toggleFullScreen() {
 bool CommonPluginEditor::isFullScreen() {
 #if JUCE_WINDOWS
     // Windows counts a maximised window as full screen: only ours is.
-    return fullScreen;
+    auto* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    return window != nullptr && static_cast<bool>(window->getProperties()[fullScreenProperty]);
 #else
     auto* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     return window != nullptr && window->isFullScreen();

@@ -94,9 +94,7 @@ private:
     CommonAudioProcessor& audioProcessor;
     int defaultEditorWidth = 0;
     int defaultEditorHeight = 0;
-    bool fullScreen = false;
     bool betaUpdatesEnabled = false;
-    juce::Rectangle<int> windowedBounds;
     bool lastOfflineRenderSuccess = false;
 public:
     PluginLookAndFeel lookAndFeel;
