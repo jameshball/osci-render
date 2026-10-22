@@ -20,6 +20,7 @@ MainMenuBarModel::~MainMenuBarModel() {}
 void MainMenuBarModel::addTopLevelMenu(const juce::String& name) {
     topLevelMenuNames.add(name);
     menuItems.push_back({});
+    openSubMenus.push_back(-1);
     menuItemsChanged();
 }
 
@@ -32,21 +33,39 @@ void MainMenuBarModel::addStandardTopLevelMenus() {
     addTopLevelMenu("Interface");
 }
 
-void MainMenuBarModel::addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, const juce::String& shortcutKey) {
-    menuItems[topLevelMenuIndex].push_back({ name, std::move(action), {}, false, shortcutKey });
+void MainMenuBarModel::addItem(int topLevelMenuIndex, MenuItem item) {
+    item.parent = openSubMenus[(size_t) topLevelMenuIndex];
+    menuItems[(size_t) topLevelMenuIndex].push_back(std::move(item));
     menuItemsChanged();
+}
+
+void MainMenuBarModel::addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, const juce::String& shortcutKey) {
+    addItem(topLevelMenuIndex, { name, std::move(action), {}, false, shortcutKey });
 }
 
 void MainMenuBarModel::addMenuSeparator(int topLevelMenuIndex) {
     MenuItem separator;
     separator.isSeparator = true;
-    menuItems[topLevelMenuIndex].push_back(std::move(separator));
-    menuItemsChanged();
+    addItem(topLevelMenuIndex, std::move(separator));
+}
+
+void MainMenuBarModel::beginSubMenu(int topLevelMenuIndex, const juce::String& name) {
+    MenuItem subMenu;
+    subMenu.name = name;
+    subMenu.isSubMenu = true;
+    addItem(topLevelMenuIndex, std::move(subMenu));
+    openSubMenus[(size_t) topLevelMenuIndex] = (int) menuItems[(size_t) topLevelMenuIndex].size() - 1;
+}
+
+void MainMenuBarModel::endSubMenu(int topLevelMenuIndex) {
+    auto& open = openSubMenus[(size_t) topLevelMenuIndex];
+    if (open >= 0) {
+        open = menuItems[(size_t) topLevelMenuIndex][(size_t) open].parent;
+    }
 }
 
 void MainMenuBarModel::addToggleMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, std::function<bool()> isTicked, const juce::String& shortcutKey) {
-    menuItems[topLevelMenuIndex].push_back({ name, std::move(action), std::move(isTicked), true, shortcutKey });
-    menuItemsChanged();
+    addItem(topLevelMenuIndex, { name, std::move(action), std::move(isTicked), true, shortcutKey });
 }
 
 void MainMenuBarModel::addDiagnosticsMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor) {
@@ -194,24 +213,47 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
         customMenuLogic(menu, topLevelMenuIndex);
     }
 
-    for (int i = 0; i < (int) menuItems[topLevelMenuIndex].size(); i++) {
-        auto& mi = menuItems[topLevelMenuIndex][i];
+    addItemsTo(menu, topLevelMenuIndex, -1);
+
+    if (customMenuAfterLogic) {
+        customMenuAfterLogic(menu, topLevelMenuIndex);
+    }
+
+    return menu;
+}
+
+// The items whose parent is `parent` (-1 for the menu itself), each submenu
+// with its own items.
+void MainMenuBarModel::addItemsTo(juce::PopupMenu& menu, int topLevelMenuIndex, int parent) {
+    const auto& items = menuItems[(size_t) topLevelMenuIndex];
+    for (int i = 0; i < (int) items.size(); i++) {
+        const auto& mi = items[(size_t) i];
+        if (mi.parent != parent) {
+            continue;
+        }
         if (mi.isSeparator) {
             menu.addSeparator();
             continue;
         }
+        if (mi.isSubMenu) {
+            juce::PopupMenu subMenu;
+            addItemsTo(subMenu, topLevelMenuIndex, i);
+            menu.addSubMenu(mi.name, subMenu, !mi.isEnabled || mi.isEnabled());
+            continue;
+        }
         juce::PopupMenu::Item item(mi.name);
         item.itemID = i + 1;
-        if (mi.shortcutKey.isNotEmpty())
+        if (mi.shortcutKey.isNotEmpty()) {
             item.shortcutKeyDescription = mi.shortcutKey;
-        if (mi.hasTick && mi.isTicked)
+        }
+        if (mi.hasTick && mi.isTicked) {
             item.setTicked(mi.isTicked());
-        if (mi.isEnabled)
+        }
+        if (mi.isEnabled) {
             item.setEnabled(mi.isEnabled());
+        }
         menu.addItem(item);
     }
-
-    return menu;
 }
 
 void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
@@ -237,4 +279,5 @@ void MainMenuBarModel::menuBarActivated(bool isActive) {}
 void MainMenuBarModel::resetMenuItems() {
     topLevelMenuNames.clear();
     menuItems.clear();
+    openSubMenus.clear();
 }
