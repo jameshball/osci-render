@@ -1087,8 +1087,10 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
         if (partMode && !picked.empty()) { picked.clear(); refreshPartBar(); return true; }
         if (partMode) { setPartMode(false); return true; }
     }
-    // Letters as capitals: Linux reports them in lower case.
-    const auto letter = juce::CharacterFunctions::toUpperCase(static_cast<juce::juce_wchar>(key.getKeyCode()));
+    // Letters as capitals: Linux reports them in lower case (and only
+    // letters: a function key's code would otherwise be cut to one).
+    const auto code = key.getKeyCode();
+    const auto letter = code >= 'a' && code <= 'z' ? code - 'a' + 'A' : code;
     // Tab switches between objects and their parts, as Blender's edit mode.
     if (key == juce::KeyPress::tabKey && !navigating) { setPartMode(!partMode); return true; }
     if (partMode && key == juce::KeyPress('a', juce::ModifierKeys::commandModifier, 0)) {
@@ -1098,7 +1100,6 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
     if (partMode && !key.getModifiers().isAnyModifierKeyDown() && letter == 'E') { extractPicked(); return true; }
     // Views along an axis: numpad 1, 3, 7 (Ctrl for the opposite side), or
     // 1, 3, 7 on the number row as with Blender's emulated numpad.
-    const auto code = key.getKeyCode();
     const auto opposite = key.getModifiers().isCtrlDown();
     const auto plain = !key.getModifiers().isAnyModifierKeyDown();
     if (!navigating && (code == juce::KeyPress::numberPad1 || (plain && code == '1'))) { setViewPreset(opposite ? ViewPreset::back : ViewPreset::front); return true; }
