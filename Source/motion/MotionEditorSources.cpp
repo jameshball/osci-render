@@ -4,9 +4,35 @@
 #include "live/BlenderCaptureArchive.h"
 #include "import/BakedSourceArchive.h"
 #include "ui/BlenderSourcePanel.h"
+#include "ui/DrawingEditor.h"
+#include "ui/LuaSourceEditor.h"
+#include "ui/TextSourceEditor.h"
 #include "ui/FractalSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
 #include "ui/SvgSequencePanel.h"
+
+namespace {
+// A file written for importing or opening, in a folder of its own under the
+// temporary folder ("osci-motion drawings"...), so another of the same name,
+// written before this one is read, can't replace it. Text is written as it
+// is held, as UTF-8.
+std::optional<juce::File> writeTemporary(const juce::String& purpose, const juce::String& fileName, const void* data, std::size_t size) {
+    const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion " + purpose).getChildFile(juce::Uuid().toString());
+    const auto file = folder.getChildFile(fileName);
+    if (!folder.createDirectory().wasOk() || !file.replaceWithData(data, size)) { return std::nullopt; }
+    return file;
+}
+std::optional<juce::File> writeTemporary(const juce::String& purpose, const juce::String& fileName, const juce::String& text) {
+    return writeTemporary(purpose, fileName, text.toRawUTF8(), text.getNumBytesAsUTF8());
+}
+// A shipped example, copied out to be read as any file is.
+std::optional<juce::File> writeExample(const juce::String& resource) {
+    int size = 0;
+    const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);
+    if (data == nullptr || size < 0) { return std::nullopt; }
+    return writeTemporary("examples", motion::ui::examples::fileName(resource), data, static_cast<std::size_t>(size));
+}
+}
 
 // Files dropped on the timeline land where they were dropped (time and
 // track, as in Premiere); anywhere else they go in at the playhead.
@@ -51,14 +77,13 @@ void MotionEditor::importSourceFiles(juce::Array<juce::File> files, std::optiona
         // Named for what the files share ("walk_001.svg"...: walk).
         const auto shared = motion::svgsequence::sharedName(svgs);
         const auto name = shared.isNotEmpty() ? shared : svgs.getFirst().getFileNameWithoutExtension();
-        const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion sequences").getChildFile(juce::Uuid().toString());
-        const auto file = folder.getChildFile(juce::File::createLegalFileName(name) + motion::svgsequence::extension);
         const auto data = motion::svgsequence::encode(frames);
-        if (!folder.createDirectory().wasOk() || !file.replaceWithData(data.getData(), data.getSize())) {
+        const auto file = writeTemporary("sequences", juce::File::createLegalFileName(name) + motion::svgsequence::extension, data.getData(), data.getSize());
+        if (!file.has_value()) {
             owner->statusBar.show("Couldn't prepare the SVG sequence.");
             return;
         }
-        SourceRequest request {file, placement.has_value() ? placement->first : owner->processor.position.load(), owner->processor.document.generation(), {}};
+        SourceRequest request {*file, placement.has_value() ? placement->first : owner->processor.position.load(), owner->processor.document.generation(), {}};
         if (placement.has_value()) { request.track = placement->second; }
         owner->beginSourceImport(std::move(request));
     };
@@ -128,21 +153,18 @@ void MotionEditor::projectNotLoaded(const juce::File& file) {
 }
 
 void MotionEditor::openExample(const juce::String& resource) {
-    int size = 0;
-    const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);
-    const juce::String name = BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8());
-    if (data == nullptr || name.isEmpty()) { return; }
+    const auto name = motion::ui::examples::fileName(resource);
+    if (name.isEmpty()) { return; }
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    afterDiscarding("Open the " + name.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' ') + " example", [owner, data, size, name] {
+    afterDiscarding("Open the " + motion::ui::examples::displayName(resource) + " example", [owner, resource, name] {
         if (owner == nullptr) { return; }
         // Read from a copy, as any project is.
-        const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion examples");
-        const auto file = folder.getChildFile(name);
-        if (!folder.createDirectory().wasOk() || !file.replaceWithData(data, static_cast<std::size_t>(size))) {
+        const auto file = writeExample(resource);
+        if (!file.has_value()) {
             owner->statusBar.show("Could not prepare the example " + name + ".");
             return;
         }
-        owner->loadProject(file, true);
+        owner->loadProject(*file, true);
     });
 }
 
@@ -170,18 +192,14 @@ void MotionEditor::loadProject(const juce::File& file, bool example) {
         }
     };
     auto sheet = std::make_unique<motion::ui::ProgressSheet>("Opening project", file.getFileName(), "Preparing sources. Your current project stays open until loading succeeds.", nullptr, cancel, "Cancel loading");
-    const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false);
-    overlay->onDismissRequested = [owner, task, file] {
+    projectLoadOverlay = motion::ui::Sheet::show(*this, std::move(sheet), [owner, task, file] {
         task->cancelled.store(true);
         if (owner != nullptr && owner->projectLoad == task) {
             owner->projectNotLoaded(file);
             owner->projectLoadOverlay = nullptr;
             owner->projectLoad.reset();
         }
-    };
-    projectLoadOverlay = overlay.get();
-    showOverlay(std::move(overlay));
+    });
     // Its own thread: a load never waits behind imports into the current project.
     projectLoads.addJob([owner, task, file, generation, revision, example] {
         auto result = juce::Result::fail("Project loading cancelled.");
@@ -253,10 +271,8 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
     const auto original = found != nullptr ? found : std::shared_ptr<const motion::Asset>();
     auto panel = std::make_unique<MotionBlenderSourcePanel>(original != nullptr ? original->name : "Blender", original != nullptr ? original->blenderSettings : motion::BlenderSourceSettings{}, id != 0);
     auto* controls = panel.get();
-    const auto size = juce::Point<int>(panel->getWidth(), panel->getHeight());
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), juce::String(), size, false);
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
+    const juce::Component::SafePointer<osci::OverlayComponent> dialog(motion::ui::Sheet::show(*this, std::move(panel)));
     const auto generation = document.generation();
     auto panelIdentity = std::make_shared<std::shared_ptr<const motion::LiveSourceIdentity>>(original != nullptr ? original->liveIdentity : nullptr);
     controls->onApply = [owner, dialog, id, generation, panelIdentity, expected = original](juce::String name, motion::BlenderSourceSettings settings, bool start) mutable {
@@ -307,7 +323,6 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
     };
     liveSettings = controls;
     liveSettingsId = id;
-    showOverlay(std::move(overlay));
 }
 
 void MotionEditor::showLiveSettings(motion::Id id) {
@@ -510,7 +525,7 @@ void MotionEditor::showNextPreparationSettings() {
     const bool video = osci::files::isVideo(extension);
     const bool text = extension.equalsIgnoreCase(".txt");
     const bool fractal = extension.equalsIgnoreCase(".lsystem");
-    std::unique_ptr<juce::Component> content;
+    std::unique_ptr<motion::ui::Sheet> content;
     MotionRasterSettingsPanel* imagePanel = nullptr;
     MotionFractalSettingsPanel* fractalPanel = nullptr;
     // Text and Lua are written in the Scene; images and fractals keep a
@@ -560,17 +575,14 @@ void MotionEditor::showNextPreparationSettings() {
         fractalPanel = panel.get();
         content = std::move(panel);
     }
-    const auto size = juce::Point<int>(content->getWidth(), content->getHeight());
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), juce::String(), size, false);
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;
-    overlay->onDismissRequested = [owner] {
+    const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(motion::ui::Sheet::show(*this, std::move(content), [owner] {
         if (owner != nullptr) {
             owner->preparationSettingsOpen = false;
             owner->showNextPreparationSettings();
         }
-    };
+    }));
     auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings, std::optional<juce::String> editedText = {}, std::optional<motion::TextSettings> textSettings = {}, std::optional<int> fractalDepth = {}, std::shared_ptr<const juce::MemoryBlock> preparedVideo = {}) mutable {
         request.preparedVideo = std::move(preparedVideo);
         request.textSettings = std::move(textSettings);
@@ -592,7 +604,6 @@ void MotionEditor::showNextPreparationSettings() {
         imagePanel->onPrepare = [submit, imagePanel](motion::RasterSettings settings) mutable { submit({}, settings, {}, {}, {}, imagePanel->preparedFor(settings)); };
     }
     if (fractalPanel != nullptr) { fractalPanel->onPrepare = [submit](int depth) mutable { submit({}, {}, {}, {}, depth); }; }
-    showOverlay(std::move(overlay));
 }
 
 void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings settings, motion::RasterSettings rasterSettings) {
@@ -679,24 +690,17 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 owner->textAnimation.clearPending();
                 // A new script that fails reopens with its code, as an edit
                 // does; the editor shows the error where it is.
-                if (request.replacement == nullptr && request.relink == 0 && request.file.hasFileExtension("lua")) {
+                const auto& assets = owner->processor.document.project().assets;
+                const auto newScript = request.replacement == nullptr && request.relink == 0 && request.file.hasFileExtension("lua");
+                const auto editedScript = request.uniqueClip == 0 && request.replacement != nullptr && (request.replacement->extension.equalsIgnoreCase(".lua") || request.replacement->extension.equalsIgnoreCase(".txt"))
+                    && std::find(assets.begin(), assets.end(), request.replacement) != assets.end();
+                if (newScript || editedScript) {
                     auto retry = request;
                     retry.retrySettings = asset->bakeSettings;
                     retry.preparationError = result.getErrorMessage();
                     owner->preparationRequests.push_front(std::move(retry));
                     owner->showNextPreparationSettings();
                     return;
-                }
-                if (request.uniqueClip == 0 && request.replacement != nullptr && (request.replacement->extension.equalsIgnoreCase(".lua") || request.replacement->extension.equalsIgnoreCase(".txt"))) {
-                    const auto& assets = owner->processor.document.project().assets;
-                    if (std::find(assets.begin(), assets.end(), request.replacement) != assets.end()) {
-                        auto retry = request;
-                        retry.retrySettings = asset->bakeSettings;
-                        retry.preparationError = result.getErrorMessage();
-                        owner->preparationRequests.push_front(std::move(retry));
-                        owner->showNextPreparationSettings();
-                        return;
-                    }
                 }
                 owner->statusBar.show(result.getErrorMessage());
                 return;
@@ -858,8 +862,6 @@ void MotionEditor::closeSceneEditor() {
     showNextPreparationSettings();
 }
 
-// Draw a new source, or edit a drawn one (`asset`). The drawing is saved as
-// SVG in a temporary folder and imported like any file, relinking an edit.
 bool MotionEditor::sceneEditorOpen() {
     if (sceneEditor == nullptr) { return false; }
     statusBar.show("An editor is open in the Scene: finish it or cancel it first.", MotionStatusBar::Kind::warning);
@@ -867,6 +869,8 @@ bool MotionEditor::sceneEditorOpen() {
     return true;
 }
 
+// Draw a new source, or edit a drawn one (`asset`). The drawing is saved as
+// SVG in a temporary folder and imported like any file, relinking an edit.
 void MotionEditor::showDrawingEditor(motion::Id asset) {
     if (sceneEditorOpen()) { return; }
     motion::drawing::Drawing initial;
@@ -889,16 +893,13 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
     auto& editor = openSceneEditor(std::make_unique<MotionDrawingEditor>(initial, name, asset != 0));
     editor.onChanged = [this] { previewDrawing(); };
     editor.onDone = [this](const motion::drawing::Drawing& drawing, const juce::String& text) {
-        // A folder of its own: another drawing of the same name, saved before
-        // this one is read, can't replace it.
-        const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion drawings").getChildFile(juce::Uuid().toString());
-        const auto file = folder.getChildFile(juce::File::createLegalFileName(text) + ".svg");
-        if (!folder.createDirectory().wasOk() || !file.replaceWithText(motion::drawing::toSvg(drawing))) {
+        const auto file = writeTemporary("drawings", juce::File::createLegalFileName(text) + ".svg", motion::drawing::toSvg(drawing));
+        if (!file.has_value()) {
             statusBar.show("Could not save the drawing.");
             return;
         }
         const auto asset = drawingAsset;
-        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), file, asset] {
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), file = *file, asset] {
             if (owner == nullptr) { return; }
             owner->closeSceneEditor();
             owner->importSourceFile(file, asset);
@@ -973,13 +974,12 @@ void MotionEditor::showLuaEditor(SourceRequest request) {
             next.editedText = written == original ? std::optional<juce::String>() : std::optional<juce::String>(written);
         } else if (written != original) {
             // A new file edited before it is added imports from a copy.
-            const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion lua").getChildFile(juce::Uuid().toString());
-            const auto copy = folder.getChildFile(next.file.getFileName());
-            if (!folder.createDirectory().wasOk() || !copy.replaceWithText(written)) {
+            const auto copy = writeTemporary("lua", next.file.getFileName(), written);
+            if (!copy.has_value()) {
                 statusBar.show("Could not save the edited script.");
                 return;
             }
-            next.file = copy;
+            next.file = *copy;
         }
         luaSubmitted = true;
         juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), next, settings] {
@@ -1028,19 +1028,23 @@ void MotionEditor::previewLua() {
 // In place of the source being edited, or a new one on a track of its own
 // for the whole project, as a drawing previews.
 void MotionEditor::showLuaPreview(std::shared_ptr<motion::Asset> asset) {
+    previewSource(asset, luaRequest.replacement != nullptr ? luaRequest.replacement->id : 0, "Script");
+}
+
+void MotionEditor::previewSource(std::shared_ptr<motion::Asset> asset, motion::Id replacing, const juce::String& trackName) {
     auto project = processor.document.project();
-    if (luaRequest.replacement != nullptr) {
-        asset->id = luaRequest.replacement->id;
+    if (replacing != 0) {
+        asset->id = replacing;
         for (auto& item : project.assets) {
-            if (item->id == asset->id) { item = asset; }
+            if (item->id == replacing) { item = asset; }
         }
     } else {
-        asset->id = std::numeric_limits<motion::Id>::max() - 4;
+        asset->id = PreviewId::asset;
         project.assets.push_back(asset);
         motion::Track track;
-        track.id = std::numeric_limits<motion::Id>::max() - 5;
-        track.name = "Script";
-        auto clip = motion::Document::makeClip(std::numeric_limits<motion::Id>::max() - 6, *asset, 0);
+        track.id = PreviewId::track;
+        track.name = trackName.toStdString();
+        auto clip = motion::Document::makeClip(PreviewId::clip, *asset, 0);
         clip.duration = project.duration;
         track.insert(clip, project.tempo());
         project.tracks.push_back(track);
@@ -1054,7 +1058,6 @@ void MotionEditor::previewText() {
     textPreviewDue = 0;
     const auto* editor = sceneEditorAs<MotionTextSourceEditor>();
     if (editor == nullptr || textRequest.replacement == nullptr) { return; }
-    auto project = processor.document.project();
     auto asset = std::make_shared<motion::Asset>(*textRequest.replacement);
     const auto text = editor->currentText();
     asset->data.reset();
@@ -1062,13 +1065,10 @@ void MotionEditor::previewText() {
     asset->textSettings = editor->currentSettings();
     asset->textSettings.animation = motion::TextSettings::Animation::none;
     if (text.trim().isEmpty() || text.length() > 16384 || motion::decodeAsset(*asset).failed()) {
-        processor.prepareComposition(project);
+        processor.prepareComposition(processor.document.project());
         return;
     }
-    for (auto& item : project.assets) {
-        if (item->id == asset->id) { item = asset; }
-    }
-    processor.prepareComposition(project);
+    previewSource(asset, asset->id, {});
 }
 
 // The drawing in progress on the output: an edited source is swapped in place;
@@ -1076,32 +1076,16 @@ void MotionEditor::previewText() {
 void MotionEditor::previewDrawing() {
     const auto* editor = sceneEditorAs<MotionDrawingEditor>();
     if (editor == nullptr) { return; }
-    auto project = processor.document.project();
     auto asset = std::make_shared<motion::Asset>();
-    asset->id = drawingAsset != 0 ? drawingAsset : std::numeric_limits<motion::Id>::max() - 1;
     asset->name = "Drawing.svg";
     asset->extension = ".svg";
     const auto svg = motion::drawing::toSvg(editor->current());
     asset->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
     if (editor->current().empty() || motion::decodeAsset(*asset).failed()) {
-        processor.prepareComposition(project);
+        processor.prepareComposition(processor.document.project());
         return;
     }
-    if (drawingAsset != 0) {
-        for (auto& item : project.assets) {
-            if (item->id == drawingAsset) { item = asset; }
-        }
-    } else {
-        project.assets.push_back(asset);
-        motion::Track track;
-        track.id = std::numeric_limits<motion::Id>::max() - 2;
-        track.name = "Drawing";
-        auto clip = motion::Document::makeClip(std::numeric_limits<motion::Id>::max() - 3, *asset, 0);
-        clip.duration = project.duration;
-        track.insert(clip, project.tempo());
-        project.tracks.push_back(track);
-    }
-    processor.prepareComposition(project);
+    previewSource(asset, drawingAsset, "Drawing");
 }
 
 void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView::Picked>& picks, const juce::String& name) {
@@ -1153,8 +1137,6 @@ void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView
     if (made != nullptr) { assetLibrary.selectAsset(made->asset); }
 }
 
-// Examples are written to a temporary folder and imported like any file;
-// the project keeps its own copy of the data.
 void MotionEditor::newScript() {
     static constexpr const char* script =
         "-- Runs for every point the beam draws.\n"
@@ -1179,27 +1161,25 @@ void MotionEditor::newScript() {
     for (int number = 2; std::any_of(processor.document.project().assets.begin(), processor.document.project().assets.end(), [&](const auto& asset) { return asset->name.upToLastOccurrenceOf(".", false, false) == name; }); ++number) {
         name = "Script " + juce::String(number);
     }
-    const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion scripts").getChildFile(juce::Uuid().toString());
-    const auto file = folder.getChildFile(name + ".lua");
-    if (!folder.createDirectory().wasOk() || !file.replaceWithText(script)) {
+    const auto file = writeTemporary("scripts", name + ".lua", juce::String(script));
+    if (!file.has_value()) {
         statusBar.show("Could not start a new script.");
         return;
     }
-    importSourceFile(file, 0);
+    importSourceFile(*file, 0);
 }
 
+// Examples are written to a temporary folder and imported like any file;
+// the project keeps its own copy of the data.
 void MotionEditor::importExample(const juce::String& resource) {
-    int size = 0;
-    const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);
-    const juce::String name = BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8());
-    if (data == nullptr || name.isEmpty()) { return; }
-    const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion examples");
-    const auto file = folder.getChildFile(name);
-    if (!folder.createDirectory().wasOk() || !file.replaceWithData(data, static_cast<std::size_t>(size))) {
+    const auto name = motion::ui::examples::fileName(resource);
+    if (name.isEmpty()) { return; }
+    const auto file = writeExample(resource);
+    if (!file.has_value()) {
         statusBar.show("Could not prepare the example " + name + ".");
         return;
     }
-    importSourceFile(file, 0);
+    importSourceFile(*file, 0);
 }
 
 // The project with an effect of `type` added to `owner`, on the output.

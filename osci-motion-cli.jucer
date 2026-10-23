@@ -26,6 +26,14 @@
             file="Source/motion/model/Document.cpp"/>
       <FILE id="MotionDocSer" name="DocumentSerialisation.cpp" compile="1"
             resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
+      <FILE id="MotionDocClips" name="DocumentClips.cpp" compile="1" resource="0"
+            file="Source/motion/model/DocumentClips.cpp"/>
+      <FILE id="MotionDocSources" name="DocumentSources.cpp" compile="1" resource="0"
+            file="Source/motion/model/DocumentSources.cpp"/>
+      <FILE id="MotionDocRig" name="DocumentRig.cpp" compile="1" resource="0"
+            file="Source/motion/model/DocumentRig.cpp"/>
+      <FILE id="MotrenderHiddenLinescpp" name="HiddenLines.cpp" compile="1"
+            resource="0" file="Source/motion/render/HiddenLines.cpp"/>
       <FILE id="MotionSrcDec" name="SourceDecoding.cpp" compile="1" resource="0"
             file="Source/motion/import/SourceDecoding.cpp"/>
       <FILE id="tTstHd" name="thorvg.h" compile="0" resource="0" file="modules/thorvg/inc/thorvg.h"/>

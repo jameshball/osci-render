@@ -14,7 +14,7 @@ public:
         for (auto* component : std::initializer_list<juce::Component*> { &frameLabel, &frame, &codecLabel, &qualityLabel, &soundtrackLabel, &codec, &quality, &soundtrack, &note }) {
             addAndMakeVisible(component);
         }
-        const auto rate = juce::String(config.frameRate, config.frameRate == std::round(config.frameRate) ? 0 : 3);
+        const auto rate = motion::style::trimmed(config.frameRate, 3);
         frame.setName("Export frame");
         frame.setText(juce::String(config.renderSize.width) + juce::String::fromUTF8(" \xc3\x97 ") + juce::String(config.renderSize.height) + " px" + motion::style::dot() + rate + " fps", juce::dontSendNotification);
         frame.setTooltip("Set by the Scope's canvas button and the composition's frame rate");

@@ -3,7 +3,6 @@
 #include "SourcePreview.h"
 #include "GeneratorIcons.h"
 #include "SourceKind.h"
-#include "../model/SourceParts.h"
 #include "MenuIcons.h"
 
 MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(document), list("Motion assets", this) {
@@ -172,8 +171,7 @@ juce::String MotionAssetLibrary::editLabel(int row) const {
     if (extension == ".lsystem") { return "Fractal settings..."; }
     if (osci::files::isVideo(extension)) { return "Video settings..."; }
     if (osci::files::isImage(extension)) { return "Image settings..."; }
-    if (extension == ".svg" && motion::drawing::isDrawing(asset.data.toString())) { return "Edit drawing..."; }
-    if (modelRow(row)) { return "3D object settings..."; }
+    if (motion::ui::isDrawing(asset)) { return "Edit drawing..."; }
     return {};
 }
 
@@ -186,9 +184,7 @@ void MotionAssetLibrary::editRow(int row) {
     const auto& asset = *assets[static_cast<std::size_t>(row)];
     if (asset.missing) {
         if (onReplace) { onReplace(assetId(row)); }
-    } else if (modelRow(row)) {
-        if (onModelSettings) { onModelSettings(assetId(row), edit); }
-    } else if (asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset.data.toString())) {
+    } else if (motion::ui::isDrawing(asset)) {
         if (onEditDrawing) { onEditDrawing(assetId(row)); }
     } else if (onBake) {
         onBake(assetId(row));
@@ -226,11 +222,8 @@ void MotionAssetLibrary::selectedRowsChanged(int row) {
     list.repaint();
 }
 
-// A 3D object as imported, not parts split from one (which keep their place).
 bool MotionAssetLibrary::modelRow(int row) const {
-    if (!validAssetRow(row)) { return false; }
-    const auto& asset = *assets[static_cast<std::size_t>(row)];
-    return asset.extension.equalsIgnoreCase(".obj") && !motion::parts::isLineSet(asset.data.toString());
+    return validAssetRow(row) && motion::ui::isModel(*assets[static_cast<std::size_t>(row)]);
 }
 
 juce::String MotionAssetLibrary::getNameForRow(int row) {

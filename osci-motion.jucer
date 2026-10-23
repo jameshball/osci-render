@@ -348,10 +348,6 @@
         <GROUP id="{CMP_MENU}" name="menu">
           <FILE id="ka6rAh" name="MainMenuBarModel.cpp" compile="1" resource="0"
                 file="Source/components/menu/MainMenuBarModel.cpp"/>
-          <FILE id="IsrMnuC" name="InternalSampleRateMenu.cpp" compile="1" resource="0"
-                file="Source/components/menu/InternalSampleRateMenu.cpp"/>
-          <FILE id="IsrMnuH" name="InternalSampleRateMenu.h" compile="0" resource="0"
-                file="Source/components/menu/InternalSampleRateMenu.h"/>
           <FILE id="t6oUhv" name="MainMenuBarModel.h" compile="0" resource="0"
                 file="Source/components/menu/MainMenuBarModel.h"/>
         </GROUP>
@@ -484,8 +480,6 @@
               resource="0" file="Source/motion/import/SourceDecoding.cpp"/>
         <FILE id="MotimportSourceDecodingh" name="SourceDecoding.h" compile="0"
               resource="0" file="Source/motion/import/SourceDecoding.h"/>
-        <FILE id="MotimportVideoDecoderProcessh" name="VideoDecoderProcess.h"
-              compile="0" resource="0" file="Source/motion/import/VideoDecoderProcess.h"/>
         <FILE id="MotimportVideoSourcePreparerh" name="VideoSourcePreparer.h"
               compile="0" resource="0" file="Source/motion/import/VideoSourcePreparer.h"/>
       </GROUP>
@@ -508,8 +502,6 @@
               resource="0" file="Source/motion/live/LiveSourceFrames.h"/>
         <FILE id="MotlivePreparedBlenderFrameh" name="PreparedBlenderFrame.h"
               compile="0" resource="0" file="Source/motion/live/PreparedBlenderFrame.h"/>
-        <FILE id="MotlivePreparedBlenderInputh" name="PreparedBlenderInput.h"
-              compile="0" resource="0" file="Source/motion/live/PreparedBlenderInput.h"/>
       </GROUP>
       <GROUP id="MotionSrcModel" name="model">
         <FILE id="MotAnimation" name="Animation.h" compile="0" resource="0"
@@ -532,6 +524,14 @@
         <FILE id="MotmodelCompositionGraphh" name="CompositionGraph.h" compile="0"
               resource="0" file="Source/motion/model/CompositionGraph.h"/>
         <FILE id="MotionDoc" name="Document.cpp" compile="1" resource="0" file="Source/motion/model/Document.cpp"/>
+        <FILE id="MotionDocClips" name="DocumentClips.cpp" compile="1" resource="0"
+              file="Source/motion/model/DocumentClips.cpp"/>
+        <FILE id="MotionDocSources" name="DocumentSources.cpp" compile="1" resource="0"
+              file="Source/motion/model/DocumentSources.cpp"/>
+        <FILE id="MotionDocRig" name="DocumentRig.cpp" compile="1" resource="0"
+              file="Source/motion/model/DocumentRig.cpp"/>
+        <FILE id="MotDocumentEdits" name="DocumentEdits.h" compile="0" resource="0"
+              file="Source/motion/model/DocumentEdits.h"/>
         <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
         <FILE id="MotLoadNotes" name="LoadNotes.h" compile="0" resource="0"
               file="Source/motion/model/LoadNotes.h"/>
@@ -543,6 +543,8 @@
               compile="1" resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
         <FILE id="MotmodelDrawingh" name="Drawing.h" compile="0" resource="0"
               file="Source/motion/model/Drawing.h"/>
+        <FILE id="MotmodelDrawingLruh" name="DrawingLru.h" compile="0" resource="0"
+              file="Source/motion/model/DrawingLru.h"/>
         <FILE id="MotmodelSourcePartsh" name="SourceParts.h" compile="0" resource="0"
               file="Source/motion/model/SourceParts.h"/>
         <FILE id="MotmodelAnchorEdith" name="AnchorEdit.h" compile="0" resource="0"
@@ -609,12 +611,20 @@
               compile="0" resource="0" file="Source/motion/render/CompositionPreparationWorker.h"/>
         <FILE id="MotCompositionRenderer" name="CompositionRenderer.h" compile="0"
               resource="0" file="Source/motion/render/CompositionRenderer.h"/>
+        <FILE id="MotrenderPreparedCliph" name="PreparedClip.h" compile="0"
+              resource="0" file="Source/motion/render/PreparedClip.h"/>
+        <FILE id="MotrenderPreparedCamerah" name="PreparedCamera.h" compile="0"
+              resource="0" file="Source/motion/render/PreparedCamera.h"/>
+        <FILE id="MotrenderHiddenLinescpp" name="HiddenLines.cpp" compile="1"
+              resource="0" file="Source/motion/render/HiddenLines.cpp"/>
         <FILE id="MotrenderHiddenLineBakerh" name="HiddenLineBaker.h" compile="0"
               resource="0" file="Source/motion/render/HiddenLineBaker.h"/>
         <FILE id="MotrenderHiddenLineShapesh" name="HiddenLineShapes.h" compile="0"
               resource="0" file="Source/motion/render/HiddenLineShapes.h"/>
         <FILE id="MotrenderHiddenLineTourh" name="HiddenLineTour.h" compile="0"
               resource="0" file="Source/motion/render/HiddenLineTour.h"/>
+        <FILE id="OfflineBeamSnap" name="OfflineVisualiserParameters.h" compile="0"
+              resource="0" file="Source/motion/render/OfflineVisualiserParameters.h"/>
         <FILE id="MotPreparedDrivers" name="PreparedDrivers.h" compile="0"
               resource="0" file="Source/motion/render/PreparedDrivers.h"/>
         <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"
@@ -654,6 +664,10 @@
               resource="0" file="Source/motion/ui/CompositionView.cpp"/>
         <FILE id="MotCompositionView" name="CompositionView.h" compile="0"
               resource="0" file="Source/motion/ui/CompositionView.h"/>
+        <FILE id="MotuiCompositionViewPartscpp" name="CompositionViewParts.cpp"
+              compile="1" resource="0" file="Source/motion/ui/CompositionViewParts.cpp"/>
+        <FILE id="MotuiCompositionViewPiecescpp" name="CompositionViewPieces.cpp"
+              compile="1" resource="0" file="Source/motion/ui/CompositionViewPieces.cpp"/>
         <FILE id="MotuiCurveEditorcpp" name="CurveEditor.cpp" compile="1" resource="0"
               file="Source/motion/ui/CurveEditor.cpp"/>
         <FILE id="MotCurveEditor" name="CurveEditor.h" compile="0" resource="0"
@@ -688,8 +702,14 @@
               file="Source/motion/ui/GrabCursor_mac.mm"/>
         <FILE id="MotuiInterpolationBarh" name="InterpolationBar.h" compile="0"
               resource="0" file="Source/motion/ui/InterpolationBar.h"/>
+        <FILE id="MotuiKeyframeButtonh" name="KeyframeButton.h" compile="0"
+              resource="0" file="Source/motion/ui/KeyframeButton.h"/>
         <FILE id="MotuiKeyPanelh" name="KeyPanel.h" compile="0" resource="0"
               file="Source/motion/ui/KeyPanel.h"/>
+        <FILE id="MotuiKeyPositionscpp" name="KeyPositions.cpp" compile="1"
+              resource="0" file="Source/motion/ui/KeyPositions.cpp"/>
+        <FILE id="MotuiKeyPositionsh" name="KeyPositions.h" compile="0"
+              resource="0" file="Source/motion/ui/KeyPositions.h"/>
         <FILE id="MotuiLuaSourceEditorh" name="LuaSourceEditor.h" compile="0"
               resource="0" file="Source/motion/ui/LuaSourceEditor.h"/>
         <FILE id="MotuiMarkerPanelh" name="MarkerPanel.h" compile="0" resource="0"
@@ -704,6 +724,8 @@
               file="Source/motion/ui/MotionPath.h"/>
         <FILE id="MotuiMotionStyleh" name="MotionStyle.h" compile="0" resource="0"
               file="Source/motion/ui/MotionStyle.h"/>
+        <FILE id="MotuiPlayheadStriph" name="PlayheadStrip.h" compile="0"
+              resource="0" file="Source/motion/ui/PlayheadStrip.h"/>
         <FILE id="MotuiPreviewGestureh" name="PreviewGesture.h" compile="0"
               resource="0" file="Source/motion/ui/PreviewGesture.h"/>
         <FILE id="MotuiPropertyInspectorcpp" name="PropertyInspector.cpp" compile="1"
@@ -743,8 +765,14 @@
               resource="0" file="Source/motion/ui/TimelineViewBands.cpp"/>
         <FILE id="MotuiTimelineViewBeamcpp" name="TimelineViewBeam.cpp" compile="1"
               resource="0" file="Source/motion/ui/TimelineViewBeam.cpp"/>
+        <FILE id="MotuiTimelineViewClipscpp" name="TimelineViewClips.cpp" compile="1"
+              resource="0" file="Source/motion/ui/TimelineViewClips.cpp"/>
         <FILE id="MotuiTimelineViewKeyscpp" name="TimelineViewKeys.cpp" compile="1"
               resource="0" file="Source/motion/ui/TimelineViewKeys.cpp"/>
+        <FILE id="MotuiTimelineViewNavigationcpp" name="TimelineViewNavigation.cpp"
+              compile="1" resource="0" file="Source/motion/ui/TimelineViewNavigation.cpp"/>
+        <FILE id="MotuiTimelineViewRowscpp" name="TimelineViewRows.cpp" compile="1"
+              resource="0" file="Source/motion/ui/TimelineViewRows.cpp"/>
         <FILE id="MotuiTimelineViewTrackscpp" name="TimelineViewTracks.cpp"
               compile="1" resource="0" file="Source/motion/ui/TimelineViewTracks.cpp"/>
         <FILE id="mottrackhdr" name="TrackHeader.h" compile="0" resource="0"
@@ -768,8 +796,6 @@
             file="Resources/images/motion_logo.png"/>
       <FILE id="MotionMark" name="motion_mark.svg" compile="0" resource="1"
             file="Resources/images/motion_mark.svg"/>
-      <FILE id="OfflineBeamSnap" name="OfflineVisualiserParameters.h" compile="0"
-            resource="0" file="Source/visualiser/OfflineVisualiserParameters.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1"

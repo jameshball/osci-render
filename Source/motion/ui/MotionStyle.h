@@ -62,6 +62,12 @@ inline juce::Colour gridZero() { return juce::Colours::white.withAlpha(.12f); }
 // display: the app's name on the start screen, and nothing else.
 // The separator between short facts, as in the status bar.
 inline juce::String dot() { return juce::String::fromUTF8(" \xc2\xb7 "); }
+// A number without decimals when it is whole, else with this many.
+inline juce::String trimmed(double value, int decimals) { return juce::String(value, value == std::round(value) ? 0 : decimals); }
+inline juce::String hertz(double value) { return trimmed(value, 2) + " Hz"; }
+// A sample rate: 48 kHz, 44.1 kHz.
+inline juce::String kilohertz(double rate) { return juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz"; }
+inline juce::String bpm(double value) { return trimmed(value, 2) + " BPM"; }
 inline juce::Font title() { return juce::Font(juce::FontOptions(13.0f, juce::Font::bold)); }
 inline juce::Font body() { return juce::Font(juce::FontOptions(13.0f)); }
 inline juce::Font caption() { return juce::Font(juce::FontOptions(11.0f)); }
@@ -601,12 +607,13 @@ inline void styleHeading(juce::Label& label, const juce::String& text) {
 }
 // Two fields to a row, each with its caption inside on the left as X, Y
 // and Z carry their axis, and the value on the right. They share the left
-// and right edges of Properties' value columns, clear of the keys' gutter.
+// and right edges of Properties' value columns, clear of the keys' gutter;
+// fields that can't be keyed (`keyless`) take that gutter too.
 // Visible fields only, two to a line in order.
 template <std::size_t count>
-inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, count>& captions, const std::type_identity_t<std::array<juce::Component*, count>>& fields) {
+inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, count>& captions, const std::type_identity_t<std::array<juce::Component*, count>>& fields, bool keyless = false) {
     const PropertyGrid grid(area.getWidth());
-    const auto right = grid.value + grid.column;
+    const auto right = keyless ? area.getWidth() : grid.value + grid.column;
     const auto half = (right - gap) / 2;
     std::vector<std::size_t> shown;
     for (std::size_t index = 0; index < fields.size(); ++index) {

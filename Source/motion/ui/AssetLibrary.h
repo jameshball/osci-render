@@ -21,8 +21,6 @@ public:
     std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition, onReplace, onEditDrawing;
     std::function<void()> onCancelImport;
     std::function<void(motion::Id)> onBake;
-    // A 3D object's settings, beside the button that asked for them.
-    std::function<void(motion::Id, juce::Component&)> onModelSettings;
     // The source (or composition) selected, or 0.
     motion::Id chosen() const { return validRow(list.getSelectedRow()) ? assetId(list.getSelectedRow()) : 0; }
     std::function<juce::String(motion::Id)> liveStatus;

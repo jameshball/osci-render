@@ -1,12 +1,116 @@
 #include "MotionEditor.h"
+#include "ui/BeamOverload.h"
 #include "ui/MenuIcons.h"
+#include "ui/StartScreen.h"
 #include "../components/AboutComponent.h"
 #include <cstdlib>
 
+namespace {
+// Message-thread transaction: the player is detached before changing bus
+// layouts or restarting hardware. Unavailable channel counts are rejected
+// without touching the running configuration. Every input bus is disabled:
+// osci-motion only produces audio.
+juce::Result configureOutputOnlyChannels(juce::StandalonePluginHolder& holder, int requestedChannels) {
+    if (!juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+        return juce::Result::fail("Output channels must be configured on the message thread.");
+    }
+    auto* device = holder.deviceManager.getCurrentAudioDevice();
+    if (holder.processor == nullptr || device == nullptr) {
+        return juce::Result::fail("No audio processor or output device is available.");
+    }
+    if (requestedChannels <= 0 || device->getOutputChannelNames().size() < requestedChannels) {
+        return juce::Result::fail("The current audio device does not expose " + juce::String(requestedChannels) + " output channels.");
+    }
+    const auto previousLayout = holder.processor->getBusesLayout();
+    const auto previousSetup = holder.deviceManager.getAudioDeviceSetup();
+    const auto previousOutputs = device->getActiveOutputChannels();
+    auto layout = previousLayout;
+    if (layout.outputBuses.isEmpty()) {
+        return juce::Result::fail("The processor has no output bus.");
+    }
+    for (auto& input : layout.inputBuses) {
+        input = juce::AudioChannelSet::disabled();
+    }
+    for (auto& output : layout.outputBuses) {
+        output = juce::AudioChannelSet::disabled();
+    }
+    layout.outputBuses.set(0, requestedChannels == 2 ? juce::AudioChannelSet::stereo() : juce::AudioChannelSet::discreteChannels(requestedChannels));
+    if (!holder.processor->checkBusesLayoutSupported(layout)) {
+        return juce::Result::fail("The processor does not support the requested output layout.");
+    }
+    auto setup = previousSetup;
+    setup.useDefaultOutputChannels = false;
+    // Preserve the user's physical channel mapping when it already fits.
+    setup.outputChannels = device->getActiveOutputChannels();
+    if (setup.outputChannels.countNumberOfSetBits() != requestedChannels) {
+        setup.outputChannels.clear();
+        setup.outputChannels.setRange(0, requestedChannels, true);
+    }
+    if (previousLayout == layout && previousOutputs.countNumberOfSetBits() == requestedChannels) {
+        return juce::Result::ok();
+    }
+    holder.stopPlaying();
+    const auto rollback = [&](juce::String reason) {
+        holder.stopPlaying();
+        const auto restoredLayout = holder.processor->setBusesLayout(previousLayout);
+        const auto restoreError = holder.deviceManager.setAudioDeviceSetup(previousSetup, true);
+        holder.startPlaying();
+        const auto* restoredDevice = holder.deviceManager.getCurrentAudioDevice();
+        const auto restored = restoredDevice != nullptr
+            && restoredDevice->getActiveOutputChannels() == previousOutputs
+            && holder.processor->getBusesLayout() == previousLayout;
+        if (!restoredLayout || restoreError.isNotEmpty() || !restored) {
+            reason += " Restoring the previous audio configuration also failed";
+            if (restoreError.isNotEmpty()) {
+                reason += ": " + restoreError;
+            }
+            reason += ". Check Audio Settings.";
+        }
+        return juce::Result::fail(reason);
+    };
+    if (!holder.processor->setBusesLayout(layout)) {
+        return rollback("The processor could not apply the requested output layout.");
+    }
+    const auto error = holder.deviceManager.setAudioDeviceSetup(setup, true);
+    if (error.isNotEmpty()) {
+        return rollback("The audio device could not enable the requested outputs: " + error);
+    }
+    const auto matches = [&] {
+        const auto* currentDevice = holder.deviceManager.getCurrentAudioDevice();
+        return currentDevice != nullptr
+            && currentDevice->getActiveOutputChannels().countNumberOfSetBits() == requestedChannels
+            && holder.processor->getTotalNumOutputChannels() == requestedChannels
+            && holder.processor->getTotalNumInputChannels() == 0;
+    };
+    if (!matches()) {
+        return rollback("The audio device or processor did not activate the requested channel count.");
+    }
+    holder.startPlaying();
+    // AudioProcessorPlayer may negotiate a layout when it reattaches.
+    if (!matches()) {
+        return rollback("Playback could not retain the requested output layout.");
+    }
+    return juce::Result::ok();
+}
+}
+
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraRig(ownerProcessor), clipTimingPanel(ownerProcessor), effectStack(ownerProcessor), routingPanel(ownerProcessor), modulatorLibrary(ownerProcessor), propertyInspector(ownerProcessor) {
-    lookAndFeel.setControlCornerRadius(3.0f);
-    motionLookAndFeel.setControlCornerRadius(3.0f);
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        // A launch that only renders, from the command line, shows nothing:
+        // its window is there for the renderer to draw into, unseen, and the
+        // app takes no place in the Dock or switcher.
+        const auto* holder = juce::StandalonePluginHolder::getInstance();
+        auto* window = juce::TopLevelWindow::getNumTopLevelWindows() > 0 ? dynamic_cast<juce::DocumentWindow*>(juce::TopLevelWindow::getTopLevelWindow(0)) : nullptr;
+        if (holder != nullptr && window != nullptr && holder->commandLine.contains("--render-video")) {
+            window->setAlpha(0.0f);
+#if JUCE_MAC
+            juce::Process::setDockIconVisible(false);
+#endif
+        }
+    }
+    lookAndFeel.setControlCornerRadius(motion::style::radiusControl);
+    motionLookAndFeel.setControlCornerRadius(motion::style::radiusControl);
     setLookAndFeel(&motionLookAndFeel);
     visualiserSettings.setSurfaceColours(osci::Colours::veryDark(), osci::Colours::surface());
     scopePanel.onXYOnly = [this] { offerHatchingForXY(); };
@@ -19,7 +123,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // the Scope panel header rather than on top of the picture.
     visualiserControls = &visualiser.detachControls(*this);
     visualiser.onControlsChanged = [this] { resized(); };
-    visualiser.setControlStyle(osci::Colours::text().withAlpha(.78f), 5);
     // The Scope shows the project as it plays: Space plays and pauses that.
     visualiser.setPausable(false);
     // Children in paint order: each draws over those added before it.
@@ -132,7 +235,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             if (chosen.has_value() && processor.document.mainProject().sampleRate != *chosen) {
                 const auto value = *chosen;
                 processor.document.edit("Change the sample rate", [value](motion::Project& project) { project.sampleRate = value; });
-                statusBar.show("Sample rate " + motion::ui::BeamOverloadPopover::kilohertz(value), MotionStatusBar::Kind::notice);
+                statusBar.show("Sample rate " + motion::style::kilohertz(value), MotionStatusBar::Kind::notice);
             }
             dismissPopover(raw);
         };
@@ -335,14 +438,14 @@ void MotionEditor::setUpTransport() {
         const auto typed = motion::ui::parseNumber(tempoValue.getText(), "BPM");
         const auto value = typed.value_or(0);
         if (value < 1 || value > 1000) {
-            tempoValue.setText(tempoText(processor.document.project().bpm), juce::dontSendNotification);
+            tempoValue.setText(motion::style::bpm(processor.document.project().bpm), juce::dontSendNotification);
             statusBar.show("Enter a tempo between 1 and 1000 BPM.", MotionStatusBar::Kind::notice);
             return;
         }
         if (value != processor.document.project().bpm) {
             const auto result = processor.document.changeTempo(value);
             if (result.failed()) {
-                tempoValue.setText(tempoText(processor.document.project().bpm), juce::dontSendNotification);
+                tempoValue.setText(motion::style::bpm(processor.document.project().bpm), juce::dontSendNotification);
                 statusBar.show("Couldn't change the tempo: " + result.getErrorMessage());
             }
         }
@@ -352,13 +455,10 @@ void MotionEditor::setUpTransport() {
     playButton.onClick = [this] { togglePlayback(); };
 }
 
-juce::String MotionEditor::tempoText(double bpm) {
-    return juce::String(bpm, bpm == std::round(bpm) ? 0 : 2) + " BPM";
-}
-
 MotionEditor::~MotionEditor() {
     // An open popover goes first: it may be a window of its own, styled by
-    // this editor's look and calling back into it.
+    // this editor's look and calling back into it, and it deletes itself
+    // only when dismissed.
     if (popover != nullptr) {
         popover->setLookAndFeel(nullptr);
         if (popover->isCurrentlyModal(false)) { popover->exitModalState(0); }
@@ -370,11 +470,6 @@ MotionEditor::~MotionEditor() {
     juce::Desktop::getInstance().removeFocusChangeListener(this);
     // Closed as it should be: the session is kept by the app on quitting.
     if (recovery != nullptr) { recovery->finish(); }
-    // A popover is parented here and deletes itself only when dismissed.
-    if (popover != nullptr) {
-        popover->exitModalState(0);
-        delete popover.getComponent();
-    }
     visualiser.setFullScreenCallback(nullptr);
     for (auto* child : getChildren()) { child->removeComponentListener(&dialogStyle); }
     motion::style::unstyleDialogs(*this, dialogStyle.look);
@@ -560,7 +655,7 @@ void MotionEditor::timerCallback() {
         const auto dot = motion::style::dot();
         // A short line of what is out of the ordinary, beside the rates; its
         // tooltip says the rest. The timeline's ruler shows the bake itself.
-        const auto rates = MotionCompositionPanel::kilohertz(rate) + dot + MotionCompositionPanel::hertz(beamRate) + " beam";
+        const auto rates = motion::style::kilohertz(rate) + dot + motion::style::hertz(beamRate) + " beam";
         juce::StringArray line {rates}, details {rates};
         if (processor.document.project().scope.xyOnly) {
             line.add("XY only");
@@ -634,7 +729,7 @@ void MotionEditor::timerCallback() {
     }
     if (timeLabel.isBeingEdited() && (positionEditGeneration != processor.document.scopeGeneration() || positionEditRevision != processor.document.revision())) { timeLabel.hideEditor(true); }
     if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification); }
-    if (!tempoValue.isBeingEdited() && !tappedBpm.has_value()) { tempoValue.setText(tempoText(processor.document.project().bpm), juce::dontSendNotification); }
+    if (!tempoValue.isBeingEdited() && !tappedBpm.has_value()) { tempoValue.setText(motion::style::bpm(processor.document.project().bpm), juce::dontSendNotification); }
     // A moving playhead repaints only its own columns of the time views, and a
     // slow full refresh (about 3 Hz) catches anything that changes without an
     // edit or a playhead move. Live Blender capture shows in the Scene, which
@@ -851,14 +946,13 @@ void MotionEditor::previewEffect(const std::string& type, std::optional<motion::
     const auto* definition = motion::effectDefinition(type);
     auto project = processor.document.project();
     auto* effects = owner.has_value() && definition != nullptr ? motion::findEffectOwner(project, *owner) : nullptr;
-    if (effects == nullptr) {
-        processor.prepareComposition(processor.document.project());
-        composition.refresh();
-        return;
-    }
-    effects->push_back(motion::makeEffect(std::numeric_limits<motion::Id>::max(), *definition));
-    processor.prepareComposition(project);
-    composition.preview(project);
+    if (effects != nullptr) { effects->push_back(motion::makeEffect(PreviewId::effect, *definition)); }
+    previewProject(effects != nullptr ? &project : nullptr);
+}
+
+void MotionEditor::previewProject(const motion::Project* project) {
+    processor.prepareComposition(project != nullptr ? *project : processor.document.project());
+    if (project != nullptr) { composition.preview(*project); } else { composition.refresh(); }
 }
 
 void MotionEditor::addEffectTo(const std::string& type, motion::Id owner) {
@@ -1215,7 +1309,7 @@ bool MotionEditor::restoreRouting() {
     routing = motion::fitRouting(routing, device.outputs);
     auto* holder = juce::StandalonePluginHolder::getInstance();
     if (routing.channels() > 2) {
-        const auto opened = holder != nullptr ? holder->configureOutputOnlyChannels(routing.channels()) : juce::Result::fail({});
+        const auto opened = holder != nullptr ? configureOutputOnlyChannels(*holder, routing.channels()) : juce::Result::fail({});
         if (opened.failed()) { routing = motion::fitRouting(routing, 2); }
     }
     processor.setRouting(routing);
@@ -1228,7 +1322,7 @@ juce::Result MotionEditor::applyRouting(motion::OutputRouting routing) {
     // More than a pair opens the outputs it needs; a pair is always open.
     if (routing.channels() > 2) {
         auto* holder = juce::StandalonePluginHolder::getInstance();
-        const auto opened = holder != nullptr ? holder->configureOutputOnlyChannels(routing.channels()) : juce::Result::fail("The beam on more than two outputs needs the standalone app's audio device.");
+        const auto opened = holder != nullptr ? configureOutputOnlyChannels(*holder, routing.channels()) : juce::Result::fail("The beam on more than two outputs needs the standalone app's audio device.");
         if (opened.failed()) { return opened; }
     }
     processor.setRouting(routing);

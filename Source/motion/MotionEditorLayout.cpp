@@ -58,9 +58,10 @@ void MotionEditor::resized() {
     const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 424 ? 424 : 378;
     auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, transportWidth), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - transportWidth / 2));
     // What the audio interface plays sits with the other audio state (the
-    // DSP meter), not in the Scope; without room it lives in the Audio menu.
+    // DSP meter), not in the Scope. It is the only way to the Output panel.
     {
-        // Narrower windows drop the label, then shrink the picker.
+        // Narrower windows drop the label, then shrink the picker, which
+        // hides only below 100 px, less than the minimum window leaves it.
         auto output = top.withLeft(transport.getRight() + 12);
         const auto labelled = output.getWidth() >= 46 + 160;
         const auto pickerWidth = labelled ? 160 : std::min(160, output.getWidth());

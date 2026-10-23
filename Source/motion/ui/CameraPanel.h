@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "KeyframeButton.h"
 
 #include "../MotionProcessor.h"
 #include "../model/KeyEdit.h"
@@ -47,7 +48,7 @@ public:
         // and next key, in the column the property rows keep theirs.
         keyButton.setName("Key camera shot");
         keyButton.setTitle("Key camera shot");
-        keyButton.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
+        keyButton.setColour(motion::ui::KeyframeButton::keyColourId, osci::Colours::text());
         keyButton.setWantsKeyboardFocus(false);
         keyButton.onClick = [this] { toggleKey(); };
         previousKey.setTooltip("Go to the camera's previous key");
@@ -86,7 +87,7 @@ public:
             }
         });
         keyButton.setEnabled(found != nullptr);
-        keyButton.setState(keyed ? osci::KeyframeButton::State::keyed : animated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated);
+        keyButton.setState(keyed ? motion::ui::KeyframeButton::State::keyed : animated ? motion::ui::KeyframeButton::State::animated : motion::ui::KeyframeButton::State::unanimated);
         keyButton.setTooltip(keyed ? "Remove the shot's keys at the playhead" : "Key position, rotation and field of view at the playhead");
         previousKey.setVisible(animated);
         nextKey.setVisible(animated);
@@ -225,6 +226,6 @@ private:
     juce::Label title, lookAtLabel, parentLabel, shotLabel, showing;
     std::vector<std::pair<motion::Id, juce::String>> listedTargets, listedParents;
     juce::TextButton cutButton;
-    osci::KeyframeButton keyButton;
+    motion::ui::KeyframeButton keyButton;
     motion::style::ChevronButton previousKey {"Previous camera key", false}, nextKey {"Next camera key", true};
 };

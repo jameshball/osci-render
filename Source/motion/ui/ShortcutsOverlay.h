@@ -27,9 +27,7 @@ public:
     }
     // Show the reference in a sheet over `owner`.
     static void show(juce::Component& owner, std::vector<Section> content) {
-        auto sheet = std::make_unique<MotionShortcutsOverlay>(std::move(content));
-        const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
-        osci::OverlayComponent::show(owner, std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false));
+        Sheet::show(owner, std::make_unique<MotionShortcutsOverlay>(std::move(content)));
     }
     void visibilityChanged() override {
         if (isShowing()) { juce::MessageManager::callAsync([safe = juce::Component::SafePointer<juce::TextEditor>(&filter)] { if (safe != nullptr) { safe->grabKeyboardFocus(); } }); }

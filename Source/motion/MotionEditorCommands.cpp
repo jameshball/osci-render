@@ -1,5 +1,8 @@
 #include "MotionEditor.h"
 #include "../JucewrightAutomation.h"
+#include "model/TempoDetection.h"
+#include "ui/ShortcutsOverlay.h"
+#include "ui/StartScreen.h"
 
 namespace {
 bool canSplitClip(const motion::Clip* clip, double time, const motion::Tempo& bpm) {
@@ -15,13 +18,7 @@ void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, j
 
 namespace {
 // The example projects that ship with osci-motion, as resources.
-juce::StringArray exampleProjects() {
-    juce::StringArray resources;
-    for (int index = 0; index < BinaryData::namedResourceListSize; ++index) {
-        if (juce::String(BinaryData::getNamedResourceOriginalFilename(BinaryData::namedResourceList[index])).endsWithIgnoreCase(".osci-motion")) { resources.add(BinaryData::namedResourceList[index]); }
-    }
-    return resources;
-}
+std::vector<juce::String> exampleProjects() { return motion::ui::examples::resources(".osci-motion"); }
 constexpr int firstExampleId = 1200;
 // One for each output mode.
 constexpr int firstExportAudioId = 1020;
@@ -30,13 +27,19 @@ constexpr int firstExportAudioId = 1020;
 void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     menu.addItem(motion::style::menuItem("New project", 1001, "Cmd+N"));
     menu.addItem(motion::style::menuItem("Open project...", 1002, "Cmd+O"));
-    menus.addRecentProjectsSubmenu(menu, processor, 1100, 1099, true);
+    juce::PopupMenu recent;
+    const int added = processor.createRecentProjectsPopupMenuItems(recent, 1100, true, true);
+    if (added == 0) {
+        recent.addItem(1100, "No recent projects", false);
+    }
+    recent.addSeparator();
+    recent.addItem(1099, "Clear recent projects", added > 0);
+    menu.addSubMenu("Open recent", recent);
     // Each opens as a new project, to look into or start from.
     juce::PopupMenu examples;
     const auto resources = exampleProjects();
-    for (int index = 0; index < resources.size(); ++index) {
-        const juce::String file = BinaryData::getNamedResourceOriginalFilename(resources[index].toRawUTF8());
-        examples.addItem(firstExampleId + index, file.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' '));
+    for (std::size_t index = 0; index < resources.size(); ++index) {
+        examples.addItem(firstExampleId + static_cast<int>(index), motion::ui::examples::displayName(resources[index]));
     }
     if (examples.getNumItems() > 0) { menu.addSubMenu("Examples", examples); }
     menu.addItem(1008, "Start screen...");
@@ -54,9 +57,10 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     // the audio device has room for.
     juce::PopupMenu audio;
     using Mode = MotionProcessor::OutputMode;
-    const std::pair<Mode, const char*> exports[] {{Mode::soundtrack, "Sound"}, {Mode::xy, "Beam XY"}, {Mode::xyz, "Beam XYZ (3 ch)"}, {Mode::xyzInverted, "Beam XYZ, inverted Z (3 ch)"}, {Mode::xyrgb, "Beam XYRGB (5 ch)"}};
-    for (const auto& [mode, name] : exports) {
-        audio.addItem(firstExportAudioId + static_cast<int>(mode), juce::String(name) + "...", mode != Mode::soundtrack || soundtrackClip() != 0);
+    for (const auto mode : {Mode::soundtrack, Mode::xy, Mode::xyz, Mode::xyzInverted, Mode::xyrgb}) {
+        const auto channels = motion::ui::output::roles(mode).size();
+        const auto name = motion::ui::output::exportName(mode) + (channels > 2 ? " (" + juce::String(channels) + " ch)" : juce::String());
+        audio.addItem(firstExportAudioId + static_cast<int>(mode), name + "...", mode != Mode::soundtrack || soundtrackClip() != 0);
     }
     menu.addSubMenu("Export audio", audio, exportState == nullptr);
 #if OSCI_PREMIUM
@@ -69,8 +73,8 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
 bool MotionEditor::fileMenuItemSelected(int id) {
     if (menus.handleRecentProjectMenuItem(id, processor, *this, 1100, 1099)) { return true; }
     const auto examples = exampleProjects();
-    if (id >= firstExampleId && id < firstExampleId + examples.size()) {
-        openExample(examples[id - firstExampleId]);
+    if (id >= firstExampleId && id < firstExampleId + static_cast<int>(examples.size())) {
+        openExample(examples[static_cast<std::size_t>(id - firstExampleId)]);
         return true;
     }
     if (id >= firstExportAudioId && id <= firstExportAudioId + static_cast<int>(MotionProcessor::OutputMode::xyzInverted)) {
@@ -667,7 +671,7 @@ void MotionEditor::showStartScreen() {
     std::stable_partition(recents.begin(), recents.end(), [](const motion::ui::StartCard& card) { return card.open; });
     for (const auto& resource : exampleProjects()) {
         motion::ui::StartCard card;
-        card.name = juce::String(BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8())).upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' ');
+        card.name = motion::ui::examples::displayName(resource);
         int size = 0;
         const auto* data = BinaryData::getNamedResource(resource.toRawUTF8(), size);
         const auto summary = data != nullptr ? motion::ProjectSummary::peek(data, static_cast<std::size_t>(size)) : motion::ProjectSummary();
@@ -793,8 +797,7 @@ void MotionEditor::refreshTiming() {
 }
 
 // The menu bar's Timing menu. Meter, frame rate and the beam's frequency
-// are set in Properties > Composition, whose fields come here through
-// applyTiming.
+// are set in Properties > Composition.
 juce::PopupMenu MotionEditor::timingMenu() {
     const auto& project = processor.document.project();
     juce::PopupMenu menu;
@@ -822,8 +825,7 @@ double MotionEditor::snapDivision(int index) const {
     return divisions[static_cast<std::size_t>(std::clamp(index, 0, 6))];
 }
 
-// Display and snapping are view options (no undo step); meter and frame
-// rate are edits.
+// Display and snapping are view options (no undo step).
 bool MotionEditor::applyTiming(int result) {
     if (result == 600) { detectTempo(); return true; }
     if (result == 700 && timeline.onEditMarker) {
@@ -849,26 +851,6 @@ bool MotionEditor::applyTiming(int result) {
         processor.document.changeView([subdivision](motion::Composition& state) { state.snapBeats = subdivision; state.gridSnap = true; });
         return true;
     }
-    if (result >= 402 && result <= 407) {
-        if (current.beatsPerBar == result - 400) { return true; }
-        processor.document.edit("Change meter", [result](motion::Project& state) {
-            if (std::abs(state.snapBeats - state.beatsPerBar) < 1.0e-9) { state.snapBeats = result - 400; }
-            state.beatsPerBar = result - 400;
-        });
-        return true;
-    }
-    if (result >= MotionCompositionPanel::beamCommand && result <= MotionCompositionPanel::beamCommand + MotionCompositionPanel::beamChoiceCount) {
-        const auto cycles = result - MotionCompositionPanel::beamCommand;
-        if (processor.document.mainProject().beamCycles != cycles) {
-            processor.document.edit("Change beam frequency", [cycles](motion::Project& state) { state.beamCycles = cycles; });
-        }
-        return true;
-    }
-    if (result >= 500 && result < 508) {
-        const auto rate = MotionCompositionPanel::rates[static_cast<std::size_t>(result - 500)];
-        if (std::abs(current.frameRate - rate) >= 1.0e-9) { processor.document.edit("Change frame rate", [rate](motion::Project& state) { state.frameRate = rate; }); }
-        return true;
-    }
     return false;
 }
 
@@ -881,7 +863,7 @@ void MotionEditor::tap() {
     tapButton.setButtonText(tapTempo.count() > 1 ? juce::String(static_cast<int>(tapTempo.count())) : "Tap");
     if (bpm.has_value()) {
         tappedBpm = bpm;
-        tempoValue.setText(tempoText(*bpm), juce::dontSendNotification);
+        tempoValue.setText(motion::style::bpm(*bpm), juce::dontSendNotification);
     }
     if (tapCommit == nullptr) {
         tapCommit = std::make_unique<juce::TimedCallback>([this] {
@@ -897,7 +879,7 @@ void MotionEditor::tap() {
                 return;
             }
             const auto result = processor.document.changeTempo(bpm);
-            if (result.failed()) { statusBar.show(result.getErrorMessage()); } else { statusBar.show("Tempo " + juce::String(bpm, 1) + " BPM from tapping.", MotionStatusBar::Kind::notice); }
+            if (result.failed()) { statusBar.show(result.getErrorMessage()); } else { statusBar.show("Tempo " + motion::style::bpm(bpm) + " from tapping.", MotionStatusBar::Kind::notice); }
             refreshTiming();
         });
     }
@@ -950,13 +932,12 @@ void MotionEditor::detectTempo() {
             const auto bars = owner->processor.document.project().timeDisplay == motion::TimeDisplay::beats;
             const auto result = owner->processor.document.setTempoFromAudio(id, estimate->bpm, estimate->firstDownbeat, moved);
             if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
-            const auto bpm = juce::String(estimate->bpm, estimate->bpm == std::round(estimate->bpm) ? 0 : 2);
             // Detection can land an octave off: the other reading is one click away.
             const auto other = estimate->bpm * 2 <= 200 ? estimate->bpm * 2 : estimate->bpm / 2;
-            auto message = "Tempo " + bpm + " BPM from the audio" + (estimate->confidence < 0.4 ? " (low confidence)" : "");
+            auto message = "Tempo " + motion::style::bpm(estimate->bpm) + " from the audio" + (estimate->confidence < 0.4 ? " (low confidence)" : "");
             if (moved > 0) { message += ", which moved " + juce::String(moved, 3) + " s so its first downbeat falls on a bar"; }
             message += bars ? "." : ". The ruler shows bars and beats.";
-            owner->statusBar.show(message, MotionStatusBar::Kind::notice, "Use " + juce::String(other, other == std::round(other) ? 0 : 2) + " BPM", [owner, other, generation] {
+            owner->statusBar.show(message, MotionStatusBar::Kind::notice, "Use " + motion::style::bpm(other), [owner, other, generation] {
                 if (owner == nullptr || owner->processor.document.generation() != generation) { return; }
                 const auto changed = owner->processor.document.changeTempo(other);
                 if (changed.failed()) { owner->statusBar.show(changed.getErrorMessage()); }

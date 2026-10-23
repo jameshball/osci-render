@@ -3,7 +3,7 @@
 #include "ui/MarkerPanel.h"
 #include "ui/GeneratorIcons.h"
 #include "ui/MenuIcons.h"
-#include "ui/ModelSizePanel.h"
+#include "ui/SourceKind.h"
 #include "ui/StylePictures.h"
 
 // Each panel set up: the Scene, the Scope, the library of sources, effects and
@@ -32,24 +32,22 @@ void MotionEditor::setUpScene() {
         if (problem.isNotEmpty()) { statusBar.show(problem); }
     };
     propertyInspector.onCentreAnchor = centreAnchor;
-    composition.onToolChanged = [this](MotionTransformTool tool) {
-        sceneTools.move.setToggleState(tool == MotionTransformTool::move, juce::dontSendNotification);
-        sceneTools.rotate.setToggleState(tool == MotionTransformTool::rotate, juce::dontSendNotification);
-        sceneTools.scale.setToggleState(tool == MotionTransformTool::scale, juce::dontSendNotification);
-        sceneTools.anchor.setToggleState(tool == MotionTransformTool::anchor, juce::dontSendNotification);
+    // The tool shown chosen in the strip: none while picking parts.
+    const auto showTool = [this](MotionTransformTool tool, bool partMode) {
+        sceneTools.move.setToggleState(!partMode && tool == MotionTransformTool::move, juce::dontSendNotification);
+        sceneTools.rotate.setToggleState(!partMode && tool == MotionTransformTool::rotate, juce::dontSendNotification);
+        sceneTools.scale.setToggleState(!partMode && tool == MotionTransformTool::scale, juce::dontSendNotification);
+        sceneTools.anchor.setToggleState(!partMode && tool == MotionTransformTool::anchor, juce::dontSendNotification);
     };
+    composition.onToolChanged = [showTool](MotionTransformTool tool) { showTool(tool, false); };
     sceneTools.parts.onClick = [this] { composition.setPartMode(true); };
     addChildComponent(partPickTools);
     partPickTools.box.onClick = [this] { composition.setPartPick(MotionCompositionView::PartPick::box); };
     partPickTools.lasso.onClick = [this] { composition.setPartPick(MotionCompositionView::PartPick::lasso); };
     partPickTools.connected.onClick = [this] { composition.setPartPick(MotionCompositionView::PartPick::pieces); };
-    composition.onPartModeChanged = [this](bool active) {
-        const auto tool = composition.viewState().tool;
+    composition.onPartModeChanged = [this, showTool](bool active) {
         sceneTools.parts.setToggleState(active, juce::dontSendNotification);
-        sceneTools.move.setToggleState(!active && tool == MotionTransformTool::move, juce::dontSendNotification);
-        sceneTools.rotate.setToggleState(!active && tool == MotionTransformTool::rotate, juce::dontSendNotification);
-        sceneTools.scale.setToggleState(!active && tool == MotionTransformTool::scale, juce::dontSendNotification);
-        sceneTools.anchor.setToggleState(!active && tool == MotionTransformTool::anchor, juce::dontSendNotification);
+        showTool(composition.viewState().tool, active);
         resized();
     };
     // Extract asks for the part's name first, beside the bar it came from.
@@ -129,9 +127,8 @@ void MotionEditor::setUpScene() {
     composition.onEffectMoved = [this](motion::Id effect, motion::Id owner, bool copy) { moveEffectTo(effect, owner, copy); };
     composition.onEffectMovePreview = [this](motion::Id effect, std::optional<motion::Id> owner) {
         auto project = processor.document.project();
-        const auto moved = owner.has_value() && motion::moveEffect(project, effect, *owner, juce::ModifierKeys::getCurrentModifiers().isAltDown(), std::numeric_limits<motion::Id>::max());
-        processor.prepareComposition(moved ? project : processor.document.project());
-        if (moved) { composition.preview(project); } else { composition.refresh(); }
+        const auto moved = owner.has_value() && motion::moveEffect(project, effect, *owner, juce::ModifierKeys::getCurrentModifiers().isAltDown(), PreviewId::effect);
+        previewProject(moved ? &project : nullptr);
     };
     timeline.onEffectMoved = [this](motion::Id effect, motion::Id owner, bool copy) { moveEffectTo(effect, owner, copy); };
     composition.onPropertyEdited = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false, true); };
@@ -147,7 +144,7 @@ void MotionEditor::setUpScene() {
         if (clip->composition != 0) { enterComposition(clip->id); return; }
         const auto asset = motion::findAsset(project.assets, clip->asset);
         if (asset == nullptr) { return; }
-        if (asset->extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset->data.toString())) {
+        if (motion::ui::isDrawing(*asset)) {
             showDrawingEditor(asset->id);
         } else if (asset->extension.equalsIgnoreCase(".txt") || asset->extension.equalsIgnoreCase(".lua")) {
             assetLibrary.onBake(asset->id);
@@ -160,7 +157,6 @@ void MotionEditor::setUpScene() {
 
 void MotionEditor::setUpScope() {
     outputHeader.setName("Scope");
-    visualiser.setControlButtonsHidden(true);
     using Control = VisualiserComponent::Control;
     scopeTools.textureOutput.onClick = [this] { visualiser.clickControl(Control::textureOutput, &scopeTools.textureOutput); };
     scopeTools.settings.onClick = [this] { visualiser.clickControl(Control::settings, &scopeTools.settings); };
@@ -172,20 +168,18 @@ void MotionEditor::setUpScope() {
     });
     scopeTools.canvas.onClick = [this] {
         auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize());
-        auto* controls = panel.get();
-        const juce::Component::SafePointer<MotionEditor> owner(this);
-        const juce::Component::SafePointer<juce::Component> popover(controls);
-        controls->onApply = [owner, popover](VisualiserRenderSize size) {
-            juce::MessageManager::callAsync([owner, popover, size] {
-                if (owner == nullptr || popover == nullptr) { return; }
+        const auto apply = popoverEdit(panel.get());
+        panel->onApply = [apply](VisualiserRenderSize size) {
+            apply([size](motion::Document& document) {
                 // The frame is the project's: an edit, saved and undone with it.
-                if (size.width != owner->processor.document.mainProject().exportSettings.width || size.height != owner->processor.document.mainProject().exportSettings.height) {
-                    owner->processor.document.edit("Change the canvas", [size](motion::Project& project) {
+                const auto& current = document.mainProject().exportSettings;
+                if (size.width != current.width || size.height != current.height) {
+                    document.edit("Change the canvas", [size](motion::Project& project) {
                         project.exportSettings.width = size.width;
                         project.exportSettings.height = size.height;
                     });
                 }
-                dismissPopover(popover.getComponent());
+                return juce::Result::ok();
             });
         };
         showPopover(std::move(panel), getLocalArea(&scopeTools, scopeTools.canvas.getBounds()));
@@ -209,142 +203,8 @@ void MotionEditor::setUpLibrary() {
     };
     // Double-clicking an effect adds it to what Properties shows.
     effectLibrary.onInsert = [this](const std::string& type) { effectStack.addEffect(type); };
-    importButton.onClick = [this] {
-        namespace icons = motion::ui::menu_icons;
-        juce::PopupMenu menu;
-        const auto item = [](int id, const juce::String& text, juce::Path glyph) {
-            juce::PopupMenu::Item result(text);
-            result.itemID = id;
-            result.image = icons::stroked(std::move(glyph), icons::ink());
-            return result;
-        };
-        // In groups: a file, one drawn or written here, one osci-motion makes,
-        // and one from elsewhere (another app, or an example).
-        menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder()));
-        menu.addSeparator();
-        menu.addItem(item(AddMenuId::drawing, "Draw a shape...", icons::glyph::pencil()));
-        menu.addItem(item(AddMenuId::newScript, "Write a script...", icons::glyph::braces()));
-        menu.addSeparator();
-        // Sources made from a few numbers, by category, each with its picture.
-        juce::PopupMenu generate;
-        for (const auto category : {motion::GeneratorCategory::shape, motion::GeneratorCategory::curve, motion::GeneratorCategory::grid, motion::GeneratorCategory::solid}) {
-            generate.addSectionHeader(juce::String(motion::generatorCategoryName(category).data()));
-            for (std::size_t index = 0; index < motion::generatorDefinitions.size(); ++index) {
-                const auto& definition = motion::generatorDefinitions[index];
-                if (definition.category != category) { continue; }
-                juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
-                entry.itemID = AddMenuId::firstGenerator + static_cast<int>(index);
-                entry.image = motion::ui::generatorIcon(definition, icons::ink());
-                generate.addItem(std::move(entry));
-            }
-        }
-        menu.addSubMenu("Generate", generate, true, icons::stroked(icons::glyph::shapes(), icons::ink()));
-        // Lights: what the Scope draws, lit by them.
-        juce::PopupMenu lights;
-        for (std::size_t index = 0; index < motion::generatorDefinitions.size(); ++index) {
-            const auto& definition = motion::generatorDefinitions[index];
-            if (definition.category != motion::GeneratorCategory::light) { continue; }
-            juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
-            entry.itemID = AddMenuId::firstGenerator + static_cast<int>(index);
-            entry.image = motion::ui::generatorIcon(definition, icons::ink());
-            lights.addItem(std::move(entry));
-        }
-        // A point light already moving on its own, named for how.
-        lights.addSectionHeader("Presets");
-        for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) {
-            const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
-            juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
-            entry.itemID = AddMenuId::firstLightPreset + static_cast<int>(index);
-            entry.image = icons::unit(motion::ui::pictures::lightPresetPicture(motion::lightPresets[index]), icons::ink());
-            lights.addItem(std::move(entry));
-        }
-        menu.addSubMenu("Light", lights, true, icons::stroked(icons::glyph::bulb(), icons::ink()));
-        // Mirrors: surfaces that show the rest of the scene.
-        juce::PopupMenu mirrors;
-        for (std::size_t index = 0; index < motion::mirrorPresets.size(); ++index) {
-            const auto& preset = motion::mirrorPresets[index];
-            juce::PopupMenu::Item entry(juce::String(preset.name.data(), preset.name.size()));
-            entry.itemID = AddMenuId::firstMirror + static_cast<int>(index);
-            // Pictured as the Add a mirror panel pictures them.
-            entry.image = icons::unit(motion::ui::pictures::ofMirror(preset).lines, icons::ink());
-            mirrors.addItem(std::move(entry));
-        }
-        menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
-        menu.addSeparator();
-        // Live: what other apps send, drawn as it arrives, never prepared ahead.
-        juce::PopupMenu live;
-        live.addItem(item(AddMenuId::blenderSource, "Blender...", icons::glyph::live()));
-        const auto senders = motion::LiveTextureController::senders();
-        if (motion::LiveTextureController::available()) {
-            live.addSectionHeader(motion::texture::technology());
-            for (std::size_t index = 0; index < senders.size(); ++index) {
-                live.addItem(item(AddMenuId::firstTexture + static_cast<int>(index), senders[index].describe(), icons::glyph::screen()));
-            }
-            if (senders.empty()) {
-                juce::PopupMenu::Item none("No app is sharing a picture");
-                none.isEnabled = false;
-                live.addItem(std::move(none));
-            }
-        }
-        menu.addSubMenu("Live", live, true, icons::stroked(icons::glyph::live(), icons::ink()));
-        // The examples that ship with osci-motion, by kind, each pictured as
-        // it draws (a blank space until its picture is made).
-        juce::PopupMenu examples;
-        std::vector<juce::String> resources;
-        const std::array<juce::Path, motion::ui::exampleKinds.size()> kindGlyphs {icons::glyph::cube(), icons::glyph::braces(), icons::glyph::play(), icons::glyph::tree(), icons::glyph::letter()};
-        for (std::size_t kindIndex = 0; kindIndex < motion::ui::exampleKinds.size(); ++kindIndex) {
-            const auto& exampleKind = motion::ui::exampleKinds[kindIndex];
-            juce::PopupMenu kind;
-            for (int index = 0; index < BinaryData::namedResourceListSize; ++index) {
-                const juce::String file = BinaryData::getNamedResourceOriginalFilename(BinaryData::namedResourceList[index]);
-                if (!file.endsWithIgnoreCase(exampleKind.extension)) { continue; }
-                resources.push_back(BinaryData::namedResourceList[index]);
-                juce::PopupMenu::Item entry(file.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' '));
-                entry.itemID = AddMenuId::firstExample + static_cast<int>(resources.size()) - 1;
-                const auto picture = examplePictures.picture(resources.back());
-                entry.image = picture.has_value() ? icons::picture(*picture) : icons::blank();
-                kind.addItem(std::move(entry));
-            }
-            if (kind.getNumItems() > 0) { examples.addSubMenu(exampleKind.title, kind, true, icons::stroked(kindGlyphs[kindIndex], icons::ink())); }
-        }
-        menu.addSubMenu("Examples", examples, true, icons::stroked(icons::glyph::book(), icons::ink()));
-        const juce::Component::SafePointer<MotionEditor> owner(this);
-        menu.setLookAndFeel(&getLookAndFeel());
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner, resources, senders](int choice) {
-            if (owner == nullptr) { return; }
-            // Which of a list's items was chosen, if one was.
-            const auto chosen = [choice](int first, std::size_t count) -> std::optional<std::size_t> {
-                if (choice < first || choice - first >= static_cast<int>(count)) { return std::nullopt; }
-                return static_cast<std::size_t>(choice - first);
-            };
-            if (choice == AddMenuId::importFile) { owner->chooseSourceFile(); }
-            if (choice == AddMenuId::blenderSource) { owner->showBlenderSettings(); }
-            if (choice == AddMenuId::drawing) { owner->showDrawingEditor(0); }
-            if (choice == AddMenuId::newScript) { owner->newScript(); }
-            const auto generator = chosen(AddMenuId::firstGenerator, motion::generatorDefinitions.size());
-            const auto lightPreset = chosen(AddMenuId::firstLightPreset, motion::lightPresets.size());
-            const auto mirror = chosen(AddMenuId::firstMirror, motion::mirrorPresets.size());
-            const auto example = chosen(AddMenuId::firstExample, resources.size());
-            const auto sender = chosen(AddMenuId::firstTexture, senders.size());
-            if (sender.has_value()) { owner->addTextureSource(senders[*sender]); }
-            if (generator.has_value()) { owner->addGenerator(motion::generatorDefinitions[*generator]); }
-            if (lightPreset.has_value()) { owner->addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[*lightPreset]); }
-            if (mirror.has_value()) { owner->addMirror(motion::mirrorPresets[*mirror]); }
-            if (example.has_value()) { owner->importExample(resources[*example]); }
-        });
-    };
+    importButton.onClick = [this] { showAddSourceMenu(); };
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
-    // A model switched to its file's own size, or back to fitted, is
-    // prepared again in place.
-    // A model's size, in a popover by its row: the Scene shows the change
-    // as it is made, so nothing covers it.
-    assetLibrary.onModelSettings = [this](motion::Id id, juce::Component& button) {
-        const auto found = motion::findAsset(processor.document.project().assets, id);
-        if (found == nullptr) { return; }
-        auto panel = std::make_unique<MotionModelSizePanel>(found->name, found->originalSize, found->fittedScale);
-        panel->onChange = [this, id](bool keep) { setModelOriginalSize(id, keep); };
-        showPopover(std::move(panel), getLocalArea(&button, button.getLocalBounds()));
-    };
     assetLibrary.onEditDrawing = [this](motion::Id id) { showDrawingEditor(id); };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {
         const auto& definitions = processor.document.mainProject().definitions;
@@ -393,6 +253,128 @@ void MotionEditor::setUpLibrary() {
     assetLibrary.onCancelImport = [this] { cancelImports(); };
 }
 
+// The Add source menu, under its button.
+void MotionEditor::showAddSourceMenu() {
+    namespace icons = motion::ui::menu_icons;
+    juce::PopupMenu menu;
+    const auto item = [](int id, const juce::String& text, juce::Path glyph) {
+        juce::PopupMenu::Item result(text);
+        result.itemID = id;
+        result.image = icons::stroked(std::move(glyph), icons::ink());
+        return result;
+    };
+    // A generator, with its picture: in Generate by category, and in Light.
+    const auto generatorItem = [](std::size_t index) {
+        const auto& definition = motion::generatorDefinitions[index];
+        juce::PopupMenu::Item result(juce::String(definition.name.data(), definition.name.size()));
+        result.itemID = AddMenuId::firstGenerator + static_cast<int>(index);
+        result.image = motion::ui::generatorIcon(definition, icons::ink());
+        return result;
+    };
+    // In groups: a file, one drawn or written here, one osci-motion makes,
+    // and one from elsewhere (another app, or an example).
+    menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder()));
+    menu.addSeparator();
+    menu.addItem(item(AddMenuId::drawing, "Draw a shape...", icons::glyph::pencil()));
+    menu.addItem(item(AddMenuId::newScript, "Write a script...", icons::glyph::braces()));
+    menu.addSeparator();
+    // Sources made from a few numbers, by category, each with its picture.
+    juce::PopupMenu generate;
+    for (const auto category : {motion::GeneratorCategory::shape, motion::GeneratorCategory::curve, motion::GeneratorCategory::grid, motion::GeneratorCategory::solid}) {
+        generate.addSectionHeader(juce::String(motion::generatorCategoryName(category).data()));
+        for (std::size_t index = 0; index < motion::generatorDefinitions.size(); ++index) {
+            if (motion::generatorDefinitions[index].category == category) { generate.addItem(generatorItem(index)); }
+        }
+    }
+    menu.addSubMenu("Generate", generate, true, icons::stroked(icons::glyph::shapes(), icons::ink()));
+    // Lights: what the Scope draws, lit by them.
+    juce::PopupMenu lights;
+    for (std::size_t index = 0; index < motion::generatorDefinitions.size(); ++index) {
+        if (motion::generatorDefinitions[index].category == motion::GeneratorCategory::light) { lights.addItem(generatorItem(index)); }
+    }
+    // A point light already moving on its own, named for how.
+    lights.addSectionHeader("Presets");
+    for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) {
+        const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
+        juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
+        entry.itemID = AddMenuId::firstLightPreset + static_cast<int>(index);
+        entry.image = icons::unit(motion::ui::pictures::lightPresetPicture(motion::lightPresets[index]), icons::ink());
+        lights.addItem(std::move(entry));
+    }
+    menu.addSubMenu("Light", lights, true, icons::stroked(icons::glyph::bulb(), icons::ink()));
+    // Mirrors: surfaces that show the rest of the scene.
+    juce::PopupMenu mirrors;
+    for (std::size_t index = 0; index < motion::mirrorPresets.size(); ++index) {
+        const auto& preset = motion::mirrorPresets[index];
+        juce::PopupMenu::Item entry(juce::String(preset.name.data(), preset.name.size()));
+        entry.itemID = AddMenuId::firstMirror + static_cast<int>(index);
+        // Pictured as the Add a mirror panel pictures them.
+        entry.image = icons::unit(motion::ui::pictures::ofMirror(preset).lines, icons::ink());
+        mirrors.addItem(std::move(entry));
+    }
+    menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
+    menu.addSeparator();
+    // Live: what other apps send, drawn as it arrives, never prepared ahead.
+    juce::PopupMenu live;
+    live.addItem(item(AddMenuId::blenderSource, "Blender...", icons::glyph::live()));
+    const auto senders = motion::LiveTextureController::senders();
+    if (motion::LiveTextureController::available()) {
+        live.addSectionHeader(motion::texture::technology());
+        for (std::size_t index = 0; index < senders.size(); ++index) {
+            live.addItem(item(AddMenuId::firstTexture + static_cast<int>(index), senders[index].describe(), icons::glyph::screen()));
+        }
+        if (senders.empty()) {
+            juce::PopupMenu::Item none("No app is sharing a picture");
+            none.isEnabled = false;
+            live.addItem(std::move(none));
+        }
+    }
+    menu.addSubMenu("Live", live, true, icons::stroked(icons::glyph::live(), icons::ink()));
+    // The examples that ship with osci-motion, by kind, each pictured as
+    // it draws (a blank space until its picture is made).
+    juce::PopupMenu examples;
+    std::vector<juce::String> resources;
+    const std::array<juce::Path, motion::ui::exampleKinds.size()> kindGlyphs {icons::glyph::cube(), icons::glyph::braces(), icons::glyph::play(), icons::glyph::tree(), icons::glyph::letter()};
+    for (std::size_t kindIndex = 0; kindIndex < motion::ui::exampleKinds.size(); ++kindIndex) {
+        const auto& exampleKind = motion::ui::exampleKinds[kindIndex];
+        juce::PopupMenu kind;
+        for (const auto& resource : motion::ui::examples::resources(exampleKind.extension)) {
+            resources.push_back(resource);
+            juce::PopupMenu::Item entry(motion::ui::examples::displayName(resource));
+            entry.itemID = AddMenuId::firstExample + static_cast<int>(resources.size()) - 1;
+            const auto picture = examplePictures.picture(resources.back());
+            entry.image = picture.has_value() ? icons::picture(*picture) : icons::blank();
+            kind.addItem(std::move(entry));
+        }
+        if (kind.getNumItems() > 0) { examples.addSubMenu(exampleKind.title, kind, true, icons::stroked(kindGlyphs[kindIndex], icons::ink())); }
+    }
+    menu.addSubMenu("Examples", examples, true, icons::stroked(icons::glyph::book(), icons::ink()));
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    menu.setLookAndFeel(&getLookAndFeel());
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner, resources, senders](int choice) {
+        if (owner == nullptr) { return; }
+        // Which of a list's items was chosen, if one was.
+        const auto chosen = [choice](int first, std::size_t count) -> std::optional<std::size_t> {
+            if (choice < first || choice - first >= static_cast<int>(count)) { return std::nullopt; }
+            return static_cast<std::size_t>(choice - first);
+        };
+        if (choice == AddMenuId::importFile) { owner->chooseSourceFile(); }
+        if (choice == AddMenuId::blenderSource) { owner->showBlenderSettings(); }
+        if (choice == AddMenuId::drawing) { owner->showDrawingEditor(0); }
+        if (choice == AddMenuId::newScript) { owner->newScript(); }
+        const auto generator = chosen(AddMenuId::firstGenerator, motion::generatorDefinitions.size());
+        const auto lightPreset = chosen(AddMenuId::firstLightPreset, motion::lightPresets.size());
+        const auto mirror = chosen(AddMenuId::firstMirror, motion::mirrorPresets.size());
+        const auto example = chosen(AddMenuId::firstExample, resources.size());
+        const auto sender = chosen(AddMenuId::firstTexture, senders.size());
+        if (sender.has_value()) { owner->addTextureSource(senders[*sender]); }
+        if (generator.has_value()) { owner->addGenerator(motion::generatorDefinitions[*generator]); }
+        if (lightPreset.has_value()) { owner->addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[*lightPreset]); }
+        if (mirror.has_value()) { owner->addMirror(motion::mirrorPresets[*mirror]); }
+        if (example.has_value()) { owner->importExample(resources[*example]); }
+    });
+}
+
 void MotionEditor::setUpProperties() {
     effectStack.onPropertySelected = [this](motion::Id id, std::string property) { selectCurveTarget(id, property, false, true); };
     effectStack.onShowOwner = [this](motion::Id id) { select(id); };
@@ -404,13 +386,7 @@ void MotionEditor::setUpProperties() {
     };
     propertyInspector.onRoutePreview = [this](std::optional<MotionPropertyInspector::RouteRequest> request) {
         const auto preview = request.has_value() ? processor.document.previewRoute(request->modulator, request->target, request->properties) : std::nullopt;
-        if (preview.has_value()) {
-            processor.prepareComposition(*preview);
-            composition.preview(*preview);
-        } else {
-            processor.prepareComposition(processor.document.project());
-            composition.refresh();
-        }
+        previewProject(preview.has_value() ? &*preview : nullptr);
     };
     effectStack.onHeightChanged = [this] { propertyInspector.relayout(); };
     effectStack.onReveal = [this](juce::Component& card) {
@@ -423,7 +399,6 @@ void MotionEditor::setUpProperties() {
     inspectorLead.add(clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
     inspectorLead.add(modelSize, [this] { return modelSize.preferredHeight(); });
     modelSize.onChange = [this](motion::Id id, bool original) { setModelOriginalSize(id, original); };
-    compositionSettings.onTiming = [this](int command) { applyTiming(command); };
     compositionSettings.onError = [this](const juce::String& message) { statusBar.show(message); };
     // Panels in the lead resize it, and Properties lays out again.
     const auto relayoutLead = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
@@ -588,10 +563,7 @@ void MotionEditor::setUpTimeline() {
     timeline.onError = [this](const juce::String& message) { statusBar.show(message); };
     timeline.chosenSource = [this] { return assetLibrary.chosen(); };
     timeline.onHint = [this](const juce::String& message) { statusBar.show(message, MotionStatusBar::Kind::notice); };
-    timeline.onPreview = [this](const motion::Project* project) {
-        processor.prepareComposition(project != nullptr ? *project : processor.document.project());
-        if (project != nullptr) { composition.preview(*project); } else { composition.refresh(); }
-    };
+    timeline.onPreview = [this](const motion::Project* project) { previewProject(project); };
 }
 
 void MotionEditor::setUpGraph() {
@@ -628,8 +600,7 @@ void MotionEditor::setUpGraph() {
                 if (target != nullptr) { *target = curve; }
             }
         }
-        processor.prepareComposition(preview);
-        composition.preview(preview);
+        previewProject(&preview);
     };
 }
 

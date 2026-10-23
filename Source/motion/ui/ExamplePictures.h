@@ -14,6 +14,21 @@ struct ExampleKind {
 };
 inline constexpr std::array<ExampleKind, 5> exampleKinds {{{"3D models", ".obj"}, {"Lua scripts", ".lua"}, {"Lottie animations", ".lottie"}, {"Fractals", ".lsystem"}, {"Text", ".txt"}}};
 
+namespace examples {
+// An example's file name as it shipped: "Spinning_cube.lua".
+inline juce::String fileName(const juce::String& resource) { return BinaryData::getNamedResourceOriginalFilename(resource.toRawUTF8()); }
+// As menus and the start screen name it: "Spinning cube".
+inline juce::String displayName(const juce::String& resource) { return fileName(resource).upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' '); }
+// The resources whose file name ends with this extension, in resource order.
+inline std::vector<juce::String> resources(const char* extension) {
+    std::vector<juce::String> found;
+    for (int index = 0; index < BinaryData::namedResourceListSize; ++index) {
+        if (fileName(BinaryData::namedResourceList[index]).endsWithIgnoreCase(extension)) { found.push_back(BinaryData::namedResourceList[index]); }
+    }
+    return found;
+}
+}
+
 // Each example's picture, made once the editor opens, on a thread of its own
 // at low priority: decoded as it would be imported (a script run for just
 // long enough to draw) and its middle frame traced as the library traces a

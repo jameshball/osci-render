@@ -7,7 +7,6 @@
 #include "model/MirrorPresets.h"
 #include "MotionProcessor.h"
 #include "SessionRecovery.h"
-#include "ui/BeamOverload.h"
 #include "ui/TimelineView.h"
 #include "ui/BeamShares.h"
 #include "ui/CompositionView.h"
@@ -24,16 +23,10 @@
 #include "ui/KeyPanel.h"
 #include "import/LuaSliderBakes.h"
 #include "model/TapTempo.h"
-#include "model/TempoDetection.h"
 #include "ui/PropertyInspector.h"
 #include "ui/ExamplePictures.h"
 #include "ui/StatusBar.h"
-#include "ui/ShortcutsOverlay.h"
-#include "ui/StartScreen.h"
 #include "ui/MotionIcons.h"
-#include "ui/DrawingEditor.h"
-#include "ui/TextSourceEditor.h"
-#include "ui/LuaSourceEditor.h"
 #include "ui/TextAnimationPanel.h"
 #include "ui/ModelSizeInspector.h"
 #include "ui/OutputPanel.h"
@@ -41,6 +34,9 @@
 #include "ui/ScopeTransport.h"
 #include <deque>
 #include <variant>
+
+class OfflineVisualiserParameters;
+namespace motion::ui { class StartScreen; }
 
 class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener, private juce::FocusChangeListener {
 public:
@@ -60,10 +56,9 @@ public:
     // The Scope's next frame becomes the project's picture as it is saved.
     void beforeSaving(std::function<void()> write) override;
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
-    // `below`: under the anchor, wherever there is more room.
-    // Where a popover goes: the side with room, under its button (though
-    // wider than the column it is in), or left of what it edits, leaving it
-    // in view.
+    // Where a popover goes: `best`, the side with room; `below`, under its
+    // button (though wider than the column it is in); `left`, left of what
+    // it edits, leaving it in view.
     enum class Placement { best, below, left };
     void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, Placement placement = Placement::best);
     static void dismissPopover(juce::Component* content);
@@ -106,6 +101,7 @@ private:
     void setUpProperties();
     void setUpTimeline();
     void setUpGraph();
+    void showAddSourceMenu();
     bool openSourceFile(const juce::File& file) override;
 #if OSCI_PREMIUM
     juce::String offlineRenderTitle() const override { return "Export video"; }
@@ -192,6 +188,9 @@ private:
     void refreshCameraTools();
     void addCamera(double time);
     void previewEffect(const std::string& type, std::optional<motion::Id> owner);
+    // The Scene and the output show `project`, a preview; nullptr: the
+    // document again.
+    void previewProject(const motion::Project* project);
     void addEffectTo(const std::string& type, motion::Id owner);
     void dragOperationStarted(const juce::DragAndDropTarget::SourceDetails&) override;
     void dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) override;
@@ -209,8 +208,6 @@ private:
     Editor& openSceneEditor(std::unique_ptr<Editor> editor);
     void closeSceneEditor();
     void showDrawingEditor(motion::Id asset);
-    // A generator's source, and a clip of it at the playhead on a new track.
-    // A generator's clip; a light's with a preset on it, named for the preset.
     // A generator's clip, named for a preset when it has one, starting with
     // `settings` over its defaults.
     void addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset = std::nullopt, std::string_view named = {}, const motion::PropertyMap& settings = {});
@@ -227,6 +224,15 @@ private:
     // baked as it stands, off the message thread, the newest only.
     void previewLua();
     void showLuaPreview(std::shared_ptr<motion::Asset> asset);
+    // Ids no document hands out, for what a live preview adds to a copy of
+    // the project.
+    struct PreviewId {
+        static constexpr motion::Id effect = std::numeric_limits<motion::Id>::max(), asset = effect - 1, track = effect - 2, clip = effect - 3;
+    };
+    // A source being written on the output, in place of the source
+    // `replacing`, or with none, new on a track of its own (named
+    // `trackName`) for the whole project.
+    void previewSource(std::shared_ptr<motion::Asset> asset, motion::Id replacing, const juce::String& trackName);
     double luaPreviewDue = 0;
     // Playback started so the script shows running, stopped again with it.
     bool luaStartedPlayback = false;
@@ -409,7 +415,7 @@ private:
     osci::SectionStack inspectorLead;
     MotionTextAnimationPanel textAnimation { processor };
     MotionModelSizeInspector modelSize { processor };
-    // A 3D object's size, from Sources or Properties: fitted or its file's own.
+    // A 3D object's size, from Properties: fitted or its file's own.
     void setModelOriginalSize(motion::Id asset, bool original);
     MotionCompositionPanel compositionSettings { processor };
     struct QueuedTextAnimation {
@@ -467,7 +473,6 @@ private:
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
     // The tempo as Composition settings write it: "120 BPM", or "121.35 BPM".
     juce::Label tempoValue;
-    static juce::String tempoText(double bpm);
     // Tap tempo: taps preview the tempo; it commits once tapping pauses.
     juce::TextButton tapButton {"Tap"};
     motion::TapTempo tapTempo;

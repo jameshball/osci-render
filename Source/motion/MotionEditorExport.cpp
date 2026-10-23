@@ -1,6 +1,6 @@
 #include "MotionEditor.h"
 #include "../JucewrightAutomation.h"
-#include "../visualiser/OfflineVisualiserParameters.h"
+#include "render/OfflineVisualiserParameters.h"
 #include "export/SignalExporter.h"
 #include "export/SoundtrackExporter.h"
 #include "ui/VideoExportSettings.h"
@@ -14,18 +14,6 @@ struct MotionVideoTemporaryFiles {
     juce::File signal() const { return directory.getChildFile("beam.wav"); }
     juce::File soundtrack() const { return directory.getChildFile("soundtrack.wav"); }
 };
-
-// The beam as an Output choice names it.
-juce::String exportedAs(motion::OutputMode mode) {
-    switch (mode) {
-        case motion::OutputMode::xy: return "Beam XY";
-        case motion::OutputMode::xyz: return "Beam XYZ";
-        case motion::OutputMode::xyzInverted: return "Beam XYZ, inverted Z";
-        case motion::OutputMode::xyrgb: return "Beam XYRGB";
-        case motion::OutputMode::soundtrack: break;
-    }
-    return "Audio";
-}
 }
 
 juce::File MotionEditor::defaultExportFile(const juce::String& extension) const {
@@ -145,13 +133,10 @@ void MotionEditor::exportVideo(bool leaveOutLive) {
     const juce::Component::SafePointer<MotionEditor> owner(this);
     auto settings = std::make_unique<MotionVideoExportSettings>(config, juce::String(project.name));
     auto* settingsPointer = settings.get();
-    const auto size = juce::Point<int>(settings->getWidth(), settings->getHeight());
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), juce::String(), size, false);
-    const juce::Component::SafePointer<osci::ComponentOverlay> settingsOverlay(overlay.get());
     auto accepted = std::make_shared<bool>(false);
-    overlay->onDismissRequested = [owner, state, accepted] {
+    const juce::Component::SafePointer<osci::ComponentOverlay> settingsOverlay(motion::ui::Sheet::show(*this, std::move(settings), [owner, state, accepted] {
         if (!*accepted && owner != nullptr && owner->exportState == state) { owner->exportState.reset(); }
-    };
+    }));
     settingsPointer->onExport = [owner, state, project, beamSnapshot, renderMode, settingsOverlay, accepted](VideoEncodingConfiguration config) {
         if (owner == nullptr || *accepted) { return; }
         *accepted = true;
@@ -192,7 +177,6 @@ void MotionEditor::exportVideo(bool leaveOutLive) {
             });
         });
     };
-    showOverlay(std::move(overlay));
 #endif
 }
 
@@ -214,10 +198,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
         auto content = std::make_unique<motion::ui::ProgressSheet>("Exporting video", destination.getFileName(), config.includeAudio ? "Preparing the beam signal and audio..." : "Preparing the beam signal...", [state] {
             return state->videoWithAudio ? (state->progress.load() + state->soundtrackProgress.load()) * 0.5 : state->progress.load();
         }, [state] { state->cancelled.store(true); }, "Cancel video preparation");
-        const auto size = juce::Point<int>(content->getWidth(), content->getHeight());
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), juce::String(), size, false);
-        const juce::Component::SafePointer<osci::ComponentOverlay> preparationOverlay(overlay.get());
-        owner->showOverlay(std::move(overlay));
+        const juce::Component::SafePointer<osci::ComponentOverlay> preparationOverlay(motion::ui::Sheet::show(*owner.getComponent(), std::move(content)));
         // The worker owns one immutable prepared snapshot for both WAVs.
         // What the editor has baked already isn't baked again.
         const auto baked = owner->processor.hiddenLineBake();
@@ -269,16 +250,16 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                     }
                     // A render that never starts still runs this completion (unsuccessful).
                     owner->startOfflineVideoRender(temporary->signal(), config.includeAudio ? temporary->soundtrack() : juce::File(),
-                        destination, config, renderMode, [owner, state, temporary, destination, finished] {
+                        destination, config, renderMode, [owner, state, temporary, destination, finished](bool succeeded) {
                             // Completion can run from base-editor destruction;
                             // touch derived UI only in a later safe callback.
-                            juce::MessageManager::callAsync([owner, state, destination, finished] {
+                            juce::MessageManager::callAsync([owner, state, destination, finished, succeeded] {
                                 if (owner == nullptr) { return; }
                                 if (owner->exportState == state) { owner->exportState.reset(); }
-                                if (owner->lastOfflineRenderSucceeded() && !state->cancelled.load()) { owner->exported(destination); }
-                                if (finished) { finished(owner->lastOfflineRenderSucceeded()); }
+                                if (succeeded && !state->cancelled.load()) { owner->exported(destination); }
+                                if (finished) { finished(succeeded); }
                             });
-                        }, beamSnapshot);
+                        }, beamSnapshot != nullptr ? std::shared_ptr<VisualiserParameters>(beamSnapshot, &beamSnapshot->params) : nullptr);
                 };
                 if (preparationOverlay != nullptr) {
                     owner->dismissOverlay(preparationOverlay.getComponent(), std::move(startRender));
@@ -457,7 +438,7 @@ void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutL
         exportTo(juce::File(automated));
         return;
     }
-    chooser = std::make_unique<juce::FileChooser>("Export " + exportedAs(mode) + motion::style::dot() + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
+    chooser = std::make_unique<juce::FileChooser>("Export " + motion::ui::output::exportName(mode) + motion::style::dot() + motion::style::kilohertz(state->sampleRate) + " float WAV",
         defaultExportFile("wav"), "*.wav");
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
         | juce::FileBrowserComponent::warnAboutOverwriting, [exportTo](const juce::FileChooser& selected) { exportTo(selected.getResult()); });

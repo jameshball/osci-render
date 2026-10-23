@@ -207,7 +207,7 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->field.getProperties().set("routeTarget", juce::String(static_cast<juce::int64>(id)));
         row->field.getProperties().set("routeProperties", juce::String(parameter.id));
         row->key.setName("Key effect " + juce::String(parameter.id));
-        row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
+        row->key.setColour(motion::ui::KeyframeButton::keyColourId, osci::Colours::text());
         row->key.setTitle(row->key.getName());
         row->key.setWantsKeyboardFocus(false);
         row->modulate.setClickingTogglesState(false);
@@ -255,7 +255,7 @@ void MotionEffectStack::Card::update() {
         if (curve == nullptr) { continue; }
         if (!row->field.isEditing()) { row->field.setValue(curve->evaluateBase(local)); }
         const bool keyed = curve->hasKeyAt(local);
-        row->key.setState(keyed ? osci::KeyframeButton::State::keyed : (curve->animated() ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
+        row->key.setState(keyed ? motion::ui::KeyframeButton::State::keyed : (curve->animated() ? motion::ui::KeyframeButton::State::animated : motion::ui::KeyframeButton::State::unanimated));
         const auto driven = stack.isDriven(id, row->id);
         row->field.setAccent(driven ? std::optional<juce::Colour>(motion::style::result()) : std::nullopt);
         row->modulate.setToggleState(driven, juce::dontSendNotification);

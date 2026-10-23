@@ -21,6 +21,8 @@ inline juce::String formName(OutputMode mode) {
     }
     return "Off";
 }
+// What an export of each Output choice is called: "Sound", "Beam XY".
+inline juce::String exportName(OutputMode mode) { return mode == OutputMode::soundtrack ? juce::String("Sound") : "Beam " + formName(mode); }
 // Short, for the top bar.
 inline juce::String shortFormName(OutputMode mode) { return mode == OutputMode::xyzInverted ? juce::String("XYZ inv.") : formName(mode); }
 // What each of a form's outputs carries, one letter each.

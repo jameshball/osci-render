@@ -35,11 +35,14 @@ public:
     // Choices take the control width; numbers a shorter, right-aligned field.
     static constexpr int row = 28, rowGap = 8, caption = 120, control = 192, number = 96;
 
-    // Shows the sheet over `owner`; returns the overlay so callers can wire
-    // its dismissal.
-    static osci::ComponentOverlay* show(juce::Component& owner, std::unique_ptr<Sheet> sheet) {
+    // Shows the sheet over `owner`; returns the overlay so callers can close
+    // it. `dismissed` runs as it is asked to close: it is set before showing,
+    // as the host wraps the overlay's dismissal then (setting it after would
+    // replace the host's and the overlay would stay).
+    static osci::ComponentOverlay* show(juce::Component& owner, std::unique_ptr<Sheet> sheet, std::function<void()> dismissed = {}) {
         const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
         auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false);
+        if (dismissed) { overlay->onDismissRequested = std::move(dismissed); }
         auto* raw = overlay.get();
         osci::OverlayComponent::show(owner, std::move(overlay));
         return raw;

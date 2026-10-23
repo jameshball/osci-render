@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "MotionIcons.h"
+#include "KeyPositions.h"
 
 // Blender-style tools inside the Scene: a vertical strip with the transform
 // tools, the motion path, fly navigation and framing, and Look through while
@@ -23,7 +24,7 @@ public:
         parts.setTooltip("Pick parts (Tab)");
         path.setTooltip("Motion path (P)");
         faces.setTooltip("Solid view: faces hide the lines behind them");
-        fly.setTooltip("Fly (N): mouse to look, " + osci::keysAtPositions({osci::KeyPosition::w, osci::KeyPosition::a, osci::KeyPosition::s, osci::KeyPosition::d}) + " or the arrows to move, Esc to finish");
+        fly.setTooltip("Fly (N): mouse to look, " + motion::ui::keysAtPositions({motion::ui::KeyPosition::w, motion::ui::KeyPosition::a, motion::ui::KeyPosition::s, motion::ui::KeyPosition::d}) + " or the arrows to move, Esc to finish");
         frame.setTooltip("Frame selection (F)");
         lookThrough.setClickingTogglesState(true);
         lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");

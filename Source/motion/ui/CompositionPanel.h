@@ -33,9 +33,9 @@ public:
         length.onTextChange = [this] { if (!updating) { applyLength(); } };
         frameRate.setName("Composition frame rate");
         const std::array<const char*, 8> rateNames {"23.976 fps", "24 fps", "25 fps", "29.97 fps", "30 fps", "50 fps", "60 fps", "120 fps"};
-        for (std::size_t index = 0; index < rateNames.size(); ++index) { frameRate.addItem(rateNames[index], 500 + static_cast<int>(index)); }
+        for (std::size_t index = 0; index < rateNames.size(); ++index) { frameRate.addItem(rateNames[index], static_cast<int>(index) + 1); }
         meter.setName("Composition meter");
-        for (const auto beats : {2, 3, 4, 5, 6, 7}) { meter.addItem(juce::String(beats) + "/4", 400 + beats); }
+        for (const auto beats : {2, 3, 4, 5, 6, 7}) { meter.addItem(juce::String(beats) + "/4", beats); }
         // The beam's base frequency: whole times a frame is drawn, so each
         // frame plays whole; the items are made for the frame rate in refresh().
         beam.setName("Composition beam frequency");
@@ -44,14 +44,16 @@ public:
         frameRate.setTooltip("Frames a second. The beam draws each frame a whole number of times (see Beam)");
         for (auto* combo : {&frameRate, &meter, &beam}) {
             motion::style::styleField(*combo);
-            combo->onChange = [this, combo] { if (!updating && onTiming) { onTiming(combo->getSelectedId()); } };
             addAndMakeVisible(*combo);
         }
+        frameRate.onChange = [this] { if (!updating) { applyFrameRate(); } };
+        meter.onChange = [this] { if (!updating) { applyMeter(); } };
+        beam.onChange = [this] { if (!updating) { applyBeam(); } };
         // What the project is drawn and exported at: the beam's time to draw.
         sampleRate.setName("Composition sample rate");
         sampleRate.setTitle("Sample rate");
-        sampleRate.setTooltip("What the project is drawn and exported at (" + kilohertz(motion::Project::defaultSampleRate) + " by default). A higher rate gives the beam time to draw more each cycle.");
-        for (std::size_t index = 0; index < sampleRates.size(); ++index) { sampleRate.addItem(kilohertz(sampleRates[index]), static_cast<int>(index) + 1); }
+        sampleRate.setTooltip("What the project is drawn and exported at (" + motion::style::kilohertz(motion::Project::defaultSampleRate) + " by default). A higher rate gives the beam time to draw more each cycle.");
+        for (std::size_t index = 0; index < sampleRates.size(); ++index) { sampleRate.addItem(motion::style::kilohertz(sampleRates[index]), static_cast<int>(index) + 1); }
         motion::style::styleField(sampleRate);
         sampleRate.onChange = [this] { if (!updating) { applySampleRate(); } };
         addAndMakeVisible(sampleRate);
@@ -80,26 +82,20 @@ public:
         addChildComponent(about);
     }
 
-    // Meter, frame rate and beam as applyTiming's command ids, which the
-    // Timing menu's display and snapping items share.
-    std::function<void(int)> onTiming;
     std::function<void(const juce::String&)> onError;
     std::function<void()> onHeightChanged;
     static constexpr std::array<double, 8> rates {24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120};
-    // The ids for the beam's frequency: Auto, then 1 to 8 cycles a frame.
-    static constexpr int beamCommand = 800, beamChoiceCount = motion::Project::mostBeamCycles;
     // The rates a project can be drawn at, from what audio runs at to four
     // times 192 kHz.
     static constexpr std::array<double, 8> sampleRates {44100, 48000, 88200, 96000, 176400, 192000, 384000, 768000};
-    static juce::String hertz(double value) { return juce::String(value, value == std::floor(value) ? 0 : 2) + " Hz"; }
-    static juce::String kilohertz(double rate) { return juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz"; }
-    static std::vector<std::pair<int, juce::String>> beamChoices(double frameRate) {
-        std::vector<std::pair<int, juce::String>> choices;
-        choices.emplace_back(beamCommand, "Auto" + motion::style::dot() + hertz(motion::beamCycleRate(frameRate)));
-        for (int cycles = 1; cycles <= beamChoiceCount; ++cycles) {
+    // The beam's frequencies: Auto, then 1 to 8 cycles a frame.
+    static std::vector<juce::String> beamChoices(double frameRate) {
+        std::vector<juce::String> choices;
+        choices.push_back("Auto" + motion::style::dot() + motion::style::hertz(motion::beamCycleRate(frameRate)));
+        for (int cycles = 1; cycles <= motion::Project::mostBeamCycles; ++cycles) {
             const auto times = cycles == 1 ? juce::String("once a frame") : cycles == 2 ? juce::String("twice a frame") : juce::String(cycles) + " times a frame";
             const auto rate = motion::beamCycleRate(frameRate, cycles);
-            choices.emplace_back(beamCommand + cycles, hertz(rate) + motion::style::dot() + times + (rate < 45 ? " (flickers)" : ""));
+            choices.push_back(motion::style::hertz(rate) + motion::style::dot() + times + (rate < 45 ? " (flickers)" : ""));
         }
         return choices;
     }
@@ -139,28 +135,29 @@ public:
         // As the clip's Timing reads a duration: in the ruler's units.
         if (!length.isBeingEdited()) { length.setText(juce::String(project.timeGrid().durationLabel(0, project.duration)), juce::dontSendNotification); }
         int rate = 0;
-        for (std::size_t index = 0; index < rates.size(); ++index) { if (std::abs(project.frameRate - rates[index]) < 1.0e-9) { rate = 500 + static_cast<int>(index); } }
+        for (std::size_t index = 0; index < rates.size(); ++index) { if (std::abs(project.frameRate - rates[index]) < 1.0e-9) { rate = static_cast<int>(index) + 1; } }
         frameRate.setSelectedId(rate, juce::dontSendNotification);
         if (rate == 0) { frameRate.setText(juce::String(project.frameRate, 3) + " fps", juce::dontSendNotification); }
-        meter.setSelectedId(400 + project.beatsPerBar, juce::dontSendNotification);
+        meter.setSelectedId(project.beatsPerBar, juce::dontSendNotification);
         // Beam: Auto, or once, twice... a frame, each named for its frequency.
         const auto& main = processor.document.mainProject();
         beam.clear(juce::dontSendNotification);
-        for (const auto& [id, text] : beamChoices(main.frameRate)) { beam.addItem(text, id); }
-        beam.setSelectedId(beamCommand + main.beamCycles, juce::dontSendNotification);
+        const auto choices = beamChoices(main.frameRate);
+        for (std::size_t cycles = 0; cycles < choices.size(); ++cycles) { beam.addItem(choices[cycles], static_cast<int>(cycles) + 1); }
+        beam.setSelectedId(main.beamCycles + 1, juce::dontSendNotification);
         int sampleRateId = 0;
         for (std::size_t index = 0; index < sampleRates.size(); ++index) {
             if (std::abs(main.sampleRate - sampleRates[index]) < .5) { sampleRateId = static_cast<int>(index) + 1; }
         }
         sampleRate.setSelectedId(sampleRateId, juce::dontSendNotification);
-        if (sampleRateId == 0) { sampleRate.setText(kilohertz(main.sampleRate), juce::dontSendNotification); }
+        if (sampleRateId == 0) { sampleRate.setText(motion::style::kilohertz(main.sampleRate), juce::dontSendNotification); }
         updating = false;
     }
     void resized() override {
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
         area.removeFromTop(motion::style::gap);
-        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &meter, &sampleRate, &beam});
+        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &meter, &sampleRate, &beam}, true);
         area.removeFromTop(aboutGap);
         aboutRule = area.getY();
         area.removeFromTop(ruleGap);
@@ -234,6 +231,29 @@ private:
         if (std::abs(processor.document.mainProject().sampleRate - rate) >= .5) {
             processor.document.edit("Change the sample rate", [rate](motion::Project& project) { project.sampleRate = rate; });
         }
+    }
+    void applyFrameRate() {
+        const auto index = frameRate.getSelectedId() - 1;
+        if (index < 0 || index >= static_cast<int>(rates.size())) { return; }
+        const auto rate = rates[static_cast<std::size_t>(index)];
+        if (std::abs(processor.document.project().frameRate - rate) >= 1.0e-9) {
+            processor.document.edit("Change frame rate", [rate](motion::Project& project) { project.frameRate = rate; });
+        }
+    }
+    // A beat grid of a whole bar stays a whole bar.
+    void applyMeter() {
+        const auto beats = meter.getSelectedId();
+        if (beats < 2 || beats > 7 || beats == processor.document.project().beatsPerBar) { return; }
+        processor.document.edit("Change meter", [beats](motion::Project& project) {
+            if (std::abs(project.snapBeats - project.beatsPerBar) < 1.0e-9) { project.snapBeats = beats; }
+            project.beatsPerBar = beats;
+        });
+    }
+    // The project's, as the sample rate is.
+    void applyBeam() {
+        const auto cycles = beam.getSelectedId() - 1;
+        if (cycles < 0 || cycles > motion::Project::mostBeamCycles || cycles == processor.document.mainProject().beamCycles) { return; }
+        processor.document.edit("Change beam frequency", [cycles](motion::Project& project) { project.beamCycles = cycles; });
     }
 
     MotionProcessor& processor;

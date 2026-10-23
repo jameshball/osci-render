@@ -33,7 +33,7 @@ public:
         if (std::find(rates.begin(), rates.end(), initial.frameRate) == rates.end()) { rates.push_back(initial.frameRate); }
         if (std::find(strides.begin(), strides.end(), initial.pointsPerFrame) == strides.end()) { strides.push_back(initial.pointsPerFrame); }
         for (std::size_t index = 0; index < rates.size(); ++index) {
-            frameRate.addItem(juce::String(rates[index], rates[index] == std::floor(rates[index]) ? 0 : 3) + " fps", static_cast<int>(index + 1));
+            frameRate.addItem(motion::style::trimmed(rates[index], 3) + " fps", static_cast<int>(index + 1));
             if (rates[index] == initial.frameRate) { frameRate.setSelectedId(static_cast<int>(index + 1), juce::dontSendNotification); }
         }
         for (std::size_t index = 0; index < strides.size(); ++index) {

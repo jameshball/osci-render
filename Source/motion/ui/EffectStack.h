@@ -7,6 +7,7 @@
 #include "ScrubField.h"
 #include "Chip.h"
 #include "FormControls.h"
+#include "KeyframeButton.h"
 
 #include "../MotionProcessor.h"
 #include "../model/PropertySchema.h"
@@ -84,7 +85,7 @@ private:
             std::string id;
             juce::String label;
             motion::ui::ScrubField field;
-            osci::KeyframeButton key;
+            motion::ui::KeyframeButton key;
             motion::ui::Chip modulate {"Modulate", motion::icons::Icon::wave};
             motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
         };
