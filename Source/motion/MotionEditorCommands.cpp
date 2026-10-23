@@ -605,7 +605,7 @@ void MotionEditor::showShortcuts() {
     for (const auto& [menu, title] : menuOrder) {
         Overlay::Section section {title, {}};
         if (menu == fileMenu) {
-            for (const auto& [keys, action] : std::initializer_list<std::pair<const char*, const char*>> {{"Cmd+N", "New project"}, {"Cmd+O", "Open project"}, {"Cmd+S", "Save project"}, {"Cmd+Shift+S", "Save project as"}, {"Cmd+I", "Import source"}}) {
+            for (const auto& [keys, action] : std::initializer_list<std::pair<const char*, const char*>> {{"Cmd+N", "New project"}, {"Cmd+O", "Open project"}, {"Cmd+S", "Save project"}, {"Cmd+Shift+S", "Save project as"}}) {
                 section.entries.push_back({keys, action});
             }
         }
