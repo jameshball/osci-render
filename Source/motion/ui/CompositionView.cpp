@@ -1087,10 +1087,8 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
         if (partMode && !picked.empty()) { picked.clear(); refreshPartBar(); return true; }
         if (partMode) { setPartMode(false); return true; }
     }
-    // Letters as capitals: Linux reports them in lower case (and only
-    // letters: a function key's code would otherwise be cut to one).
     const auto code = key.getKeyCode();
-    const auto letter = code >= 'a' && code <= 'z' ? code - 'a' + 'A' : code;
+    const auto letter = osci::shortcutKey(key);
     // Tab switches between objects and their parts, as Blender's edit mode.
     if (key == juce::KeyPress::tabKey && !navigating) { setPartMode(!partMode); return true; }
     if (partMode && key == juce::KeyPress('a', juce::ModifierKeys::commandModifier, 0)) {

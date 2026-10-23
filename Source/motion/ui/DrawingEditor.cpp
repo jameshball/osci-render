@@ -272,7 +272,8 @@ bool MotionDrawingEditor::keyPressed(const juce::KeyPress& key) {
     }
     if (drag.has_value()) { return !name.hasKeyboardFocus(false); }
     const auto command = key.getModifiers().isCommandDown();
-    if (command && key.getKeyCode() == 'Z') {
+    const auto letter = osci::shortcutKey(key);
+    if (command && letter == 'Z') {
         if (key.getModifiers().isShiftDown()) { redo(); } else { undo(); }
         return true;
     }
@@ -282,7 +283,7 @@ bool MotionDrawingEditor::keyPressed(const juce::KeyPress& key) {
         return true;
     }
     // Other shortcuts would act on the timeline behind the drawing.
-    if (command) { return key.getKeyCode() != 'S'; }
+    if (command) { return letter != 'S'; }
     if (key == juce::KeyPress::returnKey) { finishStroke(); changed(); return true; }
     if (key == juce::KeyPress::escapeKey) {
         if (activeStroke >= 0) { finishStroke(); } else { deselect(); }

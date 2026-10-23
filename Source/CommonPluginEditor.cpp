@@ -367,11 +367,7 @@ CommonPluginEditor::~CommonPluginEditor() {
 // editor operations, not "special keys" like j/k for file switching.
 
 bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
-    // Linux reports Ctrl with a letter as the lowercase letter. Only letters
-    // are raised: a key code like Windows' F4 (0x10073) would otherwise be
-    // cut to a character and read as S.
-    const auto code = key.getKeyCode();
-    const auto letter = code >= 'a' && code <= 'z' ? code - 'a' + 'A' : code;
+    const auto letter = osci::shortcutKey(key);
     if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && letter == 'Z') {
         undoRedoControls.redo();
         return true;

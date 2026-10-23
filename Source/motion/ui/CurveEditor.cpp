@@ -938,7 +938,7 @@ void MotionCurveEditor::writeCurves(const juce::String& label, const juce::Strin
 bool MotionCurveEditor::keyPressed(const juce::KeyPress& key) {
     // Select all, copying and the rest are the editor's commands.
     const auto bare = !key.getModifiers().isCommandDown() && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown();
-    if (!drag.has_value() && bare && (key.getKeyCode() == 'F' || key.getKeyCode() == 'f')) {
+    if (!drag.has_value() && bare && osci::shortcutKey(key) == 'F') {
         const auto primaryOnly = key.getModifiers().isShiftDown();
         // Framing the group is the automatic view, so later edits keep it framed.
         userView = primaryOnly;
@@ -946,7 +946,7 @@ bool MotionCurveEditor::keyPressed(const juce::KeyPress& key) {
         repaint();
         return true;
     }
-    if (key.getModifiers().isCommandDown() && (key.getKeyCode() == 'Z' || key.getKeyCode() == 'z') && drag.has_value()) {
+    if (key.getModifiers().isCommandDown() && osci::shortcutKey(key) == 'Z' && drag.has_value()) {
         restoreDragSelection();
         cancelDrag();
         refresh();

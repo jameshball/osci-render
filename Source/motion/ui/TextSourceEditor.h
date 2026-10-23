@@ -167,7 +167,8 @@ public:
             return true;
         }
         // Other shortcuts would act on the timeline behind the editor.
-        return command && key.getKeyCode() != 'S' && key.getKeyCode() != 'Z' && key.getKeyCode() != 'C' && key.getKeyCode() != 'V' && key.getKeyCode() != 'X' && key.getKeyCode() != 'A';
+        const auto letter = osci::shortcutKey(key);
+        return command && letter != 'S' && letter != 'Z' && letter != 'C' && letter != 'V' && letter != 'X' && letter != 'A';
     }
 
 private:
