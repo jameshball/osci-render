@@ -217,8 +217,11 @@ void render(const juce::ArgumentList& args) {
         // The Scope's picture, from a video the app renders: of only a short
         // stretch up to each frame (its persistence built as playing builds
         // it), or with --whole all of it, kept beside the pictures to watch or
-        // take more from (--video).
-        const auto times = timesOf(args, composition);
+        // take more from (--video). A picture is of a whole frame, so they
+        // spread over the frames' starts: half a frame on from the last is
+        // still within the video.
+        const auto last = motion::Stretches::lastFrame(composition.duration(), composition.frameRate);
+        const auto times = timesOf(args, last, last);
         const auto given = args.getValueForOption("--video");
         const auto whole = given.isNotEmpty() || args.containsOption("--whole");
         const auto folder = fileArgument(previews);
