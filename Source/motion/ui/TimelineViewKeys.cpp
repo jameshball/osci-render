@@ -14,7 +14,7 @@ auto ownerOf(ProjectType& project, motion::Id owner) { return motion::findProper
 template <typename Keys>
 bool keysLocked(const motion::Project& project, const Keys& keys) {
     return std::any_of(keys.begin(), keys.end(), [&project](const auto& key) {
-        const auto target = ownerOf(project, key.clip);
+        const auto target = ownerOf(project, key.owner);
         return target.has_value() && target->locked;
     });
 }
@@ -23,7 +23,7 @@ template <typename Keys, typename Change>
 bool changeKeys(motion::Project& project, const Keys& keys, Change&& change) {
     bool any = false;
     for (const auto& key : keys) {
-        auto* curve = motion::findPropertyCurve(project, key.clip, key.property);
+        auto* curve = motion::findPropertyCurve(project, key.owner, key.property);
         if (curve != nullptr) { any = change(*curve, key) || any; }
     }
     return any;
@@ -93,7 +93,7 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
     bool collided = false;
     std::vector<motion::Id> owners;
     for (const auto& key : keys) {
-        if (std::find(owners.begin(), owners.end(), key.clip) == owners.end()) { owners.push_back(key.clip); }
+        if (std::find(owners.begin(), owners.end(), key.owner) == owners.end()) { owners.push_back(key.owner); }
     }
     for (const auto owner : owners) {
         auto target = ownerOf(project, owner);
@@ -102,7 +102,7 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
         for (auto& [name, curve] : *target->properties) {
             std::vector<motion::Keyframe> moving;
             for (const auto& key : curve.keyframes()) {
-                const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.clip == owner && item.property == name && motion::sameTime(item.time, key.time); });
+                const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.owner == owner && item.property == name && motion::sameTime(item.time, key.time); });
                 if (chosen) { moving.push_back(key); }
             }
             if (moving.empty()) { continue; }
@@ -124,24 +124,23 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
 void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
     auto* keyDrag = active<KeyDrag>();
     if (keyDrag == nullptr) { return; }
-    if (processor.document.revision() != keyDrag->revision) { gesture = {}; return; }
-    const auto grabbed = ownerOf(std::as_const(keyDrag->before), keyDrag->grabbed.clip);
+    if (edit.stale()) { gesture = {}; edit.reset(); return; }
+    const auto& before = edit.start();
+    const auto grabbed = ownerOf(before, keyDrag->grabbed.owner);
     if (!grabbed.has_value()) { return; }
     const auto timing = grabbed->clock();
     if (timing.rate == 0) { return; }
     const auto grabbedTime = timing.projectTime(keyDrag->grabbed.time);
     auto delta = (x - keyDrag->downX) / pixelsPerSecond;
-    if (delta != 0) { delta = snapEdge(grabbedTime + delta, modifiers, keyDrag->before, {}, &keyDrag->keys) - grabbedTime; }
-    auto updated = keyDrag->before;
+    if (delta != 0) { delta = snapEdge(grabbedTime + delta, modifiers, before, {}, &keyDrag->keys) - grabbedTime; }
+    auto updated = before;
     if (delta != 0 && !moveKeys(updated, keyDrag->keys, delta)) { return; }
-    keyDrag->changed = delta != 0;
     selectedKeys = keyDrag->keys;
     for (auto& key : selectedKeys) {
-        const auto owner = ownerOf(std::as_const(keyDrag->before), key.clip);
+        const auto owner = ownerOf(before, key.owner);
         if (owner.has_value()) { key.time = movedKeyTime(owner->clock(), key.time, delta); }
     }
-    processor.document.preview(std::move(updated));
-    keyDrag->revision = processor.document.revision();
+    edit.show(std::move(updated), delta != 0);
     repaint();
 }
 
@@ -153,7 +152,7 @@ bool MotionTimelineView::nudgeSelectedKeys(int frames) {
     // Where each selected key lands, through its clip's own timing.
     auto moved = keys;
     for (auto& key : moved) {
-        const auto owner = ownerOf(project, key.clip);
+        const auto owner = ownerOf(project, key.owner);
         if (owner.has_value()) { key.time = movedKeyTime(owner->clock(), key.time, delta); }
     }
     // Nothing moves onto another key, nor when a key's track is locked.
@@ -167,32 +166,9 @@ bool MotionTimelineView::nudgeSelectedClips(int frames) {
     if (gesture.index() != 0) { return true; }
     const auto& project = processor.document.project();
     const auto delta = frames / (project.frameRate > 0 ? project.frameRate : 30.0);
-    const auto nudged = processor.document.nudgeClips({selectedClips.begin(), selectedClips.end()}, delta);
-    if (nudged.failed() && onError) { onError(nudged.getErrorMessage()); }
+    report(processor.document.nudgeClips({selectedClips.begin(), selectedClips.end()}, delta));
     repaint();
     return true;
-}
-
-void MotionTimelineView::endKeyDrag() {
-    auto* keyDrag = active<KeyDrag>();
-    if (keyDrag == nullptr) { return; }
-    if (keyDrag->changed && processor.document.revision() == keyDrag->revision) {
-        processor.document.commit(keyDrag->keys.size() > 1 ? "Move keys" : "Move key", std::move(keyDrag->before));
-    }
-    gesture = {};
-}
-
-void MotionTimelineView::cancelKeyDrag() {
-    auto* keyDrag = active<KeyDrag>();
-    if (keyDrag != nullptr && keyDrag->changed && processor.document.revision() == keyDrag->revision) {
-        selectedKeys = keyDrag->keys;
-        processor.document.preview(std::move(keyDrag->before));
-    }
-    // A marquee given up leaves the keys selected as they were.
-    const auto* marquee = active<KeyMarquee>();
-    if (marquee != nullptr) { selectedKeys = marquee->before; }
-    if (keyDrag != nullptr || marquee != nullptr) { gesture = {}; }
-    repaint();
 }
 
 bool MotionTimelineView::easeSelectedKeys(bool in, bool out) {
@@ -218,7 +194,7 @@ void MotionTimelineView::deleteSelectedKeys() {
 
 void MotionTimelineView::addKeyAt(const Row& lane, int x, juce::ModifierKeys modifiers) {
     const auto& project = processor.document.project();
-    const auto time = snapTime(scrollTime + (x - namesWidth) / pixelsPerSecond, modifiers);
+    const auto time = snapTime(timeAt(x), modifiers);
     // The owner whose span holds the time (a later one wins, as it draws on top).
     std::optional<motion::Id> owner;
     double local = 0;

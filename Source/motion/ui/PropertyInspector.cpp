@@ -212,8 +212,8 @@ void MotionPropertyInspector::refreshValues() {
         row->key.setEnabled(!found->locked);
         if (row->swatch != nullptr) { row->swatch->setEnabled(!found->locked); }
         if (row->mode != nullptr) { row->mode->setEnabled(!found->locked); }
-        row->showState(allKeyed && anyAnimated ? osci::KeyframeButton::State::keyed
-            : (anyAnimated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated), target);
+        row->showState(allKeyed && anyAnimated ? motion::ui::KeyframeButton::State::keyed
+            : (anyAnimated ? motion::ui::KeyframeButton::State::animated : motion::ui::KeyframeButton::State::unanimated), target);
         // Key navigation shows only once there are keys, lit towards them.
         row->previous.setVisible(anyAnimated);
         row->next.setVisible(anyAnimated);
@@ -389,9 +389,9 @@ void MotionPropertyInspector::Row::resized() {
     }
 }
 
-void MotionPropertyInspector::Row::showState(osci::KeyframeButton::State state, motion::Id owner) {
+void MotionPropertyInspector::Row::showState(motion::ui::KeyframeButton::State state, motion::Id owner) {
     // Animated just now, not by choosing something that already was.
-    if (owner == shownTarget && shownState == osci::KeyframeButton::State::unanimated && state != osci::KeyframeButton::State::unanimated) {
+    if (owner == shownTarget && shownState == motion::ui::KeyframeButton::State::unanimated && state != motion::ui::KeyframeButton::State::unanimated) {
         pulseStart = juce::Time::getMillisecondCounterHiRes();
         pulseFrames.startTimerHz(60);
     }
@@ -413,7 +413,7 @@ void MotionPropertyInspector::Row::paintOverChildren(juce::Graphics& g) {
         ring.addPolygon(centre, 4, radius * 1.15f, 0.0f);
         g.strokePath(ring, juce::PathStrokeType(1.5f));
     }
-    if (!key.isEnabled() || !keyHovered || shownState != osci::KeyframeButton::State::unanimated) { return; }
+    if (!key.isEnabled() || !keyHovered || shownState != motion::ui::KeyframeButton::State::unanimated) { return; }
     const auto text = juce::String("Animate");
     const auto textWidth = std::ceil(juce::TextLayout::getStringWidth(motion::style::caption(), text));
     const auto height = static_cast<float>(key.getHeight()) - 6.0f;
@@ -500,7 +500,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             row->first = isGeneratorSpec(spec);
             row->key.setName("Key " + row->group.toLowerCase());
             // Keys are neutral: filled on a key, outlined off one.
-            row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
+            row->key.setColour(motion::ui::KeyframeButton::keyColourId, osci::Colours::text());
             row->key.setTitle(row->key.getName());
             row->previous.setName("Previous " + row->group.toLowerCase() + " key");
             row->next.setName("Next " + row->group.toLowerCase() + " key");
@@ -626,35 +626,17 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
     shadingTiles.reset();
     if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return spec.id == "hatching"; })) {
         using motion::ui::pictures::Shading;
-        shadingTiles = std::make_unique<motion::ui::TileGrid>("Shading", std::vector<motion::ui::TileGrid::Choice> {
+        addChoiceTiles(shadingTiles, "Shading", "hatching", {
             {"Brightness", "Light shows as how bright each line is drawn", motion::ui::pictures::shadingPicture(Shading::brightness)},
             {"Hatching", "Light shows as how densely a curve over the frame covers what it falls on", motion::ui::pictures::shadingPicture(Shading::hatching)}},
-            2, motion::ui::TileGrid::Look::chips, true);
-        shadingTiles->onClick = [this](std::size_t index) {
-            if (shadingTiles->tile(index).getToggleState()) { return; }
-            const auto found = motion::findPropertyTarget(processor.document.project(), target);
-            if (!found.has_value() || found->locked) { return; }
-            const auto time = keyTime(*found);
-            processor.document.edit(index == 0 ? "Shade by brightness" : "Shade by hatching", [&](motion::Project& project) { apply(project, "hatching", index == 0 ? 0.0 : 100.0, time); });
-            if (onKeyTimeEdited) { onKeyTimeEdited(); }
-        };
-        content.addAndMakeVisible(*shadingTiles);
+            {"Shade by brightness", "Shade by hatching"});
     }
     if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return spec.id == "solid"; })) {
         using motion::ui::pictures::solidityPicture;
-        solidTiles = std::make_unique<motion::ui::TileGrid>("Solidity", std::vector<motion::ui::TileGrid::Choice> {
+        addChoiceTiles(solidTiles, "Solidity", "solid", {
             {"Wireframe", "Seen through: everything behind it shows", solidityPicture(false)},
             {"Solid", "Its faces hide what's behind them, its own far side too", solidityPicture(true)}},
-            2, motion::ui::TileGrid::Look::chips, true);
-        solidTiles->onClick = [this](std::size_t index) {
-            if (solidTiles->tile(index).getToggleState()) { return; }
-            const auto found = motion::findPropertyTarget(processor.document.project(), target);
-            if (!found.has_value() || found->locked) { return; }
-            const auto time = keyTime(*found);
-            processor.document.edit(index == 0 ? "Make wireframe" : "Make solid", [&](motion::Project& project) { apply(project, "solid", index == 0 ? 0.0 : 100.0, time); });
-            if (onKeyTimeEdited) { onKeyTimeEdited(); }
-        };
-        content.addAndMakeVisible(*solidTiles);
+            {"Make wireframe", "Make solid"});
     }
     if (std::any_of(specs.begin(), specs.end(), [](const auto& spec) { return motion::isLinesProperty(spec.id); })) {
         std::vector<motion::ui::TileGrid::Choice> choices;
@@ -957,6 +939,19 @@ void MotionPropertyInspector::cancelGesture() {
     gesture.cancel();
 }
 
+void MotionPropertyInspector::addChoiceTiles(std::unique_ptr<motion::ui::TileGrid>& slot, const juce::String& title, const char* property, std::vector<motion::ui::TileGrid::Choice> choices, std::array<juce::String, 2> undoLabels) {
+    slot = std::make_unique<motion::ui::TileGrid>(title, std::move(choices), 2, motion::ui::TileGrid::Look::chips, true);
+    slot->onClick = [this, &slot, property, undoLabels](std::size_t index) {
+        if (slot->tile(index).getToggleState()) { return; }
+        const auto found = motion::findPropertyTarget(processor.document.project(), target);
+        if (!found.has_value() || found->locked) { return; }
+        const auto time = keyTime(*found);
+        processor.document.edit(undoLabels[index], [&](motion::Project& project) { apply(project, property, index == 0 ? 0.0 : 100.0, time); });
+        if (onKeyTimeEdited) { onKeyTimeEdited(); }
+    };
+    content.addAndMakeVisible(*slot);
+}
+
 osci::ColourPicker::Rgb MotionPropertyInspector::colourOf(const Row& row) {
     osci::ColourPicker::Rgb rgb {1.0, 1.0, 1.0};
     for (const auto& field : row.fields) {
@@ -965,24 +960,6 @@ osci::ColourPicker::Rgb MotionPropertyInspector::colourOf(const Row& row) {
         if (index >= 0) { rgb[static_cast<std::size_t>(index)] = std::clamp(field->editor.getValue(), 0.0, 1.0); }
     }
     return rgb;
-}
-
-namespace {
-// The colour picker in its popover. The picker ends its drag when closed
-// mid-drag; closed that way (Escape), the drag is cancelled instead.
-class ColourPopover final : public juce::Component {
-public:
-    ColourPopover(std::unique_ptr<osci::ColourPicker> made, std::function<void()> cancel) : picker(std::move(made)), cancelDrag(std::move(cancel)) {
-        addAndMakeVisible(*picker);
-        setSize(picker->getWidth(), picker->getHeight());
-    }
-    ~ColourPopover() override { picker->onEnd = cancelDrag; }
-    void resized() override { picker->setBounds(getLocalBounds()); }
-
-private:
-    std::unique_ptr<osci::ColourPicker> picker;
-    std::function<void()> cancelDrag;
-};
 }
 
 void MotionPropertyInspector::openColourPicker(Row& row) {
@@ -1092,49 +1069,37 @@ void MotionPropertyInspector::jumpToKey(Row& row, bool forward) {
 
 juce::String MotionPropertyInspector::sourceKind(motion::Id clip) const {
     const auto& project = processor.document.project();
-    for (const auto& track : project.tracks) {
-        for (const auto& item : track.clips) {
-            if (item.id != clip) { continue; }
-            if (item.composition != 0) { return "Composition"; }
-            const auto found = motion::findAsset(project.assets, item.asset);
-            return found != nullptr ? motion::ui::sourceKind(*found) : juce::String("Object");
-        }
-    }
-    return "Object";
+    const auto* item = motion::findClip(project, clip);
+    if (item == nullptr) { return "Object"; }
+    if (item->composition != 0) { return "Composition"; }
+    const auto found = motion::findAsset(project.assets, item->asset);
+    return found != nullptr ? motion::ui::sourceKind(*found) : juce::String("Object");
 }
 
 std::vector<motion::PropertySpec> MotionPropertyInspector::luaSliders() const {
     std::vector<motion::PropertySpec> result;
     const auto& project = processor.document.project();
-    for (const auto& track : project.tracks) {
-        for (const auto& clip : track.clips) {
-            if (clip.id != target || clip.composition != 0) { continue; }
-            const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
-            if (asset == project.assets.end() || !(*asset)->extension.equalsIgnoreCase(".lua")) { return result; }
-            const auto script = (*asset)->data.toString();
-            for (const auto& spec : motion::luaSliderSpecs) {
-                const auto name = juce::String("slider_") + juce::String::charToString(static_cast<juce::juce_wchar>(spec.id.back()));
-                if (script.contains(name) || clip.properties.contains(std::string(spec.id))) { result.push_back(spec); }
-            }
-            return result;
-        }
+    const auto* clip = motion::findClip(project, target);
+    if (clip == nullptr || clip->composition != 0) { return result; }
+    const auto asset = motion::findAsset(project.assets, clip->asset);
+    if (asset == nullptr || !asset->extension.equalsIgnoreCase(".lua")) { return result; }
+    const auto script = asset->data.toString();
+    for (const auto& spec : motion::luaSliderSpecs) {
+        const auto name = juce::String("slider_") + juce::String::charToString(static_cast<juce::juce_wchar>(spec.id.back()));
+        if (script.contains(name) || clip->properties.contains(std::string(spec.id))) { result.push_back(spec); }
     }
     return result;
 }
 
 std::optional<motion::PropertySpec> MotionPropertyInspector::fractalDepthSpec() const {
     const auto& project = processor.document.project();
-    for (const auto& track : project.tracks) {
-        for (const auto& clip : track.clips) {
-            if (clip.id != target || clip.composition != 0) { continue; }
-            const auto asset = motion::findAsset(project.assets, clip.asset);
-            if (asset == nullptr || !motion::isFractal(asset->extension)) { return std::nullopt; }
-            auto spec = motion::fractalPropertySpecs[0];
-            spec.defaultValue = asset->fractalDepth;
-            return spec;
-        }
-    }
-    return std::nullopt;
+    const auto* clip = motion::findClip(project, target);
+    if (clip == nullptr || clip->composition != 0) { return std::nullopt; }
+    const auto asset = motion::findAsset(project.assets, clip->asset);
+    if (asset == nullptr || !motion::isFractal(asset->extension)) { return std::nullopt; }
+    auto spec = motion::fractalPropertySpecs[0];
+    spec.defaultValue = asset->fractalDepth;
+    return spec;
 }
 
 const motion::GeneratorDefinition* MotionPropertyInspector::targetGenerator() const {
@@ -1156,16 +1121,12 @@ motion::Curve* MotionPropertyInspector::createSlider(motion::Project& project, c
 
 std::optional<std::pair<bool, bool>> MotionPropertyInspector::currentModes() const {
     const auto& project = processor.document.project();
-    for (const auto& group : project.groups) {
-        if (group.id == target) { return std::make_pair(group.spatialPath, group.quaternionRotation); }
-    }
-    for (const auto& track : project.tracks) {
-        if (track.kind != motion::TrackKind::visual) { continue; }
-        for (const auto& clip : track.clips) {
-            if (clip.id == target) { return std::make_pair(clip.spatialPath, clip.quaternionRotation); }
-        }
-    }
-    return std::nullopt;
+    const auto* group = motion::findGroup(project, target);
+    if (group != nullptr) { return std::make_pair(group->spatialPath, group->quaternionRotation); }
+    const auto* track = motion::findClipTrack(project, target);
+    if (track == nullptr || track->kind != motion::TrackKind::visual) { return std::nullopt; }
+    const auto* clip = motion::findClip(project, target);
+    return std::make_pair(clip->spatialPath, clip->quaternionRotation);
 }
 
 void MotionPropertyInspector::setMotionMode(bool path, bool enabled) {

@@ -10,6 +10,7 @@
 #include "../model/PropertySchema.h"
 #include "MotionStyle.h"
 #include "Chip.h"
+#include "PlayheadStrip.h"
 #include <array>
 #include <optional>
 #include <set>
@@ -137,7 +138,6 @@ private:
     motion::PropertyMap groupCurves(const motion::PropertyTarget& target) const;
     // The drag preview of a group curve while dragging, otherwise the stored curve.
     const motion::Curve* displayed(const motion::PropertyTarget& target, const std::string& property) const;
-    // The name the inspector and channel list use, never the internal id.
     static const motion::Curve* findCurve(const std::optional<motion::PropertyTarget>& target, const std::string& property) {
         return target.has_value() ? target->curve(property) : nullptr;
     }
@@ -149,6 +149,11 @@ private:
 
 
     static bool sameCurve(const motion::Curve& a, const motion::Curve& b) { return a.sameAuthoring(b); }
+    // The results that differ from their originals.
+    static motion::PropertyMap changedCurves(const motion::PropertyMap& originals, motion::PropertyMap results);
+    // Writes the curves to the target as one undo step; with a control
+    // prefix, steps to the target's same curves join.
+    void writeCurves(const juce::String& label, const juce::String& controlPrefix, motion::PropertyMap changed);
 
     bool dragMatches(const motion::PropertyTarget& clip) const;
 
@@ -287,7 +292,7 @@ private:
     std::vector<KeyRef> marqueeBase;
     std::optional<Drag> drag;
     std::optional<double> snapGuide;     // Project time of the magnet a drag is snapped to.
-    osci::PlayheadStrip playheadStrip;
+    motion::ui::PlayheadStrip playheadStrip;
     std::map<std::string, juce::Colour> contextCurves;
     std::set<std::string> hiddenCurves;
     motion::ui::PlayheadFollow follow;

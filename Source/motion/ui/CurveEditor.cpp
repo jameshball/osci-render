@@ -836,33 +836,49 @@ void MotionCurveEditor::mouseUp(const juce::MouseEvent&) {
     }
     const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
     const auto valid = clip.has_value() && dragMatches(*clip);
-    motion::PropertyMap changed;
-    for (auto& [name, preview] : drag->previews) {
-        if (!sameCurve(preview, drag->originals.at(name))) {
-            changed.emplace(name, std::move(preview));
-        }
-    }
+    auto changed = changedCurves(drag->originals, std::move(drag->previews));
     const auto mode = drag->mode;
     drag.reset();
     if (valid && !changed.empty()) {
-        const auto id = targetId;
         const auto plural = selection().size() > 1;
         const auto* label = mode == DragMode::key ? (plural ? "Move keys" : "Move key")
             : mode == DragMode::scaleLeft || mode == DragMode::scaleRight ? "Scale keys" : "Move key handle";
         // One undo step for every curve the drag changed.
-        processor.document.edit(label, [id, changed = std::move(changed)](motion::Project& project) {
-            for (const auto& [name, curve] : changed) {
-                auto* target = mutableCurve(project, id, name);
-                if (target != nullptr) {
-                    *target = curve;
-                }
-            }
-        });
+        writeCurves(label, {}, std::move(changed));
     }
     if (onPreview) {
         onPreview(nullptr);
     }
     refresh();
+}
+
+motion::PropertyMap MotionCurveEditor::changedCurves(const motion::PropertyMap& originals, motion::PropertyMap results) {
+    motion::PropertyMap changed;
+    for (auto& [name, curve] : results) {
+        if (!sameCurve(curve, originals.at(name))) { changed.emplace(name, std::move(curve)); }
+    }
+    return changed;
+}
+
+void MotionCurveEditor::writeCurves(const juce::String& label, const juce::String& controlPrefix, motion::PropertyMap changed) {
+    const auto id = targetId;
+    juce::String control;
+    if (controlPrefix.isNotEmpty()) {
+        // Steps join while they are to this target's same curves.
+        control = controlPrefix + juce::String(id);
+        for (const auto& [name, curve] : changed) { control << ":" << juce::String(name); }
+    }
+    auto write = [id, changed = std::move(changed)](motion::Project& project) {
+        for (const auto& [name, curve] : changed) {
+            auto* target = mutableCurve(project, id, name);
+            if (target != nullptr) { *target = curve; }
+        }
+    };
+    if (control.isEmpty()) {
+        processor.document.edit(label, std::move(write));
+    } else {
+        processor.document.editCoalesced(label, control, std::move(write));
+    }
 }
 
 bool MotionCurveEditor::keyPressed(const juce::KeyPress& key) {
@@ -1571,22 +1587,10 @@ void MotionCurveEditor::setActiveKeyTime(double projectTime) {
     auto result = motion::keyedit::transformKeys(originals, keys, [time](double) { return time; }, 0.0, clip->offset, clip->localTime(clip->end()),
         [this, &clip](const std::string& property, double value) { return constrainedValue(*clip, value, property); });
     if (!result.has_value()) { return; }
-    motion::PropertyMap changed;
-    for (auto& [name, curve] : result->curves) {
-        if (!sameCurve(curve, originals.at(name))) { changed.emplace(name, std::move(curve)); }
-    }
+    auto changed = changedCurves(originals, std::move(result->curves));
     adoptSelection(std::move(result->selection), selectedTime.has_value());
     if (changed.empty()) { return; }
-    const auto id = targetId;
-    // Steps join while they are to this target's same curves.
-    juce::String control = "graph.key.time:" + juce::String(id);
-    for (const auto& [name, curve] : changed) { control << ":" << juce::String(name); }
-    processor.document.editCoalesced("Move key", control, [id, changed = std::move(changed)](motion::Project& project) {
-        for (const auto& [name, curve] : changed) {
-            auto* target = mutableCurve(project, id, name);
-            if (target != nullptr) { *target = curve; }
-        }
-    });
+    writeCurves("Move key", "graph.key.time:", std::move(changed));
     refresh();
 }
 
@@ -1625,23 +1629,9 @@ bool MotionCurveEditor::nudgeSelected(int frames, double values) {
         clip->offset, clip->localTime(clip->end()), [this, &clip](const std::string& property, double value) { return constrainedValue(*clip, value, property); });
     // Nothing moves past the clip or onto another key.
     if (!result.has_value()) { return true; }
-    motion::PropertyMap changed;
-    for (auto& [name, curve] : result->curves) {
-        if (!sameCurve(curve, originals.at(name))) { changed.emplace(name, std::move(curve)); }
-    }
+    auto changed = changedCurves(originals, std::move(result->curves));
     adoptSelection(std::move(result->selection), selectedTime.has_value());
-    if (!changed.empty()) {
-        const auto id = targetId;
-        // Nudges join while they are to this target's same curves.
-        juce::String control = (frames != 0 ? "graph.nudge.time:" : "graph.nudge.value:") + juce::String(id);
-        for (const auto& [name, curve] : changed) { control << ":" << juce::String(name); }
-        processor.document.editCoalesced(keys.size() > 1 ? "Nudge keys" : "Nudge key", control, [id, changed = std::move(changed)](motion::Project& updated) {
-            for (const auto& [name, curve] : changed) {
-                auto* target = mutableCurve(updated, id, name);
-                if (target != nullptr) { *target = curve; }
-            }
-        });
-    }
+    if (!changed.empty()) { writeCurves(keys.size() > 1 ? "Nudge keys" : "Nudge key", frames != 0 ? "graph.nudge.time:" : "graph.nudge.value:", std::move(changed)); }
     refresh();
     return true;
 }

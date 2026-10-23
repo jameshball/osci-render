@@ -3,6 +3,7 @@
 #include "MotionIcons.h"
 #include "PreviewGesture.h"
 #include "Chip.h"
+#include "KeyframeButton.h"
 #include "TileGrid.h"
 
 #include "../MotionProcessor.h"
@@ -96,7 +97,7 @@ private:
         bool first = false;
         std::vector<std::unique_ptr<Field>> fields;
         std::unique_ptr<Swatch> swatch;
-        osci::KeyframeButton key;
+        motion::ui::KeyframeButton key;
         motion::ui::Chip modulate {"Modulate", motion::icons::Icon::wave};
         motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
         // Position: one spatial path; Rotation: quaternion orientation.
@@ -154,8 +155,8 @@ private:
             repaint();
         }
         bool keyHovered = false;
-        void showState(osci::KeyframeButton::State state, motion::Id target);
-        osci::KeyframeButton::State shownState = osci::KeyframeButton::State::unanimated;
+        void showState(motion::ui::KeyframeButton::State state, motion::Id target);
+        motion::ui::KeyframeButton::State shownState = motion::ui::KeyframeButton::State::unanimated;
         motion::Id shownTarget = 0;
         double pulseStart = 0;
         static constexpr double pulseLength = 650;
@@ -180,6 +181,9 @@ private:
     std::unique_ptr<motion::ui::TileGrid> presetTiles;
     // How a camera shades: by brightness, or by hatching.
     std::unique_ptr<motion::ui::TileGrid> shadingTiles;
+    // Fills `slot` with two chips for a property that is off (0) or on (100),
+    // as Shading's and Solidity's are; picking one records undoLabels' entry.
+    void addChoiceTiles(std::unique_ptr<motion::ui::TileGrid>& slot, const juce::String& title, const char* property, std::vector<motion::ui::TileGrid::Choice> choices, std::array<juce::String, 2> undoLabels);
     // Under Surface's or Shading's tiles, the numbers behind them, folded
     // away until asked for; shown only when opening it would show some.
     motion::style::Disclosure advanced {"Advanced settings", "Advanced", "Advanced"};

@@ -10,8 +10,11 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
     const auto many = selectedClips.size() > 1;
     motion::Id asset = 0, definition = 0;
     bool locked = false;
-    for (const auto& track : processor.document.project().tracks) {
-        for (const auto& clip : track.clips) { if (clip.id == id) { asset = clip.asset; definition = clip.composition; locked = track.locked; } }
+    const auto* clip = motion::findClip(processor.document.project(), id);
+    if (clip != nullptr) {
+        asset = clip->asset;
+        definition = clip->composition;
+        locked = motion::findClipTrack(processor.document.project(), id)->locked;
     }
     // The editor's own commands, so the menu and shortcuts agree.
     const std::array<std::pair<const char*, const char*>, 4> edits {{{"Cut", "Cmd+X"}, {"Copy", "Cmd+C"}, {"Paste", "Cmd+V"}, {"Split at playhead", "Cmd+K"}}};
@@ -68,13 +71,11 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
         } else if (result == 9 && onLoopSelection) {
             onLoopSelection();
         } else if (result == 10 && onRevealSource) {
-            for (const auto& track : processor.document.project().tracks) {
-                for (const auto& clip : track.clips) { if (clip.id == id) { onRevealSource(clip.asset); } }
-            }
+            const auto* shown = motion::findClip(processor.document.project(), id);
+            if (shown != nullptr) { onRevealSource(shown->asset); }
         } else if (result == 6) {
             motion::Id definitionId = 0;
-            const auto copied = processor.document.makeCompositionUnique(id, definitionId);
-            if (copied.failed() && onError) { onError(copied.getErrorMessage()); }
+            report(processor.document.makeCompositionUnique(id, definitionId));
             refreshTracks();
         }
     });
@@ -322,13 +323,13 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
     ensureTrackRows();
     if (active<TrackDrag>() == nullptr) {
         if (finished) { return; }
-        const auto found = std::find_if(rows.begin(), rows.end(), [id](const auto& row) { return row.id == id && !row.isLane(); });
-        if (found == rows.end()) { return; }
+        const auto first = headerRow(id);
+        if (first < 0) { return; }
         cancelGesture();
-        const auto first = static_cast<int>(found - rows.begin());
+        const auto& head = rows[static_cast<std::size_t>(first)];
         // A track lifts with its lanes; a group with everything under it.
         auto last = first + 1;
-        while (last < static_cast<int>(rows.size()) && (found->group() ? rows[static_cast<std::size_t>(last)].depth > found->depth : rows[static_cast<std::size_t>(last)].isLane())) { ++last; }
+        while (last < static_cast<int>(rows.size()) && (head.group() ? rows[static_cast<std::size_t>(last)].depth > head.depth : rows[static_cast<std::size_t>(last)].isLane())) { ++last; }
         gesture = TrackDrag {id, first, last, rowY(last) - rowY(first), y - rowY(first), y, processor.document.revision(), first};
         rowShift.assign(rows.size(), 0.0f);
         rowAnimation.startTimerHz(60);
@@ -348,7 +349,7 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
     // Let go where it was, it stays put: nothing to place.
     const auto inPlace = drag.group == 0 && drag.boundary >= drag.first && drag.boundary <= drag.last;
     if (!inPlace) {
-        const auto [boundary, group] = dropTarget(drag);
+        const auto [boundary, group] = trackDropPlace(drag);
         if (motion::findGroup(processor.document.project(), drag.id) != nullptr) {
             placeGroup(drag.id, boundary, group);
         } else {
@@ -358,10 +359,9 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
     // The block glides from where it was let go into its new place.
     ensureTrackRows();
     rowShift.assign(rows.size(), 0.0f);
-    const auto landed = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == drag.id && !row.isLane(); });
-    if (landed != rows.end()) {
-        const auto index = static_cast<int>(landed - rows.begin());
-        const auto& head = *landed;
+    const auto index = headerRow(drag.id);
+    if (index >= 0) {
+        const auto& head = rows[static_cast<std::size_t>(index)];
         const auto inBlock = [&](int row) { return row == index || (head.group() ? rows[static_cast<std::size_t>(row)].depth > head.depth : rows[static_cast<std::size_t>(row)].isLane()); };
         for (auto row = index; row < static_cast<int>(rows.size()) && inBlock(row); ++row) {
             rowShift[static_cast<std::size_t>(row)] = static_cast<float>(top - rowY(index));
@@ -404,7 +404,7 @@ int MotionTimelineView::dropBoundary(motion::Id& group) const {
     return count;
 }
 
-std::pair<int, motion::Id> MotionTimelineView::dropTarget(const TrackDrag& drag) const {
+std::pair<int, motion::Id> MotionTimelineView::trackDropPlace(const TrackDrag& drag) const {
     const auto& project = processor.document.project();
     const auto& tracks = project.tracks;
     const auto count = static_cast<int>(rows.size());
@@ -495,7 +495,7 @@ void MotionTimelineView::showSpaceMenu() {
     menu.addItem(motion::style::menuItem("Paste", 1, "Cmd+V").setEnabled(canPaste && canPaste()));
     menu.addItem(2, "Add track");
     menu.addItem(3, "Add camera here");
-    const auto time = std::clamp(scrollTime + (getMouseXYRelative().x - namesWidth) / pixelsPerSecond, 0.0, processor.document.project().duration);
+    const auto time = std::clamp(timeAt(getMouseXYRelative().x), 0.0, processor.document.project().duration);
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, time](int result) {
         cancelGesture();
         if (result == 1 && onCommand) { onCommand("Paste"); }
@@ -508,13 +508,7 @@ void MotionTimelineView::showSpaceMenu() {
 
 void MotionTimelineView::fitProject() {
     cancelGesture();
-    const auto& project = processor.document.project();
-    auto end = project.duration;
-    for (const auto& track : project.tracks) {
-        for (const auto& clip : track.clips) {
-            end = std::max(end, clip.timing(project.tempo()).end());
-        }
-    }
+    const auto end = contentEnd();
     const auto duration = std::isfinite(end) ? std::max(0.001, end) : 1.0;
     scrollY = 0;
     animateView(std::clamp(std::max(1, getWidth() - namesWidth - 20) / duration, 0.000001, 500.0), 0.0);
@@ -531,7 +525,7 @@ void MotionTimelineView::createCompositionFromSelection() {
     auto& document = processor.document;
     const auto name = "Composition " + juce::String(document.mainProject().definitions.size() + 1);
     const auto created = document.createComposition({selectedClips.begin(), selectedClips.end()}, name, instance);
-    if (created.failed()) { if (onError) { onError(created.getErrorMessage()); } return; }
+    if (!report(created)) { return; }
     selectClip(instance);
     refreshTracks();
 }

@@ -5,6 +5,8 @@
 #include "ViewNavigation.h"
 #include "TrackHeader.h"
 #include "TrackLayout.h"
+#include "PlayheadStrip.h"
+#include "PreviewGesture.h"
 #include <optional>
 #include <variant>
 #include <limits>
@@ -34,7 +36,7 @@ class MotionTimelineView : public juce::Component, public juce::DragAndDropTarge
         bool composition() const { return track == compositionTrack && lane.empty(); }
     };
     struct KeyRef {
-        motion::Id clip = 0; // Whose key: a clip, an effect, or another owner of keys.
+        motion::Id owner = 0; // Whose key: a clip, an effect, or another owner of keys.
         std::string property;
         double time = 0; // Content-local key time.
     };
@@ -241,11 +243,14 @@ private:
     // pointer across barSize but are drawn restingBar thick until hovered.
     static constexpr int barSize = 8, restingBar = 4, scrollStrip = barSize + 4;
     double timelineSpan() const;
-    // Where the composition or its last clip ends.
+    // Where the composition or its last clip ends. Kept per document state
+    // (scope and revision): scroll limits ask for it on every row lookup.
     double contentEnd() const;
+    mutable double contentEndCache = 0;
+    mutable std::optional<std::pair<std::uint64_t, std::uint64_t>> contentEndKey;
     juce::Rectangle<int> horizontalBar() const { return {namesWidth + 2, getHeight() - barSize - 2, std::max(0, getWidth() - namesWidth - 4), barSize}; }
     juce::Rectangle<int> horizontalThumb() const;
-    bool horizontalBarShown() const { return std::max(1, getWidth() - namesWidth) / pixelsPerSecond < timelineSpan() * 0.999 || scrollTime > 0; }
+    bool horizontalBarShown() const { return visibleSpan() < timelineSpan() * 0.999 || scrollTime > 0; }
     juce::Rectangle<int> verticalBar() const { return {getWidth() - barSize - 2, rulerHeight + 2, barSize, std::max(0, viewHeight() - 4)}; }
     juce::Rectangle<int> verticalThumb() const;
     bool verticalBarShown() const { return maximumScrollY() > 0; }
@@ -260,7 +265,7 @@ private:
     static constexpr int loopTop = 20, loopHeight = 6;
     juce::Rectangle<int> loopBounds() const;
     void paintLoop(juce::Graphics& g) const;
-    struct LoopDrag { enum class Mode { move, left, right } mode; double start, end; int downX; motion::Project before; std::uint64_t revision; bool changed; };
+    struct LoopDrag { enum class Mode { move, left, right } mode; double start, end; int downX; };
     bool loopDown(const juce::MouseEvent& event);
     // Cmd-click (Ctrl on Windows and Linux) on the ruler moves the nearer loop
     // point there, as modifier-clicks on Cubase's ruler set its locators;
@@ -286,6 +291,20 @@ private:
     juce::Colour clipColour(const motion::Clip& clip, const motion::Track& track) const;
     // Project times of every key on a clip, restricted to its visible interval.
     std::vector<double> clipKeyTimes(const motion::Clip& clip) const;
+    // Key summary ticks along a foot: a diamond at each time between left and
+    // right, none under 3 px from the last, kept within `inset` when given.
+    template <typename Times>
+    juce::Path keyTicks(const Times& times, float footY, float left, float right, std::optional<juce::Range<float>> inset = {}) const {
+        juce::Path ticks;
+        double lastX = -10;
+        for (const auto time : times) {
+            const auto x = static_cast<float>(timeX(time));
+            if (x - lastX < 3 || x < left || x > right) { continue; }
+            motion::style::addDiamond(ticks, {inset.has_value() ? std::clamp(x, inset->getStart(), inset->getEnd()) : x, footY}, 3.5f);
+            lastX = x;
+        }
+        return ticks;
+    }
     void paintClip(juce::Graphics& g, const motion::Clip& clip, const motion::Track& track, int index, float opacity) const;
     // The beam's shares across the visible time, one value per column.
     static constexpr int beamStep = 4;
@@ -302,13 +321,12 @@ private:
     // Shares rise on a square-root scale, so one of many still shows and can
     // be grabbed: a quarter of the beam fills half the height.
     static float beamY(juce::Rectangle<float> area, float share) { return area.getBottom() - std::sqrt(std::clamp(share, 0.0f, 1.0f)) * area.getHeight(); }
-    static double beamShareOfY(juce::Rectangle<float> area, float y) { const auto level = std::clamp(static_cast<double>(area.getBottom() - y) / std::max(1.0f, area.getHeight()), 0.0, 1.0); return level * level; }
     void paintBeamShare(juce::Graphics& g, motion::Id id, juce::Rectangle<float> area, juce::Rectangle<float> body, float opacity) const;
     void paintBeamLabel(juce::Graphics& g) const;
     // The clip or group whose share edge is under the point, if any.
     struct BeamTarget { motion::Id id; juce::Rectangle<float> area; };
     std::optional<BeamTarget> beamEdgeAt(juce::Point<int> point) const;
-    struct BeamDrag { motion::Id id; juce::Rectangle<float> area; double time, fraction, beam; motion::Project before; std::uint64_t revision; bool changed, keyed; int downY; };
+    struct BeamDrag { motion::Id id; juce::Rectangle<float> area; double time, fraction, beam; bool keyed; int downY; };
     // The hovered or dragged share's readout, drawn over every row.
     mutable std::optional<std::pair<juce::Rectangle<float>, juce::String>> beamLabel;
     bool beamDown(const juce::MouseEvent& event);
@@ -318,8 +336,8 @@ private:
     void paintLane(juce::Graphics& g, const Row& row, int y, int height) const;
     // The clip a lane's owner is, or is an effect of; none for the composition's effects.
     static const motion::Clip* laneClip(const motion::Project& project, motion::Id owner);
-    bool isKeySelected(motion::Id clip, const std::string& property, double time) const {
-        return std::any_of(selectedKeys.begin(), selectedKeys.end(), [&](const auto& key) { return key.clip == clip && key.property == property && motion::sameTime(key.time, time); });
+    bool isKeySelected(motion::Id owner, const std::string& property, double time) const {
+        return std::any_of(selectedKeys.begin(), selectedKeys.end(), [&](const auto& key) { return key.owner == owner && key.property == property && motion::sameTime(key.time, time); });
     }
     // Keys whose diamond lies under a point in a lane row.
     std::optional<KeyRef> keyAt(juce::Point<int> point) const;
@@ -330,11 +348,10 @@ private:
     // Fails when a moved key would land on a key that is not moving.
     static bool moveKeys(motion::Project& project, const std::vector<KeyRef>& keys, double delta);
     void beginKeyDrag(const KeyRef& grabbed, int x) {
-        gesture = KeyDrag{processor.document.project(), selectedKeys, grabbed, x, processor.document.revision(), false};
+        edit.begin();
+        gesture = KeyDrag {selectedKeys, grabbed, x};
     }
     void dragKeys(int x, juce::ModifierKeys modifiers);
-    void endKeyDrag();
-    void cancelKeyDrag();
     void deleteSelectedKeys();
     // Moves the selected keys `frames` frames along, as Alt+Left and Right
     // do (Shift: ten); presses in a row are one undo step.
@@ -381,8 +398,10 @@ private:
     void cameraBandDown(const juce::MouseEvent& event);
     void cameraBandDrag(const juce::MouseEvent& event);
     void showCutMenu(motion::Id cut, double time);
-    void report(const juce::Result& result) {
+    // Says why it failed, if it did; true when it didn't.
+    bool report(const juce::Result& result) {
         if (result.failed() && onError) { onError(result.getErrorMessage()); }
+        return result.wasOk();
     }
     struct CutDrag {
         enum class Mode { move, left, right };
@@ -390,10 +409,6 @@ private:
         double start = 0, end = 0;
         int downX = 0;
         Mode mode = Mode::move;
-        // The project when it began, put back by Escape.
-        motion::Project before;
-        std::uint64_t revision = 0;
-        bool changed = false;
     };
     // A camera key in the Cameras band stands for every property's key at
     // that time; dragging moves them together as one undo step.
@@ -401,9 +416,6 @@ private:
         motion::Id camera = 0;
         double from = 0, to = 0;
         int downX = 0;
-        motion::Project before;
-        std::uint64_t revision = 0;
-        bool moved = false;
     };
     mutable std::optional<std::pair<motion::Id, double>> selectedCameraKey;
     const motion::Camera* selectedCamera() const;
@@ -444,6 +456,10 @@ public:
     void groupTracks(const std::vector<motion::Id>& ids);
 private:
     void pickTrack(motion::Id id, juce::ModifierKeys mods);
+    // Shows or hides a track's (or the composition's) key lanes.
+    void toggleLanes(motion::Id id) {
+        if (expandedTracks.contains(id)) { expandedTracks.erase(id); } else { expandedTracks.insert(id); }
+    }
     std::vector<motion::Id> tracksToGroup() const;
     // The track headers picked: several, or the one selected.
     std::vector<motion::Id> pickedTracks() const;
@@ -466,7 +482,7 @@ private:
         int boundary;
         motion::Id group = 0;
     };
-    osci::PlayheadStrip playheadStrip;
+    motion::ui::PlayheadStrip playheadStrip;
     std::vector<float> rowShift;
     juce::TimedCallback rowAnimation {[this] { stepRows(); }};
     // A drag ends where it began if the document changes under it (an undo,
@@ -489,7 +505,7 @@ private:
     // The track array position and parent group that a row boundary means:
     // before the track at the boundary, inside a group it was dropped on, or
     // ahead of a group's first track (among that group's siblings).
-    std::pair<int, motion::Id> dropTarget(const TrackDrag& drag) const;
+    std::pair<int, motion::Id> trackDropPlace(const TrackDrag& drag) const;
     float targetShift(int row) const;
     void stepRows();
     // What an effect dropped here applies to: the clip under the pointer, a
@@ -507,6 +523,12 @@ private:
     bool gestureIsCurrent();
     // Ends a scrub, or a clip or marker drag and puts back what it changed.
     void cancelGesture();
+    // Letting go of a document drag records it as one undo step, named for
+    // what it did.
+    void commitDrag();
+    // Escape during a key, beam, loop, cut or camera key drag puts back what
+    // it changed; false when none is under way.
+    bool cancelDrag();
 
     bool isClip(motion::Id id) const { return motion::findClip(processor.document.project(), id) != nullptr; }
     bool notifyingSelection = false;
@@ -533,8 +555,12 @@ private:
     // default; groups use the default.
     int heightOf(std::size_t row) const;
     int heightAt(int row) const { return row >= 0 && row < static_cast<int>(rows.size()) ? heightOf(static_cast<std::size_t>(row)) : defaultTrackHeight; }
-    int trackIndex(motion::Id id) const;
     int trackHeight(int track) const;
+    // The row of a track's or group's header (not a lane), or -1.
+    int headerRow(motion::Id id) const {
+        const auto found = std::find_if(rows.begin(), rows.end(), [id](const auto& row) { return row.id == id && !row.isLane(); });
+        return found == rows.end() ? -1 : static_cast<int>(found - rows.begin());
+    }
     void layoutRows() const;
     // Rows end above the horizontal scroll bar's strip, while it is shown.
     int viewHeight() const { return std::max(0, getHeight() - rulerHeight - (horizontalBarShown() ? scrollStrip : 0)); }
@@ -554,6 +580,12 @@ private:
     const Row* laneAtY(int y) const;
     int trackY(int track) const;
     int timeX(double time) const { return namesWidth + boundedPixel((time - scrollTime) * pixelsPerSecond); }
+    // The time at x, timeX's inverse.
+    double timeAt(int x) const { return scrollTime + (x - namesWidth) / pixelsPerSecond; }
+    // Seconds across the tracks' width.
+    double visibleSpan() const { return std::max(1, getWidth() - namesWidth) / pixelsPerSecond; }
+    // Where something dropped at x lands: over the names column, the playhead.
+    double dropTime(int x) const { return x < namesWidth ? processor.position.load() : std::max(0.0, timeAt(x)); }
     // Along the ruler's foot, the main composition's hidden-line bake: frames
     // baked, being baked and still to bake (each drawn whole until it is),
     // fading once every frame is.
@@ -607,25 +639,26 @@ private:
     mutable std::uint64_t layoutGeneration = 0;
     mutable std::optional<std::uint64_t> layoutRevision;
     MotionProcessor& processor;
+    // The document drag under way (a clip, marker, key, beam, loop, cut or
+    // camera key): it previews its edit on the project it began from, Escape
+    // puts that back, and letting go records one undo step.
+    motion::ui::PreviewGesture edit {processor.document};
     Tool tool = Tool::move;
     void setTool(Tool next);
     void updateToolButtons();
-    // A clip or marker drag previews its edit on the project it began from,
-    // put back by Escape, and records one undo step when let go.
-    struct ProjectDrag {
-        motion::Project before;
-        std::uint64_t revision = 0;
-        bool changed = false;
-        int downX = 0;
-    };
-    struct ClipDrag : ProjectDrag {
+    struct ClipDrag {
         motion::Clip original;
         int originalRow = 0;
         Mode mode = Mode::move;
+        int downX = 0;
+        // Whether the preview shows the clips moved: back where they began,
+        // the start is shown once.
+        bool changed = false;
     };
-    struct MarkerDrag : ProjectDrag {
+    struct MarkerDrag {
         motion::Id marker = 0;
         double originalTime = 0;
+        int downX = 0;
     };
     std::optional<juce::Point<int>> dropPosition;
     motion::Id dropAssetId = 0;
@@ -633,12 +666,9 @@ private:
     motion::Id dropInstance = 0; // an effect card being moved
     mutable std::vector<KeyRef> selectedKeys;
     struct KeyDrag {
-        motion::Project before;
         std::vector<KeyRef> keys;
         KeyRef grabbed;
         int downX = 0;
-        std::uint64_t revision = 0;
-        bool changed = false;
     };
     // A box dragged across key lanes, or across empty track space, picks the
     // keys or clips inside it, and keeps `base` picked when it adds to them.
@@ -664,11 +694,6 @@ private:
     std::variant<std::monostate, ClipDrag, KeyDrag, BeamDrag, LoopDrag, BarDrag, HeightDrag, CutDrag, CameraKeyDrag, TrackDrag, MarkerDrag, Scrub, NamesResize, Pan, KeyMarquee, ClipMarquee> gesture;
     template <typename T> T* active() { return std::get_if<T>(&gesture); }
     template <typename T> const T* active() const { return std::get_if<T>(&gesture); }
-    // The clip or marker drag under way, if either is.
-    ProjectDrag* projectDrag() {
-        auto* clip = active<ClipDrag>();
-        return clip != nullptr ? static_cast<ProjectDrag*>(clip) : active<MarkerDrag>();
-    }
     // A clip or marker drag, or a scrub: what cancelGesture() ends.
     bool clipGesture() const { return active<ClipDrag>() != nullptr || active<MarkerDrag>() != nullptr || active<Scrub>() != nullptr; }
     // The clip, or group row, under the pointer: its beam share shows.

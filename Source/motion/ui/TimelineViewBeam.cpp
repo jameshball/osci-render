@@ -191,7 +191,7 @@ bool MotionTimelineView::beamDown(const juce::MouseEvent& event) {
     const auto target = beamEdgeAt(event.getPosition());
     if (!target.has_value()) { return false; }
     const auto& project = processor.document.project();
-    auto time = scrollTime + (event.x - namesWidth) / pixelsPerSecond;
+    auto time = timeAt(event.x);
     const auto fraction = beamShareAt(target->id, static_cast<float>(event.x)).value_or(0.0f);
     const auto id = target->id;
     const auto group = motion::findGroup(project, id) != nullptr;
@@ -211,17 +211,16 @@ bool MotionTimelineView::beamDown(const juce::MouseEvent& event) {
         }
     }
     const auto beam = curve != nullptr ? curve->evaluate(local) : 1.0;
-    auto& drag = gesture.emplace<BeamDrag>(BeamDrag {id, target->area, time, fraction, beam, project, processor.document.revision(), false, event.mods.isCommandDown(), event.y});
+    edit.begin();
+    const auto& drag = gesture.emplace<BeamDrag>(BeamDrag {id, target->area, time, fraction, beam, event.mods.isCommandDown(), event.y});
     beamPointer = event.x;
     if (drag.keyed) {
         // Cmd-click keys the Beam here at its current value.
-        auto updated = drag.before;
+        auto updated = edit.start();
         auto* keyed = motion::ensurePropertyCurve(updated, id, "beam");
         if (keyed != nullptr) {
             keyed->setKeyValue(local, keyed->evaluateBase(local));
-            processor.document.preview(std::move(updated));
-            drag.revision = processor.document.revision();
-            drag.changed = true;
+            edit.show(std::move(updated));
         }
     }
     repaint();
@@ -229,8 +228,8 @@ bool MotionTimelineView::beamDown(const juce::MouseEvent& event) {
 }
 
 void MotionTimelineView::beamDragged(const juce::MouseEvent& event) {
-    auto& drag = std::get<BeamDrag>(gesture);
-    if (processor.document.revision() != drag.revision) { gesture = {}; repaint(); return; }
+    const auto& drag = std::get<BeamDrag>(gesture);
+    if (edit.stale()) { gesture = {}; edit.reset(); repaint(); return; }
     const auto area = drag.area;
     // The edge follows the pointer, over at least 64 px however short the
     // row, so small rows stay precise; Shift moves it a quarter as far.
@@ -245,7 +244,7 @@ void MotionTimelineView::beamDragged(const juce::MouseEvent& event) {
     // 1x, the even share, is a detent.
     if (std::abs(value - 1) < .04) { value = 1; }
     value = std::round(std::clamp(value, 0.0, motion::maximumBeam) * 100) / 100;
-    auto updated = drag.before;
+    auto updated = edit.start();
     auto* curve = motion::ensurePropertyCurve(updated, drag.id, "beam");
     const auto found = motion::findPropertyTarget(updated, drag.id);
     if (curve == nullptr || !found.has_value()) { return; }
@@ -255,9 +254,7 @@ void MotionTimelineView::beamDragged(const juce::MouseEvent& event) {
     } else {
         curve->base = value;
     }
-    processor.document.preview(std::move(updated));
-    drag.revision = processor.document.revision();
-    drag.changed = true;
+    edit.show(std::move(updated));
     beamPointer = event.x;
     repaint();
 }

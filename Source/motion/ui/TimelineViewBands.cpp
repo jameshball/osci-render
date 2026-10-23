@@ -119,12 +119,13 @@ void MotionTimelineView::cameraBandDown(const juce::MouseEvent& event) {
     if (key.has_value()) {
         selectedCut = 0;
         selectedCameraKey = std::make_pair(selected, *key);
-        gesture = CameraKeyDrag {selected, *key, *key, event.x, processor.document.project(), processor.document.revision(), false};
+        edit.begin();
+        gesture = CameraKeyDrag {selected, *key, *key, event.x};
         repaint();
         return;
     }
     selectedCameraKey.reset();
-    const auto time = std::clamp(snapTime(scrollTime + (event.x - namesWidth) / pixelsPerSecond, event.mods), 0.0, processor.document.project().duration);
+    const auto time = std::clamp(snapTime(timeAt(event.x), event.mods), 0.0, processor.document.project().duration);
     const auto* cut = cutAt(event.getPosition());
     selectedCut = cut != nullptr ? cut->id : 0;
     // A cut, or the gap where the first camera shows, selects that camera.
@@ -148,16 +149,15 @@ void MotionTimelineView::cameraBandDown(const juce::MouseEvent& event) {
     drag.end = cut->end();
     drag.downX = event.x;
     drag.mode = std::abs(event.x - bounds.getX()) <= 5 ? CutDrag::Mode::left : (std::abs(event.x - bounds.getRight()) <= 5 ? CutDrag::Mode::right : CutDrag::Mode::move);
-    drag.before = processor.document.project();
-    drag.revision = processor.document.revision();
+    edit.begin();
     gesture = std::move(drag);
     repaint();
 }
 
 void MotionTimelineView::cameraBandDrag(const juce::MouseEvent& event) {
-    auto& drag = std::get<CutDrag>(gesture);
-    if (processor.document.revision() != drag.revision) { gesture = {}; return; }
-    const auto& project = drag.before;
+    const auto& drag = std::get<CutDrag>(gesture);
+    if (edit.stale()) { gesture = {}; edit.reset(); return; }
+    const auto& project = edit.start();
     const auto delta = (event.x - drag.downX) / pixelsPerSecond;
     auto start = drag.start, end = drag.end;
     // Neighbouring cuts bound every gesture; nothing overlaps.
@@ -181,12 +181,10 @@ void MotionTimelineView::cameraBandDrag(const juce::MouseEvent& event) {
     }
     // Shown as it goes, one undo step when let go; a place it can't go is
     // simply not taken.
-    auto candidate = drag.before;
+    auto candidate = project;
     if (!motion::Document::applyCutRange(candidate, drag.cut, start, end).wasOk()) { return; }
     // Back where it began is no change to record.
-    drag.changed = start != drag.start || end != drag.end;
-    processor.document.preview(std::move(candidate));
-    drag.revision = processor.document.revision();
+    edit.show(std::move(candidate), start != drag.start || end != drag.end);
     repaint();
 }
 
@@ -271,23 +269,23 @@ void MotionTimelineView::moveCameraKeys(motion::Camera& camera, double from, dou
 void MotionTimelineView::dragCameraKey(const juce::MouseEvent& event) {
     auto& drag = std::get<CameraKeyDrag>(gesture);
     // An undo or load under the drag ends it where it is.
-    if (processor.document.revision() != drag.revision) {
+    if (edit.stale()) {
         gesture = {};
+        edit.reset();
         return;
     }
     const auto time = processor.document.project().frameTime(snapTime(drag.from + (event.x - drag.downX) / pixelsPerSecond, event.mods));
     if (motion::sameTime(time, drag.to)) { return; }
-    auto updated = drag.before;
+    auto updated = edit.start();
     const auto camera = std::find_if(updated.cameras.begin(), updated.cameras.end(), [&drag](const auto& item) { return item.id == drag.camera; });
     if (camera == updated.cameras.end()) { return; }
     // A key never lands on another key of the same camera.
     const auto occupied = !motion::sameTime(time, drag.from) && std::any_of(camera->properties.begin(), camera->properties.end(), [time](const auto& entry) { return entry.second.hasKeyAt(time); });
     if (occupied) { return; }
     // Back where it started is no move at all.
-    drag.moved = !motion::sameTime(time, drag.from);
-    if (drag.moved) { moveCameraKeys(*camera, drag.from, time); }
-    processor.document.preview(std::move(updated));
-    drag.revision = processor.document.revision();
+    const auto moved = !motion::sameTime(time, drag.from);
+    if (moved) { moveCameraKeys(*camera, drag.from, time); }
+    edit.show(std::move(updated), moved);
     drag.to = time;
     selectedCameraKey = std::make_pair(drag.camera, time);
     repaint();
@@ -378,22 +376,16 @@ void MotionTimelineView::showMarkerMenu(motion::Id id, double time) {
     }
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, time](int result) {
         if ((result == 1 || result == 3) && onEditMarker) { onEditMarker(result == 1 ? id : 0, time); }
-        if (result == 2) { const auto removed = processor.document.removeMarker(id); if (removed.failed() && onError) { onError(removed.getErrorMessage()); } }
+        if (result == 2) { report(processor.document.removeMarker(id)); }
         if (result == 4 || result == 5) { jumpMarker(result == 5); }
         if (result == 6 || result == 7) { editTempoChange(time); }
         if (result == 9) {
             const auto* existing = tempoChangeNear(time);
-            if (existing != nullptr) {
-                const auto changed = processor.document.setTempoChange(existing->beat, existing->bpm, existing->beat, !existing->ramp);
-                if (changed.failed() && onError) { onError(changed.getErrorMessage()); }
-            }
+            if (existing != nullptr) { report(processor.document.setTempoChange(existing->beat, existing->bpm, existing->beat, !existing->ramp)); }
         }
         if (result == 8) {
             const auto* existing = tempoChangeNear(time);
-            if (existing != nullptr) {
-                const auto removed = processor.document.removeTempoChange(existing->beat);
-                if (removed.failed() && onError) { onError(removed.getErrorMessage()); }
-            }
+            if (existing != nullptr) { report(processor.document.removeTempoChange(existing->beat)); }
         }
     });
 }
@@ -414,4 +406,168 @@ void MotionTimelineView::editTempoChange(double time) {
     const auto beat = existing != nullptr ? existing->beat : std::round(tempo.beats(time) * 4) / 4;
     const auto current = existing != nullptr ? existing->bpm : tempo.bpmAt(time);
     if (onEditTempo) { onEditTempo(beat, current, existing != nullptr ? std::optional<double>(existing->beat) : std::nullopt); }
+}
+
+// The loop brace and the bake strip along the time ruler.
+
+void MotionTimelineView::updateBake() {
+    const auto bake = processor.hiddenLineBake();
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto finished = bake == nullptr || bake->complete();
+    const auto wasShown = bakeShown;
+    if (bake.get() != bakeSeen) {
+        // A new bake goes on from what the strip showed of the last one.
+        bakeShown = bakeShown && !finished && bakeFinishedAt == 0;
+        bakeSeen = bake.get();
+        bakeSeenAt = now;
+        bakeFinishedAt = 0;
+    }
+    if (!finished && now - bakeSeenAt >= bakeShowAfterMs) { bakeShown = true; }
+    if (finished && bakeFinishedAt == 0) { bakeFinishedAt = now; }
+    // Faded out: nothing more to paint.
+    if (bakeShown && bakeFinishedAt > 0 && now - bakeFinishedAt > bakeFadeMs + 100) { bakeShown = false; }
+    if (bakeShown || wasShown) { repaint(bakeStrip().expanded(0, 1)); }
+}
+
+void MotionTimelineView::paintBake(juce::Graphics& g) const {
+    const auto bake = processor.hiddenLineBake();
+    // Its frames are the main composition's, on its time.
+    if (bake == nullptr || processor.document.editingComposition() != 0) { return; }
+    if (!bakeShown || bake.get() != bakeSeen) { return; }
+    const auto opacity = bakeFinishedAt > 0 ? 1.0 - (juce::Time::getMillisecondCounterHiRes() - bakeFinishedAt) / bakeFadeMs : 1.0;
+    if (opacity <= 0) { return; }
+    const auto strip = bakeStrip();
+    // Over the loop's brace, the strip cuts through it, so the progress
+    // reads the same along the whole ruler.
+    const auto loop = loopBounds();
+    if (!loop.isEmpty()) {
+        g.setColour(osci::Colours::surfaceRaised().withMultipliedAlpha(static_cast<float>(opacity)));
+        g.fillRect(juce::Rectangle<int>(loop.getX(), strip.getY() - 1, loop.getWidth(), strip.getHeight() + 2).getIntersection(strip.expanded(0, 1)));
+    }
+    const auto first = std::max(strip.getX(), timeX(0));
+    const auto last = std::min(strip.getRight(), timeX(bake->timeOf(bake->frameCount())));
+    using State = motion::hidden::Bake::State;
+    // Neutral, so it never reads as a loop or a selection: the frames being
+    // baked brightest, those baked dimmer, those waiting faintest.
+    const auto colour = [opacity](State state) {
+        const auto alpha = state == State::done ? .35f : state == State::baking ? .6f : .12f;
+        return osci::Colours::text().withAlpha(alpha * static_cast<float>(opacity));
+    };
+    // Each column shows the least done of its frames; runs of one state are
+    // one rectangle.
+    std::optional<State> run;
+    auto runStart = first;
+    for (auto x = first; x <= last; ++x) {
+        std::optional<State> here;
+        if (x < last) {
+            const auto from = bake->frameOf(timeAt(x));
+            const auto next = bake->frameOf(timeAt(x + 1));
+            const auto to = next > from ? next - 1 : from;
+            here = State::done;
+            for (auto frame = from; frame <= to; ++frame) {
+                const auto state = bake->state(frame);
+                if (state == State::baking) { here = state; break; }
+                if (state == State::waiting) { here = state; }
+            }
+        }
+        if (here != run) {
+            if (run.has_value()) {
+                g.setColour(colour(*run));
+                g.fillRect(runStart, strip.getY(), x - runStart, strip.getHeight());
+            }
+            run = here;
+            runStart = x;
+        }
+    }
+}
+
+juce::Rectangle<int> MotionTimelineView::loopBounds() const {
+    const auto& project = processor.document.project();
+    if (!project.hasLoop()) { return {}; }
+    const auto left = std::max(namesWidth, timeX(project.loopStart)), right = std::min(getWidth(), timeX(project.loopEnd));
+    return right > left ? juce::Rectangle<int>(left, loopTop, right - left, loopHeight) : juce::Rectangle<int>();
+}
+
+void MotionTimelineView::paintLoop(juce::Graphics& g) const {
+    const auto bounds = loopBounds();
+    if (bounds.isEmpty()) { return; }
+    const auto on = processor.document.project().looping;
+    const auto colour = on ? motion::style::accent() : osci::Colours::textMuted();
+    if (on) {
+        g.setColour(colour.withAlpha(.05f));
+        g.fillRect(bounds.getX(), rulerHeight, bounds.getWidth(), getHeight() - rulerHeight);
+    }
+    // One opaque shape (bar and end brackets), so nothing overlaps.
+    juce::Path brace;
+    brace.addRoundedRectangle(bounds.toFloat(), motion::style::radiusSmall);
+    brace.addRectangle(static_cast<float>(bounds.getX()), static_cast<float>(loopTop - 4), 2.0f, static_cast<float>(loopHeight + 4));
+    brace.addRectangle(static_cast<float>(bounds.getRight() - 2), static_cast<float>(loopTop - 4), 2.0f, static_cast<float>(loopHeight + 4));
+    brace.setUsingNonZeroWinding(true);
+    g.setColour(osci::Colours::surfaceRaised().interpolatedWith(colour, on ? .8f : .55f));
+    g.fillPath(brace);
+}
+
+bool MotionTimelineView::loopDown(const juce::MouseEvent& event) {
+    const auto bounds = loopBounds();
+    if (bounds.isEmpty() || event.y < loopTop - 4 || event.y >= loopTop + loopHeight || event.x < bounds.getX() - 5 || event.x > bounds.getRight() + 5) { return false; }
+    const auto& project = processor.document.project();
+    if (event.getNumberOfClicks() > 1) {
+        processor.document.changeView([](motion::Composition& state) { state.looping = !state.looping; });
+        return true;
+    }
+    const auto mode = std::abs(event.x - bounds.getX()) <= 5 ? LoopDrag::Mode::left : std::abs(event.x - bounds.getRight()) <= 5 ? LoopDrag::Mode::right : LoopDrag::Mode::move;
+    edit.begin();
+    gesture = LoopDrag {mode, project.loopStart, project.loopEnd, event.x};
+    return true;
+}
+
+bool MotionTimelineView::moveNearestLoopEdge(const juce::MouseEvent& event) {
+    const auto& project = processor.document.project();
+    if (project.duration <= 0) { return false; }
+    const auto frame = project.frameRate > 0 ? 1 / project.frameRate : 1.0 / 30;
+    const auto time = std::clamp(snapTime(timeAt(event.x), event.mods), 0.0, project.duration);
+    auto start = project.loopStart, end = project.loopEnd;
+    juce::String label;
+    if (!project.hasLoop()) {
+        const auto playhead = std::clamp(processor.position.load(), 0.0, project.duration);
+        start = std::min(time, playhead);
+        end = std::abs(time - playhead) >= frame ? std::max(time, playhead) : project.duration;
+        label = "Set loop";
+    } else if (std::abs(time - start) <= std::abs(time - end)) {
+        start = std::min(time, end - frame);
+        label = "Move loop start";
+    } else {
+        end = std::max(time, start + frame);
+        label = "Move loop end";
+    }
+    if (end - start < frame || (start == project.loopStart && end == project.loopEnd)) { return true; }
+    const motion::Document::ViewChange view(processor.document);
+    processor.document.edit(label, [start, end](motion::Project& state) {
+        state.loopStart = start;
+        state.loopEnd = end;
+    });
+    repaint();
+    return true;
+}
+
+void MotionTimelineView::loopDragged(const juce::MouseEvent& event) {
+    const auto& drag = std::get<LoopDrag>(gesture);
+    if (edit.stale()) { gesture = {}; edit.reset(); return; }
+    const auto& before = edit.start();
+    const auto delta = (event.x - drag.downX) / pixelsPerSecond;
+    auto updated = before;
+    const auto length = drag.end - drag.start;
+    const auto frame = updated.frameRate > 0 ? 1 / updated.frameRate : 1.0 / 30;
+    if (drag.mode == LoopDrag::Mode::move) {
+        updated.loopStart = std::clamp(snapEdge(drag.start + delta, event.mods, before, {}), 0.0, std::max(0.0, updated.duration - length));
+        updated.loopEnd = updated.loopStart + length;
+    } else if (drag.mode == LoopDrag::Mode::left) {
+        updated.loopStart = std::clamp(snapEdge(drag.start + delta, event.mods, before, {}), 0.0, std::max(0.0, drag.end - frame));
+    } else {
+        updated.loopEnd = std::clamp(snapEdge(drag.end + delta, event.mods, before, {}), std::min(drag.start + frame, updated.duration), updated.duration);
+    }
+    const auto changed = updated.loopStart != before.loopStart || updated.loopEnd != before.loopEnd;
+    const motion::Document::ViewChange view(processor.document);
+    edit.show(std::move(updated), changed);
+    repaint();
 }
