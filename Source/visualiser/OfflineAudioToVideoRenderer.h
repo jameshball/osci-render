@@ -85,7 +85,8 @@ private:
     const juce::File muxAudioFile;
     const juce::File outputVideoFile;
 
-    // Must outlive preview: its effects/parameter references belong here.
+    // Must outlive preview, and keep alive whatever owns its parameters
+    // (VisualiserParameters does not): alias the owner, as osci-motion does.
     const std::shared_ptr<VisualiserParameters> beam;
     juce::WaitableEvent glReadyEvent;
     OfflinePreviewRenderer preview;

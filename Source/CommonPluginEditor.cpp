@@ -149,11 +149,15 @@ bool CommonPluginEditor::usesSoftwareRendering() const {
 void CommonPluginEditor::setSoftwareRendering(bool software) {
     audioProcessor.globalSettings.set("softwareRendering", software);
     audioProcessor.globalSettings.save();
+    applyRenderingEngine();
+}
+
+void CommonPluginEditor::applyRenderingEngine() {
 #if JUCE_WINDOWS
     auto* peer = getPeer();
     if (peer != nullptr) {
         const auto engines = peer->getAvailableRenderingEngines();
-        const auto wanted = engines.indexOf(software ? "Software Renderer" : "Direct2D");
+        const auto wanted = engines.indexOf(usesSoftwareRendering() ? "Software Renderer" : "Direct2D");
         if (wanted >= 0 && peer->getCurrentRenderingEngine() != wanted) {
             peer->setCurrentRenderingEngine(wanted);
             // The new renderer starts from a blank surface: draw all of it.
@@ -171,7 +175,7 @@ void CommonPluginEditor::parentHierarchyChanged()
     // The renderer chosen in View, once the window has one to set.
     if (juce::JUCEApplicationBase::isStandaloneApp() && getPeer() != nullptr && usesSoftwareRendering()) {
         juce::Component::SafePointer<CommonPluginEditor> safe(this);
-        juce::MessageManager::callAsync([safe] { if (safe != nullptr) { safe->setSoftwareRendering(true); } });
+        juce::MessageManager::callAsync([safe] { if (safe != nullptr) { safe->applyRenderingEngine(); } });
     }
 #endif
 

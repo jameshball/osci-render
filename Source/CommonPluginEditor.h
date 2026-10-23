@@ -81,12 +81,18 @@ protected:
     virtual juce::String offlineRenderTitle() const { return "Render Audio File to Video"; }
     // Completion retains caller resources until the worker and OpenGL renderer
     // have stopped, and is told whether the render succeeded. It also runs
-    // (unsuccessful) on failed launch/editor teardown: cleanup only.
+    // (unsuccessful) on failed launch/editor teardown: cleanup only. A beam,
+    // drawn instead of the processor's visualiser parameters, must keep alive
+    // whatever owns its parameters (VisualiserParameters does not): alias the
+    // owner, as osci-motion does.
     bool startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void(bool succeeded)> completion = {}, std::shared_ptr<VisualiserParameters> beam = nullptr);
 #endif
     virtual bool openSourceFile(const juce::File& file) = 0;
 
 private:
+    // Sets the window's renderer from the saved choice, without saving it.
+    void applyRenderingEngine();
+
     CommonAudioProcessor& audioProcessor;
     int defaultEditorWidth = 0;
     int defaultEditorHeight = 0;

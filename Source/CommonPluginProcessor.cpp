@@ -13,7 +13,9 @@
 #include "audio/OutputClip.h"
 #include "components/OverlayDialogHelpers.h"
 
+#include <atomic>
 #include <cmath>
+#include <mutex>
 
 #if JUCE_MAC || JUCE_LINUX || JUCE_BSD
  #include <execinfo.h>
@@ -32,11 +34,13 @@ namespace
 
 #if JUCE_MAC || JUCE_LINUX || JUCE_BSD
     // The log, opened before any crash: a signal handler may not allocate or
-    // open files, as the heap may be what broke.
-    int crashLogDescriptor = -1;
+    // open files, as the heap may be what broke. Atomic, as a new processor
+    // re-points it at the log its FileLogger may just have replaced.
+    std::atomic<int> crashLogDescriptor { -1 };
+    static_assert(std::atomic<int>::is_always_lock_free, "the signal handler reads the descriptor");
 
-    void writeToCrashLog(const char* text, size_t length) {
-        if (::write(crashLogDescriptor, text, length) < 0) {
+    void writeToCrashLog(int descriptor, const char* text, size_t length) {
+        if (::write(descriptor, text, length) < 0) {
             return;
         }
     }
@@ -46,15 +50,16 @@ namespace
     // rather than JUCE's SIGKILL, so the OS still writes its crash report.
     void handleCrash(void* context) {
         const auto signum = static_cast<int>(reinterpret_cast<juce::pointer_sized_int>(context));
-        if (crashLogDescriptor >= 0) {
+        const int descriptor = crashLogDescriptor.load();
+        if (descriptor >= 0) {
             static constexpr char header[] = "\n==== " JucePlugin_Name " crashed, signal ";
             const char number[] = {static_cast<char>('0' + signum / 10 % 10), static_cast<char>('0' + signum % 10)};
             static constexpr char footer[] = " ====\n";
-            writeToCrashLog(header, sizeof(header) - 1);
-            writeToCrashLog(number, sizeof(number));
-            writeToCrashLog(footer, sizeof(footer) - 1);
+            writeToCrashLog(descriptor, header, sizeof(header) - 1);
+            writeToCrashLog(descriptor, number, sizeof(number));
+            writeToCrashLog(descriptor, footer, sizeof(footer) - 1);
             void* frames[128];
-            ::backtrace_symbols_fd(frames, ::backtrace(frames, 128), crashLogDescriptor);
+            ::backtrace_symbols_fd(frames, ::backtrace(frames, 128), descriptor);
         }
         ::signal(signum, SIG_DFL);
         sigset_t signals;
@@ -64,15 +69,24 @@ namespace
         ::raise(signum);
     }
 
+    // Each processor's FileLogger may trim the log by replacing the file, so
+    // every install opens the log afresh and closes the descriptor it replaces;
+    // the handler itself is installed once.
     void installCrashHandler(const juce::File& log) {
-        if (crashLogDescriptor >= 0) {
-            return;
+        const int descriptor = ::open(log.getFullPathName().toRawUTF8(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
+        if (descriptor >= 0) {
+            const int previous = crashLogDescriptor.exchange(descriptor);
+            if (previous >= 0) {
+                ::close(previous);
+            }
         }
-        crashLogDescriptor = ::open(log.getFullPathName().toRawUTF8(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
-        // backtrace() can load a library the first time it runs: not in the handler.
-        void* frame[1];
-        ::backtrace(frame, 1);
-        juce::SystemStats::setApplicationCrashHandler(handleCrash);
+        static std::once_flag installed;
+        std::call_once(installed, [] {
+            // backtrace() can load a library the first time it runs: not in the handler.
+            void* frame[1];
+            ::backtrace(frame, 1);
+            juce::SystemStats::setApplicationCrashHandler(handleCrash);
+        });
     }
 #endif
 }

@@ -113,6 +113,7 @@ public:
         addAndMakeVisible (helpButton);
         helpButton.setMouseCursor (juce::MouseCursor::PointingHandCursor);
         helpButton.setTitle ("Help");
+        helpButton.setTooltip ("Help");
         helpButton.onClick = [this] {
             showSupportOverlay();
         };
