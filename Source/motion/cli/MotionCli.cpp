@@ -40,17 +40,21 @@ double sampleRateOf(const juce::ArgumentList& args) {
 }
 
 // The frames asked for: --at=times (seconds, comma separated), or --frames=N
-// evenly over the composition (8 unless asked).
-std::vector<double> timesOf(const juce::ArgumentList& args, double duration) {
+// evenly over the composition (8 unless asked). A time past `last` (the last
+// frame's start) is the last frame.
+std::vector<double> timesOf(const juce::ArgumentList& args, double duration, double last) {
     const auto at = args.getValueForOption("--at");
     if (at.isNotEmpty()) {
         std::vector<double> times;
-        // Kept within the composition: past its end is its last frame.
-        for (const auto& time : juce::StringArray::fromTokens(at, ",", {})) { times.push_back(motion::Stretches::within(time.getDoubleValue(), duration)); }
+        for (const auto& time : juce::StringArray::fromTokens(at, ",", {})) { times.push_back(motion::Stretches::within(time.getDoubleValue(), last)); }
         return times;
     }
     const auto count = args.getValueForOption("--frames");
     return frameTimes(duration, count.isEmpty() ? 8 : std::max(1, count.getIntValue()));
+}
+
+std::vector<double> timesOf(const juce::ArgumentList& args, const Composition& composition) {
+    return timesOf(args, composition.duration(), motion::Stretches::lastFrame(composition.duration(), composition.frameRate));
 }
 
 Composition open(const juce::File& file, double sampleRate) {
@@ -174,7 +178,7 @@ void make(const juce::ArgumentList& args) {
     // project's picture (see ProjectSummary).
     const auto picture = juce::JSON::parse(recipe.loadFileAsString()).getProperty("picture", {});
     if (!picture.isVoid()) {
-        const std::vector<double> times {motion::Stretches::within(static_cast<double>(picture), project.duration)};
+        const std::vector<double> times {motion::Stretches::within(static_cast<double>(picture), motion::Stretches::lastFrame(project.duration, project.frameRate))};
         const juce::TemporaryFile video(videoExtension(destination)), still(".png");
         renderVideo(args, destination, video.getFile(), times);
         const auto at = motion::Stretches::upTo(times, project.frameRate, project.duration).exportTime(0, times[0]) + .5 / (project.frameRate > 0 ? project.frameRate : 60.0);
@@ -213,9 +217,8 @@ void render(const juce::ArgumentList& args) {
         // The Scope's picture, from a video the app renders: of only a short
         // stretch up to each frame (its persistence built as playing builds
         // it), or with --whole all of it, kept beside the pictures to watch or
-        // take more from (--video). The last a picture can show is the last frame's start.
-        const auto lastFrame = std::max(0.0, composition.duration() - 1 / (composition.frameRate > 0 ? composition.frameRate : 60.0));
-        const auto times = timesOf(args, lastFrame);
+        // take more from (--video).
+        const auto times = timesOf(args, composition);
         const auto given = args.getValueForOption("--video");
         const auto whole = given.isNotEmpty() || args.containsOption("--whole");
         const auto folder = fileArgument(previews);
@@ -241,7 +244,7 @@ void stats(const juce::ArgumentList& args) {
     const auto files = positional(args);
     if (files.size() != 1) { juce::ConsoleApplication::fail("stats takes one project."); }
     auto composition = open(fileArgument(files[0]), sampleRateOf(args));
-    const auto times = timesOf(args, composition.duration());
+    const auto times = timesOf(args, composition);
     composition.bakeAt(times);
     const auto frames = statsAt(composition, times);
     if (args.containsOption("--json")) {
@@ -265,7 +268,7 @@ void frame(const juce::ArgumentList& args) {
     const auto files = positional(args);
     if (files.size() != 1) { juce::ConsoleApplication::fail("frame takes one project."); }
     auto composition = open(fileArgument(files[0]), sampleRateOf(args));
-    const auto times = timesOf(args, composition.duration());
+    const auto times = timesOf(args, composition);
     composition.bakeAt(times);
     const auto* bake = composition.prepared->hiddenLines.get();
     for (const auto time : times) {
@@ -333,7 +336,8 @@ void diff(const juce::ArgumentList& args) {
     // Two projects: each frame drawn from both, side by side.
     const auto rate = sampleRateOf(args);
     auto first = open(one, rate), second = open(other, rate);
-    const auto times = timesOf(args, std::min(first.duration(), second.duration()));
+    const auto last = std::min(motion::Stretches::lastFrame(first.duration(), first.frameRate), motion::Stretches::lastFrame(second.duration(), second.frameRate));
+    const auto times = timesOf(args, std::min(first.duration(), second.duration()), last);
     first.bakeAt(times);
     second.bakeAt(times);
     int differing = 0;
@@ -375,7 +379,7 @@ void check(const juce::ArgumentList& args) {
         if (beforeFrames != nullptr && !args.containsOption("--frames") && !args.containsOption("--at")) {
             for (const auto& frame : *beforeFrames) { times.push_back(frame["time"]); }
         } else {
-            times = timesOf(args, composition.duration());
+            times = timesOf(args, composition);
         }
         composition.bakeAt(times);
         const auto frames = statsAt(composition, times);

@@ -18,6 +18,9 @@ struct Stretches {
     static Stretches whole(double duration) { return {{{0, std::max(0.0, duration)}}}; }
     // A time kept within a composition `duration` long (one not a number is its start).
     static double within(double time, double duration) { return std::isfinite(time) ? std::clamp(time, 0.0, std::max(0.0, duration)) : 0.0; }
+    // The start of a composition's last frame: the latest time a clip ending
+    // with the composition still draws.
+    static double lastFrame(double duration, double frameRate) { return std::max(0.0, duration - 1 / (frameRate > 0 ? frameRate : 60.0)); }
     // `lead` seconds up to each time (kept within `duration`), and two frames
     // (at `frameRate`) past it, so the frame at the time is drawn whole.
     static Stretches upTo(const std::vector<double>& times, double frameRate, double duration, double lead = .3) {
