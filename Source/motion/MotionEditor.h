@@ -89,6 +89,10 @@ private:
     // soundtrack, with the file and audio its codec takes.
     VideoEncodingConfiguration exportConfiguration(const motion::Project& project);
     static juce::File withExtension(juce::File chosen, const juce::String& extension);
+    struct ExportState;
+    // `then`, or first a question when the extension added names a file that
+    // is already there (the save dialog checked only the name as typed).
+    void whenReplaceable(const juce::File& chosen, const juce::File& destination, std::shared_ptr<ExportState> state, std::function<void()> then);
     // Says an export is done, with a way to find it.
     void exported(const juce::File& file);
     // True while Lua sliders are still baking: `resume` then runs once they
@@ -279,7 +283,6 @@ private:
     // A capture of the live source `live` was saved as `capture`.
     // `why` it ended by itself, if it did.
     void captured(motion::Id live, motion::Id capture, const juce::String& why = {});
-    struct ExportState;
     void startVideoExport(std::shared_ptr<ExportState> state, motion::Project project, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot,
         VisualiserRenderer::RenderMode renderMode, VideoEncodingConfiguration config, juce::File destination, std::function<void(bool)> finished);
     void handleCommandLine(const juce::String& commandLine) override;

@@ -455,6 +455,9 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
             readout = describe(hover.key->property, hover.key->time);
         } else if (!drag.has_value() && hover.curve) {
             readout = ghostKey();
+            // Where it was drawn, for the next move to clear (the snapping
+            // that placed it can change with the modifiers before then).
+            paintedGhost = ghostBounds();
             if (readout.has_value()) {
                 g.setColour(osci::Colours::veryDark());
                 g.fillEllipse(juce::Rectangle<float>(9.0f, 9.0f).withCentre(readout->first));
@@ -552,7 +555,7 @@ void MotionCurveEditor::setHover(Hover next) {
 }
 
 void MotionCurveEditor::mouseMove(const juce::MouseEvent& event) {
-    const auto before = ghostBounds();
+    const auto before = paintedGhost;
     pointer = event.position;
     const auto next = hoverAt(event.position);
     if (next != hover) {

@@ -59,6 +59,8 @@ clip = ET.SubElement(track, "clip", id="3", asset="1", name="Cube", start="0", d
                      timeBase="seconds", contentBpm="120")
 ET.SubElement(clip, "property", name="rotation.x", base="30")
 ET.SubElement(clip, "property", name="rotation.y", base="40")
+# A model starts solid; this one starts as a wireframe, to be made solid.
+ET.SubElement(clip, "property", name="solid", base="0")
 ET.SubElement(composition, "camera", id="9", name="Camera")
 xml = ET.tostring(root, encoding="utf-8")
 project = session.artifact_dir / "hidden-lines.osci-motion"

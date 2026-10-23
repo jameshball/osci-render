@@ -83,7 +83,9 @@ try:
     restored = find(snapshot(), lambda node: node.get("componentName") == "Track name " + track_id)["bounds"]
     if restored["y"] != name["y"]:
         raise RuntimeError("Track order did not restore")
-    step("track actions", "click", "--component-name", "Track name " + track_id, "--exact", "--button", "right")
+    # A real pointer's right-click: the header, which opens the menu, hears
+    # its name's mouse events only when they are routed.
+    step("track actions", "click-xy", restored["x"] + restored["w"] // 2, restored["y"] + restored["h"] // 2, "--button", "right")
     step("delete populated track", "click", "--name", "Delete track", "--role", "menuItem", "--exact")
     wait_undo("Delete track")
     if find(snapshot(), lambda node: node.get("componentName") == "Track name " + track_id) is not None:

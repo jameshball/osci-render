@@ -16,8 +16,14 @@ namespace {
 // temporary folder ("osci-motion drawings"...), so another of the same name,
 // written before this one is read, can't replace it. Text is written as it
 // is held, as UTF-8.
+// Those a day old are read long since, and go when the next is written.
 std::optional<juce::File> writeTemporary(const juce::String& purpose, const juce::String& fileName, const void* data, std::size_t size) {
-    const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion " + purpose).getChildFile(juce::Uuid().toString());
+    const auto parent = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion " + purpose);
+    const auto dayAgo = juce::Time::getCurrentTime() - juce::RelativeTime::days(1);
+    for (const auto& old : parent.findChildFiles(juce::File::findDirectories, false)) {
+        if (old.getLastModificationTime() < dayAgo) { old.deleteRecursively(); }
+    }
+    const auto folder = parent.getChildFile(juce::Uuid().toString());
     const auto file = folder.getChildFile(fileName);
     if (!folder.createDirectory().wasOk() || !file.replaceWithData(data, size)) { return std::nullopt; }
     return file;

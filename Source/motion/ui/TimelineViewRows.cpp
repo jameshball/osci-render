@@ -57,18 +57,20 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
         const auto timing = target.has_value() ? target->clock() : motion::ClipTiming();
         if (curve == nullptr || !curve->animated() || timing.rate == 0) { continue; }
         const auto left = timeX(timing.start), right = timeX(timing.end());
-        // Keys at its ends reach a few pixels past them.
-        if (right + 6 < repainted.getX() || left - 6 > repainted.getRight()) { continue; }
+        // The span limits only its fill and curve: keys trimmed past its ends still show.
+        const auto spanShown = right + 6 >= repainted.getX() && left - 6 <= repainted.getRight();
         const auto* clip = laneClip(project, owner);
         const auto* track = clip != nullptr ? motion::findClipTrack(project, clip->id) : nullptr;
         // Tinted as what holds it: its clip, the composition's slate, or (a track's own effect) neutral.
         const auto composition = std::any_of(project.effects.begin(), project.effects.end(), [owner](const auto& effect) { return effect.id == owner; });
         const auto tint = clip != nullptr && track != nullptr ? clipColour(*clip, *track) : composition ? motion::style::compositionClip() : osci::Colours::textMuted();
-        g.setColour(tint.withAlpha(.18f));
-        g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
+        if (spanShown) {
+            g.setColour(tint.withAlpha(.18f));
+            g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
+        }
         const auto& keys = curve->keyframes();
         // A faint value curve normalised to the lane shows each move's shape.
-        if (keys.size() > 1) {
+        if (spanShown && keys.size() > 1) {
             const auto first = std::max(left, namesWidth), last = std::min(right, getWidth());
             const auto localAt = [&](int x) { return timing.localTime(timeAt(x)); };
             // Normalised over all it shows, wherever the repaint is.
@@ -87,7 +89,7 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
             // Sampled every 2 px from `first`, as a full paint does, so a
             // repainted strip meets the curve either side of it.
             const auto from = std::max(first, first + (repainted.getX() - 2 - first) / 2 * 2);
-            const auto to = std::min(last, repainted.getRight() + 2);
+            const auto to = std::min(last, repainted.getRight() + 4);
             if (high > low && to > from) {
                 juce::Path shape;
                 const auto yOf = [&](double value) { return static_cast<float>(y + height - 4 - (value - low) / (high - low) * (height - 8)); };

@@ -1020,8 +1020,12 @@ bool MotionEditor::keyPressed(const juce::KeyPress& key) {
     if (startScreen != nullptr) { return startScreen->handleKey(key); }
     // Behind a sheet (opening a project, a question, settings) the project
     // stays as the sheet found it: its shortcuts wait, and the key stops
-    // here rather than reaching the window's shortcuts.
-    if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return true; }
+    // here rather than reaching the window's shortcuts. A sheet fading out
+    // has been answered, so it holds nothing back.
+    const auto sheetUp = std::any_of(activeOverlays.begin(), activeOverlays.end(), [](const auto& overlay) { return !overlay->isDismissing(); });
+    if (sheetUp) { return true; }
+    // A popover's keys are its own; what it doesn't use goes to the window.
+    if (popover != nullptr) { return false; }
     if (scopeFullScreen && key == juce::KeyPress::escapeKey) {
         setScopeFullScreen(false);
         return true;
@@ -1201,7 +1205,8 @@ void MotionEditor::refreshOutputChoices() {
 MotionOutputPanel::Device MotionEditor::outputDevice() const {
     auto* holder = juce::StandalonePluginHolder::getInstance();
     auto* device = holder != nullptr ? holder->deviceManager.getCurrentAudioDevice() : nullptr;
-    return device != nullptr ? MotionOutputPanel::Device {device->getName(), device->getOutputChannelNames().size()} : MotionOutputPanel::Device {};
+    // Only the outputs it can play on are offered.
+    return device != nullptr ? MotionOutputPanel::Device {device->getName(), std::min(device->getOutputChannelNames().size(), MotionProcessor::mostOutputs)} : MotionOutputPanel::Device {};
 }
 
 void MotionEditor::showOutputPanel() {

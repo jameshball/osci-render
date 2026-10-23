@@ -94,7 +94,7 @@ try:
     step("undo split", "click", "--name", "Undo", "--exact")
     command("wait-for-locator", "--name", "Undo Change tempo", "--role", "label", "--exact")
     step("undo tempo", "click", "--name", "Undo", "--exact")
-    command("wait-for-locator", "--name", "120.0", "--class", "juce::Label", "--exact")
+    command("wait-for-locator", "--name", "120 BPM", "--class", "juce::Label", "--exact")
     step("restored placement", "screenshot", "--file", session.artifact_dir / "restored.png")
     print("Beat clip timing workflow passed.", flush=True)
 finally:

@@ -201,6 +201,7 @@ private:
     std::optional<std::pair<juce::Point<float>, juce::String>> ghostKey() const;
     // What the ghost key and its readout cover.
     std::optional<juce::Rectangle<int>> ghostBounds() const;
+    std::optional<juce::Rectangle<int>> paintedGhost;
     // What the pointer is over, for hover feedback and the cursor.
     struct Hover {
         std::optional<KeyRef> key;

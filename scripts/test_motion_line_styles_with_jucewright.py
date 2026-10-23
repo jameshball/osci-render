@@ -62,8 +62,13 @@ def tile(name):
     return found
 
 
-def toggle(name, undo):
-    step(name, "click", "--name", "Surface styles: " + name, "--exact")
+def toggle(name, undo, combine=False):
+    """A click draws by that style alone; Shift-click adds or removes it."""
+    if combine:
+        bounds = tile(name)["bounds"]
+        step(name, "click-xy", bounds["x"] + bounds["w"] // 2, bounds["y"] + bounds["h"] // 2, "--modifiers", "shift")
+    else:
+        step(name, "click", "--name", "Surface styles: " + name, "--exact")
     session.wait_for_undo(undo)
 
 
@@ -116,20 +121,21 @@ try:
     add("Generate", "Sphere")
     if not tile("Edges").get("checked") or tile("Outline").get("checked"):
         raise RuntimeError("A surface draws its edges until asked otherwise")
-    # Each style's amount is folded under Advanced.
+    # Each style's amount is folded under Advanced, every one of them, to mix
+    # styles; what only patterns or noise use shows with them.
     step("open advanced settings", "click", "--name", "Advanced settings", "--exact")
-    # Only what is on has a row for how much.
     field("edges")
-    field("outline", present=False)
+    field("outline")
+    field("fillDetail", present=False)
+    field("noiseFlow", present=False)
     time.sleep(3)
     edged = scope_lit("edges.png")
 
     # By its outline and a spiral over it, not its edges.
-    toggle("Edges", "Turn off Edges")
-    toggle("Outline", "Turn on Outline")
-    toggle("Spiral", "Turn on Spiral")
-    field("edges", present=False)
-    field("outline")
+    toggle("Outline", "Draw as Outline")
+    toggle("Spiral", "Turn on Spiral", combine=True)
+    if tile("Edges").get("checked") or not tile("Outline").get("checked") or not tile("Spiral").get("checked"):
+        raise RuntimeError("A click draws by one style; Shift-click adds another")
     field("fillDetail")
     field("noiseFlow", present=False)
     time.sleep(3)
@@ -137,22 +143,22 @@ try:
     if abs(styled - edged) < 20:
         raise RuntimeError("Its style should change what the ball draws: " + str((edged, styled)))
     # Nothing on: nothing drawn.
-    toggle("Outline", "Turn off Outline")
-    toggle("Spiral", "Turn off Spiral")
+    toggle("Outline", "Turn off Outline", combine=True)
+    toggle("Spiral", "Turn off Spiral", combine=True)
     time.sleep(3)
     blank = scope_lit("nothing.png")
     if blank > edged // 4:
         raise RuntimeError("With no lines asked for, the ball draws none: " + str((blank, edged)))
-    toggle("Outline", "Turn on Outline")
-    toggle("Rings", "Turn on Rings")
+    toggle("Outline", "Draw as Outline")
+    toggle("Rings", "Turn on Rings", combine=True)
     set_field("rings", "60", "Change Rings")
     if tile("Rings").get("checked") is not True:
         raise RuntimeError("Part-way on is on")
     # Noise brings how it morphs.
-    toggle("Noise", "Turn on Noise")
+    toggle("Noise", "Turn on Noise", combine=True)
     field("noisePhase")
     field("noiseFlow")
-    toggle("Noise", "Turn off Noise")
+    toggle("Noise", "Turn off Noise", combine=True)
     command("screenshot", "--file", session.artifact_dir / "lines.png")
 
     # A curve has no surface to draw lines on.

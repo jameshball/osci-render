@@ -26,6 +26,23 @@ juce::File MotionEditor::withExtension(juce::File chosen, const juce::String& ex
     return chosen.getFileExtension().isEmpty() ? chosen.withFileExtension(extension) : chosen;
 }
 
+void MotionEditor::whenReplaceable(const juce::File& chosen, const juce::File& destination, std::shared_ptr<ExportState> state, std::function<void()> then) {
+    if (destination == chosen || !destination.existsAsFile()) {
+        then();
+        return;
+    }
+    // Not exporting while it asks: Cancel leaves nothing started.
+    exportState.reset();
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    motion::ui::MessageSheet::show(*this, "Replace " + destination.getFileName() + "?", "A file of that name is already there.", "Replace", [owner, state, then] {
+        if (owner == nullptr) {
+            return;
+        }
+        owner->exportState = state;
+        then();
+    }, {}, true);
+}
+
 void MotionEditor::exported(const juce::File& file) {
 #if JUCE_MAC
     const juce::String reveal = "Show in Finder";
@@ -173,7 +190,9 @@ void MotionEditor::exportVideo(bool leaveOutLive) {
                     return;
                 }
                 owner->processor.setLastOpenedDirectory(destination.getParentDirectory());
-                owner->startVideoExport(state, project, beamSnapshot, renderMode, config, destination, {});
+                owner->whenReplaceable(selected.getResult(), destination, state, [owner, state, project, beamSnapshot, renderMode, config, destination] {
+                    owner->startVideoExport(state, project, beamSnapshot, renderMode, config, destination, {});
+                });
             });
         });
     };
@@ -355,7 +374,7 @@ void MotionEditor::continueCommandLineRender() {
     config.includeAudio = config.includeAudio && commandLineStills.empty();
     auto state = std::make_shared<ExportState>();
     state->sampleRate = processor.exportSampleRate();
-    if (!commandLineStills.empty()) { state->stretches = motion::Stretches::upTo(commandLineStills, project.frameRate); }
+    if (!commandLineStills.empty()) { state->stretches = motion::Stretches::upTo(commandLineStills, project.frameRate, project.duration); }
     exportState = state;
     const auto destination = commandLineRender;
     std::cout << "osci-motion rendering " << project.name << " at " << state->sampleRate << " Hz to " << destination.getFullPathName() << std::endl;
@@ -407,28 +426,30 @@ void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutL
             owner->statusBar.show("Audio exports as a .wav file. Choose Export audio again and use that extension.");
             return;
         }
-        const auto project = leaveOutLive ? motion::Document::withoutLiveSources(owner->processor.document.mainProject()) : owner->processor.document.mainProject();
-        const auto reach = owner->processor.canvasReach();
-        const auto baked = owner->processor.hiddenLineBake();
-        owner->exportBar.setName("Audio export progress");
-        owner->exportProgress = 0;
-        owner->exportBar.setVisible(true);
-        owner->cancelExport.setVisible(true);
-        owner->exports.addJob([owner, state, project, destination, reach, baked, mode, beam] {
-            const auto result = beam ? motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach, baked.get(), mode)
-                                     : motion::SoundtrackExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress);
-            juce::MessageManager::callAsync([owner, state, result, destination] {
-                if (owner == nullptr) {
-                    return;
-                }
-                owner->exportState.reset();
-                owner->exportBar.setVisible(false);
-                owner->cancelExport.setVisible(false);
-                if (result.failed() && !state->cancelled.load()) {
-                    owner->statusBar.show(result.getErrorMessage());
-                } else if (result.wasOk() && !state->cancelled.load()) {
-                    owner->exported(destination);
-                }
+        owner->whenReplaceable(chosen, destination, state, [owner, state, leaveOutLive, mode, beam, destination] {
+            const auto project = leaveOutLive ? motion::Document::withoutLiveSources(owner->processor.document.mainProject()) : owner->processor.document.mainProject();
+            const auto reach = owner->processor.canvasReach();
+            const auto baked = owner->processor.hiddenLineBake();
+            owner->exportBar.setName("Audio export progress");
+            owner->exportProgress = 0;
+            owner->exportBar.setVisible(true);
+            owner->cancelExport.setVisible(true);
+            owner->exports.addJob([owner, state, project, destination, reach, baked, mode, beam] {
+                const auto result = beam ? motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach, baked.get(), mode)
+                                         : motion::SoundtrackExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress);
+                juce::MessageManager::callAsync([owner, state, result, destination] {
+                    if (owner == nullptr) {
+                        return;
+                    }
+                    owner->exportState.reset();
+                    owner->exportBar.setVisible(false);
+                    owner->cancelExport.setVisible(false);
+                    if (result.failed() && !state->cancelled.load()) {
+                        owner->statusBar.show(result.getErrorMessage());
+                    } else if (result.wasOk() && !state->cancelled.load()) {
+                        owner->exported(destination);
+                    }
+                });
             });
         });
     };

@@ -869,7 +869,7 @@ juce::Rectangle<int> MotionTimelineView::hoverBounds(motion::Id id) const {
     if (!body.has_value()) { return {}; }
     // The readout sits above the share's edge or below it, and may be wider
     // than a short clip.
-    return body->withRight(std::max(body->getRight(), body->getX() + 240.0f)).expanded(2.0f, 26.0f).getSmallestIntegerContainer();
+    return body->withRight(std::max(body->getRight(), std::max(body->getX(), static_cast<float>(namesWidth)) + 240.0f)).expanded(2.0f, 26.0f).getSmallestIntegerContainer();
 }
 
 void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {

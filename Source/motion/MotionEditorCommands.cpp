@@ -736,14 +736,18 @@ bool MotionEditor::restoreAtLaunch() {
     if (!juce::JUCEApplicationBase::isStandaloneApp() || commandLineRender != juce::File() || !processor.remembersFiles) {
         return false;
     }
-    recovery = std::make_unique<motion::SessionRecovery>(processor.applicationFolder);
+    // One instance at a time keeps the recovery file: a second one opened
+    // alongside neither reopens nor overwrites the first one's session.
+    static juce::InterProcessLock recoveryLock("osci-motion recovery");
+    static const bool ownsRecovery = recoveryLock.enter(0);
+    if (ownsRecovery) { recovery = std::make_unique<motion::SessionRecovery>(processor.applicationFolder); }
     // A new project makes a new editor: what follows is for the app opening.
     static bool opened = false;
     if (std::exchange(opened, true)) {
         recoveredState = {processor.document.generation(), processor.document.revision(), processor.document.unsaved()};
         return false;
     }
-    const auto left = recovery->file();
+    const auto left = recovery != nullptr ? recovery->file() : juce::File();
     juce::MemoryBlock session;
     if (left.existsAsFile() && left.loadFileAsData(session) && session.getSize() > 0) {
         processor.setStateInformation(session.getData(), static_cast<int>(session.getSize()));
