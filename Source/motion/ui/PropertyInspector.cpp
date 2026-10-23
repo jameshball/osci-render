@@ -957,6 +957,12 @@ void MotionPropertyInspector::beginGesture(const std::string& property) {
 
 void MotionPropertyInspector::previewValue(const std::string& property, double value) {
     if (!gesture.active() || gestureTarget != target) { return; }
+    // The project changed under the drag (an undo, a finished import): the
+    // drag ends rather than rebuild from what it started on.
+    if (gesture.stale()) {
+        gesture.reset();
+        return;
+    }
     gesture.preview([&](motion::Project& project) { applyEdit(project, property, value, gestureTime); });
 }
 
@@ -998,6 +1004,10 @@ void MotionPropertyInspector::openColourPicker(Row& row) {
     picker->onBegin = [this] { beginGesture("red"); };
     picker->onChange = [this](osci::ColourPicker::Rgb rgb) {
         if (!gesture.active() || gestureTarget != target) { return; }
+        if (gesture.stale()) {
+            gesture.reset();
+            return;
+        }
         gesture.preview([&](motion::Project& project) {
             for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"red", rgb[0]}, {"green", rgb[1]}, {"blue", rgb[2]}}) {
                 apply(project, property, value, gestureTime);
