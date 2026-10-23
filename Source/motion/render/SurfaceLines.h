@@ -926,7 +926,7 @@ struct Smoothing {
             for (std::size_t one = 0; one < ways.size(); ++one) {
                 for (std::size_t other = 0; other < ways.size(); ++other) {
                     const auto apart = std::acos(std::clamp(ways[one].normal.dot(ways[other].normal), -1.0, 1.0));
-                    const auto slack = 2 * near + 1.0e-7;
+                    const auto slack = 2 * closeAngle + 1.0e-7;
                     if (apart + slack < crease) {
                         smooth[one * ways.size() + other] = 1;
                     } else if (apart - slack <= crease) {
