@@ -116,12 +116,17 @@ void writePreviews(const juce::File& video, const std::vector<double>& times, co
 // The kind of file a project's video goes in, as its codec has it (ProRes
 // in a .mov), with the dot.
 juce::String videoExtension(const juce::File& project) {
-    juce::MemoryBlock bytes;
-    std::unique_ptr<juce::XmlElement> xml;
-    if (project.loadFileAsData(bytes)) { xml = juce::AudioProcessor::getXmlFromBinary(bytes.getData(), static_cast<int>(bytes.getSize())); }
-    const auto* document = xml != nullptr ? xml->getChildByName("composition") : nullptr;
-    const auto* exporting = document != nullptr ? document->getChildByName("export") : nullptr;
-    const auto codec = exporting != nullptr ? exporting->getIntAttribute("codec", 0) : 0;
+    int codec = 0;
+    if (Recipe::isRecipe(project)) {
+        codec = static_cast<int>(juce::JSON::parse(project.loadFileAsString()).getProperty("export", {}).getProperty("codec", 0));
+    } else {
+        juce::MemoryBlock bytes;
+        std::unique_ptr<juce::XmlElement> xml;
+        if (project.loadFileAsData(bytes)) { xml = juce::AudioProcessor::getXmlFromBinary(bytes.getData(), static_cast<int>(bytes.getSize())); }
+        const auto* document = xml != nullptr ? xml->getChildByName("composition") : nullptr;
+        const auto* exporting = document != nullptr ? document->getChildByName("export") : nullptr;
+        codec = exporting != nullptr ? exporting->getIntAttribute("codec", 0) : 0;
+    }
     const auto known = codec >= 0 && codec < static_cast<int>(VideoEncodingConstants::videoCodecs.size());
     return "." + juce::String(VideoEncodingConstants::getVideoCodecInfo(static_cast<VideoCodec>(known ? codec : 0)).defaultFileExtension);
 }

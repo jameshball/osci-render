@@ -143,7 +143,7 @@ public:
     // A video already prepared here with these settings, as the cache it
     // is saved with, if one is.
     std::shared_ptr<const juce::MemoryBlock> preparedFor(const motion::RasterSettings& chosen) const {
-        return bakedArchive != nullptr && same(bakedSettings, chosen) ? bakedArchive : nullptr;
+        return bakedArchive != nullptr && bakedSettings == chosen ? bakedArchive : nullptr;
     }
     ~MotionRasterSettingsPanel() override {
         if (bake != nullptr) { bake->cancel.store(true); }
@@ -235,10 +235,6 @@ private:
     std::shared_ptr<const juce::MemoryBlock> bakedArchive;
     std::optional<motion::RasterSettings> videoShown;
     motion::RasterSettings bakedSettings;
-    static bool same(const motion::RasterSettings& a, const motion::RasterSettings& b) {
-        return a.mode == b.mode && a.shading == b.shading && a.threshold == b.threshold && a.invert == b.invert && a.resolution == b.resolution
-            && a.videoFrameRate == b.videoFrameRate && a.pointsPerFrame == b.pointsPerFrame;
-    }
     void startBake() {
         bakeDelay.stopTimer();
         if (still == nullptr) { return; }
@@ -285,7 +281,7 @@ private:
             auto archive = motion::BakedSourceArchive::encode(*prepared.source);
             if (!archive || job->cancel.load()) { return; }
             juce::MessageManager::callAsync([owner, job, archive = std::make_shared<const juce::MemoryBlock>(std::move(archive.data))] {
-                if (owner == nullptr || owner->bake != nullptr || !same(owner->bakedSettings, job->settings)) { return; }
+                if (owner == nullptr || owner->bake != nullptr || owner->bakedSettings != job->settings) { return; }
                 owner->bakedArchive = archive;
             });
         });
@@ -334,7 +330,7 @@ private:
         if (live.has_value()) {
             // Each change applied is an undo step, so opening the sheet, or
             // choosing what is already applied, applies nothing.
-            if (live->onChange && !same(liveApplied, settings)) {
+            if (live->onChange && liveApplied != settings) {
                 liveApplied = settings;
                 live->onChange(settings);
             }
@@ -344,7 +340,7 @@ private:
         if (isVideo) {
             // Settings as they were (Prepare refreshes too) leave the frame,
             // and the whole video prepared or preparing, as they are.
-            if (videoShown.has_value() && same(*videoShown, settings)) { return; }
+            if (videoShown.has_value() && *videoShown == settings) { return; }
             videoShown = settings;
             preview.request([still = still, chosen = settings](const std::atomic<bool>& cancel) {
                 motion::ui::SourcePreview::Result result;

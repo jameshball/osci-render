@@ -1,10 +1,10 @@
 #pragma once
 
 #include "FractalPreparation.h"
+#include "../model/DrawingLru.h"
 #include "../model/PreparedSource.h"
 #include <cmath>
 #include <complex>
-#include <list>
 #include <map>
 #include <unordered_map>
 
@@ -138,52 +138,25 @@ public:
     std::shared_ptr<const PreparedDrawing> at(const juce::String& source, double depth) {
         depth = settle(depth);
         const auto key = std::make_pair(source.hashCode64(), depth);
-        {
-            const juce::SpinLock::ScopedLockType lock(guard);
-            const auto found = entries.find(key);
-            if (found != entries.end()) {
-                order.splice(order.begin(), order, found->second.place);
-                return found->second.drawing;
-            }
-        }
+        const auto found = blends.find(key);
+        if (found != nullptr) { return found; }
         const auto whole = static_cast<int>(std::floor(depth));
         const auto shallower = segmentsAt(source, whole);
         if (shallower == nullptr) {
             return nullptr;
         }
         const auto deeper = depth > whole ? segmentsAt(source, whole + 1) : nullptr;
-        auto made = drawingOf(deeper != nullptr ? between(*shallower, *deeper, depth - whole) : *shallower);
-        const auto size = made->bytes();
-        std::vector<std::shared_ptr<const PreparedDrawing>> released;
-        const juce::SpinLock::ScopedLockType lock(guard);
-        const auto found = entries.find(key);
-        if (found != entries.end()) { return found->second.drawing; }
-        order.push_front(key);
-        entries.emplace(key, Entry {made, order.begin(), size});
-        held += size;
-        while (held > budget && entries.size() > 1) {
-            const auto oldest = entries.find(order.back());
-            held -= oldest->second.bytes;
-            released.push_back(std::move(oldest->second.drawing));
-            entries.erase(oldest);
-            order.pop_back();
-        }
-        return made;
+        return blends.insert(key, drawingOf(deeper != nullptr ? between(*shallower, *deeper, depth - whole) : *shallower));
     }
 
 private:
     using Key = std::pair<juce::int64, double>;
-    struct Entry {
-        std::shared_ptr<const PreparedDrawing> drawing;
-        std::list<Key>::iterator place;
-        std::size_t bytes = 0;
-    };
     // A whole depth's segments; the deepest that can be drawn in place of
     // one too deep. Null when none can.
     std::shared_ptr<const Segments> segmentsAt(const juce::String& source, int depth) {
         const auto key = std::make_pair(source.hashCode64(), depth);
         {
-            const juce::SpinLock::ScopedLockType lock(guard);
+            const juce::SpinLock::ScopedLockType lock(depthsGuard);
             const auto found = depths.find(key);
             if (found != depths.end()) { return found->second; }
         }
@@ -192,17 +165,14 @@ private:
             auto prepared = prepare(source, tried);
             if (prepared) { made = std::make_shared<const Segments>(std::move(prepared.segments)); }
         }
-        const juce::SpinLock::ScopedLockType lock(guard);
+        const juce::SpinLock::ScopedLockType lock(depthsGuard);
         depths.emplace(key, made);
         return made;
     }
 
-    static constexpr std::size_t budget = 64 * 1024 * 1024;
-    juce::SpinLock guard;
-    std::map<Key, Entry> entries;
-    std::list<Key> order;
+    DrawingLru<Key, std::map> blends {64 * 1024 * 1024};
+    juce::SpinLock depthsGuard;
     std::map<std::pair<juce::int64, int>, std::shared_ptr<const Segments>> depths;
-    std::size_t held = 0;
 };
 
 // A clip's drawing of an L-system, a frame per frame of its content (fewer
@@ -210,26 +180,6 @@ private:
 // same depth share a drawing.
 template <typename DepthAt>
 std::shared_ptr<const PreparedSource> clipSource(const juce::String& source, double contentEnd, double frameRate, DepthAt&& depthAt) {
-    const auto [rate, count] = contentFrames(contentEnd, frameRate, 3600);
-    std::vector<std::shared_ptr<const PreparedDrawing>> frames;
-    frames.reserve(count);
-    double previous = -1;
-    bool varies = false;
-    for (std::size_t frame = 0; frame < count; ++frame) {
-        const auto depth = DrawingCache::settle(depthAt(static_cast<double>(frame) / rate));
-        if (frame > 0 && depth == previous) {
-            frames.push_back(frames.back());
-            continue;
-        }
-        auto drawing = DrawingCache::shared().at(source, depth);
-        if (drawing == nullptr) {
-            return nullptr;
-        }
-        varies = varies || frame > 0;
-        frames.push_back(std::move(drawing));
-        previous = depth;
-    }
-    if (!varies) { frames.resize(1); }
-    return std::make_shared<PreparedSource>(std::move(frames), rate);
+    return sampledSource(contentEnd, frameRate, [&](double seconds) { return DrawingCache::settle(depthAt(seconds)); }, [&](double depth) { return DrawingCache::shared().at(source, depth); });
 }
 }

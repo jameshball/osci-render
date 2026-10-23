@@ -19,6 +19,7 @@ struct TextureCapture {
     // since each frame is packed on its own to measure it.
     static constexpr std::uint64_t maximumPackedBytes = BakedSourceArchive::maximumCompressedBytes / 8 * 7;
     static constexpr double frameRate = 30;
+    static constexpr std::size_t maximumUpdates = 8192;
     double duration = 0;
     std::size_t pointsPerFrame = 0;
     std::vector<double> times;
@@ -95,6 +96,7 @@ public:
     LiveTextureInput() : juce::Thread("osci-motion live picture") { startThread(juce::Thread::Priority::normal); }
     ~LiveTextureInput() override {
         disconnect();
+        stopping.store(true);
         signalThreadShouldExit();
         wake.signal();
         stopThread(4000);
@@ -143,8 +145,8 @@ public:
             const juce::SpinLock::ScopedLockType lock(settingsLock);
             made->pointsPerFrame = settings.pointsPerFrame;
         }
-        made->times.reserve(8192);
-        made->frames.reserve(8192);
+        made->times.reserve(TextureCapture::maximumUpdates);
+        made->frames.reserve(TextureCapture::maximumUpdates);
         const juce::SpinLock::ScopedLockType lock(captureLock);
         capture = std::move(made);
         captureStart = now();
@@ -240,12 +242,14 @@ private:
                 latest = source;
             }
             traced.fetch_add(1);
-            // Measured outside the lock, so the message thread never waits on it.
-            const auto packed = !kept.empty() && capturing() ? packedSize(kept) : 0;
+            // Measured outside the lock, so the message thread never waits on
+            // it. A frame that arrives as a capture begins is costed at its raw
+            // size, never less than it packs.
+            const auto packed = kept.empty() ? std::size_t {0} : capturing() ? packedSize(kept) : kept.size() * sizeof(PointSample);
             const juce::SpinLock::ScopedLockType lock(captureLock);
             if (capture == nullptr || capture->ending != CaptureEnding::none) { continue; }
             const auto bytes = kept.size() * sizeof(PointSample);
-            if (capture->bytes + bytes > TextureCapture::maximumBytes || capture->times.size() == capture->times.capacity()) {
+            if (capture->bytes + bytes > TextureCapture::maximumBytes || capture->times.size() >= TextureCapture::maximumUpdates) {
                 endLocked(capture->bytes + bytes > TextureCapture::maximumBytes ? CaptureEnding::size : CaptureEnding::updates);
                 continue;
             }
@@ -416,8 +420,7 @@ private:
                 found = std::prev(sessions.end());
                 found->input->setSettings(asset->rasterSettings);
             }
-            if (found->settings.mode != asset->rasterSettings.mode || found->settings.shading != asset->rasterSettings.shading || found->settings.threshold != asset->rasterSettings.threshold
-                || found->settings.invert != asset->rasterSettings.invert || found->settings.resolution != asset->rasterSettings.resolution || found->settings.pointsPerFrame != asset->rasterSettings.pointsPerFrame) {
+            if (found->settings != asset->rasterSettings) {
                 found->settings = asset->rasterSettings;
                 found->input->setSettings(asset->rasterSettings);
             }

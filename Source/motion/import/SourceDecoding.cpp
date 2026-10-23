@@ -5,6 +5,7 @@
 #include "RasterSourcePreparer.h"
 #include "VideoSourcePreparer.h"
 #include "../live/BlenderCaptureArchive.h"
+#include "../live/PreparedBlenderFrame.h"
 #include "../model/Cancellation.h"
 #include "../model/Drawing.h"
 #include "../model/SourceParts.h"
@@ -14,12 +15,10 @@
 #include "../../../modules/osci_file_import/third_party/tinyobjloader/tiny_obj_loader.h"
 #include <cstring>
 #include <new>
-#if OSCI_PREMIUM
 #include "../../parser/lottie/LottieParser.h"
 #include "../../parser/lottie/DotLottieArchive.h"
 #include "SvgSequence.h"
 #include "../live/TextureSource.h"
-#endif
 
 namespace motion {
 namespace {
@@ -129,8 +128,6 @@ juce::Result keepMissing(Asset& asset, std::atomic<double>* progress) {
     return juce::Result::ok();
 }
 
-// repeatsPrevious(frame) lets identical frames share one drawing (and count
-// once against the geometry budget).
 // An OBJ's faces as triangles (polygons fanned), in the normalised space its
 // edges are drawn in: the vertices WorldObject centred and scaled.
 PreparedDrawing::Mesh meshFaces(const std::string& content, const std::vector<float>& vertices) {
@@ -156,6 +153,8 @@ PreparedDrawing::Mesh meshFaces(const std::string& content, const std::vector<fl
     return mesh;
 }
 
+// repeatsPrevious(frame) lets identical frames share one drawing (and count
+// once against the geometry budget).
 juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate, const std::function<juce::Result(int, ImportShapes&)>& draw, const std::atomic<bool>* cancel, std::atomic<double>* progress, const std::function<bool(int)>& repeatsPrevious = {}, PreparedDrawing::Mesh faces = {}, bool fills = false) {
     if (frameCount <= 0 || static_cast<std::size_t>(frameCount) > maximumSourceFrames
         || !std::isfinite(frameRate) || frameRate <= 0.0 || frameRate > 1000.0
@@ -497,19 +496,16 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (cancelled(cancel)) {
         return juce::Result::fail("Source import cancelled.");
     }
-    if (asset.extension.equalsIgnoreCase(".blender")) {
-        if (!asset.blenderSettings.valid() || asset.data.getSize() != 0) { return juce::Result::fail("Invalid Blender source settings."); }
-        asset.liveIdentity = std::make_shared<const LiveSourceIdentity>();
-        asset.source.reset();
-        asset.audio.reset();
-        if (progress != nullptr) { progress->store(1); }
-        return juce::Result::ok();
-    }
-    if (texture::isSource(asset.extension)) {
-        // A picture another app shares: traced as it arrives, never ahead.
-        if (!texture::decode(asset.data).has_value()) { return juce::Result::fail("This shared picture's settings are damaged."); }
-        const auto error = asset.rasterSettings.validate();
-        if (!error.empty()) { return juce::Result::fail(juce::String(error)); }
+    const bool blender = asset.extension.equalsIgnoreCase(".blender");
+    if (blender || texture::isSource(asset.extension)) {
+        if (blender) {
+            if (!asset.blenderSettings.valid() || asset.data.getSize() != 0) { return juce::Result::fail("Invalid Blender source settings."); }
+        } else {
+            // A picture another app shares: traced as it arrives, never ahead.
+            if (!texture::decode(asset.data).has_value()) { return juce::Result::fail("This shared picture's settings are damaged."); }
+            const auto error = asset.rasterSettings.validate();
+            if (!error.empty()) { return juce::Result::fail(juce::String(error)); }
+        }
         asset.liveIdentity = std::make_shared<const LiveSourceIdentity>();
         asset.source.reset();
         asset.audio.reset();
@@ -551,12 +547,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         drawings.reserve(capture.frames.size());
         for (const auto& frame : capture.frames) {
             if (cancelled(cancel)) { return juce::Result::fail("Capture preparation cancelled."); }
-            std::vector<std::unique_ptr<osci::Shape>> lines;
-            lines.reserve(frame->segments.size());
-            for (const auto& segment : frame->segments) {
-                lines.push_back(std::make_unique<osci::Line>(osci::Point(segment.x1, segment.y1, 0), osci::Point(segment.x2, segment.y2, 0)));
-            }
-            drawings.push_back(std::make_shared<const motion::PreparedDrawing>(std::move(lines)));
+            drawings.push_back(blenderDrawing(*frame));
             if (progress != nullptr) { progress->store(static_cast<double>(drawings.size()) / capture.frames.size()); }
         }
         asset.source = std::make_shared<const PreparedSource>(std::move(drawings), std::move(capture.timing));
@@ -637,7 +628,6 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
             }, cancel, progress, {}, {}, true);
     }
     if (osci::files::isLottie(extension)) {
-#if OSCI_PREMIUM
         const auto content = extension == ".lottie" ? osci::lottie::extractAnimationJsonFromDotLottie(asset.data)
             : asset.data.toString();
         if (content.isEmpty() || static_cast<std::size_t>(content.getNumBytesAsUTF8()) > maximumSourceBytes) {
@@ -669,9 +659,6 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
                 shapes = parser.draw();
                 return error.isEmpty() ? juce::Result::ok() : juce::Result::fail(error);
             }, cancel, progress, {}, {}, true);
-#else
-        return juce::Result::fail("Lottie import is not available in this build.");
-#endif
     }
     ImportShapes shapes;
     PreparedDrawing::Mesh faces;

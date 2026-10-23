@@ -1,7 +1,7 @@
 #pragma once
 
 #include "LiveSourceFrames.h"
-#include "PreparedBlenderInput.h"
+#include "BlenderReceiver.h"
 #include "../model/Document.h"
 #include <functional>
 
@@ -21,20 +21,20 @@ public:
         const auto* session = findSession(asset->liveIdentity);
         if (enabled) {
             for (const auto& item : sessions) {
-                if (item.identity != asset->liveIdentity && item.port == asset->blenderSettings.port && active(item.input->status().state)) {
+                if (item.identity != asset->liveIdentity && item.input->getStatus().port == asset->blenderSettings.port && active(item.input->getStatus().state)) {
                     return juce::Result::fail("Another Blender source is using this port. Choose a different port.");
                 }
             }
             // Only those listening count: a stopped one holds at most its frozen frame.
-            const auto listeningNow = std::count_if(sessions.begin(), sessions.end(), [](const auto& item) { return active(item.input->status().state); });
-            if (session == nullptr || !active(session->input->status().state)) {
+            const auto listeningNow = std::count_if(sessions.begin(), sessions.end(), [](const auto& item) { return active(item.input->getStatus().state); });
+            if (session == nullptr || !active(session->input->getStatus().state)) {
                 if (static_cast<std::size_t>(listeningNow) >= maximumInputs) { return juce::Result::fail("osci-motion listens to at most 16 Blender sources at once. Stop listening on one first."); }
             }
             if (session == nullptr) {
-                sessions.push_back({asset->liveIdentity, asset->blenderSettings.port, std::make_unique<PreparedBlenderInput>()});
+                sessions.push_back({asset->liveIdentity, std::make_unique<BlenderReceiver>()});
                 session = &sessions.back();
             }
-            session->input->listen(asset->blenderSettings.port);
+            session->input->start(asset->blenderSettings.port);
         } else if (session != nullptr) { session->input->stop(); }
         poll();
         return juce::Result::ok();
@@ -45,7 +45,7 @@ public:
             if (item.input->capturing()) { return juce::Result::fail("Finish or cancel the current Blender capture first."); }
         }
         const auto* session = sessionFor(id);
-        if (session == nullptr || !active(session->input->status().state)) { return juce::Result::fail("Start listening before recording a capture."); }
+        if (session == nullptr || !active(session->input->getStatus().state)) { return juce::Result::fail("Start listening before recording a capture."); }
         return session->input->beginCapture(liveAsset(id)->blenderSettings.freezeOnDisconnect) ? juce::Result::ok() : juce::Result::fail("A capture is already running.");
     }
     std::unique_ptr<BlenderCapture> finishCapture(Id id) {
@@ -82,20 +82,19 @@ public:
         const auto dot = juce::String::fromUTF8(separator.data(), static_cast<int>(separator.size()));
         const auto* session = findSession(asset->liveIdentity);
         if (session == nullptr) { return "Offline" + dot + "start listening to connect Blender"; }
-        const auto status = session->input->status();
-        if (session->input->preparationFailed()) { return "Could not prepare the incoming frame"; }
+        const auto status = session->input->getStatus();
         if (status.message.isNotEmpty()) { return status.message; }
         switch (status.state) {
             case BlenderReceiver::State::connected: return "Connected" + dot + juce::String(status.acceptedFrames) + (status.acceptedFrames == 1 ? " frame received" : " frames received");
             case BlenderReceiver::State::listening: return "Listening on port " + juce::String(status.port) + dot + "waiting for Blender";
             case BlenderReceiver::State::failed: return "Could not start the listener";
-            case BlenderReceiver::State::stopped: return asset->blenderSettings.freezeOnDisconnect && session->input->frame().source != nullptr ? "Stopped" + dot + "last frame frozen" : juce::String("Stopped");
+            case BlenderReceiver::State::stopped: return asset->blenderSettings.freezeOnDisconnect && session->input->snapshot().source != nullptr ? "Stopped" + dot + "last frame frozen" : juce::String("Stopped");
         }
         return {};
     }
     bool listening(Id id) const {
         const auto* session = sessionFor(id);
-        return session != nullptr && active(session->input->status().state);
+        return session != nullptr && active(session->input->getStatus().state);
     }
     void poll() {
         prune();
@@ -104,8 +103,8 @@ public:
         for (const auto& asset : document.mainProject().assets) {
             const auto* session = findSession(asset->liveIdentity);
             if (session == nullptr) { continue; }
-            const auto status = session->input->status();
-            const auto frame = session->input->frame();
+            const auto status = session->input->getStatus();
+            const auto frame = session->input->snapshot();
             const bool visible = asset->blenderSettings.freezeOnDisconnect
                 || (status.state == BlenderReceiver::State::connected && frame.connection == status.connection);
             entries.push_back({asset->liveIdentity, visible ? frame.source : nullptr});
@@ -122,8 +121,7 @@ public:
 private:
     struct Session {
         std::shared_ptr<const LiveSourceIdentity> identity;
-        int port;
-        std::unique_ptr<PreparedBlenderInput> input;
+        std::unique_ptr<BlenderReceiver> input;
     };
     static constexpr std::size_t maximumInputs = 16;
     const Asset* liveAsset(Id id) const {

@@ -3,6 +3,7 @@
 #include <juce_core/juce_core.h>
 #include "BlenderFrame.h"
 #include "BlenderCapture.h"
+#include "PreparedBlenderFrame.h"
 #include <memory>
 #include <string>
 
@@ -21,6 +22,8 @@ public:
     };
     struct Snapshot {
         std::shared_ptr<const BlenderFrame> frame;
+        // The frame as drawn, prepared here so nothing else waits on it.
+        std::shared_ptr<const PreparedSource> source;
         std::uint64_t connection = 0, serial = 0;
         double receivedSeconds = 0;
     };
@@ -151,11 +154,18 @@ private:
             return true;
         }
         auto frame = std::make_shared<const BlenderFrame>(std::move(*decoded.frame));
+        std::shared_ptr<const PreparedSource> source;
+        try {
+            source = prepareBlenderFrame(*frame);
+        } catch (...) {
+            reject("Could not prepare the incoming Blender frame.");
+            return true;
+        }
         Snapshot old;
         {
             const juce::SpinLock::ScopedLockType guard(lock);
             old = std::move(latest);
-            latest = {std::move(frame), status.connection, ++status.acceptedFrames, nowSeconds()};
+            latest = {std::move(frame), std::move(source), status.connection, ++status.acceptedFrames, nowSeconds()};
             if (capture != nullptr) { capture->append(latest.receivedSeconds, latest.frame); }
             status.message.clear();
         }

@@ -108,9 +108,6 @@ private:
     std::unique_ptr<motion::CompositionPreparationWorker> preparationWorker;
     std::uint64_t preparationRevision = 0, acceptedPreparationRevision = 0;
     std::atomic<double> requestedSampleRate {48000};
-    // Whether an audio device has prepared it yet; until then the project's
-    // rate stands in for the rate the device would prepare.
-    std::atomic<bool> devicePrepared {false};
     double preparationSampleRate = 48000;
     motion::hidden::Reach preparationReach;
     juce::String preparationError;
@@ -159,11 +156,11 @@ public:
     void followPlayhead() {
         if (publishedBake != nullptr) { publishedBake->focusOn(publishedBake->frameOf(position.load())); }
     }
-    bool hidesHiddenLines() const { return publishedBake != nullptr && publishedBake->hides; }
-    bool lightsFrames() const { return publishedBake != nullptr && publishedBake->lights; }
-    bool reflectsFrames() const { return publishedBake != nullptr && publishedBake->reflects; }
-    bool restylesFrames() const { return publishedBake != nullptr && publishedBake->restyles; }
-    bool hatchesFrames() const { return publishedBake != nullptr && publishedBake->hatches; }
+    bool hidesHiddenLines() const { return publishedBake != nullptr && publishedBake->settings.hides; }
+    bool lightsFrames() const { return publishedBake != nullptr && publishedBake->settings.lights; }
+    bool reflectsFrames() const { return publishedBake != nullptr && publishedBake->settings.reflects; }
+    bool restylesFrames() const { return publishedBake != nullptr && publishedBake->settings.restyles; }
+    bool hatchesFrames() const { return publishedBake != nullptr && publishedBake->settings.hatches; }
 private:
     // Removes the lines cameras can't see, off the audio thread, from the
     // playhead out. Last, so its workers stop before the rest is destroyed.

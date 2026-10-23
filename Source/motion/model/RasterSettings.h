@@ -19,6 +19,8 @@ struct RasterSettings {
     double videoFrameRate = 30;
     std::size_t pointsPerFrame = 4096;
 
+    bool operator==(const RasterSettings&) const = default;
+
     std::string validate() const {
         if (!std::isfinite(videoFrameRate) || videoFrameRate < 1 || videoFrameRate > 120) { return "Video preparation rate must be between 1 and 120 FPS."; }
         if (mode != Mode::contours && mode != Mode::scanlines && mode != Mode::hilbert) { return "Choose outlines, scanlines or Hilbert."; }
