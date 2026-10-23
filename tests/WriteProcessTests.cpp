@@ -7,6 +7,10 @@ class WriteProcessTests final : public juce::UnitTest {
 public:
     WriteProcessTests() : juce::UnitTest("WriteProcess", "Recording") {}
 
+    // A reader's whole frame: Windows starts PowerShell to read it, which
+    // can take several seconds on a slow or busy machine.
+    static constexpr int readerTimeoutMs = 30000;
+
     void runTest() override {
         std::vector<unsigned char> frame(2 * 1024 * 1024);
         for (size_t i = 0; i < frame.size(); ++i) {
@@ -19,7 +23,7 @@ public:
         const bool started = process.start(readerCommand(output.getFile()));
         expect(started);
         if (started) {
-            expectEquals(process.write(frame.data(), frame.size(), 5000), frame.size());
+            expectEquals(process.write(frame.data(), frame.size(), readerTimeoutMs), frame.size());
             expect(process.close());
             juce::MemoryBlock result;
             expect(output.getFile().loadFileAsData(result));
@@ -30,7 +34,7 @@ public:
 
         beginTest("A child that consumes the frame but fails finalization reports failure");
         expect(process.start(readerCommand(output.getFile()) + " && " + exitCommand(1)));
-        expectEquals(process.write(frame.data(), frame.size(), 5000), frame.size());
+        expectEquals(process.write(frame.data(), frame.size(), readerTimeoutMs), frame.size());
         expect(!process.close());
         expect(!process.isRunning());
         expect(process.close());
@@ -76,14 +80,14 @@ public:
         SetStdHandle(STD_OUTPUT_HANDLE, savedOutput);
         SetStdHandle(STD_ERROR_HANDLE, savedError);
         expect(guiStarted);
-        expectEquals(process.write(frame.data(), frame.size(), 5000), frame.size());
+        expectEquals(process.write(frame.data(), frame.size(), readerTimeoutMs), frame.size());
         expect(process.close());
         expectEquals(output.getFile().getSize(), static_cast<juce::int64>(frame.size()));
 #endif
 
         beginTest("The writer can restart after cancellation");
         expect(process.start(readerCommand(output.getFile())));
-        expectEquals(process.write(frame.data(), frame.size(), 5000), frame.size());
+        expectEquals(process.write(frame.data(), frame.size(), readerTimeoutMs), frame.size());
         expect(process.close());
         expectEquals(output.getFile().getSize(), static_cast<juce::int64>(frame.size()));
     }

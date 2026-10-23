@@ -1,0 +1,228 @@
+#pragma once
+
+#include "../MotionProcessor.h"
+#include "Chip.h"
+#include "DocumentMenu.h"
+#include "../model/ModulationGraph.h"
+#include "MotionIcons.h"
+#include "ScrubField.h"
+#include "FormControls.h"
+#include "LibraryCard.h"
+
+namespace motion::ui {
+inline constexpr PropertySpec rateHzSpec {"rate", "Rate", "", "", 0.001, 1000, 1, .01, 3, " Hz"};
+inline constexpr PropertySpec beatsSpec {"beats", "Beats", "", "", 0.0625, 64, 1, .25, 3, " beats"};
+inline constexpr PropertySpec phaseSpec {"phase", "Phase", "", "", 0, 360, 0, 1, 1, "\xc2\xb0"};
+inline constexpr PropertySpec seedSpec {"seed", "Seed", "", "", 0, 4294967295.0, 0, 1, 0, ""};
+inline constexpr PropertySpec amountSpec {"amount", "Amount", "", "", -unbounded, unbounded, 1, .01, 3, ""};
+inline constexpr PropertySpec delaySpec {"delay", "Delay", "", "", -3600, 3600, 0, .01, 3, "s"};
+
+// A labelled scrub row; owners set the spec and callbacks.
+struct LabelledScrub {
+    juce::Label label;
+    motion::ui::ScrubField field;
+    void setup(juce::Component& owner, const juce::String& text, const juce::String& name, const PropertySpec& spec);
+    void setVisible(bool visible) { label.setVisible(visible); field.setVisible(visible); }
+    void layout(juce::Rectangle<int>& area);
+};
+
+// One modulator route, seen from either end: what it connects to above its
+// amount, add or multiply, and removal. Rows are reused as routes change, so
+// owners call show() rather than rebuilding them.
+class RouteRow final : public juce::Component {
+public:
+    static constexpr int height = style::controlHeight * 2;
+
+    RouteRow(Document& document, std::function<void(const juce::Result&)> report);
+    // `text` names the route's other end: its target, or its modulator.
+    void show(const ModulationRoute& value, const juce::String& text);
+    bool isEditing() const { return amount.isEditing(); }
+    void resized() override;
+
+    // Shows `routes` in `rows`, reusing rows in order and adding or removing
+    // the difference.
+    static void showAll(std::vector<std::unique_ptr<RouteRow>>& rows, juce::Component& parent, const std::vector<std::pair<ModulationRoute, juce::String>>& routes, Document& document, const std::function<void(const juce::Result&)>& report);
+
+private:
+    void apply(double value, ModulationMode next);
+
+    Document& document;
+    std::function<void(const juce::Result&)> report;
+    ModulationRoute route;
+    juce::Label label;
+    motion::ui::ScrubField amount;
+    // Both modes in view, in words, so neither reads as "add another" or
+    // as a second close button.
+    motion::ui::SegmentedControl mode {"Route mode", {"Add", "Scale"}};
+    osci::CloseButton remove {"Remove route"};
+};
+}
+
+namespace motion::ui {
+// What a modulator does, drawn: two cycles of its wave, or the soundtrack's
+// loudness. Shared by the cards and the shape picker.
+inline void paintModulatorShape(juce::Graphics& g, const Modulator& modulator, juce::Rectangle<float> area, juce::Colour colour, float stroke = 1.4f) {
+    juce::Path path;
+    const auto point = [&](double x, double y) { return juce::Point<float>(area.getX() + static_cast<float>(x) * area.getWidth(), area.getCentreY() - static_cast<float>(y) * area.getHeight() * .5f); };
+    if (modulator.shape.waveform == ModulationWaveform::soundtrack) {
+        // Loudness: a level that follows the music.
+        Modulation shape;
+        shape.waveform = ModulationWaveform::noiseSmooth;
+        shape.seed = 7;
+        for (int step = 0; step <= 48; ++step) {
+            const auto x = step / 48.0;
+            const auto y = -.9 + 1.7 * std::abs(shape.atCycles(x * 6)) * (.6 + .4 * std::sin(x * 3.1));
+            if (step == 0) { path.startNewSubPath(point(x, y)); } else { path.lineTo(point(x, y)); }
+        }
+    } else {
+        auto shape = modulator.shape;
+        shape.phase = 0;
+        // Random ones over more cycles, so they read as random, and spread
+        // to the height like the rest (a few values seldom reach it).
+        const auto random = shape.waveform == ModulationWaveform::noiseSmooth || shape.waveform == ModulationWaveform::noiseHold;
+        const auto cycles = random ? 6.0 : 2.0;
+        const auto steps = static_cast<int>(area.getWidth());
+        std::vector<double> values;
+        for (int step = 0; step <= steps; ++step) { values.push_back(shape.atCycles(static_cast<double>(step) / steps * cycles)); }
+        const auto [low, high] = std::minmax_element(values.begin(), values.end());
+        const auto fit = [&](double value) { return random && *high - *low > 1.0e-6 ? (value - *low) / (*high - *low) * 2 - 1 : value; };
+        for (int step = 0; step <= steps; ++step) {
+            const auto x = static_cast<double>(step) / steps;
+            const auto y = fit(values[static_cast<std::size_t>(step)]) * .9;
+            if (step == 0) { path.startNewSubPath(point(x, y)); } else { path.lineTo(point(x, y)); }
+        }
+    }
+    g.setColour(colour);
+    g.strokePath(path, juce::PathStrokeType(stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+
+inline juce::String modulatorKindName(const Modulator& modulator) {
+    if (modulator.shape.waveform == ModulationWaveform::soundtrack) { return "Loudness"; }
+    if (modulator.shape.waveform == ModulationWaveform::noiseSmooth || modulator.shape.waveform == ModulationWaveform::noiseHold) { return "Random"; }
+    return "LFO";
+}
+}
+
+// Library tab: the composition's shared modulators as cards, the selected one
+// edited below with what it drives. Routes are made from a property's Graph.
+class MotionModulatorLibrary final : public juce::Component, private juce::ChangeListener {
+public:
+    explicit MotionModulatorLibrary(MotionProcessor& owner);
+    ~MotionModulatorLibrary() override { processor.document.removeChangeListener(this); }
+
+    std::function<void(const juce::String&)> onError;
+    void select(motion::Id id) {
+        // A rename under way is finished first, on the modulator it began on.
+        if (id != selected && name.isBeingEdited()) { name.hideEditor(false); }
+        selected = id;
+        refresh();
+    }
+
+    void refresh();
+
+    void resized() override;
+    void paint(juce::Graphics& g) override { g.fillAll(osci::Colours::surface()); }
+
+private:
+    // The modulator as a library card: its wave, its name and how much it
+    // drives.
+    class Card final : public motion::ui::LibraryCard {
+    public:
+        Card(MotionModulatorLibrary& library, const motion::Modulator& value, int routeCount);
+        motion::Id id() const { return modulator.id; }
+        void mouseDown(const juce::MouseEvent&) override { owner.select(modulator.id); }
+        // Dragging the card onto a property in Properties routes it there.
+        void mouseDrag(const juce::MouseEvent& event) override;
+    private:
+        void paintPicture(juce::Graphics& g, juce::Rectangle<float> well, float lit) override;
+        MotionModulatorLibrary& owner;
+        motion::Modulator modulator;
+    };
+    // One oscillator shape, drawn.
+    class ShapeButton final : public juce::Button {
+    public:
+        ShapeButton(const juce::String& text, motion::ModulationWaveform waveform);
+        void buttonStateChanged() override { fade.follow(*this); }
+        void paintButton(juce::Graphics& g, bool highlighted, bool down) override;
+    private:
+        motion::Modulator shape;
+        motion::style::Fade fade {*this};
+    };
+    const motion::Modulator* current() const;
+    struct Kind { const char* name; motion::ModulationWaveform waveform; };
+    static const std::array<Kind, 7>& kinds();
+    static std::size_t kindIndex(const motion::Modulator& modulator);
+    // Changing the kind renames a modulator that still has its default name.
+    void setKind(std::size_t index);
+    void add();
+    void change(const std::function<void(motion::Modulator&)>& update);
+    void bind(motion::ui::LabelledScrub& row, std::function<void(motion::Modulator&, double)> apply);
+    void report(const juce::Result& result) {
+        if (result.failed() && onError) { onError(result.getErrorMessage()); }
+    }
+    void showRoutes();
+    void changeListenerCallback(juce::ChangeBroadcaster*) override;
+    // The selected modulator's output over two cycles, above its settings.
+    class Content final : public juce::Component {
+    public:
+        explicit Content(MotionModulatorLibrary& library) : owner(library) {}
+        void paint(juce::Graphics& g) override;
+    private:
+        MotionModulatorLibrary& owner;
+    };
+
+    MotionProcessor& processor;
+    motion::Id selected = 0;
+    osci::ScrollFadeViewport viewport;
+    Content content {*this};
+    juce::TextButton addButton;
+    juce::Label emptyHint;
+    motion::icons::Button remove {"Delete modulator", motion::icons::Icon::trash};
+    std::array<std::unique_ptr<ShapeButton>, 7> shapes;
+    std::vector<std::pair<motion::Modulator, int>> listedCards;
+    motion::style::Disclosure more {"More modulator settings"};
+    bool showMore = false;
+    motion::ui::Chip hertz {"Hz"}, beatsChip {"Beats"};
+    juce::Label name, routesTitle, routesHint;
+    motion::ui::LabelledScrub rate, phase, seed;
+    std::vector<std::unique_ptr<Card>> cards;
+    std::vector<std::unique_ptr<motion::ui::RouteRow>> routes;
+    juce::Rectangle<int> previewArea;
+    int separatorY = 0;
+};
+
+// Graph column: modulators routed into the selected property, and its link.
+class MotionRoutingPanel final : public juce::Component, private juce::ChangeListener {
+public:
+    explicit MotionRoutingPanel(MotionProcessor& owner);
+    ~MotionRoutingPanel() override { processor.document.removeChangeListener(this); }
+
+    std::function<void(const juce::String&)> onError;
+
+    void setTarget(motion::Id id, std::string property);
+    void refresh();
+    int preferredHeight() const;
+    void resized() override;
+    void paint(juce::Graphics& g) override;
+
+private:
+    void showLinkMenu();
+    void report(const juce::Result& result) {
+        if (result.failed() && onError) { onError(result.getErrorMessage()); }
+    }
+    void changeListenerCallback(juce::ChangeBroadcaster*) override;
+
+public:
+    std::function<void()> onLayoutChanged;
+
+private:
+    MotionProcessor& processor;
+    motion::Id targetId = 0;
+    std::string propertyName;
+    juce::TextButton link, unlink;
+    juce::Label linkSource;
+    motion::ui::LabelledScrub scale, offset, delay;
+    std::vector<std::unique_ptr<motion::ui::RouteRow>> rows;
+    std::vector<std::pair<motion::Id, std::string>> choices;
+    static constexpr int headerHeight = 26;
+};

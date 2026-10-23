@@ -436,7 +436,23 @@ run_pluginval() {
     fi
 }
 
+# The video import tests need FFmpeg and the clips they decode: FFmpeg as
+# osci-render downloads it, or on PATH, and clips generated once with it.
+find_video_decoder() {
+    if [[ -n "${MOTION_VIDEO_DECODER:-}" ]]; then return; fi
+    if [[ -n "$TEST_CATEGORY" && "$TEST_CATEGORY" != "MotionVideo" ]]; then return; fi
+    local CANDIDATE="$HOME/Library/Application Support/osci-render/ffmpeg"
+    if [[ ! -x "$CANDIDATE" ]]; then CANDIDATE="$(command -v ffmpeg || true)"; fi
+    if [[ -z "$CANDIDATE" || ! -x "$CANDIDATE" ]]; then return; fi
+    local FIXTURES="${MOTION_VIDEO_FIXTURES:-${TMPDIR:-/tmp}/motion-video-fixtures}"
+    if [[ ! -f "$FIXTURES/motion.mp4" ]]; then
+        python3 "$ROOT/scripts/generate_motion_video_fixtures.py" --output-dir "$FIXTURES" --ffmpeg "$CANDIDATE" > /dev/null || return
+    fi
+    export MOTION_VIDEO_DECODER="$CANDIDATE" MOTION_VIDEO_FIXTURES="$FIXTURES"
+}
+
 run_unit_tests() {
+    find_video_decoder
     local BINARY
     if [[ "$OS_TYPE" == "Darwin" ]]; then
         BINARY="$ROOT/Builds/Test/MacOSX/build/$CONFIG/osci-render-test"
@@ -482,6 +498,20 @@ run_unit_tests() {
         else
             echo "==> All tests passed."
         fi
+    fi
+}
+
+# The visualiser's bundled resampler, checked on its own under ASan/UBSan.
+run_resampling_tests() {
+    echo ""
+    echo "============================================="
+    echo " Running visualiser resampling tests"
+    echo "============================================="
+    if sh "$ROOT/modules/osci_gui/tests/run_visualiser_resampling_tests.sh"; then
+        echo "==> Resampling tests passed."
+    else
+        echo "ERROR: Resampling tests failed"
+        OVERALL_STATUS=1
     fi
 }
 
@@ -580,6 +610,9 @@ fi
 
 if $RUN_TESTS; then
     run_unit_tests
+    if [[ -z "$TEST_CATEGORY" && -z "$SANITIZER" ]]; then
+        run_resampling_tests
+    fi
 fi
 
 if $RUN_STANDALONE; then

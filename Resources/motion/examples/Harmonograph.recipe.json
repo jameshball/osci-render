@@ -1,0 +1,25 @@
+{
+  "name": "Harmonograph",
+  "description": "A Lua script drawing a harmonograph, with sliders for its shape, fade and turn that slow LFOs move. Open the script to see how sliders reach your code.",
+  "picture": 9,
+  "duration": 12,
+  "fps": 60,
+  "beam": {
+    "intensity": 6,
+    "persistence": 0.6,
+    "glow": 0.35
+  },
+  "objects": [
+    {
+      "name": "Harmonograph",
+      "file": "Harmonograph.lua",
+      "bake": {"duration": 0.1, "pointsPerFrame": 2048},
+      "properties": {"slider.a": 0.5, "slider.b": 0.4, "slider.c": 0.5, "scale.x": 0.9, "scale.y": 0.9}
+    }
+  ],
+  "modulators": [
+    {"name": "Shape", "waveform": "triangle", "rate": 0.0833, "routes": [{"to": "Harmonograph", "property": "slider.a", "amount": 0.5}]},
+    {"name": "Fade", "waveform": "sine", "rate": 0.1667, "routes": [{"to": "Harmonograph", "property": "slider.b", "amount": 0.35}]},
+    {"name": "Turn", "waveform": "saw", "rate": 0.0833, "routes": [{"to": "Harmonograph", "property": "slider.c", "amount": 0.5}]}
+  ]
+}

@@ -50,6 +50,10 @@ public:
     void paint(juce::Graphics& g) override;
     void setPaused(bool paused, bool affectAudio = true);
     bool isPaused() const;
+    // A host whose picture is never live (osci-motion plays a project) keeps
+    // it running: a click or Space no longer pauses it, here or popped out.
+    void setPausable(bool shouldBePausable);
+    bool isPausable() const { return pausable; }
     bool isTransparentBackgroundEnabled() const;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
@@ -67,8 +71,26 @@ public:
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;
+    // Hands the control row to a host that places it elsewhere and draws its
+    // own control buttons; the picture then fills the component. Without
+    // this, the row sits under the picture as before.
+    // The host adds the bar as its own child. While detached, the built-in
+    // buttons hide (the recording stopwatch, ffmpeg download and media
+    // timeline stay) and the host's buttons act through clickControl.
+    juce::Component& detachControls(juce::Component& host);
+    int controlsPreferredWidth();
+    enum class Control { record, textureOutput, settings, popout, fullScreen };
+    void clickControl(Control control, juce::Component* anchor);
+    bool isControlOn(Control control) const;
+    bool hasControl(Control control) const;
+    // Called when the detached bar's preferred width changes (a recording
+    // stopwatch or ffmpeg download).
+    std::function<void()> onControlsChanged;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+    // The next frame drawn, as an image, handed to `done` on the message
+    // thread. A later request replaces one not yet answered.
+    void captureFrame(std::function<void(juce::Image)> done);
 
     enum ColourIds
     {
@@ -85,6 +107,12 @@ private:
     };
 
     static constexpr int overlayFadeDurationMs = 225;
+
+    // A captureFrame request, answered after the next frame is drawn.
+    juce::SpinLock frameCaptureLock;
+    std::function<void(juce::Image)> frameCapture;
+    std::atomic<bool> frameCapturePending {false};
+    void answerFrameCapture();
 
     void updatePausedState();
     void updateFramePresentation();
@@ -107,6 +135,7 @@ private:
     std::atomic<bool> active = true;
     std::atomic<unsigned int> pendingParameterUpdates { 0 };
     bool pauseOnMouseUp = false;
+    bool pausable = true;
 
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
@@ -155,6 +184,22 @@ private:
     osci::SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
 
     juce::Rectangle<int> buttonRow;
+
+    // The control row's container; a child of this component unless detached.
+    class ControlBar final : public juce::Component {
+    public:
+        // Empty parts of the row behave like the picture (click to pause).
+        explicit ControlBar(VisualiserComponent& visualiser) : owner(visualiser) { setName("Visualiser controls"); setInterceptsMouseClicks(false, true); }
+        void paint(juce::Graphics& g) override;
+        void resized() override { owner.layoutControls(); }
+    private:
+        VisualiserComponent& owner;
+    };
+    ControlBar controls { *this };
+    bool controlsDetached = false;
+    int lastControlsWidth = 0;
+    int placeControls(juce::Rectangle<int> area, bool apply);
+    void layoutControls();
 
     void popoutWindow(bool saveOpenPreference = true);
     void newOpenGLContextCreated() override;

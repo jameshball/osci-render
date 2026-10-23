@@ -20,6 +20,9 @@ namespace osci::installer {
         if (juce::String (product) == "sosci") {
             return { BinaryData::sosci_mac_saturated_png, static_cast<size_t> (BinaryData::sosci_mac_saturated_pngSize) };
         }
+        if (juce::String (product) == "osci-motion") {
+            return { BinaryData::motion_mac_png, static_cast<size_t> (BinaryData::motion_mac_pngSize) };
+        }
 
         return { BinaryData::osci_mac_png, static_cast<size_t> (BinaryData::osci_mac_pngSize) };
     }
@@ -29,6 +32,7 @@ namespace osci::installer {
         None,
         OsciRender,
         Sosci,
+        OsciMotion,
     };
 
     enum class InstallPath {
@@ -36,6 +40,7 @@ namespace osci::installer {
         OsciRenderFree,
         OsciRenderPremium,
         SosciPremium,
+        OsciMotionPremium,
     };
 
     struct InstallRequest {
@@ -57,7 +62,26 @@ namespace osci::installer {
     }
 
     juce::String productSlug (ProductChoice product) {
-        return product == ProductChoice::Sosci ? "sosci" : "osci-render";
+        return product == ProductChoice::Sosci ? "sosci" : product == ProductChoice::OsciMotion ? "osci-motion" : "osci-render";
+    }
+
+    juce::String productSlug (InstallPath path) {
+        return path == InstallPath::SosciPremium ? "sosci" : path == InstallPath::OsciMotionPremium ? "osci-motion" : "osci-render";
+    }
+
+    // The latest stable release. Only osci-motion, which has no stable release
+    // yet, falls back to its latest beta. `result` says if asking failed.
+    std::optional<osci::VersionInfo> latestInstallable (juce::StringRef product, juce::StringRef variant, juce::Result& result) {
+        const auto tracks = juce::String(product) == "osci-motion" ? std::vector<osci::ReleaseTrack> { osci::ReleaseTrack::Stable, osci::ReleaseTrack::Beta } : std::vector<osci::ReleaseTrack> { osci::ReleaseTrack::Stable };
+        for (const auto track : tracks) {
+            osci::UpdateChecker checker;
+            auto version = checker.checkForUpdate (product, currentInstallerVersionBaseline(), track, variant);
+            result = checker.getLastResult();
+            if (version.has_value() || result.failed()) {
+                return version;
+            }
+        }
+        return std::nullopt;
     }
 
     juce::String errorWithContext (juce::StringRef context, juce::StringRef detail) {
@@ -78,6 +102,7 @@ public:
     InstallerComponent()
         : osciRenderTile ("osci-render", loadImage (BinaryData::osci_mac_png, BinaryData::osci_mac_pngSize), "osci-render"),
           sosciTile ("sosci", loadImage (BinaryData::sosci_mac_saturated_png, BinaryData::sosci_mac_saturated_pngSize), "sosci"),
+          motionTile ("osci-motion", loadImage (BinaryData::motion_mac_png, BinaryData::motion_mac_pngSize), "osci-motion"),
           needLicenseLink ("Find my license key", juce::URL()),
           progressBar (progressValue) {
         addAndMakeVisible (headingLabel);
@@ -138,6 +163,15 @@ public:
         sosciTile.setLayoutMode (osci::GridItemComponent::LayoutMode::IconTile);
         sosciTile.onItemSelected = [this] (const juce::String&) {
             selectProduct (ProductChoice::Sosci);
+        };
+
+        addAndMakeVisible (motionTile);
+        motionTile.setTitle ("osci-motion");
+        motionTile.setWantsKeyboardFocus (true);
+        motionTile.setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        motionTile.setLayoutMode (osci::GridItemComponent::LayoutMode::IconTile);
+        motionTile.onItemSelected = [this] (const juce::String&) {
+            selectProduct (ProductChoice::OsciMotion);
         };
 
         addAndMakeVisible (panel);
@@ -251,6 +285,7 @@ public:
             headingLabel.setBounds ({});
             osciRenderTile.setBounds ({});
             sosciTile.setBounds ({});
+            motionTile.setBounds ({});
             locationsPanel.setBounds ({});
             panel.setBounds ({});
             completionPanel.setBounds (getLocalBounds().reduced (72, 52));
@@ -275,13 +310,15 @@ public:
         constexpr auto tileRowHeight = 228;
 #endif
         auto tilesRow = area.removeFromTop (tileRowHeight);
-        const auto tileWidth = 214;
-        const auto gap = 34;
-        const auto totalWidth = tileWidth * 2 + gap;
+        const auto gap = 24;
+        const auto tileWidth = juce::jmin (214, (tilesRow.getWidth() - gap * 2) / 3);
+        const auto totalWidth = tileWidth * 3 + gap * 2;
         auto tileArea = tilesRow.withSizeKeepingCentre (totalWidth, tilesRow.getHeight());
         osciRenderTile.setBounds (tileArea.removeFromLeft (tileWidth));
         tileArea.removeFromLeft (gap);
         sosciTile.setBounds (tileArea.removeFromLeft (tileWidth));
+        tileArea.removeFromLeft (gap);
+        motionTile.setBounds (tileArea.removeFromLeft (tileWidth));
 
 #if JUCE_LINUX
         area.removeFromTop (18);
@@ -391,6 +428,7 @@ private:
     juce::Label headingLabel;
     ProductTile osciRenderTile;
     ProductTile sosciTile;
+    ProductTile motionTile;
     juce::Component panel;
     juce::TextButton blenderButton;
     std::unique_ptr<BlenderSetupComponent> blenderSetup;
@@ -523,7 +561,7 @@ private:
     }
 
     juce::String installLocationsTitle (InstallPath path) const {
-        const auto product = path == InstallPath::SosciPremium ? juce::String ("sosci") : "osci-render";
+        const auto product = productSlug (path);
         const auto variant = path == InstallPath::OsciRenderFree ? juce::String ("free") : "premium";
         return "Install " + product + " " + variant;
     }
@@ -667,7 +705,10 @@ private:
         }
 
         selectedProduct = product;
-        currentPath = product == ProductChoice::Sosci ? InstallPath::SosciPremium : InstallPath::None;
+        // Only osci-render has a free edition to choose.
+        currentPath = product == ProductChoice::Sosci ? InstallPath::SosciPremium
+            : product == ProductChoice::OsciMotion ? InstallPath::OsciMotionPremium
+            : InstallPath::None;
         licenseKeyEditor.clear();
         loadCachedLicenseState();
 #if JUCE_LINUX
@@ -685,7 +726,9 @@ private:
             return;
         }
 
-        currentPath = selectedProduct == ProductChoice::Sosci ? InstallPath::SosciPremium : InstallPath::OsciRenderPremium;
+        currentPath = selectedProduct == ProductChoice::Sosci ? InstallPath::SosciPremium
+            : selectedProduct == ProductChoice::OsciMotion ? InstallPath::OsciMotionPremium
+            : InstallPath::OsciRenderPremium;
         loadCachedLicenseState();
         refreshUi();
 #if JUCE_LINUX
@@ -722,7 +765,7 @@ private:
             return;
         }
 
-        cachedTokenMessage = "Enter your license key to install premium.";
+        cachedTokenMessage = selectedProduct == ProductChoice::OsciMotion ? "Enter your osci-motion license key." : "Enter your license key to install premium.";
     }
 
     void refreshUi() {
@@ -739,8 +782,10 @@ private:
 
         osciRenderTile.setSelected (selectedOsciRender);
         sosciTile.setSelected (selectedSosci);
+        motionTile.setSelected (selectedProduct == ProductChoice::OsciMotion);
         osciRenderTile.setInteractive(!busy);
         sosciTile.setInteractive(!busy);
+        motionTile.setInteractive(!busy);
 
         panel.setVisible (showPanel);
         choiceLabel.setVisible (showChoiceLabel);
@@ -758,6 +803,7 @@ private:
         helpButton.setVisible (showInstaller);
         osciRenderTile.setVisible (showInstaller);
         sosciTile.setVisible (showInstaller);
+        motionTile.setVisible (showInstaller);
         panel.setVisible (showInstaller && showPanel);
         completionPanel.setVisible (installationComplete);
         locationsPanel.setBusy (busy);
@@ -800,6 +846,10 @@ private:
     }
 
     juce::String buttonTextForPremiumPath() const {
+        // osci-motion has one edition.
+        if (currentPath == InstallPath::OsciMotionPremium) {
+            return hasCachedPremiumToken ? "Install osci-motion" : "Activate and install";
+        }
         if (hasCachedPremiumToken) {
             return cachedTokenNeedsRefresh ? "Refresh and install premium" : "Install premium";
         }
@@ -822,13 +872,13 @@ private:
     }
 
     static bool isPremiumPath (InstallPath path) {
-        return path == InstallPath::OsciRenderPremium || path == InstallPath::SosciPremium;
+        return path == InstallPath::OsciRenderPremium || path == InstallPath::SosciPremium || path == InstallPath::OsciMotionPremium;
     }
 
     InstallRequest makeRequest (InstallPath path) const {
         InstallRequest request;
-        request.productSlug = path == InstallPath::SosciPremium ? "sosci" : "osci-render";
-        request.productName = path == InstallPath::SosciPremium ? "sosci" : "osci-render";
+        request.productSlug = productSlug (path);
+        request.productName = productSlug (path);
         request.variant = path == InstallPath::OsciRenderFree ? "free" : "premium";
         request.licenseKey = licenseKeyEditor.getText().trim();
         request.premium = path != InstallPath::OsciRenderFree;
@@ -876,9 +926,8 @@ private:
         }
 #endif
         juce::Thread::launch([owner, path, request] {
-            osci::UpdateChecker checker;
-            const auto version = checker.checkForUpdate(request.productSlug, currentInstallerVersionBaseline(), osci::ReleaseTrack::Stable, request.variant);
-            const auto result = checker.getLastResult();
+            auto result = juce::Result::ok();
+            const auto version = latestInstallable(request.productSlug, request.variant, result);
             juce::MessageManager::callAsync([owner, path, result, version] {
                 if (owner == nullptr) { return; }
                 owner->setBusy(false, {});
@@ -965,22 +1014,18 @@ private:
                     return;
                 }
 
-                safeThis->statusLabel.setText ("Checking latest stable " + request.productName + " " + request.variant + " release...",
+                safeThis->statusLabel.setText ("Checking latest " + request.productName + " " + request.variant + " release...",
                                                juce::dontSendNotification);
             });
 
-            osci::UpdateChecker checker;
-            version = checker.checkForUpdate (request.productSlug,
-                                              currentInstallerVersionBaseline(),
-                                              osci::ReleaseTrack::Stable,
-                                              request.variant);
+            auto checkResult = juce::Result::ok();
+            version = latestInstallable (request.productSlug, request.variant, checkResult);
 
             if (!version.has_value()) {
-                const auto checkResult = checker.getLastResult();
                 result = checkResult.failed()
-                    ? failWithContext ("Could not check for the latest stable " + request.productName + " " + request.variant + " installer",
+                    ? failWithContext ("Could not check for the latest " + request.productName + " " + request.variant + " installer",
                                        checkResult)
-                    : juce::Result::fail ("No stable " + request.productName + " " + request.variant
+                    : juce::Result::fail ("No " + request.productName + " " + request.variant
                                           + " installer is available for " + osci::HardwareInfo::getCurrentPlatform() + ".");
             }
         }
@@ -1152,6 +1197,12 @@ private:
             setBusy (false, message);
             osci::InstallPrompt::showError (this, "Install failed", message);
             return;
+        }
+
+        // Installed from beta (no stable release yet), it updates from beta
+        // too. A stable install leaves whatever track was chosen alone.
+        if (version->releaseTrack == "beta") {
+            osci::UpdateSettings (request.productSlug).setReleaseTrack (osci::ReleaseTrack::Beta);
         }
 
 #if JUCE_LINUX

@@ -10,6 +10,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -46,6 +47,7 @@ class BrowserSession:
 
         app_path_env = os.environ.get("APP_PATH") or os.environ.get("APP_BUNDLE")
         self.app_path = Path(args.app_path or app_path_env or default_app_path(self.root_dir)).resolve()
+        self.app_name = self.app_path.stem
         self.app_executable = Path(args.app_executable or os.environ.get("APP_EXECUTABLE", default_app_executable(self.app_path))).resolve()
         self.audio_output = (args.audio_output or os.environ.get("AUTOMATION_AUDIO_OUTPUT", "")).strip() or None
         self.jucewright = Path(args.jucewright or os.environ.get("JUCEWRIGHT", "")).resolve() if (args.jucewright or os.environ.get("JUCEWRIGHT")) else None
@@ -79,6 +81,13 @@ class BrowserSession:
         return [str(self.jucewright), *[str(arg) for arg in args]]
 
     def cli(self, *args: object) -> list[str]:
+        # On Linux, Jucewright's OpenGL framebuffer capture deadlocks with the
+        # GL render thread (a blocking OpenGLContext::execute from the message
+        # thread while renderFrame waits for the message lock). Screenshots are
+        # artifacts, not assertions, so they are skipped there.
+        if is_linux() and args and str(args[0]) == "screenshot":
+            print("[browse-osci-render] screenshot skipped on Linux (OpenGL capture deadlock)", flush=True)
+            return self.jw("-s", self.session, "wait", "--ms", "1")
         return self.jw("-s", self.session, *args)
 
     def call(self, command: list[str], stdin: str | None = None) -> str:
@@ -133,6 +142,60 @@ class BrowserSession:
 
         self.log(f"OK  {label} -> {file}")
         return True
+
+    def hover_selected_source(self) -> None:
+        """Moves the pointer over the source selected in Sources: its edit
+        button shows, with the +, on the row under the pointer."""
+        tree = json.loads(subprocess.run(self.cli("snapshot", "--json", "--full"), capture_output=True, text=True, check=True).stdout)
+
+        def find(node, inside=False):
+            if isinstance(node, list):
+                for child in node:
+                    found = find(child, inside)
+                    if found is not None:
+                        return found
+                return None
+            if not isinstance(node, dict):
+                return None
+            inside = inside or node.get("componentId") == "motion.assets" or node.get("componentID") == "motion.assets" or node.get("id") == "motion.assets"
+            if inside and node.get("role") == "listItem" and node.get("selected"):
+                return node
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    found = find(value, inside)
+                    if found is not None:
+                        return found
+            return None
+
+        row = find(tree)
+        if row is None:
+            raise StepError("No source is selected in Sources")
+        bounds = row["bounds"]
+        subprocess.run(self.cli("mouse-move", bounds["x"] + bounds["w"] // 3, bounds["y"] + bounds["h"] // 2), capture_output=True, text=True, check=True)
+        time.sleep(.2)
+
+    def wait_for_undo(self, description: str, timeout: float = 10.0) -> None:
+        """Waits for the undo button's description, shown or not: osci-motion
+        hides it in narrow windows rather than wrapping it."""
+        wanted = "Undo " + description
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            result = subprocess.run(self.cli("snapshot", "--json", "--full", "--include-hidden"), capture_output=True, text=True)
+            stack = []
+            try:
+                stack = [json.loads(result.stdout)]
+            except ValueError:
+                pass
+            while stack:
+                node = stack.pop()
+                if isinstance(node, dict):
+                    if node.get("name") == wanted and node.get("role") == "label":
+                        return
+                    stack.extend(node.values())
+                elif isinstance(node, list):
+                    stack.extend(node)
+            time.sleep(0.1)
+        raise RuntimeError("Timed out waiting for " + wanted)
 
     def run_step(self, label: str, action) -> bool:
         return self.step_action(label, action, True)
@@ -202,6 +265,35 @@ class BrowserSession:
             "--parallel",
             jobs,
         ], cwd=self.root_dir)
+        # The session uses the executable just built from here on.
+        self.jucewright = None
+        if not self.find_jucewright():
+            raise StepError(f"jucewright was built but not found in {self.jucewright_build_dir}")
+
+    def open_project(self, path, editor_class: str = "MotionEditor") -> None:
+        """Opens a project in the running app: as Finder does on macOS, by dropping
+        the file on the editor elsewhere (the editor opens dropped projects)."""
+        if is_macos():
+            # open -a hands the file to the running instance only once macOS
+            # has registered it; before then it starts a second, ordinary copy
+            # of the app (which takes focus and the user's own profile).
+            if self.app_pid is not None:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    found = subprocess.run(["lsappinfo", "find", f"pid={self.app_pid}"], capture_output=True, text=True).stdout
+                    if found.strip():
+                        break
+                    time.sleep(0.1)
+            before = set(self.app_pids())
+            # -g hands over the file without bringing the app to the front.
+            background = ["-g"] if os.environ.get("OSCI_AUTOMATION_FOREGROUND") != "1" else []
+            subprocess.run(["open", *background, "-a", str(self.app_path), str(path)], check=True)
+            # A stray copy started anyway is stopped; the file reached no session.
+            time.sleep(0.3)
+            for pid in set(self.app_pids()) - before - {self.app_pid}:
+                self.terminate_pid(pid)
+        else:
+            subprocess.run(self.cli("drop-files", "--file", str(path), "--class", editor_class, "--exact"), check=True)
 
     def projucer_path(self) -> Path:
         if os.environ.get("PROJUCER"):
@@ -242,27 +334,30 @@ class BrowserSession:
         if not projucer.exists():
             self.die(f"Projucer not found: {projucer}. Set PROJUCER to override.")
 
-        self.log("Resaving osci-render.jucer")
-        subprocess.check_call([str(projucer), "--resave", "osci-render.jucer"], cwd=self.root_dir)
-        self.log("Building osci-render Debug standalone")
+        product = self.app_name
+        if product not in {"osci-render", "osci-motion", "sosci"}:
+            self.die(f"Automatic build is not configured for {product}; supply an already built app.")
+        self.log(f"Resaving {product}.jucer")
+        subprocess.check_call([str(projucer), "--resave", f"{product}.jucer"], cwd=self.root_dir)
+        self.log(f"Building {product} Debug standalone")
 
         if is_macos():
             subprocess.check_call([
                 "xcodebuild",
                 "-project",
-                "osci-render.xcodeproj",
+                f"{product}.xcodeproj",
                 "-scheme",
-                "osci-render - Standalone Plugin",
+                f"{product} - Standalone Plugin",
                 "-configuration",
                 "Debug",
                 "-arch",
-                "arm64",
+                platform.machine(),
                 "build",
-            ], cwd=self.root_dir / "Builds" / "osci-render" / "MacOSX")
+            ], cwd=self.root_dir / "Builds" / product / "MacOSX")
         elif is_windows():
             subprocess.check_call([
                 self.find_msbuild(),
-                str(self.root_dir / "Builds" / "osci-render" / "VisualStudio2022" / "osci-render.sln"),
+                str(self.root_dir / "Builds" / product / "VisualStudio2022" / f"{product}.sln"),
                 "/p:Configuration=Debug",
                 "/p:Platform=x64",
                 "/m",
@@ -271,7 +366,7 @@ class BrowserSession:
             subprocess.check_call([
                 "make",
                 "-C",
-                str(self.root_dir / "Builds" / "osci-render" / "LinuxMakefile"),
+                str(self.root_dir / "Builds" / product / "LinuxMakefile"),
                 "CONFIG=Debug",
                 "Standalone",
                 f"-j{os.cpu_count() or 4}",
@@ -285,7 +380,7 @@ class BrowserSession:
             "--home",
             launch_home,
             "--app-name",
-            "osci-render",
+            self.app_name,
             "--source-home",
             self.source_home,
             "--copy-setting",
@@ -313,6 +408,7 @@ class BrowserSession:
             self.die("Prepared jucewright profile has no audio output device. Configure the standalone output device once, then rerun the browser automation.")
 
         profile["ffmpegFile"] = self.copy_profile_ffmpeg(profile, launch_home)
+        self.reset_profile_layout(profile, launch_home)
         if self.legal_only:
             # Reset acknowledgements, preserving the installer's offline document cache.
             legal_file = Path(profile['supportDirectory']) / 'osci-licensing.settings'
@@ -349,6 +445,22 @@ class BrowserSession:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         return str(destination)
+
+    @staticmethod
+    def reset_profile_layout(profile: dict, launch_home: Path) -> None:
+        """Start from the default workspace layout (any product's `<product>.layout.*`
+        settings), whatever the user last arranged."""
+        support = Path(profile.get("supportDirectory", ""))
+        if not support.is_dir() or not support.resolve().is_relative_to(launch_home.resolve()):
+            return
+        for settings in support.glob("*_globals.settings"):
+            tree = ET.parse(settings)
+            root = tree.getroot()
+            layout = [entry for entry in root if ".layout." in entry.get("name", "")]
+            for entry in layout:
+                root.remove(entry)
+            if layout:
+                tree.write(settings, xml_declaration=True, encoding="UTF-8")
 
     @staticmethod
     def disable_profile_audio_input(settings_file: Path, audio_output_override: str | None = None) -> str | None:
@@ -472,6 +584,11 @@ end clickDenyButton
                 pids.append(int(match.group(2)))
         return pids
 
+    def app_pids(self) -> list[int]:
+        """Every running process of the app bundle under test (macOS)."""
+        completed = subprocess.run(["pgrep", "-f", str(Path(self.app_path)) + "/Contents/MacOS/"], text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        return [int(pid) for pid in completed.stdout.split() if pid.isdigit()]
+
     def terminate_pid(self, pid: int) -> None:
         if is_windows():
             subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -509,7 +626,7 @@ end clickDenyButton
 
         self.app_pid = None
 
-    def launch_app(self, label: str) -> None:
+    def launch_app(self, label: str, env: dict | None = None) -> None:
         self.stop_app()
         time.sleep(0.5)
 
@@ -524,13 +641,13 @@ end clickDenyButton
         if not profile.get("disabledAudioInput"):
             self.die("Internal error: refusing to launch before disabling profile audio input.")
 
-        self.log(f"Launching osci-render ({label})")
+        self.log(f"Launching {self.app_name} ({label})")
         command = self.jw(
             "launch",
             "--app",
             self.app_path,
             "--app-name",
-            "osci-render",
+            self.app_name,
             "--session",
             self.session,
             "--artifact-dir",
@@ -545,6 +662,12 @@ end clickDenyButton
             "--timeout-ms",
             self.session_timeout_seconds * 1000,
         )
+        # The app opens behind whatever the user is working in (automation
+        # treats it as frontmost); OSCI_AUTOMATION_FOREGROUND=1 brings it forward.
+        if sys.platform == "darwin" and os.environ.get("OSCI_AUTOMATION_FOREGROUND") != "1":
+            command.append("--background")
+        for name, value in (env or {}).items():
+            command += ["--env", f"{name}={value}"]
 
         prompt_watcher = self.start_audio_permission_prompt_watcher()
         try:
@@ -569,6 +692,29 @@ end clickDenyButton
             self.app_pid = None
 
         time.sleep(0.9)
+        if not self.legal_only and not self.installer_legal_only:
+            self.acknowledge_startup_legal()
+
+    def acknowledge_startup_legal(self) -> None:
+        # A copied profile may not have acknowledged this build's documents:
+        # agree in the isolated automation profile, with statistics off.
+        agree = "I agree to the terms and acknowledge the privacy policy"
+        for _ in range(8):
+            snapshot = subprocess.run([str(part) for part in self.cli("snapshot", "--json", "--full")], cwd=self.root_dir, text=True, capture_output=True).stdout
+            if agree in snapshot:
+                break
+            time.sleep(0.5)
+        else:
+            return
+        self.log("Agreeing to Privacy & Terms in the isolated profile")
+        for args in (("set-checked", "--name", "Share anonymous version and platform statistics", "--exact", "false"),
+                     ("set-checked", "--name", agree, "--exact", "true"),
+                     ("click", "--name", "Continue", "--exact")):
+            completed = subprocess.run([str(part) for part in self.cli(*args)], cwd=self.root_dir, text=True, capture_output=True)
+            # Statistics are optional; agreeing and continuing are not.
+            if completed.returncode != 0 and "statistics" not in args[2]:
+                self.die("Could not agree to Privacy & Terms: " + completed.stdout[-400:])
+        time.sleep(0.5)
 
     def mcp_call(self, label: str, request: dict) -> bool:
         payload = json.dumps(request)

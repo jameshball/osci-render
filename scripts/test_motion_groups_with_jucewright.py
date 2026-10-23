@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Exercise nested groups, shared transforms/effects, folding and deletion undo."""
+import json
+import subprocess
+from jucewright_osci_browser.cli import parse_args
+from jucewright_osci_browser.session import BrowserSession
+
+session = BrowserSession(parse_args())
+if session.build_app_requested:
+    session.build_app()
+if not session.find_jucewright():
+    session.build_jucewright()
+keep = session.keep_app
+session.keep_app = False
+session.launch_app("motion-groups")
+session.keep_app = keep
+
+
+def command(*args):
+    return subprocess.run(session.cli(*args), capture_output=True, text=True, check=True).stdout
+
+
+def step(label, *args):
+    if not session.run_step(label, session.cli(*args)):
+        raise RuntimeError(label)
+
+
+def find(value, predicate):
+    if isinstance(value, dict):
+        if predicate(value):
+            return value
+        for child in value.values():
+            found = find(child, predicate)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = find(child, predicate)
+            if found is not None:
+                return found
+    return None
+
+
+def snapshot():
+    return json.loads(command("snapshot", "--json", "--full"))
+
+
+def wait_undo(text):
+    session.wait_for_undo(text)
+
+
+def header_id(label):
+    node = find(snapshot(), lambda node: str(node.get("componentName", "")).startswith("Track name ") and node.get("value") == label)
+    if node is None:
+        raise RuntimeError("Missing timeline header " + label)
+    return node["componentName"].split()[-1]
+
+
+def header_bounds(id):
+    """A track's or group's name in its header: what a drag moves it by."""
+    return find(snapshot(), lambda node: node.get("componentName") == "Track name " + id)["bounds"]
+
+
+def header_menu(label, id):
+    """Right-clicks a header's name where a pointer would: the header, which
+    opens the menu, hears the name's mouse events only when routed for real."""
+    bounds = header_bounds(id)
+    step(label, "click-xy", bounds["x"] + bounds["w"] // 2, bounds["y"] + bounds["h"] // 2, "--button", "right")
+
+
+try:
+    command("wait-for-locator", "--class", "MotionEditor", "--exact")
+    step("resize workspace", "resize-window", "--w", 1100, "--h", 800)
+    step("import object", "drop-files", "--file", session.root_dir / "Resources/models/cube.obj", "--class", "MotionEditor", "--exact")
+    command("wait-for-locator", "--name", "cube.obj", "--role", "label", "--exact")
+    track = header_id("cube.obj")
+    header_menu("track menu", track)
+    step("group track", "click", "--name", "Group track", "--role", "menuItem", "--exact")
+    wait_undo("Group track")
+    group = header_id("Group 1")
+    source = header_bounds(track)
+    timeline = find(snapshot(), lambda node: node.get("class") == "MotionTimelineView")["bounds"]
+    # Dragging a track past the top of the list lifts it out of its group,
+    # above everything; undo puts it back.
+    step("drag track above its group", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
+         timeline["x"] + 20, timeline["y"] + 8, "--steps", 20)
+    wait_undo("Reorder track")
+    moved = header_bounds(track)
+    if moved["y"] >= header_bounds(group)["y"] or moved["x"] >= source["x"]:
+        raise RuntimeError("Dragging to the top did not lift the track out of its group")
+    step("undo lift out of group", "click", "--name", "Undo", "--exact")
+    if header_bounds(track) != source:
+        raise RuntimeError("Undo did not put the track back in its group")
+    # Dragging the track by its header picked it; Properties edits the group
+    # once its header is clicked.
+    bounds = header_bounds(group)
+    step("select group", "click-xy", bounds["x"] + bounds["w"] // 2, bounds["y"] + bounds["h"] // 2)
+    position = find(snapshot(), lambda node: node.get("componentName") == "position.x")
+    step("translate group", "set-value", position["ref"], "0.35")
+    wait_undo("Change Position X")
+    step("key group position", "click", "--name", "Key position", "--exact")
+    wait_undo("Key position")
+    step("fold group", "click", "--component-name", "Fold group " + group, "--exact")
+    hidden = find(snapshot(), lambda node: node.get("componentName") == "Track name " + track and node.get("visible"))
+    if hidden is not None:
+        raise RuntimeError("Collapsed group kept child track visible")
+    step("unfold group", "click", "--component-name", "Fold group " + group, "--exact")
+    header_menu("group menu", group)
+    step("create nested group", "click", "--name", "Add nested group", "--role", "menuItem", "--exact")
+    wait_undo("Create group")
+    nested = header_id("Group 2")
+    source, target = header_bounds(track), header_bounds(nested)
+    # Rows below a dragged track close up by its row, so a group below it is
+    # met one row higher.
+    row = find(snapshot(), lambda node: node.get("class") == "MotionTrackHeader" and find(node.get("children", []), lambda child: child.get("componentName") == "Track name " + track) is not None)["bounds"]["h"]
+    target_y = target["y"] + target["h"] // 2 - (row + 4 - 6 if target["y"] > source["y"] else 0)
+    step("drag track into nested group", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
+         target["x"] + target["w"] // 2, target_y, "--steps", 20)
+    wait_undo("Reorder track")
+    if header_bounds(track)["x"] <= source["x"]:
+        raise RuntimeError("Track did not become a nested child")
+    step("nested group screenshot", "screenshot", "--file", session.artifact_dir / "nested-groups.png")
+    library = find(snapshot(), lambda node: node.get("class") == "osci::TabBar" and node.get("name") == "Library tabs")
+    tab = find(library, lambda node: node.get("class") == "osci::TabBar::Tab" and node.get("name") == "Effects")
+    step("effects library", "click", tab["ref"])
+    source = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Scale"))["bounds"]
+    target = header_bounds(group)
+    step("effect on group", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
+         target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
+    wait_undo("Add Scale")
+    command("wait-for-locator", "--component-name", "Effect scaleX", "--exact")
+    step("group effects screenshot", "screenshot", "--file", session.artifact_dir / "group-effects.png")
+    header_menu("empty grouped track menu", group)
+    step("add empty grouped track", "click", "--name", "Add track to group", "--role", "menuItem", "--exact")
+    wait_undo("Add track")
+    empty = header_id("New track")
+    source = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Translate"))["bounds"]
+    target = header_bounds(empty)
+    step("effect on empty grouped track", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
+         target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
+    wait_undo("Add Translate")
+    # The empty track's group chip shows the group's effects; a double-click adds there.
+    step("show the group's effects", "click", "--component-name", "Effects of Group 1", "--exact")
+    command("wait-for-value", "--component-name", "Inspector title", "--value", "Group 1")
+    swirl = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and node.get("componentName") == "Swirl")
+    step("add group swirl", "click", swirl["ref"], "--click-count", 2)
+    wait_undo("Add Swirl")
+    header_menu("delete parent menu", group)
+    step("delete group", "click", "--name", "Delete group and its tracks", "--role", "menuItem", "--exact")
+    wait_undo("Delete group")
+    if find(snapshot(), lambda node: node.get("componentName") == "Track name " + track) is not None:
+        raise RuntimeError("Group deletion left descendant track")
+    step("undo group deletion", "click", "--name", "Undo", "--exact")
+    command("wait-for-locator", "--component-name", "Track name " + track, "--exact")
+    step("restored group screenshot", "screenshot", "--file", session.artifact_dir / "group-restored.png")
+    print("Motion group workflow smoke passed", flush=True)
+finally:
+    session.stop_app()

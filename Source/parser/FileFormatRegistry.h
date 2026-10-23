@@ -49,6 +49,7 @@ inline const std::vector<FileFormat>& sourceFormats() {
         FileFormat::define("jpeg").image(),
         FileFormat::define("wav").audio(),
         FileFormat::define("aiff").audio(),
+        FileFormat::define("aif").audio(),
         FileFormat::define("ogg").audio(),
         FileFormat::define("flac").audio(),
         FileFormat::define("mp3").audio(),

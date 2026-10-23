@@ -624,10 +624,25 @@ begin
   end;
 end;
 
+// The runtime's own registry entry, which Microsoft documents for this check.
+// On Windows on Arm the x64 runtime installs without the MSI product the
+// check below looks for, so without this it would be installed every time.
+function Dependency_IsVCRuntimeRegistered(const MinimumVersion: Int64): Boolean;
+var
+  Key: String;
+  Installed, Major, Minor, Build: Cardinal;
+begin
+  Key := 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\' + Dependency_String('x86', 'x64');
+  Result := RegQueryDWordValue(HKLM, Key, 'Installed', Installed) and (Installed = 1)
+    and RegQueryDWordValue(HKLM, Key, 'Major', Major) and RegQueryDWordValue(HKLM, Key, 'Minor', Minor) and RegQueryDWordValue(HKLM, Key, 'Bld', Build)
+    and (ComparePackedVersion(PackVersionComponents(Major, Minor, Build, 0), MinimumVersion) >= 0);
+end;
+
 procedure Dependency_AddVC2015To2022;
 begin
   // https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
-  if not Dependency_IsMsiProductInstalled(Dependency_String('{65E5BD06-6392-3027-8C26-853107D3CF1A}', '{36F68A90-239C-34DF-B58C-64B30153CE35}'), PackVersionComponents(14, 42, 34433, 0)) then begin
+  if not Dependency_IsVCRuntimeRegistered(PackVersionComponents(14, 42, 34433, 0))
+    and not Dependency_IsMsiProductInstalled(Dependency_String('{65E5BD06-6392-3027-8C26-853107D3CF1A}', '{36F68A90-239C-34DF-B58C-64B30153CE35}'), PackVersionComponents(14, 42, 34433, 0)) then begin
     Dependency_Add('vcredist2022' + Dependency_ArchSuffix + '.exe',
       '/passive /norestart',
       'Visual C++ 2015-2022 Redistributable' + Dependency_ArchTitle,

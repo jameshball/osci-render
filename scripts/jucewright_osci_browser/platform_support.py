@@ -44,7 +44,7 @@ def default_app_path(root: Path) -> Path:
 
 def default_app_executable(app_path: Path) -> Path:
     if is_macos() and app_path.suffix == ".app":
-        return app_path / "Contents" / "MacOS" / "osci-render"
+        return app_path / "Contents" / "MacOS" / app_path.stem
     return app_path
 
 

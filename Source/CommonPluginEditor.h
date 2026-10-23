@@ -21,13 +21,21 @@ public:
     CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
     ~CommonPluginEditor() override;
 
-    void handleCommandLine(const juce::String& commandLine);
+    virtual void handleCommandLine(const juce::String& commandLine);
     bool openFile(const juce::File& file);
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);
     virtual void openProject(const juce::File& file);
     virtual void openProject();
     void saveProject();
+    // Runs `write` once the project is ready to be written: a product can
+    // first gather what it saves with it (osci-motion takes a picture).
+    virtual void beforeSaving(std::function<void()> write) { write(); }
     void saveProjectAs();
+    // The name Save As suggests for a project not yet saved, without extension.
+    virtual juce::String suggestedProjectName() const { return {}; }
+    // Where the update prompt goes, given its size: top right by default. A
+    // product moves it off an OpenGL view, which would draw over it.
+    virtual juce::Rectangle<int> updatePromptArea(int width, int height) const { return {getWidth() - width - 14, 42, width, height}; }
     virtual void resetWindowSizeAndPosition();
     void updateTitle();
     void fileUpdated(juce::String fileName);
@@ -54,21 +62,43 @@ public:
     // Offline render: input audio file -> encoded video using Recording Settings
     void renderAudioFileToVideo();
     virtual void resetToDefault();
+    // Called once the project is written to its file.
+    virtual void projectSaved() {}
     void toggleFullScreen();
     bool isFullScreen();
     void resized() override;
     void parentHierarchyChanged() override;
+    // Windows draws the editor with Direct2D unless this is on: then with
+    // JUCE's software renderer, which screen capture that reads a window's
+    // pixels (OBS's Window Capture on Automatic or BitBlt) can see; Direct2D
+    // windows come out white there.
+    bool usesSoftwareRendering() const;
+    void setSoftwareRendering(bool software);
 
 protected:
+#if OSCI_PREMIUM
+    // The title over an offline render's progress.
+    virtual juce::String offlineRenderTitle() const { return "Render Audio File to Video"; }
+    // Says an offline render to `outputFile` failed; `errorMessage` may be empty.
+    virtual void showOfflineRenderFailure(const juce::String& errorMessage, const juce::File& outputFile);
+    // Completion retains caller resources until the worker and OpenGL renderer
+    // have stopped, and is told whether the render succeeded. It also runs
+    // (unsuccessful) on failed launch/editor teardown: cleanup only. A beam,
+    // drawn instead of the processor's visualiser parameters, must keep alive
+    // whatever owns its parameters (VisualiserParameters does not): alias the
+    // owner, as osci-motion does.
+    bool startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void(bool succeeded)> completion = {}, std::shared_ptr<VisualiserParameters> beam = nullptr);
+#endif
     virtual bool openSourceFile(const juce::File& file) = 0;
 
 private:
+    // Sets the window's renderer from the saved choice, without saving it.
+    void applyRenderingEngine();
+
     CommonAudioProcessor& audioProcessor;
     int defaultEditorWidth = 0;
     int defaultEditorHeight = 0;
-    bool fullScreen = false;
     bool betaUpdatesEnabled = false;
-    juce::Rectangle<int> windowedBounds;
 public:
     PluginLookAndFeel lookAndFeel;
 
@@ -117,6 +147,8 @@ public:
     };
 
     bool usingNativeMenuBar = false;
+    // A click away from a text field ends the typing in it.
+    osci::ClickAwayUnfocuser clickAway {*this};
 
 #if JUCE_LINUX
     juce::OpenGLContext openGlContext;

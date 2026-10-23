@@ -1,0 +1,152 @@
+#pragma once
+
+#include "../MotionProcessor.h"
+#include "TypedNumber.h"
+#include "MotionStyle.h"
+#include <array>
+#include <functional>
+
+// A clip's timing, shown as the first section of the Properties inspector.
+// Times use the ruler's format; the document converts musical clips back into
+// their canonical beat domain.
+class MotionClipTimingPanel : public juce::Component {
+public:
+    explicit MotionClipTimingPanel(MotionProcessor& owner) : processor(owner) {
+        setName("Clip timing inspector");
+        motion::style::inspector::styleHeading(title, "Timing");
+        addAndMakeVisible(title);
+        const std::array<const char*, 4> labels {"Start", "Duration", "Offset", "Speed"};
+        const std::array<const char*, 4> names {"Clip start", "Clip duration", "Clip source offset", "Clip speed"};
+        const std::array<const char*, 4> hints {"", "Musical lengths read bars.beats (1.2 is a bar and two beats); add s for seconds", "Slips the source and its animation inside the clip",
+            "Playback multiplier; the clip's duration stays the same"};
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            motion::style::inspector::styleCaption(captions[i], labels[i]);
+            addAndMakeVisible(captions[i]);
+            auto& value = values[i];
+            value.setName(names[i]);
+            value.setTitle(names[i]);
+            value.setEditable(false, true);
+            value.setJustificationType(juce::Justification::centredRight);
+            value.setFont(motion::style::body());
+            value.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
+            value.setTooltip(hints[i]);
+            value.onEditorShow = [this] { editRevision = processor.document.revision(); editGeneration = processor.document.generation(); };
+            value.onTextChange = [this, i] { if (!updating) { apply(i); } };
+            addAndMakeVisible(value);
+        }
+        details.setFont(motion::style::caption());
+        details.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+        details.setJustificationType(juce::Justification::centredLeft);
+        details.setBorderSize({});
+        addAndMakeVisible(details);
+        status.setFont(motion::style::caption());
+        status.setJustificationType(juce::Justification::topLeft);
+        addAndMakeVisible(status);
+        refresh();
+    }
+    // The duration, for "Edit clip timing" to go to.
+    juce::Component& durationField() { return values[1]; }
+    void setSelection(motion::Id id) {
+        if (id != selected) { discardEditors(); selected = id; error.clear(); }
+        refresh();
+    }
+    std::function<void()> onHeightChanged;
+    bool hasClip() const { return findClip() != nullptr; }
+    int preferredHeight() const { return hasClip() ? motion::style::inspector::headingHeight + motion::style::gap + 2 * motion::style::inspector::row + (status.isVisible() ? 30 : 0) + 4 : 0; }
+    void refresh() {
+        if (editGeneration != processor.document.generation() || editRevision != processor.document.revision()) { discardEditors(); }
+        const auto* clip = findClip();
+        const bool locked = isLocked();
+        const auto previousHeight = preferredHeight();
+        updating = true;
+        const auto timing = clip != nullptr ? clip->timing(processor.document.project().tempo()) : motion::ClipTiming();
+        const auto grid = processor.document.project().timeGrid();
+        const std::array<juce::String, 4> current {juce::String(grid.positionLabel(timing.start)), juce::String(grid.durationLabel(timing.start, timing.end())), format(timing.offset) + "s", format(timing.rate)};
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            values[i].setEnabled(clip != nullptr && !locked);
+            if (!values[i].isBeingEdited()) { values[i].setText(current[i], juce::dontSendNotification); }
+        }
+        updating = false;
+        // Which clock the clip keeps: only the exception, a clip in bars and
+        // beats, says so on the heading line; both say so in its tooltip.
+        const auto beats = clip != nullptr && clip->timeBase == motion::ClipTimeBase::beats;
+        details.setText(beats ? "follows tempo" : juce::String(), juce::dontSendNotification);
+        const juce::String clock = clip == nullptr ? juce::String() : beats ? "Follows tempo: keeps its place in bars and beats when the tempo changes"
+            : "Ignores tempo: keeps its time in seconds when the tempo changes";
+        title.setTooltip(clock);
+        details.setTooltip(clock);
+        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
+        status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
+        status.setVisible(clip != nullptr && status.getText().isNotEmpty());
+        setVisible(clip != nullptr);
+        resized();
+        if (preferredHeight() != previousHeight && onHeightChanged) { onHeightChanged(); }
+    }
+    void resized() override {
+        auto area = getLocalBounds();
+        auto heading = area.removeFromTop(motion::style::inspector::headingHeight);
+        // A clip that follows tempo says so beside the heading: "Timing  follows tempo".
+        title.setBounds(heading);
+        details.setBounds(heading.withTrimmedLeft(juce::roundToInt(juce::TextLayout::getStringWidth(title.getFont(), title.getText())) + 8));
+        // Rows a gap below the heading, as Properties' sections have them.
+        area.removeFromTop(motion::style::gap);
+        motion::style::inspector::layoutFields(area, captions, {&values[0], &values[1], &values[2], &values[3]});
+        status.setBounds(area.removeFromTop(30));
+    }
+    // Three decimals, more only when the value needs them (no trailing zeros).
+    static juce::String format(double value) {
+        auto text = juce::String(value, 6);
+        while (text.contains(".") && text.endsWithChar('0') && text.length() - text.indexOfChar('.') > 4) { text = text.dropLastCharacters(1); }
+        return text;
+    }
+private:
+    const motion::Clip* findClip() const { return motion::findClip(processor.document.project(), selected); }
+    bool isLocked() const {
+        const auto* track = motion::findClipTrack(processor.document.project(), selected);
+        return track != nullptr && track->locked;
+    }
+    void discardEditors() {
+        for (auto& value : values) { if (value.isBeingEdited()) { value.hideEditor(true); } }
+    }
+    void apply(std::size_t index) {
+        const auto* clip = findClip();
+        if (clip == nullptr || isLocked() || editGeneration != processor.document.generation() || editRevision != processor.document.revision()) { refresh(); return; }
+        const auto text = values[index].getText().trim();
+        auto timing = clip->timing(processor.document.project().tempo());
+        const auto grid = processor.document.project().timeGrid();
+        std::optional<double> parsed;
+        if (index == 0) {
+            parsed = grid.parsePosition(text.toStdString());
+        } else if (index == 1) {
+            parsed = grid.parseDuration(text.toStdString(), timing.start);
+        } else {
+            // Offset is in seconds; its "s" is optional.
+            parsed = motion::ui::parseNumber(text, index == 2 ? "s" : "");
+        }
+        if (!parsed.has_value()) {
+            error = index < 2 ? "Enter a time like the ruler shows (" + juce::String(grid.positionLabel(timing.start)) + "), or seconds with s." : "Enter a number, like 1.5.";
+            refresh();
+            return;
+        }
+        const auto value = *parsed;
+        if (index == 0) {
+            timing.moveTo(value);
+        } else if (index == 1) {
+            timing.setDuration(value);
+        } else if (index == 2) {
+            timing.offset = value;
+        } else {
+            timing.rate = value;
+        }
+        const auto result = processor.document.setClipTiming(selected, timing);
+        error = result.failed() ? result.getErrorMessage() : juce::String();
+        refresh();
+    }
+    MotionProcessor& processor;
+    motion::Id selected = 0;
+    std::uint64_t editRevision = 0, editGeneration = 0;
+    bool updating = false;
+    std::array<juce::Label, 4> captions, values;
+    juce::Label title, details, status;
+    juce::String error;
+};

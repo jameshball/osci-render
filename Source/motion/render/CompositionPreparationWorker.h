@@ -1,0 +1,94 @@
+#pragma once
+
+#include "CompositionRenderer.h"
+
+namespace motion {
+// One coalesced pending request, one running job, one completed result. A
+// running job finishes and its result stays available even when newer work
+// is waiting, so a stream of edits (a drag) still updates playback; the
+// newest request runs next. All project copies and prepared-state
+// destruction stay off the audio thread.
+class CompositionPreparationWorker : private juce::Thread {
+public:
+    struct Result {
+        std::uint64_t revision = 0;
+        std::unique_ptr<PreparedComposition> composition;
+        juce::String error;
+    };
+    explicit CompositionPreparationWorker(std::function<void()> ready) : juce::Thread("Motion preparation"), ready(std::move(ready)) { startThread(); }
+    ~CompositionPreparationWorker() override {
+        signalThreadShouldExit();
+        {
+            const juce::SpinLock::ScopedLockType lock(queueLock);
+            if (running) { running->cancel.store(true); }
+            if (pending) { pending->cancel.store(true); }
+        }
+        wake.signal();
+        waitForThreadToExit(-1);
+    }
+    // Publisher/message thread only; previous pending work is replaced.
+    std::uint64_t request(const Project& project, double sampleRate, hidden::Reach reach = squareScope()) {
+        auto next = std::make_shared<Request>(project, sampleRate, reach, ++revision);
+        std::shared_ptr<Request> replaced;
+        {
+            const juce::SpinLock::ScopedLockType lock(queueLock);
+            replaced = std::move(pending);
+            pending = std::move(next);
+        }
+        wake.signal();
+        return revision;
+    }
+    std::unique_ptr<Result> take() {
+        const juce::SpinLock::ScopedLockType lock(queueLock);
+        return std::move(completed);
+    }
+
+private:
+    struct Request {
+        Request(const Project& project, double rate, hidden::Reach reach, std::uint64_t revision) : project(project), rate(rate), reach(reach), revision(revision) {}
+        Project project;
+        double rate;
+        hidden::Reach reach;
+        std::uint64_t revision;
+        std::atomic<bool> cancel {false};
+    };
+    void run() override {
+        while (!threadShouldExit()) {
+            wake.wait();
+            std::shared_ptr<Request> job;
+            {
+                const juce::SpinLock::ScopedLockType lock(queueLock);
+                job = std::move(pending);
+                running = job;
+            }
+            if (!job || threadShouldExit()) { continue; }
+            auto result = std::make_unique<Result>();
+            result->revision = job->revision;
+            try {
+                result->composition = std::make_unique<PreparedComposition>(job->project, job->rate, &job->cancel, CompositionPurpose::signal, job->reach);
+                result->error = result->composition->preparationError;
+            } catch (...) {
+                result->error = "Couldn't prepare the composition for playback.";
+            }
+            std::unique_ptr<Result> obsolete;
+            bool notify = false;
+            {
+                const juce::SpinLock::ScopedLockType lock(queueLock);
+                running.reset(); // job retains ownership until outside this lock.
+                if (!job->cancel.load() && !threadShouldExit()) {
+                    obsolete = std::move(completed);
+                    completed = std::move(result);
+                    notify = true;
+                }
+            }
+            if (notify) { ready(); }
+        }
+    }
+    std::function<void()> ready;
+    juce::SpinLock queueLock;
+    juce::WaitableEvent wake;
+    std::shared_ptr<Request> pending, running;
+    std::unique_ptr<Result> completed;
+    std::uint64_t revision = 0;
+};
+}

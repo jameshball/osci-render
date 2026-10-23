@@ -7,6 +7,106 @@
               defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
+    <GROUP id="MotionTests" name="Motion">
+      <FILE id="MotionBlenderLifecycleT" name="MotionBlenderLifecycleTest.cpp"
+            compile="1" resource="0" file="tests/MotionBlenderLifecycleTest.cpp"/>
+      <FILE id="MotionLiveSourceT" name="MotionLiveSourceTest.cpp" compile="1"
+            resource="0" file="tests/MotionLiveSourceTest.cpp"/>
+      <FILE id="MotionBlenderReceiverT" name="MotionBlenderReceiverTest.cpp"
+            compile="1" resource="0" file="tests/MotionBlenderReceiverTest.cpp"/>
+      <FILE id="MotionContinuityT" name="MotionBeamRendererTest.cpp" compile="1"
+            resource="0" file="tests/MotionBeamRendererTest.cpp"/>
+      <FILE id="MotionClipboardT" name="MotionClipboardTest.cpp" compile="1"
+            resource="0" file="tests/MotionClipboardTest.cpp"/>
+      <FILE id="MotionModulatorsT" name="MotionModulatorsTest.cpp" compile="1"
+            resource="0" file="tests/MotionModulatorsTest.cpp"/>
+      <FILE id="MotionSpatialT" name="MotionSpatialTest.cpp" compile="1"
+            resource="0" file="tests/MotionSpatialTest.cpp"/>
+      <FILE id="MotionCameraRigT" name="MotionCameraRigTest.cpp" compile="1"
+            resource="0" file="tests/MotionCameraRigTest.cpp"/>
+      <FILE id="MotionScopeBeamT" name="MotionScopeBeamTest.cpp" compile="1"
+            resource="0" file="tests/MotionScopeBeamTest.cpp"/>
+      <FILE id="MotionPerfBench" name="MotionPerformanceBenchmark.cpp" compile="1"
+            resource="0" file="tests/MotionPerformanceBenchmark.cpp"/>
+      <FILE id="MotionTempoMapT" name="MotionTempoMapTest.cpp" compile="1"
+            resource="0" file="tests/MotionTempoMapTest.cpp"/>
+      <FILE id="MotionTempoTool" name="MotionTempoToolsTest.cpp" compile="1"
+            resource="0" file="tests/MotionTempoToolsTest.cpp"/>
+      <FILE id="MotionViewState" name="MotionViewStateTest.cpp" compile="1"
+            resource="0" file="tests/MotionViewStateTest.cpp"/>
+      <FILE id="MotionTrackSharing" name="MotionTrackSharingTest.cpp" compile="1"
+            resource="0" file="tests/MotionTrackSharingTest.cpp"/>
+      <FILE id="MotionKeyEasing" name="MotionKeyEasingTest.cpp" compile="1"
+            resource="0" file="tests/MotionKeyEasingTest.cpp"/>
+      <FILE id="MotionDrawing" name="MotionDrawingTest.cpp" compile="1" resource="0"
+            file="tests/MotionDrawingTest.cpp"/>
+      <FILE id="MotionParts" name="MotionPartsTest.cpp" compile="1" resource="0"
+            file="tests/MotionPartsTest.cpp"/>
+      <FILE id="MotionAnchor" name="MotionAnchorTest.cpp" compile="1" resource="0"
+            file="tests/MotionAnchorTest.cpp"/>
+      <FILE id="MotionAnimateChange" name="MotionAnimateChangeTest.cpp" compile="1"
+            resource="0" file="tests/MotionAnimateChangeTest.cpp"/>
+      <FILE id="MotionSvgSequence" name="MotionSvgSequenceTest.cpp" compile="1"
+            resource="0" file="tests/MotionSvgSequenceTest.cpp"/>
+      <FILE id="MotionLivePicture" name="MotionLivePictureTest.cpp" compile="1"
+            resource="0" file="tests/MotionLivePictureTest.cpp"/>
+      <FILE id="MotionHiddenLines" name="MotionHiddenLinesTest.cpp" compile="1"
+            resource="0" file="tests/MotionHiddenLinesTest.cpp"/>
+      <FILE id="MotionGenerators" name="MotionGeneratorsTest.cpp" compile="1"
+            resource="0" file="tests/MotionGeneratorsTest.cpp"/>
+      <FILE id="MotionLighting" name="MotionLightingTest.cpp" compile="1"
+            resource="0" file="tests/MotionLightingTest.cpp"/>
+      <FILE id="MotionReflection" name="MotionReflectionTest.cpp" compile="1"
+            resource="0" file="tests/MotionReflectionTest.cpp"/>
+      <FILE id="MotionLineStyle" name="MotionLineStyleTest.cpp" compile="1"
+            resource="0" file="tests/MotionLineStyleTest.cpp"/>
+      <FILE id="MotionEffectMove" name="MotionEffectMoveTest.cpp" compile="1"
+            resource="0" file="tests/MotionEffectMoveTest.cpp"/>
+      <FILE id="MotionTypography" name="MotionTypographyTest.cpp" compile="1"
+            resource="0" file="tests/MotionTypographyTest.cpp"/>
+      <FILE id="MotionLuaSlidersT" name="MotionLuaSlidersTest.cpp" compile="1"
+            resource="0" file="tests/MotionLuaSlidersTest.cpp"/>
+      <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
+            resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
+      <FILE id="MotionSignalT" name="MotionSignalExportTest.cpp" compile="1"
+            resource="0" file="tests/MotionSignalExportTest.cpp"/>
+      <FILE id="MotionPerfT" name="MotionPerformanceTest.cpp" compile="1"
+            resource="0" file="tests/MotionPerformanceTest.cpp"/>
+      <FILE id="MotionRasterDecoderT" name="MotionRasterDecoderTest.cpp"
+            compile="1" resource="0" file="tests/MotionRasterDecoderTest.cpp"/>
+      <FILE id="MotionRasterImportT" name="MotionRasterImportTest.cpp" compile="1"
+            resource="0" file="tests/MotionRasterImportTest.cpp"/>
+      <FILE id="MotionBakeArchiveT" name="MotionBakeArchiveTest.cpp" compile="1"
+            resource="0" file="tests/MotionBakeArchiveTest.cpp"/>
+      <FILE id="MotionLuaBakeT" name="MotionLuaBakerTest.cpp" compile="1"
+            resource="0" file="tests/MotionLuaBakerTest.cpp"/>
+      <FILE id="LuaOfflineT" name="LuaOfflinePolicyTest.cpp" compile="1"
+            resource="0" file="tests/LuaOfflinePolicyTest.cpp"/>
+      <FILE id="MotionDocT" name="MotionDocumentTest.cpp" compile="1" resource="0"
+            file="tests/MotionDocumentTest.cpp"/>
+      <FILE id="RecParamsH" name="RecordingParameters.h" compile="0" resource="0"
+            file="Source/visualiser/RecordingParameters.h"/>
+      <FILE id="RecParamsC" name="RecordingParameters.cpp" compile="1" resource="0"
+            file="Source/visualiser/RecordingParameters.cpp"/>
+      <FILE id="OfflineBeamT" name="OfflineVisualiserParametersTest.cpp"
+            compile="1" resource="0" file="tests/OfflineVisualiserParametersTest.cpp"/>
+      <FILE id="MotionDocC" name="Document.cpp" compile="1" resource="0"
+            file="Source/motion/model/Document.cpp"/>
+      <FILE id="MotionDocSer" name="DocumentSerialisation.cpp" compile="1"
+            resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
+      <FILE id="MotionDocClips" name="DocumentClips.cpp" compile="1" resource="0"
+            file="Source/motion/model/DocumentClips.cpp"/>
+      <FILE id="MotionDocSources" name="DocumentSources.cpp" compile="1" resource="0"
+            file="Source/motion/model/DocumentSources.cpp"/>
+      <FILE id="MotionDocRig" name="DocumentRig.cpp" compile="1" resource="0"
+            file="Source/motion/model/DocumentRig.cpp"/>
+      <FILE id="MotrenderHiddenLinescpp" name="HiddenLines.cpp" compile="1"
+            resource="0" file="Source/motion/render/HiddenLines.cpp"/>
+      <FILE id="MotionSrcDec" name="SourceDecoding.cpp" compile="1" resource="0"
+            file="Source/motion/import/SourceDecoding.cpp"/>
+      <FILE id="MotionRasterDecoderCpp" name="RasterDecoder.cpp" compile="1" resource="0"
+            file="Source/motion/import/RasterDecoder.cpp"/>
+    </GROUP>
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
       <GROUP id="{F3A16E09-874D-45F4-A045-20839A1CDB88}" name="video">
         <FILE id="FfEncC" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
@@ -152,6 +252,8 @@
             resource="0" file="tests/LiveRecordingSessionTests.cpp"/>
       <FILE id="WrProcT" name="WriteProcessTests.cpp" compile="1" resource="0"
             file="tests/WriteProcessTests.cpp"/>
+      <FILE id="SubPrcT" name="SubprocessTests.cpp" compile="1" resource="0"
+            file="tests/SubprocessTests.cpp"/>
       <FILE id="RecExpT" name="RecordingExporterTests.cpp" compile="1" resource="0"
             file="tests/RecordingExporterTests.cpp"/>
       <FILE id="VisTexT" name="VisualiserTextureOutputControllerTests.cpp"
@@ -184,6 +286,8 @@
       <FILE id="TstClH" name="TestCleanup.h" compile="0" resource="0" file="tests/TestCleanup.h"/>
       <FILE id="SmpAcc" name="SampleAccuracyTest.cpp" compile="1" resource="0"
             file="tests/SampleAccuracyTest.cpp"/>
+      <FILE id="PrjRate" name="ProjectRateAdapterTest.cpp" compile="1" resource="0"
+            file="tests/ProjectRateAdapterTest.cpp"/>
       <FILE id="IrsAdp" name="IntegerRatioSampleRateAdapterTest.cpp" compile="1"
             resource="0" file="tests/IntegerRatioSampleRateAdapterTest.cpp"/>
     </GROUP>
@@ -253,7 +357,7 @@
         <MODULEPATH id="melatonin_blur" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2022 targetFolder="Builds/Test/VisualStudio2022" extraCompilerFlags="/arch:AVX"
+    <VS2022 targetFolder="Builds/Test/VisualStudio2022" extraCompilerFlags="/arch:AVX /utf-8"
             extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"

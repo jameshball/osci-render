@@ -33,10 +33,15 @@ public:
     ~CommonAudioProcessor() override;
 
     void addAllParameters();
+    // Parameters left out of undo/redo; a product may leave out more (view
+    // toggles that are not edits). Called by addAllParameters, which each
+    // derived constructor calls, never the base constructor.
+    virtual bool isUndoExcluded(const juce::String& paramID) const { return paramID == "visualiserFullScreen"; }
 
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
     void clearRecentProjectFiles();
+    void removeRecentProjectFile(const juce::File& file);
     void recordingExportCompleted(const juce::File& file);
     juce::File getRecentRecordingFile(int index) const;
     int createRecentRecordingsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo, int baseItemId);
@@ -50,6 +55,8 @@ public:
 
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override final;
     virtual void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
+    // What processBlockInternal made, once brought to the device's rate.
+    virtual void afterDeviceRate(juce::AudioBuffer<float>&) {}
     virtual void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) {}
     virtual bool supportsInternalSampleRateOverride() const { return false; }
 
@@ -73,6 +80,10 @@ public:
     double getInternalSampleRateRatio() const { return internalSampleRate.getRatio(); }
     bool canSetInternalSampleRateRatio(double ratio) const;
     void setInternalSampleRateRatio(double ratio);
+    // A processing rate chosen outright, in place of the ratio, resampled to
+    // the device as it plays (osci-motion's project rate); never remembered
+    // for the app.
+    void setProcessingSampleRate(double rate);
     void loadAudioFile(const juce::File& file);
     virtual void loadAudioFile(std::unique_ptr<juce::InputStream> stream);
     virtual void stopAudioFile();
@@ -89,6 +100,9 @@ public:
     
     // Check if ffmpeg exists, if not download it
     bool ensureFFmpegExists(std::function<void()> onStart = nullptr, std::function<void()> onSuccess = nullptr);
+    // Verify the downloaded ffmpeg binary actually runs on this system.
+    // Returns true if ffmpeg -version exits successfully. Result is cached.
+    bool validateFFmpegBinary();
     
     // A static method to get the appropriate ffmpeg URL based on platform
     static juce::String getFFmpegURL();
@@ -169,6 +183,9 @@ public:
     // This is used for the File > Open Recent menu in both standalone and DAW plugin builds.
     int getNumRecentProjectFiles() const;
     juce::File getRecentProjectFile(int index) const;
+    // False for a launch that only renders (from the command line): what it
+    // opens and writes isn't added to the recent lists.
+    bool remembersFiles = true;
     void addRecentProjectFile(const juce::File& file);
     int createRecentProjectsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo,
                                           int baseItemId,
@@ -287,9 +304,6 @@ private:
     bool heartbeatActive = false;
 
 #if OSCI_PREMIUM
-    // Verify the downloaded ffmpeg binary actually runs on this system.
-    // Returns true if ffmpeg -version exits successfully. Result is cached.
-    bool validateFFmpegBinary();
     bool ffmpegValidated = false;
 #endif
 

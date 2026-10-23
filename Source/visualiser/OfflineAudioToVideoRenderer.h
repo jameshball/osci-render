@@ -29,9 +29,11 @@ public:
                                         VisualiserParameters& visualiserParameters,
                                         osci::AudioBackgroundThreadManager& threadManager,
                                         const juce::File& inputAudioFile,
+                                        const juce::File& muxAudioFile,
                                         const juce::File& outputVideoFile,
                                         VisualiserRenderer::RenderMode initialRenderMode,
-                                        VideoEncodingConfiguration encodingConfiguration);
+                                        VideoEncodingConfiguration encodingConfiguration,
+                                        std::shared_ptr<VisualiserParameters> beam = nullptr);
 
     ~OfflineAudioToVideoRendererComponent() override;
 
@@ -80,8 +82,12 @@ private:
     const VideoEncodingConfiguration encodingConfiguration;
 
     const juce::File inputAudioFile;
+    const juce::File muxAudioFile;
     const juce::File outputVideoFile;
 
+    // Must outlive preview, and keep alive whatever owns its parameters
+    // (VisualiserParameters does not): alias the owner, as osci-motion does.
+    const std::shared_ptr<VisualiserParameters> beam;
     juce::WaitableEvent glReadyEvent;
     OfflinePreviewRenderer preview;
 

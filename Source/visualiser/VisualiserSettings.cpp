@@ -1,7 +1,7 @@
 #include "VisualiserSettings.h"
 #include "VisualiserComponent.h"
 #include "RecordingSettings.h"
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 #include "../PluginProcessor.h"
 #endif
 
@@ -134,7 +134,7 @@ VisualiserSettings::~VisualiserSettings() {
     recordingParameters.canvasHeight.removeListener(this);
 }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
     lineColour.wireModulation(processor);
     lightEffects.wireModulation(processor);
@@ -159,7 +159,18 @@ void VisualiserSettings::setTransparencyControlEnabled(bool enabled) {
 }
 
 void VisualiserSettings::paint(juce::Graphics& g) {
-    g.fillAll(osci::Colours::darker());
+    g.fillAll(backgroundColour);
+}
+
+void VisualiserSettings::setSurfaceColours(juce::Colour background, juce::Colour section) {
+    backgroundColour = background;
+    for (auto* child : getChildren()) {
+        auto* settingsSection = dynamic_cast<SettingsSection*>(child);
+        if (settingsSection != nullptr) {
+            settingsSection->setColour(osci::groupComponentBackgroundColourId, section);
+        }
+    }
+    repaint();
 }
 
 void VisualiserSettings::updateScreenOverlayItemsEnabled() {

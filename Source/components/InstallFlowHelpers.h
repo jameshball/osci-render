@@ -7,6 +7,10 @@ namespace osci {
         if (juce::String (product) == "sosci") {
             return { "sosci", "sosci", "sosci", { "sosci.vst3" }, {}, "AudioVideo;Audio;" };
         }
+        // Standalone only: no plug-ins.
+        if (juce::String (product) == "osci-motion") {
+            return { "osci-motion", "osci-motion", "osci-motion", {}, {}, "AudioVideo;Audio;Graphics;" };
+        }
 
         return { "osci-render", "osci-render", "osci-render",
                  { "osci-render.vst3" }, { "osci-render-instrument.vst3" }, "AudioVideo;Audio;" };
@@ -15,6 +19,8 @@ namespace osci {
     inline juce::MemoryBlock linuxProductIconPng() {
 #if defined (SOSCI)
         return { BinaryData::sosci_mac_saturated_png, static_cast<size_t> (BinaryData::sosci_mac_saturated_pngSize) };
+#elif defined (OSCI_MOTION)
+        return { BinaryData::motion_mac_png, static_cast<size_t> (BinaryData::motion_mac_pngSize) };
 #else
         return { BinaryData::osci_mac_png, static_cast<size_t> (BinaryData::osci_mac_pngSize) };
 #endif

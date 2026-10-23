@@ -64,7 +64,7 @@ void VisualiserPresentationView::mouseDrag(const juce::MouseEvent& event) {
 void VisualiserPresentationView::mouseUp(const juce::MouseEvent& event) {
     const bool shouldTogglePause = pauseOnMouseUp && event.getDistanceFromDragStart() <= 4;
     pauseOnMouseUp = false;
-    if (shouldTogglePause) {
+    if (shouldTogglePause && owner.isPausable()) {
         owner.setPaused(!owner.isPaused());
     }
 }

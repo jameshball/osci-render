@@ -69,8 +69,8 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
     command.addArray(audioCodecArgs);
     command.addArray({ "-shortest", "-y", output.getFullPathName() });
 
-    juce::ChildProcess process;
-    if (!process.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+    osci::Subprocess process;
+    if (!process.start(command, osci::Subprocess::Output::capture)) {
         error = "Failed to start FFmpeg for audio mux.";
         return false;
     }
@@ -82,7 +82,7 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
         constexpr std::size_t maxOutputBytes = 64 * 1024;
         char buffer[4096];
         for (;;) {
-            const int count = process.readProcessOutput(buffer, sizeof(buffer));
+            const int count = process.read(buffer, sizeof(buffer));
             if (count <= 0) {
                 return;
             }
@@ -95,24 +95,23 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
 
     bool cancelled = false;
     auto* exportJob = juce::ThreadPoolJob::getCurrentThreadPoolJob();
-    while (process.isRunning()) {
+    while (!process.wait(200)) {
         if ((cancelRequested != nullptr && cancelRequested->load()) || juce::Thread::currentThreadShouldExit()
             || (exportJob != nullptr && exportJob->shouldExit())) {
             process.kill();
             cancelled = true;
             break;
         }
-        process.waitForProcessToFinish(200);
     }
     outputReader.join();
     if (cancelled) {
-        process.waitForProcessToFinish(200);
+        process.wait(200);
         error = "Cancelled.";
         return false;
     }
 
     const auto processOutput = juce::String::fromUTF8(outputTail.data(), static_cast<int>(outputTail.size()));
-    const bool succeeded = process.getExitCode() == 0 && output.existsAsFile() && output.getSize() > 0;
+    const bool succeeded = process.exitedCleanly() && output.existsAsFile() && output.getSize() > 0;
     if (!succeeded) {
         output.deleteFile();
         error = processOutput.isNotEmpty() ? processOutput : "FFmpeg mux failed.";
