@@ -21,7 +21,6 @@ public:
     static constexpr int largestFactor = 16;
 
     void prepare(double deviceRate, double rate, int maxDeviceBlock, int channels) {
-        deviceSampleRate = deviceRate;
         processingSampleRate = juce::jlimit(lowestRate, highestRate, rate);
         numChannels = juce::jmax(1, channels);
         maxDeviceBlockSize = juce::jmax(1, maxDeviceBlock);
@@ -135,7 +134,7 @@ private:
     }
     static constexpr int lookAhead = 6, guard = 16;
 
-    double deviceSampleRate = 0, processingSampleRate = 0, speed = 1;
+    double processingSampleRate = 0, speed = 1;
     bool exact = true, prefiltered = false;
     int factor = 1, numChannels = 1, maxDeviceBlockSize = 1, maxProcessingBlockSize = 1, latencySamples = 0, pendingCount = 0;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;

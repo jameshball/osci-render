@@ -25,7 +25,6 @@ public:
     [[nodiscard]] double getRatio() const noexcept { return ratio.load(); }
     // A rate chosen outright (an osci-motion project's) in place of a ratio
     // of the device's, resampled to the device as it plays; 0 for none.
-    [[nodiscard]] double getChosenRate() const noexcept { return chosenRate.load(); }
     bool setChosenRate(double rate) noexcept {
         rate = rate > 0 ? juce::jlimit(ProjectRateAdapter::lowestRate, ProjectRateAdapter::highestRate, rate) : 0.0;
         if (std::abs(rate - chosenRate.load()) < 1.0e-6) { return false; }
