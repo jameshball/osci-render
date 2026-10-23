@@ -54,8 +54,9 @@ struct ScopeRender {
             if (written.failed()) { return written; }
             source = made.getFile();
         }
-        destination.deleteFile();
-        juce::StringArray command {app.getFullPathName(), "--render-video", destination.getFullPathName(), source.getFullPathName()};
+        // Beside it until it rendered: a failed render leaves what was there.
+        const juce::TemporaryFile rendered(destination);
+        juce::StringArray command {app.getFullPathName(), "--render-video", rendered.getFile().getFullPathName(), source.getFullPathName()};
         if (!stills.empty()) {
             juce::StringArray times;
             for (const auto time : stills) { times.add(juce::String(time, 6)); }
@@ -67,10 +68,10 @@ struct ScopeRender {
         }
         const auto output = readAll(process);
         if (said != nullptr) { *said = output; }
-        if (!process.exitedCleanly() || !destination.existsAsFile()) {
+        if (!process.exitedCleanly() || !rendered.getFile().existsAsFile()) {
             return juce::Result::fail("The app couldn't render it" + (output.trim().isEmpty() ? juce::String(".") : ":\n" + output.trim()));
         }
-        return juce::Result::ok();
+        return rendered.overwriteTargetFileWithTemporary() ? juce::Result::ok() : juce::Result::fail("Couldn't write " + destination.getFullPathName() + ".");
     }
 
     // The frame of `video` at `time`, as an image.

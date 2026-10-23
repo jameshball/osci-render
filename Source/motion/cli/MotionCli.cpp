@@ -35,7 +35,7 @@ double sampleRateOf(const juce::ArgumentList& args) {
     const auto text = args.getValueForOption("--rate");
     if (text.isEmpty()) { return 0; }
     const auto rate = text.getDoubleValue();
-    if (!(rate >= 1000)) { juce::ConsoleApplication::fail("--rate must be a sample rate in Hz, such as 48000."); }
+    if (!motion::Project::validSampleRate(rate)) { juce::ConsoleApplication::fail("--rate must be a sample rate in Hz from " + juce::String(motion::Project::lowestSampleRate, 0) + " to " + juce::String(motion::Project::highestSampleRate, 0) + "."); }
     return rate;
 }
 
@@ -83,7 +83,8 @@ void writePreviews(const juce::File& video, const std::vector<double>& times, co
     if (!folder.createDirectory()) { juce::ConsoleApplication::fail("Couldn't make " + folder.getFullPathName() + "."); }
     juce::Array<juce::File> stills;
     for (std::size_t index = 0; index < times.size(); ++index) {
-        const auto file = folder.getChildFile(name + "-" + juce::String(times[index], 3) + "s.png");
+        // Its index first: two times can round to the same name.
+        const auto file = folder.getChildFile(name + "-" + juce::String(index + 1) + "-" + juce::String(times[index], 3) + "s.png");
         const auto taken = ScopeRender::still(video, at(index), file);
         if (taken.failed()) { juce::ConsoleApplication::fail(taken.getErrorMessage()); }
         stills.add(file);
@@ -175,7 +176,7 @@ void make(const juce::ArgumentList& args) {
         const std::vector<double> times {static_cast<double>(picture)};
         const juce::TemporaryFile video(videoExtension(destination)), still(".png");
         renderVideo(args, destination, video.getFile(), times);
-        const auto at = motion::Stretches::upTo(times, project.frameRate).exportTime(0, times[0]) + .5 / (project.frameRate > 0 ? project.frameRate : 60.0);
+        const auto at = motion::Stretches::upTo(times, project.frameRate, project.duration).exportTime(0, times[0]) + .5 / (project.frameRate > 0 ? project.frameRate : 60.0);
         const auto taken = ScopeRender::still(video.getFile(), at, still.getFile());
         if (taken.failed()) { juce::ConsoleApplication::fail(taken.getErrorMessage()); }
         const auto jpeg = motion::ProjectSummary::encode(juce::ImageFileFormat::loadFrom(still.getFile()));
@@ -217,7 +218,7 @@ void render(const juce::ArgumentList& args) {
         const auto whole = given.isNotEmpty() || args.containsOption("--whole");
         const auto folder = fileArgument(previews);
         if (!folder.createDirectory()) { juce::ConsoleApplication::fail("Couldn't make " + folder.getFullPathName() + "."); }
-        const auto stretches = motion::Stretches::upTo(times, composition.frameRate);
+        const auto stretches = motion::Stretches::upTo(times, composition.frameRate, composition.duration());
         const auto halfFrame = .5 / (composition.frameRate > 0 ? composition.frameRate : 60.0);
         const juce::TemporaryFile stills(videoExtension(project));
         const auto source = given.isNotEmpty() ? fileArgument(given) : renderVideo(args, project, whole ? folder.getChildFile(sceneName(project) + videoExtension(project)) : stills.getFile(), whole ? std::vector<double> {} : times);

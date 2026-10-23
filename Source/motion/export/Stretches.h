@@ -16,13 +16,13 @@ struct Stretches {
     std::vector<Stretch> list;
 
     static Stretches whole(double duration) { return {{{0, std::max(0.0, duration)}}}; }
-    // `lead` seconds up to each time, and two frames (at `frameRate`) past it,
-    // so the frame at the time is drawn whole.
-    static Stretches upTo(const std::vector<double>& times, double frameRate, double lead = .3) {
+    // `lead` seconds up to each time (kept within `duration`), and two frames
+    // (at `frameRate`) past it, so the frame at the time is drawn whole.
+    static Stretches upTo(const std::vector<double>& times, double frameRate, double duration, double lead = .3) {
         Stretches result;
         const auto frame = 1 / (frameRate > 0 ? frameRate : 60.0);
         for (const auto time : times) {
-            const auto at = std::max(0.0, time);
+            const auto at = std::isfinite(time) ? std::clamp(time, 0.0, std::max(0.0, duration)) : 0.0;
             result.list.push_back({std::max(0.0, at - lead), at + 2 * frame});
         }
         return result;
