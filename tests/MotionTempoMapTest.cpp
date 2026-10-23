@@ -248,6 +248,77 @@ public:
             const auto tempo = document.project().tempo();
             expectWithinAbsoluteError(tempo.beats(document.project().markers[0].time), 10.0, 1.0e-9);
         }
+        beginTest("Before beat 0 the initial tempo holds, so a first ramp can't make a key's time NaN");
+        {
+            const auto rising = std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{4, 240, true}});
+            const motion::Tempo ramp(120, rising);
+            expectEquals(ramp.beats(-3), -6.0);
+            expectEquals(ramp.seconds(-6), -3.0);
+            expectEquals(ramp.bpmAtBeat(-1), 120.0);
+            expectEquals(motion::Tempo(100, rising).seconds(-6), -3.6);
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            motion::Project project;
+            project.duration = 20;
+            project.timeDisplay = motion::TimeDisplay::beats;
+            project.tempoChanges = rising;
+            motion::Group group;
+            group.id = document.newId();
+            group.properties["position.x"].setKey({-3, 1, motion::Interpolation::linear});
+            group.properties["position.x"].setKey({1, 2, motion::Interpolation::linear});
+            project.groups.push_back(group);
+            document.reset(project);
+            expect(document.changeTempo(100).wasOk());
+            const auto& keys = document.project().groups[0].properties.at("position.x").keyframes();
+            expect(keys.size() == 2 && keys[0].time == -3.6, "the key before 0 keeps its beat at the initial tempo");
+            const auto tempo = document.project().tempo();
+            expectWithinAbsoluteError(tempo.beats(keys[1].time), ramp.beats(1), 1.0e-9);
+        }
+        beginTest("A ramp over a vanishing span is refused");
+        {
+            const motion::Tempo denormal(120, std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{1.0e-310, 240, true}}));
+            expect(!denormal.valid());
+            const motion::Tempo stepped(120, std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{1.0e-310, 240}}));
+            expect(stepped.valid(), "a step there has no slope to overflow");
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            motion::Project project;
+            project.duration = 20;
+            project.tempoChanges = std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{1.0e-310, 240, true}});
+            motion::Project loaded;
+            expect(motion::Document::prepareLoad(motion::Document::save(project), loaded).wasOk());
+            expect(loaded.tempoChanges == nullptr, "the map is left out on load");
+        }
+        beginTest("Conversions search the map and agree with a walk through it");
+        {
+            std::vector<motion::TempoChange> list;
+            for (int index = 1; index <= 200; ++index) { list.push_back({index * 1.5, 60.0 + (index * 37) % 300, index % 3 == 0}); }
+            const motion::Tempo tempo(90, std::make_shared<const std::vector<motion::TempoChange>>(list));
+            expect(tempo.valid());
+            // A walk summing every segment before the beat.
+            const auto walked = [&](double beat) {
+                double seconds = 0, from = 0, current = 90;
+                for (const auto& change : list) {
+                    const auto end = std::min(beat, change.beat);
+                    if (change.ramp) {
+                        const auto slope = (change.bpm - current) / (change.beat - from);
+                        seconds += std::abs(slope) < 1.0e-12 ? (end - from) * 60 / current : 60 / slope * std::log1p(slope * (end - from) / current);
+                    } else {
+                        seconds += (end - from) * 60 / current;
+                    }
+                    if (beat <= change.beat) { return seconds; }
+                    from = change.beat;
+                    current = change.bpm;
+                }
+                return seconds + (beat - from) * 60 / current;
+            };
+            for (const auto beat : {0.0, 0.75, 1.5, 2.0, 44.9, 45.0, 150.25, 299.0, 300.0, 310.0}) {
+                expectWithinAbsoluteError(tempo.seconds(beat), walked(beat), 1.0e-9);
+                expectWithinAbsoluteError(tempo.beats(tempo.seconds(beat)), beat, 1.0e-9);
+            }
+            expectEquals(tempo.bpmAtBeat(1.5), list[0].bpm);
+            expectEquals(tempo.bpmAtBeat(400), list.back().bpm);
+        }
     }
 };
 

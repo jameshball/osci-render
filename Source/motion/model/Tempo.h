@@ -17,15 +17,31 @@ struct TempoChange {
     bool valid() const { return std::isfinite(beat) && beat > 0 && std::isfinite(bpm) && bpm >= 1 && bpm <= 1000; }
 };
 
-// The project's musical clock: an initial tempo from beat 0, then stepped or
-// ramped changes. Conversions are exact and invertible (ramps integrate in
-// closed form). Construction from a plain BPM is explicit so no caller
-// silently ignores a tempo map.
+// The project's musical clock: an initial tempo from beat 0 (and before it),
+// then stepped or ramped changes. Conversions are exact and invertible (ramps
+// integrate in closed form). Construction from a plain BPM is explicit so no
+// caller silently ignores a tempo map. A map keeps the seconds at each change,
+// so a conversion is a binary search and one segment, free of allocation.
 class Tempo {
 public:
     explicit Tempo(double initialBpm = 120, std::shared_ptr<const std::vector<TempoChange>> tempoChanges = nullptr)
         : bpm(initialBpm), changes(std::move(tempoChanges)) {
         if (changes != nullptr && changes->empty()) { changes.reset(); }
+        if (changes != nullptr) {
+            // elapsed[i]: seconds at the start of change i's segment; the last
+            // entry is the seconds at the final change.
+            auto sums = std::make_shared<std::vector<double>>();
+            sums->reserve(changes->size() + 1);
+            double seconds = 0, from = 0, current = bpm;
+            sums->push_back(seconds);
+            for (const auto& change : *changes) {
+                seconds += segmentSeconds(from, current, change);
+                sums->push_back(seconds);
+                from = change.beat;
+                current = change.bpm;
+            }
+            elapsed = std::move(sums);
+        }
     }
 
     double initialBpm() const { return bpm; }
@@ -33,53 +49,57 @@ public:
     bool valid() const {
         if (!std::isfinite(bpm) || bpm < 1 || bpm > 1000) { return false; }
         if (changes == nullptr) { return true; }
-        double previous = 0;
+        double previous = 0, previousBpm = bpm;
         for (const auto& change : *changes) {
             if (!change.valid() || change.beat <= previous) { return false; }
+            // A ramp over a vanishing span (a denormal gap) has no finite slope.
+            const auto slope = (change.bpm - previousBpm) / (change.beat - previous);
+            if (change.ramp && !std::isfinite(slope)) { return false; }
             previous = change.beat;
+            previousBpm = change.bpm;
         }
         return true;
     }
 
+    // Before beat 0 the initial tempo holds, whatever the first change is.
     double seconds(double beat) const {
-        if (changes == nullptr || !std::isfinite(beat)) { return beat * 60 / bpm; }
-        double seconds = 0, from = 0, current = bpm;
-        for (const auto& change : *changes) {
-            if (beat <= change.beat) {
-                return seconds + (change.ramp ? rampSeconds(from, current, change, beat) : (beat - from) * 60 / current);
-            }
-            seconds += change.ramp ? rampSeconds(from, current, change, change.beat) : (change.beat - from) * 60 / current;
-            from = change.beat;
-            current = change.bpm;
-        }
-        return seconds + (beat - from) * 60 / current;
+        if (changes == nullptr || !std::isfinite(beat) || beat < 0) { return beat * 60 / bpm; }
+        const auto& list = *changes;
+        // The first change at or after the beat.
+        const auto index = static_cast<std::size_t>(std::lower_bound(list.begin(), list.end(), beat,
+            [](const TempoChange& change, double value) { return change.beat < value; }) - list.begin());
+        const auto from = index == 0 ? 0.0 : list[index - 1].beat;
+        const auto current = index == 0 ? bpm : list[index - 1].bpm;
+        const auto seconds = (*elapsed)[index];
+        if (index == list.size()) { return seconds + (beat - from) * 60 / current; }
+        const auto& change = list[index];
+        return seconds + (change.ramp ? rampSeconds(from, current, change, beat) : (beat - from) * 60 / current);
     }
     double beats(double time) const {
-        if (changes == nullptr || !std::isfinite(time)) { return time * bpm / 60; }
-        double seconds = 0, from = 0, current = bpm;
-        for (const auto& change : *changes) {
-            const auto length = change.ramp ? rampSeconds(from, current, change, change.beat) : (change.beat - from) * 60 / current;
-            if (time <= seconds + length) {
-                return change.ramp ? rampBeat(from, current, change, time - seconds) : from + (time - seconds) * current / 60;
-            }
-            seconds += length;
-            from = change.beat;
-            current = change.bpm;
-        }
-        return from + (time - seconds) * current / 60;
+        if (changes == nullptr || !std::isfinite(time) || time < 0) { return time * bpm / 60; }
+        const auto& list = *changes;
+        // The first segment whose end is at or after the time.
+        const auto ends = elapsed->begin() + 1;
+        const auto index = static_cast<std::size_t>(std::lower_bound(ends, elapsed->end(), time) - ends);
+        const auto from = index == 0 ? 0.0 : list[index - 1].beat;
+        const auto current = index == 0 ? bpm : list[index - 1].bpm;
+        const auto seconds = (*elapsed)[index];
+        if (index == list.size()) { return from + (time - seconds) * current / 60; }
+        const auto& change = list[index];
+        return change.ramp ? rampBeat(from, current, change, time - seconds) : from + (time - seconds) * current / 60;
     }
     // Tempo at a beat (ramps interpolate linearly in beats).
     double bpmAtBeat(double beat) const {
-        if (changes == nullptr) { return bpm; }
-        double from = 0, current = bpm;
-        for (const auto& change : *changes) {
-            if (beat < change.beat) {
-                return change.ramp ? current + (change.bpm - current) * (beat - from) / (change.beat - from) : current;
-            }
-            from = change.beat;
-            current = change.bpm;
-        }
-        return current;
+        if (changes == nullptr || beat < 0) { return bpm; }
+        const auto& list = *changes;
+        // The first change after the beat.
+        const auto index = static_cast<std::size_t>(std::upper_bound(list.begin(), list.end(), beat,
+            [](double value, const TempoChange& change) { return value < change.beat; }) - list.begin());
+        const auto from = index == 0 ? 0.0 : list[index - 1].beat;
+        const auto current = index == 0 ? bpm : list[index - 1].bpm;
+        if (index == list.size()) { return current; }
+        const auto& change = list[index];
+        return change.ramp ? current + (change.bpm - current) * (beat - from) / (change.beat - from) : current;
     }
     double bpmAt(double time) const { return changes == nullptr ? bpm : bpmAtBeat(beats(time)); }
     // The single tempo that spans [firstBeat, lastBeat] in the same time.
@@ -100,6 +120,9 @@ private:
         if (std::abs(x) < 1e-12) { return (beat - from) * 60 / start; }
         return 60 / slope * std::log1p(x);
     }
+    static double segmentSeconds(double from, double start, const TempoChange& change) {
+        return change.ramp ? rampSeconds(from, start, change, change.beat) : (change.beat - from) * 60 / start;
+    }
     static double rampBeat(double from, double start, const TempoChange& change, double elapsed) {
         const auto slope = (change.bpm - start) / (change.beat - from);
         const auto y = slope * elapsed / 60;
@@ -109,5 +132,6 @@ private:
 
     double bpm;
     std::shared_ptr<const std::vector<TempoChange>> changes;
+    std::shared_ptr<const std::vector<double>> elapsed;
 };
 }

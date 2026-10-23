@@ -453,12 +453,14 @@ static void keepBeats(Project& next, const Tempo& before, const Tempo& after, bo
     const auto scaleCurve = [&](Curve& curve) {
         auto keys = curve.keyframes();
         for (const auto& key : keys) { curve.removeKey(key.time); }
-        for (auto key : keys) {
+        for (const auto& key : keys) {
             const auto ratio = stretch(key.time);
-            key.time = remap(key.time);
-            key.incomingSlope /= ratio;
-            key.outgoingSlope /= ratio;
-            curve.setKey(key);
+            auto moved = key;
+            moved.time = remap(key.time);
+            moved.incomingSlope /= ratio;
+            moved.outgoingSlope /= ratio;
+            // A key the map can't carry (a non-finite time or slope) stays as it is.
+            curve.setKey(moved.valid() ? moved : key);
         }
     };
     const auto scaleEffects = [&](std::vector<EffectInstance>& effects) {
