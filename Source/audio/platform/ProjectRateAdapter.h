@@ -87,7 +87,10 @@ public:
         int processed = 0;
         while (pendingCount < needed) {
             const auto count = juce::jmin(maxProcessingBlockSize, needed - pendingCount);
-            juce::AudioBuffer<float> block(made.getArrayOfWritePointers(), numChannels, count);
+            // Resized within what was allocated: a buffer referring to `made`
+            // would allocate its channel list beyond 32 channels.
+            made.setSize(numChannels, count, false, false, true);
+            auto& block = made;
             block.clear();
             processInternal(block, internalMidi);
             internalMidi.clear();

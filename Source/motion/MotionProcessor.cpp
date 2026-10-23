@@ -144,6 +144,12 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     // allocating nothing).
     const auto capacity = signal.getNumSamples();
     if (capacity <= 0) { return; }
+    // Usually one piece: the buffer itself (a buffer referring to it would
+    // allocate its channel list beyond 32 channels).
+    if (buffer.getNumSamples() <= capacity) {
+        processChunk(buffer);
+        return;
+    }
     for (int start = 0; start < buffer.getNumSamples(); start += capacity) {
         juce::AudioBuffer<float> part(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), start, std::min(capacity, buffer.getNumSamples() - start));
         processChunk(part);

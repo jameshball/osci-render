@@ -107,7 +107,9 @@ public:
             const auto frame = session->input->snapshot();
             const bool visible = asset->blenderSettings.freezeOnDisconnect
                 || (status.state == BlenderReceiver::State::connected && frame.connection == status.connection);
-            entries.push_back({asset->liveIdentity, visible ? frame.source : nullptr});
+            // A live source with nothing to show resolves to nothing anyway, so
+            // only those drawing are published: stopped sessions can't fill the set.
+            if (visible && frame.source != nullptr && entries.size() < LiveSourceFrames::maximumSources) { entries.push_back({asset->liveIdentity, frame.source}); }
         }
         bool changed = entries.size() != previous.size();
         for (std::size_t index = 0; !changed && index < entries.size(); ++index) {

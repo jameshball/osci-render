@@ -135,7 +135,10 @@ private:
         }
         return true;
     }
-    bool consume(std::string_view message) {
+    // `newest` is false while more is already waiting: such a frame is only
+    // counted and captured, not prepared, so a slow preparation drops frames
+    // rather than falling behind.
+    bool consume(std::string_view message, bool newest = true) {
         if (!message.empty() && message.back() == '\r') { message.remove_suffix(1); }
         if (message == "CLOSE") { return false; }
         if (message.empty()) { return true; }
@@ -154,6 +157,12 @@ private:
             return true;
         }
         auto frame = std::make_shared<const BlenderFrame>(std::move(*decoded.frame));
+        if (!newest) {
+            const juce::SpinLock::ScopedLockType guard(lock);
+            ++status.acceptedFrames;
+            if (capture != nullptr) { capture->append(nowSeconds(), frame); }
+            return true;
+        }
         std::shared_ptr<const PreparedSource> source;
         try {
             source = prepareBlenderFrame(*frame);
@@ -212,7 +221,8 @@ private:
                 for (int index = 0; index < count && open && !threadShouldExit(); ++index) {
                     const auto ch = bytes[index];
                     if (ch == '\n') {
-                        open = consume(message);
+                        const auto newest = index + 1 == count && connection->waitUntilReady(true, 0) == 0;
+                        open = consume(message, newest);
                         message.clear();
                     } else if (ch == '\0' || message.size() >= maximumMessageBytes) {
                         reject("Blender message exceeds the input limit or contains a null byte.");
