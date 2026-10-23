@@ -793,7 +793,7 @@ juce::String MotionCompositionView::centreAnchor(motion::Id id) {
     if (!any) { return "This object has nothing to centre on"; }
     const auto centre = (low + high) * .5;
     const auto pose = motion::editor::gizmoFrameForClip(processor.document.project(), id, time);
-    if (!pose.has_value()) { return "This object's transform cannot be edited here"; }
+    if (!pose.has_value()) { return "This object's transform can't be edited here"; }
     const motion::editor::transform_detail::Affine own {{}, pose->eulerRadians, pose->evaluatedScale, {}};
     const auto local = centre - pose->evaluatedAnchor;
     const auto parent = own.direction(local);
@@ -1144,7 +1144,7 @@ juce::String MotionCompositionView::emptyMessage() const {
             if (!silenced && timing.start > now && (!next.has_value() || timing.start < *next)) { next = timing.start; }
         }
     }
-    if (!any) { return "Drop files here, or use Add source (" + motion::style::shortcutText("Cmd+I") + " imports one)"; }
+    if (!any) { return "Drop files here, or choose Add source"; }
     if (hidden) { return "Clips here are on muted or un-soloed tracks"; }
     const auto grid = project.timeGrid();
     const auto at = "Nothing on screen at " + juce::String(grid.positionLabel(now));

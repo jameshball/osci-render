@@ -68,7 +68,7 @@ private:
                 result->composition = std::make_unique<PreparedComposition>(job->project, job->rate, &job->cancel, CompositionPurpose::signal, job->reach);
                 result->error = result->composition->preparationError;
             } catch (...) {
-                result->error = "Could not prepare the composition for playback.";
+                result->error = "Couldn't prepare the composition for playback.";
             }
             std::unique_ptr<Result> obsolete;
             bool notify = false;

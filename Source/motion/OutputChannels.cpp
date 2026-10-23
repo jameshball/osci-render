@@ -63,11 +63,11 @@ juce::Result configureOutputOnlyChannels(juce::StandalonePluginHolder& holder, i
         return juce::Result::fail(reason);
     };
     if (!holder.processor->setBusesLayout(layout)) {
-        return rollback("The processor could not apply the requested output layout.");
+        return rollback("Couldn't switch to the chosen outputs.");
     }
     const auto error = holder.deviceManager.setAudioDeviceSetup(setup, true);
     if (error.isNotEmpty()) {
-        return rollback("The audio device could not enable the requested outputs: " + error);
+        return rollback("The audio device couldn't turn on the chosen outputs: " + error);
     }
     const auto matches = [&] {
         const auto* currentDevice = holder.deviceManager.getCurrentAudioDevice();
@@ -82,7 +82,7 @@ juce::Result configureOutputOnlyChannels(juce::StandalonePluginHolder& holder, i
     holder.startPlaying();
     // AudioProcessorPlayer may negotiate a layout when it reattaches.
     if (!matches()) {
-        return rollback("Playback could not retain the requested output layout.");
+        return rollback("Playback couldn't keep the chosen outputs.");
     }
     return juce::Result::ok();
 }

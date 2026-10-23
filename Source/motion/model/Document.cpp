@@ -132,7 +132,7 @@ void Document::refreshScope() {
 juce::Result Document::setMarker(Id id, double time, juce::String name) {
     name = name.trim();
     if (!std::isfinite(time) || time < 0 || time > project().duration) { return juce::Result::fail("Place the marker within the composition duration."); }
-    if (!Marker::validName(name)) { return juce::Result::fail("Use a marker name of 1-120 characters on one line."); }
+    if (!Marker::validName(name)) { return juce::Result::fail(juce::String::fromUTF8("Use a marker name of 1\xe2\x80\x93" "120 characters on one line.")); }
     const auto& markers = project().markers;
     const auto found = std::find_if(markers.begin(), markers.end(), [id](const auto& marker) { return marker.id == id; });
     const bool adding = id == 0;
@@ -505,7 +505,7 @@ juce::Result Document::setTempoChange(double beat, double bpm, std::optional<dou
     changes.push_back({beat, bpm, glide});
     std::sort(changes.begin(), changes.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
     auto shared = std::make_shared<const std::vector<TempoChange>>(std::move(changes));
-    if (!Tempo(current.bpm, shared).valid()) { return juce::Result::fail("A tempo change needs a position after the start and 1-1000 BPM."); }
+    if (!Tempo(current.bpm, shared).valid()) { return juce::Result::fail(juce::String::fromUTF8("A tempo change needs a position after the start and 1\xe2\x80\x93" "1000 BPM.")); }
     return retempo(std::move(shared), replacing.has_value() ? "Edit tempo change" : "Add tempo change");
 }
 

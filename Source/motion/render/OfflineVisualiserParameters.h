@@ -86,7 +86,7 @@ public:
 
     explicit OfflineVisualiserParameters(VisualiserParameters& source, ExternalModulation external = ExternalModulation::reject) : OfflineVisualiserParameters() {
         if (source.applyExternalModulation && external == ExternalModulation::reject) {
-            throw std::invalid_argument("External processor modulation cannot be captured as an independent offline beam snapshot.");
+            throw std::invalid_argument("External processor modulation can't be captured as an independent offline beam snapshot.");
         }
         copyEffects(source.effects, params.effects);
         copyEffects(source.audioEffects, params.audioEffects);

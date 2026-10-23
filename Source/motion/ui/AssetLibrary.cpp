@@ -63,13 +63,8 @@ void MotionAssetLibrary::setImportStatus(const juce::String& message) {
 void MotionAssetLibrary::refresh() {
     builtFrom = shownInputs();
     const auto selectedId = assetId(list.getSelectedRow());
-    // With nothing to search, no search field: the list stays blank under Add source.
-    const auto searchable = !document.project().assets.empty() || !document.mainProject().definitions.empty();
-    if (searchable != search.isVisible()) {
-        if (!searchable) { search.clear(); }
-        search.setVisible(searchable);
-        resized();
-    }
+    // A search field only once there is more than the list shows at once.
+    if (wantsSearch() != search.isVisible()) { resized(); }
     const auto filter = search.getText().trim();
     assets.clear();
     definitions.clear();
@@ -140,8 +135,18 @@ juce::String MotionAssetLibrary::getTooltipForRow(int row) {
     return {};
 }
 
+bool MotionAssetLibrary::wantsSearch() const {
+    // Kept while it filters or is typed in, so filtering can't hide it.
+    if (search.getText().isNotEmpty() || search.hasKeyboardFocus(false)) { return true; }
+    const auto rows = static_cast<int>(document.project().assets.size() + document.mainProject().definitions.size());
+    // The list's room without the field: the panel less what sits at its foot.
+    const auto room = getHeight() - (cancelImport.isVisible() ? 30 : 0) - status.getHeight();
+    return rows * list.getRowHeight() > room;
+}
+
 void MotionAssetLibrary::resized() {
     auto area = getLocalBounds();
+    search.setVisible(wantsSearch());
     if (search.isVisible()) {
         // Lined up with Add source above it and the rows below.
         search.setBounds(area.removeFromTop(motion::style::controlHeight).reduced(4, 0));

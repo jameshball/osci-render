@@ -14,8 +14,6 @@ struct StartCard {
     juce::Image picture;
     juce::File file;
     juce::String resource;
-    // The project open now: choosing it just carries on with it.
-    bool open = false;
     bool isExample() const { return resource.isNotEmpty(); }
 };
 
@@ -198,9 +196,7 @@ private:
         overlay->requestDismiss();
     }
     void choose(const StartCard& card) {
-        if (card.open) {
-            finish({});
-        } else if (card.isExample()) {
+        if (card.isExample()) {
             finish([open = actions.openExample, resource = card.resource] { if (open != nullptr) { open(resource); } });
         } else {
             finish([open = actions.openRecent, file = card.file] { if (open != nullptr) { open(file); } });
@@ -475,7 +471,7 @@ private:
             }
             const auto& card = *placed[static_cast<std::size_t>(index)].card;
             juce::PopupMenu menu;
-            menu.addItem(1, card.open ? "Continue" : "Open");
+            menu.addItem(1, "Open");
             if (!card.isExample()) {
 #if JUCE_MAC
                 menu.addItem(2, "Show in Finder");
@@ -643,16 +639,6 @@ private:
                 // A faint sheen along the top edge, as on glass.
                 g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(.05f), picture.getX(), picture.getY(), juce::Colours::transparentWhite, picture.getX(), picture.getY() + picture.getHeight() * .45f, false));
                 g.fillRect(picture);
-                if (card.open) {
-                    const auto badge = juce::Rectangle<float>(picture.getX() + 8, picture.getY() + 8, juce::TextLayout::getStringWidth(style::caption(), "Open now") + 26, 20);
-                    g.setColour(juce::Colours::black.withAlpha(.6f));
-                    g.fillRoundedRectangle(badge, 10.0f);
-                    g.setColour(style::accent());
-                    g.fillEllipse(badge.getX() + 7, badge.getCentreY() - 2.5f, 5, 5);
-                    g.setFont(style::caption());
-                    g.setColour(osci::Colours::text());
-                    g.drawText("Open now", badge.withTrimmedLeft(16), juce::Justification::centredLeft, false);
-                }
             }
             if (chosen) {
                 g.setColour(style::accent());

@@ -17,7 +17,7 @@ public:
         }
         return writePrepared(PreparedSoundtrack(snapshot), snapshot.duration, destination, sampleRate, cancel, progress);
     } catch (...) {
-        return juce::Result::fail("Cannot prepare the audio for WAV export.");
+        return juce::Result::fail("Couldn't prepare the audio for export.");
     }
 
     static juce::Result write(const PreparedComposition& composition, const juce::File& destination, double sampleRate, const std::atomic<bool>& cancel, std::atomic<double>* progress = nullptr) {

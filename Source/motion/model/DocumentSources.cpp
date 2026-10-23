@@ -167,7 +167,7 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
 
 juce::Result Document::renameAsset(Id assetId, juce::String name) {
     name = name.trim();
-    if (name.isEmpty() || name.length() > 200 || name.containsAnyOf("\r\n")) { return juce::Result::fail("Use a source name of 1-200 characters on one line."); }
+    if (name.isEmpty() || name.length() > 200 || name.containsAnyOf("\r\n")) { return juce::Result::fail(juce::String::fromUTF8("Use a source name of 1\xe2\x80\x93" "200 characters on one line.")); }
     const auto& assets = mainProject().assets;
     const auto found = findAsset(assets, assetId);
     if (found == nullptr) { return juce::Result::fail("The source no longer exists."); }

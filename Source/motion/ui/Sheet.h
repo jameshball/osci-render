@@ -8,8 +8,9 @@
 namespace motion::ui {
 // The inside of a modal sheet: a title on the left (with the file it is
 // about, muted, beside it), a form, and a footer with Cancel and the one
-// action the sheet exists for. The overlay supplies the panel, the dimmed
-// window behind it and the close button, which lines up with the title.
+// action the sheet exists for. The overlay supplies the panel and the
+// dimmed window behind it. Cancel and Escape close a sheet; only a reference
+// (no footer) has a close button, a quiet one in line with the title.
 class Sheet : public juce::Component, private juce::KeyListener {
 public:
     Sheet(const juce::String& heading, const juce::String& about, const juce::String& verb) : title(heading), subtitle(about) {
@@ -22,9 +23,10 @@ public:
         cancel.setButtonText("Cancel");
         cancel.setName("Cancel");
         cancel.onClick = [this] { close(); };
-        closeButton.setIconPadding(4);
+        closeButton.setIconPadding(6);
+        closeButton.setColours(osci::Colours::textMuted(), osci::Colours::text());
         closeButton.onClick = [this] { close(); };
-        addAndMakeVisible(closeButton);
+        addChildComponent(closeButton);
         addAndMakeVisible(cancel);
         addAndMakeVisible(primary);
     }
@@ -58,9 +60,10 @@ public:
     // A form of fixed-width controls, optionally beside a square preview.
     static int widthFor(int preview = 0) { return (preview > 0 ? preview + 24 : 0) + caption + control; }
 
-    // The sheet closes itself (its own close button, Cancel and Escape), so
-    // the overlay's larger close button goes. A form keeps what's typed in
-    // it from a stray click outside; a reference (no footer) closes on one.
+    // The sheet closes itself (Cancel and Escape, or a reference's own
+    // close button), so the overlay's larger close button goes. A form keeps
+    // what's typed in it from a stray click outside; a reference (no footer)
+    // closes on one.
     // The overlay holds the keyboard while it animates in, so the sheet
     // listens to its keys too.
     void parentHierarchyChanged() override {
@@ -79,7 +82,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        auto header = getLocalBounds().removeFromTop(headerHeight).withTrimmedRight(32);
+        auto header = getLocalBounds().removeFromTop(headerHeight).withTrimmedRight(closeButton.isVisible() ? 32 : 0);
         g.setFont(style::title());
         g.setColour(osci::Colours::text());
         const auto titleWidth = juce::roundToInt(juce::TextLayout::getStringWidth(style::title(), title)) + 1;
@@ -149,19 +152,21 @@ protected:
     juce::TextButton primary, cancel;
     // Return clicks the action, unless it loses something.
     bool returnConfirms = true;
-    // Sheets that only show something (a reference) have no footer.
+    // Sheets that only show something (a reference) have no footer, so
+    // they close with a button of their own.
     void removeFooter() {
         footer = false;
         primary.setVisible(false);
         cancel.setVisible(false);
+        closeButton.setVisible(true);
     }
     // The footer's free space left of the buttons, for a status line.
     juce::Rectangle<int> footerLeft;
     bool footer = true;
     juce::Component::SafePointer<osci::OverlayComponent> host;
-    osci::CloseButton closeButton {"Close"};
 
 private:
+    osci::CloseButton closeButton {"Close"};
     juce::String title, subtitle;
 };
 }
@@ -314,8 +319,6 @@ public:
             cancel.setEnabled(false);
             status.setText("Cancelling...", juce::dontSendNotification);
         };
-        // Closing means cancelling: the close button and Escape do the same.
-        closeButton.onClick = [this] { if (cancel.isEnabled()) { cancel.triggerClick(); } };
         status.setText(message, juce::dontSendNotification);
         status.setFont(style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());

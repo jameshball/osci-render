@@ -23,10 +23,10 @@ public:
             BoundedOutput output;
             {
                 juce::GZIPCompressorOutputStream compressor(output, 6, 31);
-                if (!compressor.write(raw.bytes.data(), raw.bytes.size())) { return { {}, "Could not compress baked source." }; }
+                if (!compressor.write(raw.bytes.data(), raw.bytes.size())) { return { {}, "Couldn't compress the baked source." }; }
                 compressor.flush();
             }
-            if (output.failed || output.data.getSize() == 0) { return { {}, "Compressed baked source exceeds 64 MiB or could not be written." }; }
+            if (output.failed || output.data.getSize() == 0) { return { {}, "Compressed baked source exceeds 64 MiB or couldn't be written." }; }
             return { std::move(output.data), {} };
         } catch (const std::bad_alloc&) {
             return { {}, "Not enough memory to compress baked source." };
@@ -40,7 +40,7 @@ public:
                 return { nullptr, "Compressed baked source must contain 1 byte to 64 MiB." };
             }
             Inflater inflater;
-            if (!inflater.valid) { return { nullptr, "Could not initialise baked source decompression." }; }
+            if (!inflater.valid) { return { nullptr, "Couldn't start decompressing the baked source." }; }
             auto& stream = inflater.stream;
             stream.next_in = static_cast<const Bytef*>(data.getData());
             stream.avail_in = static_cast<uInt>(data.getSize());

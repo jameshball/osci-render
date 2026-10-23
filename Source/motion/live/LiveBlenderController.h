@@ -87,7 +87,7 @@ public:
         switch (status.state) {
             case BlenderReceiver::State::connected: return "Connected" + dot + juce::String(status.acceptedFrames) + (status.acceptedFrames == 1 ? " frame received" : " frames received");
             case BlenderReceiver::State::listening: return "Listening on port " + juce::String(status.port) + dot + "waiting for Blender";
-            case BlenderReceiver::State::failed: return "Could not start the listener";
+            case BlenderReceiver::State::failed: return "Couldn't start the listener";
             case BlenderReceiver::State::stopped: return asset->blenderSettings.freezeOnDisconnect && session->input->snapshot().source != nullptr ? "Stopped" + dot + "last frame frozen" : juce::String("Stopped");
         }
         return {};

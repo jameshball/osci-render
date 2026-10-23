@@ -548,7 +548,7 @@ void MotionEditor::placeClipAtPlayhead(bool start, bool trim) {
         }
     }
     if (timings.empty()) {
-        if (skipped > 0) { statusBar.show(trim ? "The playhead is outside the selected clips." : "The selected clips cannot start before 0."); }
+        if (skipped > 0) { statusBar.show(trim ? "The playhead is outside the selected clips." : "The selected clips can't start before 0."); }
         return;
     }
     const auto result = processor.document.setClipTimings(timings);
@@ -600,11 +600,12 @@ void MotionEditor::splitAtPlayhead() {
 void MotionEditor::showShortcuts() {
     using Overlay = MotionShortcutsOverlay;
     std::vector<Overlay::Section> sections;
-    const std::array<std::pair<int, const char*>, 5> menuOrder {{{transportMenu, "Transport"}, {editMenu, "Edit"}, {clipMenu, "Clip and keys"}, {viewMenu, "View"}, {fileMenu, "File"}}};
+    // The menus in the menu bar's order, then the panels, then moving about.
+    const std::array<std::pair<int, const char*>, 5> menuOrder {{{fileMenu, "File"}, {editMenu, "Edit"}, {clipMenu, "Clip and keys"}, {transportMenu, "Transport"}, {viewMenu, "View"}}};
     for (const auto& [menu, title] : menuOrder) {
         Overlay::Section section {title, {}};
         if (menu == fileMenu) {
-            for (const auto& [keys, action] : std::initializer_list<std::pair<const char*, const char*>> {{"Cmd+N", "New project"}, {"Cmd+O", "Open project"}, {"Cmd+S", "Save project"}, {"Cmd+Shift+S", "Save project as"}}) {
+            for (const auto& [keys, action] : std::initializer_list<std::pair<const char*, const char*>> {{"Cmd+N", "New project"}, {"Cmd+O", "Open project"}, {"Cmd+S", "Save project"}, {"Cmd+Shift+S", "Save project as"}, {"Cmd+I", "Import source"}}) {
                 section.entries.push_back({keys, action});
             }
         }
@@ -619,17 +620,17 @@ void MotionEditor::showShortcuts() {
         sections.push_back(std::move(section));
     }
     sections.push_back({"Timeline", {{"V / B / S / R", "Move, ripple trim, slip and stretch tools"}, {"M", "Add a marker at the playhead"}, {"Cmd+click the ruler", "Move the nearer loop point there"},
-        {"Drag empty space", "Select clips (Shift adds)"}, {"Shift+click a clip", "Select every clip from the last one clicked (Cmd too: add them)"}, {"Cmd+click a clip", "Add or remove it"}, {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"},
-        {"Double-click a lane", "Add a key"}, {"Alt+Left / Right", "Nudge the selected keys, or else clips, a frame (Shift: ten)"}}});
-    sections.push_back({"Scrolling and zoom (timeline, graph)", {{"Wheel / two fingers", "Pan (Shift: horizontal)"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
-        {"Alt+wheel", "Track height, value range or key height"}, {"Middle-drag", "Grab and move the view"}}});
+        {"Drag empty space", "Select clips (Shift adds)"}, {"Shift+click a clip", "Select a range of clips"}, {"Cmd+Shift+click a clip", "Add a range of clips"}, {"Cmd+click a clip", "Add or remove a clip"},
+        {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"}, {"Double-click a lane", "Add a key"},
+        {"Alt+Left / Right", "Nudge keys or clips a frame"}, {"Alt+Shift+Left / Right", "Nudge keys or clips ten frames"}}});
     sections.push_back({"Graph", {{"Double-click", "Add a key"}, {"Drag a box", "Select keys (Shift adds)"}, {"Drag box edges", "Scale key times"},
         {"F / Shift+F", "Frame all curves / this curve"}, {"Right-click a key", "Interpolation and easing"}, {"Drag the time axis", "Scrub"},
-        {"Alt+arrows", "Nudge the selected keys (Shift: further)"}, {"Right-click a curve's name", "Show or hide curves"}}});
-    sections.push_back({"Scene", {{"G / R / S", "Move, rotate and scale tools"}, {"Y", "Anchor tool"}, {"Tab", "Pick parts (Cmd+A all, E extracts them)"}, {"F", "Frame the selection"}, {"0", "Reset the view"},
-        {"Click again", "Select what is behind (pause between clicks)"},
-        {"1 / 3 / 7", "Front, right and top views (Ctrl: opposite side)"}, {"N", "Fly through the scene"}, {"P", "Show the motion path"},
+        {"Alt+arrows", "Nudge the selected keys"}, {"Alt+Shift+arrows", "Nudge them further"}, {"Right-click a curve's name", "Show or hide curves"}}});
+    sections.push_back({"Scene", {{"G / R / S", "Move, rotate and scale tools"}, {"Y", "Anchor tool"}, {"Tab", "Pick parts"}, {"E", "Extract the picked parts"}, {"F", "Frame the selection"}, {"0", "Reset the view"},
+        {"Click again", "Select what is behind"}, {"1 / 3 / 7", "Front, right and top views"}, {"Ctrl+1 / 3 / 7", "Back, left and bottom views"}, {"N", "Fly through the scene"}, {"P", "Show the motion path"},
         {"Two fingers / wheel", "Orbit / zoom"}, {"Shift + two fingers", "Pan"}, {"Alt+drag", "Orbit with the mouse"}}});
+    sections.push_back({"Navigation", {{"Wheel / two fingers", "Pan the timeline or graph"}, {"Shift+wheel", "Pan sideways"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
+        {"Alt+wheel", "Track height, value range or key height"}, {"Middle-drag", "Grab and move the view"}}});
     Overlay::show(*this, std::move(sections));
 }
 
@@ -656,7 +657,8 @@ void MotionEditor::showStartScreen() {
     std::vector<motion::ui::StartCard> recents, examples;
     for (int index = 0; index < processor.getNumRecentProjectFiles(); ++index) {
         const auto file = processor.getRecentProjectFile(index);
-        if (!file.existsAsFile()) {
+        // The project open now is Continue's, not one to switch to.
+        if (!file.existsAsFile() || file == current) {
             continue;
         }
         const auto summary = motion::ProjectSummary::peek(file);
@@ -667,11 +669,8 @@ void MotionEditor::showStartScreen() {
         card.when = edited(file.getLastModificationTime());
         card.file = file;
         card.picture = summary.picture;
-        card.open = file == current;
         recents.push_back(std::move(card));
     }
-    // The project open now comes first.
-    std::stable_partition(recents.begin(), recents.end(), [](const motion::ui::StartCard& card) { return card.open; });
     for (const auto& resource : exampleProjects()) {
         motion::ui::StartCard card;
         card.name = motion::ui::examples::displayName(resource);
@@ -932,7 +931,7 @@ void MotionEditor::detectTempo() {
             owner->detectingTempo = false;
             if (owner->processor.document.generation() != generation) { return; }
             if (!estimate.has_value()) {
-                owner->statusBar.show("Could not find a steady tempo in the audio. Set it by hand or tap it.", MotionStatusBar::Kind::warning);
+                owner->statusBar.show("Couldn't find a steady tempo in the audio. Set it by hand or tap it.", MotionStatusBar::Kind::warning);
                 return;
             }
             double moved = 0;

@@ -587,7 +587,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         // A linked file is read where it is, never all in memory at once.
         std::unique_ptr<juce::AudioFormatReader> reader(asset.isLinked() ? formats.createReaderFor(asset.linked) : formats.createReaderFor(std::make_unique<juce::MemoryInputStream>(asset.data, false)));
         if (reader == nullptr || reader->lengthInSamples <= 0) {
-            return juce::Result::fail("Cannot decode this audio file. Check its contents and whether its codec is enabled in this build.");
+            return juce::Result::fail("Couldn't decode this audio file. Check its contents and whether its codec is enabled in this build.");
         }
         const auto prepared = PreparedAudio::create(reader->sampleRate, reader->numChannels, static_cast<std::uint64_t>(reader->lengthInSamples),
             [&](float* const* channels, std::size_t channelCount, std::size_t first, std::size_t frames) {

@@ -186,7 +186,7 @@ void MotionEditor::exportVideo(bool leaveOutLive) {
                 const auto destination = withExtension(selected.getResult(), config.fileExtension);
                 if (!destination.getFileExtension().equalsIgnoreCase("." + config.fileExtension)) {
                     owner->exportState.reset();
-                    owner->statusBar.show("Video export requires a ." + config.fileExtension + " filename. Choose Export video again and use that extension.");
+                    owner->statusBar.show(juce::String(VideoEncodingConstants::getVideoCodecInfo(config.codec).displayName) + " videos are ." + config.fileExtension + " files. Export again and name it ." + config.fileExtension + ".");
                     return;
                 }
                 owner->processor.setLastOpenedDirectory(destination.getParentDirectory());
@@ -238,7 +238,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                     }
                 }
             } catch (...) {
-                result = juce::Result::fail("Could not prepare the composition for video export.");
+                result = juce::Result::fail("Couldn't prepare the video for export.");
             }
             // Native save-dialog callbacks have returned before this starts
             // the shared GL renderer and its own cancellable progress overlay.
@@ -294,6 +294,13 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
 #endif
 }
 
+#if OSCI_PREMIUM
+// A render that failed says so as osci-motion's other failures do.
+void MotionEditor::showOfflineRenderFailure(const juce::String& errorMessage, const juce::File& outputFile) {
+    motion::ui::MessageSheet::show(*this, "Couldn't export the video", errorMessage.isNotEmpty() ? errorMessage : "Something went wrong while rendering it.", "OK", {}, outputFile.getFileName());
+}
+#endif
+
 // Standalone batch render: osci-motion --render-video <out.mp4> <project.osci-motion>
 // opens the project, renders it with the canvas and project frame rate, then quits.
 void MotionEditor::handleCommandLine(const juce::String& commandLine) {
@@ -347,7 +354,7 @@ void MotionEditor::failCommandLineRender(const juce::String& message) {
 void MotionEditor::continueCommandLineRender() {
 #if OSCI_PREMIUM
     if (commandLineRender == juce::File() || commandLineRenderStarted || projectLoad != nullptr || processor.isPreparingComposition() || exportState != nullptr) { return; }
-    if (commandLineProject == CommandLineProject::failed) { failCommandLineRender("the project could not be opened."); return; }
+    if (commandLineProject == CommandLineProject::failed) { failCommandLineRender("the project couldn't be opened."); return; }
     if (commandLineProject != CommandLineProject::loaded) { return; }
     if (processor.getPreparationError().isNotEmpty()) { failCommandLineRender(processor.getPreparationError()); return; }
     // Lua sliders bake in the background: frames drawn before they land
@@ -423,17 +430,16 @@ void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutL
         const auto destination = withExtension(chosen, "wav");
         if (!destination.getFileExtension().equalsIgnoreCase(".wav")) {
             owner->exportState.reset();
-            owner->statusBar.show("Audio exports as a .wav file. Choose Export audio again and use that extension.");
+            owner->statusBar.show("Audio exports are .wav files. Export again and name it .wav.");
             return;
         }
         owner->whenReplaceable(chosen, destination, state, [owner, state, leaveOutLive, mode, beam, destination] {
             const auto project = leaveOutLive ? motion::Document::withoutLiveSources(owner->processor.document.mainProject()) : owner->processor.document.mainProject();
             const auto reach = owner->processor.canvasReach();
             const auto baked = owner->processor.hiddenLineBake();
-            owner->exportBar.setName("Audio export progress");
-            owner->exportProgress = 0;
-            owner->exportBar.setVisible(true);
-            owner->cancelExport.setVisible(true);
+            // Its progress shows in the status bar, which the result then takes.
+            owner->exportTask = "Exporting " + destination.getFileName();
+            owner->statusBar.showTask(owner->exportTask + motion::style::dot() + "0%", "Cancel", [state] { state->cancelled.store(true); });
             owner->exports.addJob([owner, state, project, destination, reach, baked, mode, beam] {
                 const auto result = beam ? motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress, reach, baked.get(), mode)
                                          : motion::SoundtrackExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress);
@@ -442,8 +448,8 @@ void MotionEditor::exportSignal(MotionProcessor::OutputMode mode, bool leaveOutL
                         return;
                     }
                     owner->exportState.reset();
-                    owner->exportBar.setVisible(false);
-                    owner->cancelExport.setVisible(false);
+                    owner->exportTask.clear();
+                    owner->statusBar.endTask();
                     if (result.failed() && !state->cancelled.load()) {
                         owner->statusBar.show(result.getErrorMessage());
                     } else if (result.wasOk() && !state->cancelled.load()) {

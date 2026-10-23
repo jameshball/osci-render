@@ -144,3 +144,22 @@ private:
     osci::ToggleAnimationController slide {this};
 };
 }
+
+// Record, with the red dot every recorder uses before its name: how a live
+// picture or Blender source starts a capture.
+class MotionRecordButton final : public juce::TextButton {
+public:
+    static constexpr int inset = 10, dot = 8, gap = 6;
+    int bestWidth() { return inset + dot + gap + juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::buttonFont(*this), getButtonText()))) + inset; }
+    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
+        getLookAndFeel().drawButtonBackground(g, *this, findColour(buttonColourId), highlighted, down);
+        auto area = getLocalBounds().reduced(inset, 0);
+        const auto alpha = isEnabled() ? 1.0f : .4f;
+        g.setColour(motion::style::error().withMultipliedAlpha(alpha));
+        g.fillEllipse(area.removeFromLeft(dot).withSizeKeepingCentre(dot, dot).toFloat());
+        area.removeFromLeft(gap);
+        g.setColour(osci::Colours::text().withMultipliedAlpha(isEnabled() ? 1.0f : .5f));
+        g.setFont(motion::style::buttonFont(*this));
+        g.drawText(getButtonText(), area, juce::Justification::centredLeft, false);
+    }
+};

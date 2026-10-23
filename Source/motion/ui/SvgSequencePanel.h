@@ -12,10 +12,10 @@
 class MotionSvgSequencePanel final : public motion::ui::Sheet {
 public:
     explicit MotionSvgSequencePanel(juce::Array<juce::File> chosen)
-        : Sheet("Import " + juce::String(chosen.size()) + " SVGs", chosen.getFirst().getFileName() + juce::String::fromUTF8(" \xe2\x80\x93 ") + chosen.getLast().getFileName(), "Import"),
+        : Sheet("Add " + juce::String(chosen.size()) + " SVGs", chosen.getFirst().getFileName() + juce::String::fromUTF8(" \xe2\x80\x93 ") + chosen.getLast().getFileName(), "Add"),
           files(std::move(chosen)) {
         setName("SVG sequence import");
-        nameAction("Import SVGs");
+        nameAction("Add SVGs");
         mode.setTooltip("Animation plays the SVGs as frames, in name order; Separate adds a source for each");
         mode.setSelected(motion::svgsequence::numbered(files) ? 0 : 1);
         mode.onChange = [this](int) { refresh(); };

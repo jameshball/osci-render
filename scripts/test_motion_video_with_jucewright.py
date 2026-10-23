@@ -80,7 +80,7 @@ try:
         step("choose tracing detail", "select-option", "--name", "Image detail", "--class", "juce::ComboBox", "--exact", "--text", "64 px")
         step("choose sample count", "select-option", "--name", "Image samples per frame", "--class", "juce::ComboBox", "--exact", "--text", "1024")
         step("video settings", "screenshot", "--file", session.artifact_dir / (name + "-settings.png"))
-        step("prepare " + name, "click", "--name", "Prepare video", "--class", "juce::TextButton", "--exact")
+        step("add " + name, "click", "--name", "Add video", "--class", "juce::TextButton", "--exact")
         # Generous: a Debug build preparing video in a VM takes far longer than on a Mac.
         command("wait-for-locator", "--name", name, "--role", "label", "--exact", "--timeout-ms", "120000")
     state = save()
@@ -96,7 +96,7 @@ try:
     session.hover_selected_source()
     step("edit video source", "click", "--name", "Video settings...", "--exact")
     step("change bake rate", "set-value", "--name", "Video bake frame rate", "--exact", "12")
-    step("rebuild video source", "click", "--name", "Prepare video", "--exact")
+    step("rebuild video source", "click", "--name", "Apply video settings", "--exact")
     wait_undo("Change source settings")
     state = save()
     assert float(state.findall("asset")[-1].find("raster").get("frameRate")) == 12
@@ -113,19 +113,19 @@ try:
     assert ET.tostring(save()) == saved
     step("reopened video project", "screenshot", "--file", session.artifact_dir / "video-reopened.png")
     step("import corrupt video", "drop-files", "--file", fixtures / "corrupt.mp4", "--class", "MotionEditor", "--exact")
-    step("prepare corrupt video", "click", "--name", "Prepare video", "--exact")
-    command("wait-for-locator", "--name", "Cannot decode this video. Check that it contains a supported, undamaged video stream.", "--role", "label", "--exact", "--timeout-ms", "30000")
+    step("add corrupt video", "click", "--name", "Add video", "--exact")
+    command("wait-for-locator", "--name", "Couldn't decode this video. Check that it contains a supported, undamaged video stream.", "--role", "label", "--exact", "--timeout-ms", "30000")
     assert ET.tostring(save()) == saved
     step("video failure message", "screenshot", "--file", session.artifact_dir / "video-failure.png")
     step("import single frame", "drop-files", "--file", fixtures / "single-frame.mp4", "--class", "MotionEditor", "--exact")
     step("match single frame rate", "set-value", "--name", "Video bake frame rate", "--exact", "24")
-    step("prepare single frame", "click", "--name", "Prepare video", "--exact")
+    step("add single frame", "click", "--name", "Add video", "--exact")
     command("wait-for-locator", "--name", "single-frame.mp4", "--role", "label", "--exact", "--timeout-ms", "30000")
     assert abs(float(save().findall("track/clip")[-1].get("duration")) - 1 / 24) < 1e-12
     step("compact video workspace", "resize-window", "--w", "1100", "--h", "740")
     session.hover_selected_source()
     step("compact video settings", "click", "--name", "Video settings...", "--exact")
-    command("wait-for-locator", "--name", "Prepare video", "--class", "juce::TextButton", "--exact")
+    command("wait-for-locator", "--name", "Apply video settings", "--class", "juce::TextButton", "--exact")
     command("wait", "--ms", "500")
     step("compact settings screenshot", "screenshot", "--file", session.artifact_dir / "compact-video-settings.png")
     print("MP4/MOV preparation, source edit, undo/redo and archived reopen passed", flush=True)

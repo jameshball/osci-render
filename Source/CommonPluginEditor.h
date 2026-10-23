@@ -79,6 +79,8 @@ protected:
 #if OSCI_PREMIUM
     // The title over an offline render's progress.
     virtual juce::String offlineRenderTitle() const { return "Render Audio File to Video"; }
+    // Says an offline render to `outputFile` failed; `errorMessage` may be empty.
+    virtual void showOfflineRenderFailure(const juce::String& errorMessage, const juce::File& outputFile);
     // Completion retains caller resources until the worker and OpenGL renderer
     // have stopped, and is told whether the render succeeded. It also runs
     // (unsuccessful) on failed launch/editor teardown: cleanup only. A beam,

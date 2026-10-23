@@ -74,7 +74,7 @@ juce::Result Document::applyCutRange(Project& project, Id cut, double start, dou
         return juce::Result::fail("A cut must stay inside the composition and last at least one frame.");
     }
     for (const auto& other : project.cameraCuts) {
-        if (other.id != cut && start < other.end() && other.start < end) { return juce::Result::fail("Cuts cannot overlap; trim the neighbouring cut first."); }
+        if (other.id != cut && start < other.end() && other.start < end) { return juce::Result::fail("Cuts can't overlap; trim the neighbouring cut first."); }
     }
     found->start = start;
     found->duration = spanUntil(start, std::min(end, project.duration));
@@ -333,11 +333,11 @@ juce::Result Document::setLink(Id target, const std::string& property, std::opti
     const auto& current = project();
     const auto* curve = findPropertyCurve(current, target, property);
     if (curve == nullptr) { return juce::Result::fail("The property no longer exists."); }
-    if (link.has_value() && !drivableProperty(current, target, property)) { return juce::Result::fail("Audio clip gain and pan cannot be linked."); }
+    if (link.has_value() && !drivableProperty(current, target, property)) { return juce::Result::fail("Audio clip gain and pan can't be linked."); }
     if (link.has_value()) {
         if (!link->valid() || !hasPropertyCurve(current, link->source, link->property)) { return juce::Result::fail("Choose an existing property to link to."); }
         // The Scope follows the main composition; nothing follows the Scope.
-        if (link->source == current.beam.id) { return juce::Result::fail("Scope properties cannot be linked to."); }
+        if (link->source == current.beam.id) { return juce::Result::fail("Scope properties can't be linked to."); }
         if (beamOutsideMain(target)) { return juce::Result::fail("The Scope is linked from the main composition."); }
         if (linkCreatesCycle(current, target, property, *link)) { return juce::Result::fail("That link would make the property depend on itself."); }
     }

@@ -22,7 +22,7 @@ public:
         const std::atomic<bool>* cancel, std::atomic<double>* progress, Limits limits) {
         if (data.getSize() == 0 || data.getSize() > 64 * 1024 * 1024) { return {nullptr, "Video source must contain 1 byte to 64 MiB."}; }
         juce::TemporaryFile input(".mov");
-        if (!input.getFile().replaceWithData(data.getData(), data.getSize())) { return {nullptr, "Cannot create the temporary video source."}; }
+        if (!input.getFile().replaceWithData(data.getData(), data.getSize())) { return {nullptr, "Couldn't create a temporary copy of the video."}; }
         return prepare(input.getFile(), executable, settings, cancel, progress, limits);
     }
     // A video read where it is on disk: one linked rather than held, however
@@ -49,7 +49,7 @@ public:
             "-protocol_whitelist", "file,pipe", "-i", input.getFullPathName(), "-map", "0:v:0", "-an", "-sn", "-dn",
             "-vf", filter, "-frames:v", juce::String(static_cast<juce::int64>(maximumFrames + 1)), "-pix_fmt", "rgba", "-f", "rawvideo", output.getFile().getFullPathName()};
         osci::Subprocess decoder;
-        if (!decoder.start(args, osci::Subprocess::Output::discard)) { return {nullptr, "Cannot start the video decoder."}; }
+        if (!decoder.start(args, osci::Subprocess::Output::discard)) { return {nullptr, "Couldn't start the video decoder."}; }
         const auto started = juce::Time::getMillisecondCounterHiRes();
         while (!decoder.wait(30)) {
             if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
@@ -57,7 +57,7 @@ public:
             if (output.getFile().getSize() > static_cast<juce::int64>((maximumFrames + 1) * frameBytes)) { return {nullptr, "Decoded video exceeds the temporary storage limit."}; }
         }
         if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
-        if (!decoder.exitedCleanly()) { return {nullptr, "Cannot decode this video. Check that it contains a supported, undamaged video stream."}; }
+        if (!decoder.exitedCleanly()) { return {nullptr, "Couldn't decode this video. Check that it contains a supported, undamaged video stream."}; }
         const auto bytes = output.getFile().getSize();
         if (bytes <= 0 || static_cast<std::uint64_t>(bytes) % frameBytes != 0) { return {nullptr, "Video decoder returned no complete frames."}; }
         const auto frames = static_cast<std::uint64_t>(bytes) / frameBytes;
@@ -65,7 +65,7 @@ public:
         const auto frameError = PreparedPointFrames::validate(settings.videoFrameRate, frames, settings.pointsPerFrame);
         if (!frameError.empty()) { return {nullptr, frameError}; }
         auto stream = output.getFile().createInputStream();
-        if (!stream) { return {nullptr, "Cannot read decoded video frames."}; }
+        if (!stream) { return {nullptr, "Couldn't read the decoded video frames."}; }
         std::vector<std::uint8_t> rgba(static_cast<std::size_t>(frameBytes));
         std::vector<PointSample> points;
         points.reserve(static_cast<std::size_t>(frames) * settings.pointsPerFrame);

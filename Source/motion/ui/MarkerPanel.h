@@ -5,11 +5,12 @@
 
 #include "../model/TimeGrid.h"
 
-// Names a marker and places it, in the ruler's notation.
+// Names a marker and places it, in the ruler's notation: Add for a new one,
+// Apply for one that's `existing`.
 class MotionMarkerPanel final : public motion::ui::Popover {
 public:
-    MotionMarkerPanel(juce::String initialName, double seconds, motion::TimeGrid grid, double duration)
-        : Popover("Marker", "Save", "Save marker"), grid(grid), duration(duration), originalTime(seconds) {
+    MotionMarkerPanel(juce::String initialName, double seconds, motion::TimeGrid grid, double duration, bool existing)
+        : Popover("Marker", existing ? "Apply" : "Add", existing ? "Apply marker" : "Add marker"), grid(grid), duration(duration), originalTime(seconds) {
         name.setName("Marker name");
         position.setName("Marker position");
         name.setText(initialName, false);
@@ -50,7 +51,7 @@ private:
         const bool validName = motion::Marker::validName(name.getText().trim());
         const bool validTime = time.has_value() && *time >= 0 && *time <= duration;
         primary.setEnabled(validName && validTime);
-        setError(!validName ? "Name: 1-" + juce::String(motion::Marker::longestName) + " characters" : !validTime ? "Outside the composition" : "");
+        setError(!validName ? juce::String::fromUTF8("Name: 1\xe2\x80\x93") + juce::String(motion::Marker::longestName) + " characters" : !validTime ? "Outside the composition" : "");
     }
     motion::TimeGrid grid;
     double duration, originalTime;
@@ -60,10 +61,12 @@ private:
     juce::Label nameLabel, positionLabel;
 };
 
-// Adds or edits one tempo change: the tempo from a beat onwards.
+// Adds or edits one tempo change: the tempo from a beat onwards (Add for a
+// new one, Apply for one that's `existing`).
 class MotionTempoPanel final : public motion::ui::Popover {
 public:
-    MotionTempoPanel(double beat, double bpm, int beatsPerBar, bool ramped = false) : Popover("Tempo change", "Save", "Save tempo") {
+    MotionTempoPanel(double beat, double bpm, int beatsPerBar, bool existing, bool ramped = false)
+        : Popover("Tempo change", existing ? "Apply" : "Add", existing ? "Apply tempo" : "Add tempo") {
         const auto bar = std::max(1, beatsPerBar);
         detail = "Bar " + juce::String(static_cast<int>(std::floor(beat / bar)) + 1) + ", beat " + juce::String(beat - bar * std::floor(beat / bar) + 1, beat == std::round(beat) ? 0 : 2);
         ramp.setToggleState(ramped, juce::dontSendNotification);
@@ -111,7 +114,7 @@ private:
         const auto value = motion::ui::parseNumber(tempo.getText()).value_or(0);
         const bool valid = value >= 1 && value <= 1000;
         primary.setEnabled(valid);
-        setError(valid ? "" : "Tempo: 1-1000 BPM");
+        setError(valid ? juce::String() : juce::String::fromUTF8("Tempo: 1\xe2\x80\x93" "1000 BPM"));
     }
     static constexpr int unitWidth = 36;
     juce::TextEditor tempo;
@@ -149,7 +152,7 @@ private:
         const auto text = name.getText().trim();
         const auto valid = text.isNotEmpty() && text.length() <= 200;
         primary.setEnabled(valid);
-        setError(valid ? "" : "Name: 1-200 characters");
+        setError(valid ? juce::String() : juce::String::fromUTF8("Name: 1\xe2\x80\x93" "200 characters"));
     }
     juce::TextEditor name;
     juce::Label nameLabel;

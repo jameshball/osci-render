@@ -17,7 +17,7 @@ public:
         const auto rate = motion::style::trimmed(config.frameRate, 3);
         frame.setName("Export frame");
         frame.setText(juce::String(config.renderSize.width) + juce::String::fromUTF8(" \xc3\x97 ") + juce::String(config.renderSize.height) + " px" + motion::style::dot() + rate + " fps", juce::dontSendNotification);
-        frame.setTooltip("Set by the Scope's canvas button and the composition's frame rate");
+        frame.setTooltip("Set in the Composition settings (canvas and frame rate)");
         frame.setFont(motion::style::body());
         frame.setBorderSize({});
         codec.setName("Video codec");

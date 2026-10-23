@@ -84,7 +84,7 @@ void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
         g.fillRoundedRectangle(bounds, motion::style::radiusControl);
         g.setColour(allowed ? motion::style::accent() : motion::style::error());
         g.drawRoundedRectangle(bounds, motion::style::radiusControl, 1);
-        g.drawText(allowed ? (audio ? "Add audio" : definition != nullptr ? "Add composition" : "Add object") : (recursive ? "Cannot contain itself" : correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
+        g.drawText(allowed ? (audio ? "Add audio" : definition != nullptr ? "Add composition" : "Add object") : (recursive ? "Can't contain itself" : correctKind ? "Clips can't overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
     }
 }
 

@@ -12,7 +12,8 @@
 
 // How an image or video is traced into beam strokes, the traced picture
 // beside the settings, updated as they change: an image's first frame, or a
-// frame FFmpeg picks from a video. For a picture another app shares, the
+// frame FFmpeg picks from a video. A new file is added; the settings of an
+// `existing` source are applied. For a picture another app shares, the
 // settings apply as they change and the picture is the live one.
 class MotionRasterSettingsPanel final : public motion::ui::Sheet {
 public:
@@ -29,8 +30,8 @@ public:
     // A video's frame comes from `videoFile` (or its bytes, in `image`) by
     // `ffmpeg`; without FFmpeg there is no picture.
     MotionRasterSettingsPanel(motion::RasterSettings initial, bool video, const juce::String& fileName, juce::MemoryBlock image = {}, bool xyOnlyScope = false,
-            juce::File videoFile = {}, juce::File ffmpeg = {}, std::optional<Live> liveSource = std::nullopt)
-        : Sheet(liveSource.has_value() ? motion::texture::technology() + " source" : video ? "Prepare video" : "Prepare image", fileName, liveSource.has_value() ? "Done" : "Prepare"),
+            juce::File videoFile = {}, juce::File ffmpeg = {}, std::optional<Live> liveSource = std::nullopt, bool existing = false)
+        : Sheet(liveSource.has_value() ? motion::texture::technology() + " source" : heading(video, existing), fileName, liveSource.has_value() ? "Done" : existing ? "Apply" : "Add"),
           settings(initial), isVideo(video), data(std::move(image)), live(std::move(liveSource)) {
         if (isVideo && ffmpeg.existsAsFile() && (videoFile.existsAsFile() || data.getSize() > 0)) {
             still = std::make_shared<VideoStill>();
@@ -39,7 +40,7 @@ public:
             still->ffmpeg = ffmpeg;
         }
         setName(live.has_value() ? "Live picture settings" : "Image preparation settings");
-        nameAction(live.has_value() ? "Done" : isVideo ? "Prepare video" : "Prepare image");
+        nameAction(live.has_value() ? "Done" : existing ? (isVideo ? "Apply video settings" : "Apply image settings") : isVideo ? "Add video" : "Add image");
         detailEdited = initial.resolution != motion::RasterSettings().resolution || initial.mode == motion::RasterSettings::Mode::scanlines;
         mode.setSelected(initial.mode == motion::RasterSettings::Mode::scanlines ? 1 : initial.mode == motion::RasterSettings::Mode::hilbert ? 2 : 0);
         mode.setTooltip("Outlines follow image edges. Scanlines fill it with horizontal passes. Hilbert draws one curve, denser where brighter, which shows on any scope.");
@@ -75,7 +76,7 @@ public:
             samples.addItem(juce::String(static_cast<juce::int64>(strides[i])), static_cast<int>(i + 1));
             if (strides[i] == initial.pointsPerFrame) { samples.setSelectedId(static_cast<int>(i + 1), juce::dontSendNotification); }
         }
-        samples.setTooltip("Increase this if the image is too complex");
+        samples.setTooltip("Points drawn each frame; increase this if the image is too complex");
         samples.onChange = [this] { samplesEdited = true; refresh(); };
         invert.setToggleState(initial.invert, juce::dontSendNotification);
         invert.setTooltip("For dark artwork on a light background");
@@ -91,6 +92,8 @@ public:
         for (auto* combo : {&detail, &samples}) {
             combo->setColour(juce::ComboBox::backgroundColourId, fieldFill());
             combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+            // Numbers end at the right, as Threshold and Frame rate do.
+            combo->setJustificationType(juce::Justification::centredRight);
         }
         for (auto* caption : {&modeLabel, &shadingLabel, &thresholdLabel, &detailLabel, &samplesLabel, &frameRateLabel, &invertLabel}) { styleCaption(*caption); }
         error.setFont(motion::style::body());
@@ -123,14 +126,27 @@ public:
             // Changes apply as they're made, so there's nothing to cancel.
             cancel.setVisible(false);
             error.setVisible(false);
+            // The capture control the Blender sheet has: Record, then Stop
+            // and keep.
+            record.setButtonText("Record");
             record.setName("Record capture");
+            record.setTitle("Record capture");
             record.setTooltip("Export needs a capture of a live picture");
-            record.onClick = [this] {
-                const auto result = live->onRecord ? live->onRecord() : juce::Result::fail("Recording isn't available.");
-                if (result.failed()) { recordError = result.getErrorMessage(); }
-                showLive();
-            };
-            addAndMakeVisible(record);
+            keep.setButtonText("Stop and keep");
+            keep.setName("Stop and keep");
+            keep.setTitle("Stop and keep");
+            keep.setTooltip("Stop recording and add the capture as a source");
+            for (auto* button : std::initializer_list<juce::TextButton*> {&record, &keep}) {
+                button->onClick = [this] {
+                    const auto result = live->onRecord ? live->onRecord() : juce::Result::fail("Recording isn't available.");
+                    if (result.failed()) { recordError = result.getErrorMessage(); }
+                    showLive();
+                };
+                addChildComponent(button);
+            }
+            const auto recording = live->recording && live->recording();
+            record.setVisible(!recording);
+            keep.setVisible(recording);
             liveFrames.startTimerHz(15);
         }
         const auto rows = isVideo ? 7 : 6;
@@ -157,40 +173,45 @@ protected:
             area.removeFromLeft(24);
         }
         formRow(area, modeLabel, mode);
-        formRow(area, shadingLabel, shading);
         formRow(area, thresholdLabel, threshold, number);
-        formRow(area, detailLabel, detail);
-        formRow(area, samplesLabel, samples);
+        formRow(area, detailLabel, detail, number);
+        formRow(area, samplesLabel, samples, number);
         if (isVideo) { formRow(area, frameRateLabel, frameRate, number); }
         auto line = area.removeFromTop(row);
         invertLabel.setBounds(line.removeFromLeft(caption));
         invert.setBounds(line.removeFromLeft(motion::ui::Switch::width + 4));
+        area.removeFromTop(rowGap);
+        // Last, and only for the Hilbert curve, whose alone it is.
+        formRow(area, shadingLabel, shading);
         error.setBounds(footerLeft);
-        if (live.has_value()) { record.setBounds(footerLeft.removeFromLeft(std::max(132, record.getBestWidthForHeight(footerLeft.getHeight()) + 20))); }
+        if (live.has_value()) {
+            record.setBounds(footerLeft.withWidth(record.bestWidth()));
+            keep.setBounds(footerLeft.withWidth(keep.getBestWidthForHeight(footerLeft.getHeight()) + 20));
+        }
     }
 
 private:
     static constexpr motion::PropertySpec thresholdSpec {"threshold", "Threshold", "", "", 0, 100, 2, .1, 1, "%"};
     static constexpr motion::PropertySpec frameRateSpec {"frameRate", "Frame rate", "", "", 1, 120, 30, .5, 3, " fps"};
     bool hasPreview() const { return live.has_value() || (isVideo ? still != nullptr : data.getSize() > 0); }
+    static juce::String heading(bool video, bool existing) {
+        if (existing) { return video ? "Video settings" : "Image settings"; }
+        return video ? "Add video" : "Add image";
+    }
     std::optional<Live> live;
     // The settings last given to the live picture: its own at first (its
     // shading aside, which only a Hilbert curve uses).
     motion::RasterSettings liveApplied;
-    juce::TextButton record;
+    MotionRecordButton record;
+    juce::TextButton keep;
     juce::String recordError;
     std::shared_ptr<const motion::PreparedSource> shownFrame;
     juce::String shownStatus;
     // The live picture as it is traced now, and how it's arriving.
     void showLive() {
         const auto recording = live->recording && live->recording();
-        record.setButtonText(recording ? "Stop and keep" : "Record capture");
-        // Red while it records, as a recorder's button is.
-        if (recording) {
-            record.setColour(juce::TextButton::buttonColourId, motion::style::error().withAlpha(.3f));
-        } else {
-            record.removeColour(juce::TextButton::buttonColourId);
-        }
+        record.setVisible(!recording);
+        keep.setVisible(recording);
         const auto frame = live->frame ? live->frame() : nullptr;
         const auto status = recordError.isNotEmpty() ? recordError : live->status ? live->status() : juce::String();
         if (frame == shownFrame && status == shownStatus) { return; }
@@ -224,7 +245,7 @@ private:
     std::shared_ptr<VideoStill> still;
 
     // The whole video prepared with the settings shown, played behind the
-    // settings once it is; Prepare keeps it when its settings are still these.
+    // settings once it is; Add or Apply keeps it when its settings are still these.
     struct Bake {
         motion::RasterSettings settings;
         std::atomic<bool> cancel {false};
@@ -307,7 +328,7 @@ private:
         const auto sampleIndex = samples.getSelectedId() - 1;
         juce::String message;
         if (detailIndex < 0 || sampleIndex < 0 || static_cast<std::size_t>(detailIndex) >= resolutions.size() || static_cast<std::size_t>(sampleIndex) >= strides.size()) {
-            message = "Choose an image detail and samples per frame.";
+            message = "Choose an image detail and points per frame.";
         } else {
             next.mode = mode.getSelected() == 0 ? motion::RasterSettings::Mode::contours : mode.getSelected() == 1 ? motion::RasterSettings::Mode::scanlines : motion::RasterSettings::Mode::hilbert;
             next.resolution = resolutions[static_cast<std::size_t>(detailIndex)];
@@ -317,10 +338,10 @@ private:
             if (thresholdEdited) { next.threshold = threshold.getValue() / 100.0; }
             message = juce::String(next.validate());
         }
-        // Shading is the Hilbert curve's alone.
+        // Shading is the Hilbert curve's alone, so it shows only for one.
         const auto hilbert = mode.getSelected() == 2;
-        shading.setEnabled(hilbert);
-        shadingLabel.setAlpha(hilbert ? 1.0f : .4f);
+        shading.setVisible(hilbert);
+        shadingLabel.setVisible(hilbert);
         valid = message.isEmpty();
         error.setText(message, juce::dontSendNotification);
         primary.setEnabled(valid && !submitted);
@@ -338,7 +359,7 @@ private:
             return;
         }
         if (isVideo) {
-            // Settings as they were (Prepare refreshes too) leave the frame,
+            // Settings as they were (Add or Apply refreshes too) leave the frame,
             // and the whole video prepared or preparing, as they are.
             if (videoShown.has_value() && *videoShown == settings) { return; }
             videoShown = settings;
@@ -398,7 +419,7 @@ private:
     motion::ui::Switch invert {"Invert image"};
     motion::ui::SourcePreview preview;
     juce::Label modeLabel {"Image mode caption", "Trace"}, shadingLabel {"Image shading caption", "Shading"}, thresholdLabel {"Image threshold caption", "Threshold"};
-    juce::Label detailLabel {"Image detail caption", "Detail"}, samplesLabel {"Image samples caption", "Samples per frame"};
+    juce::Label detailLabel {"Image detail caption", "Detail"}, samplesLabel {"Image samples caption", "Points per frame"};
     juce::Label frameRateLabel {"Video frame rate caption", "Frame rate"}, invertLabel {"Invert caption", "Invert"};
     juce::Label error;
 };

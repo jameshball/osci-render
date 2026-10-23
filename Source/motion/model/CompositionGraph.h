@@ -78,7 +78,7 @@ CompositionGraphResult validateCompositionGraph(const ProjectType& project) {
                 std::size_t cost = 1;
                 if (clip.composition != 0) {
                     if (clip.asset != 0) {
-                        result.error = "A clip cannot reference both media and a composition.";
+                        result.error = "A clip can't reference both media and a composition.";
                         return std::nullopt;
                     }
                     const auto found = definitions.find(clip.composition);
@@ -87,7 +87,7 @@ CompositionGraphResult validateCompositionGraph(const ProjectType& project) {
                         return std::nullopt;
                     }
                     if (visiting.contains(clip.composition)) {
-                        result.error = "Reusable compositions cannot contain cycles.";
+                        result.error = "Reusable compositions can't contain cycles.";
                         return std::nullopt;
                     }
                     auto cached = summaries.find(clip.composition);

@@ -76,7 +76,7 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
             return juce::Result::fail("A copied clip's source is not in this composition.");
         }
         if (copied.clip.composition != 0 && !canReferenceComposition(copied.clip.composition)) {
-            return juce::Result::fail("A copied composition cannot be placed here.");
+            return juce::Result::fail("A copied composition can't be placed here.");
         }
         first = std::min(first, copied.clip.timing(state.tempo()).start);
     }
@@ -229,9 +229,9 @@ juce::Result Document::extractParts(const std::vector<PartSplit>& splits, std::v
     std::vector<Id> created;
     for (const auto& split : splits) {
         const auto& [clipId, part, rest, name] = split;
-        if (part == nullptr || rest == nullptr || part->source == nullptr || rest->source == nullptr) { return juce::Result::fail("The parts could not be prepared."); }
+        if (part == nullptr || rest == nullptr || part->source == nullptr || rest->source == nullptr) { return juce::Result::fail("Couldn't prepare the parts."); }
         const auto partName = name.trim();
-        if (partName.isEmpty() || partName.length() > 200 || partName.containsAnyOf("\r\n")) { return juce::Result::fail("Name the part with 1-200 characters on one line."); }
+        if (partName.isEmpty() || partName.length() > 200 || partName.containsAnyOf("\r\n")) { return juce::Result::fail(juce::String::fromUTF8("Name the part with 1\xe2\x80\x93" "200 characters on one line.")); }
         const auto trackAt = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [clipId = clipId](const auto& track) { return holdsClip(track, clipId); });
         if (trackAt == candidate.tracks.end()) { return juce::Result::fail("The clip no longer exists."); }
         if (trackAt->locked) { return juce::Result::fail("Unlock the track before extracting parts."); }
@@ -316,7 +316,7 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
                 if (interval.end() <= timing.start) {
                     displacement += interval.duration();
                 } else if (interval.start < timing.end() && timing.start < interval.end()) {
-                    return juce::Result::fail("Ripple delete cannot close an overlapping clip interval.");
+                    return juce::Result::fail("Ripple delete can't close an overlapping clip interval.");
                 }
             }
             if (displacement > 0) {
@@ -559,7 +559,7 @@ juce::Result Document::groupTracks(const std::vector<Id>& ids, Id& made) {
         }
         return validGroupHierarchy(updated);
     });
-    if (!grouped) { return juce::Result::fail("Those tracks cannot share a group."); }
+    if (!grouped) { return juce::Result::fail("Those tracks can't share a group."); }
     made = group.id;
     return juce::Result::ok();
 }

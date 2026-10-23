@@ -7,13 +7,14 @@
 #include <algorithm>
 #include <functional>
 
-// How deep an L-system is grown, with the result drawn beside the setting.
+// How deep an L-system is grown, with the result drawn beside the setting:
+// Add for a new file, Apply for an `existing` source.
 class MotionFractalSettingsPanel final : public motion::ui::Sheet {
 public:
-    MotionFractalSettingsPanel(int initialDepth, const juce::String& fileName, juce::String sourceText = {})
-        : Sheet("Prepare fractal", fileName, "Prepare"), source(std::move(sourceText)) {
+    MotionFractalSettingsPanel(int initialDepth, const juce::String& fileName, juce::String sourceText = {}, bool existing = false)
+        : Sheet(existing ? "Fractal settings" : "Add fractal", fileName, existing ? "Apply" : "Add"), source(std::move(sourceText)) {
         setName("Fractal preparation settings");
-        nameAction("Prepare fractal");
+        nameAction(existing ? "Apply fractal settings" : "Add fractal");
         depth.setName("Fractal depth");
         depth.setSpec(depthSpec);
         depth.setValue(std::clamp(initialDepth, 0, 15));

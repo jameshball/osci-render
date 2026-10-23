@@ -870,11 +870,11 @@ struct Smoothing {
             for (std::uint8_t corner = 0; corner < 3; ++corner) { around[detail::placeOf(corners[faces[index][corner]])].emplace_back(index, corner); }
         }
         const auto cosCrease = std::cos(crease);
-        // Faces within `near` (radians) of a way's first face face that way.
+        // Faces within `closeAngle` (radians) of a way's first face face that way.
         // Two ways' faces are then all smooth, or all not, unless the ways
         // are within twice that (and rounding) of the crease apart.
-        const auto near = crease * 1.0e-3;
-        const auto cosNear = std::cos(near);
+        const auto closeAngle = crease * 1.0e-3;
+        const auto cosNear = std::cos(closeAngle);
         const auto grouping = crease > 1.0e-3 && crease < 3;
         Smoothing smoothing;
         smoothing.groupOf.assign(faces.size() * 3, 0);

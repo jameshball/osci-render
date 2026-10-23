@@ -77,6 +77,9 @@ inline const juce::Identifier captionButton {"motionCaptionButton"};
 // How wide a caption laid over a field is, set on the field, so its value
 // keeps clear of it.
 inline const juce::Identifier captionWidth {"motionCaptionWidth"};
+// A short muted note a section's heading carries at its right, set on what
+// the section shows (Effects, when there are none: where they come from).
+inline const juce::Identifier headingNote {"motionHeadingNote"};
 inline juce::Font buttonFont(const juce::Button& button) { return button.getProperties()[captionButton] ? caption() : body(); }
 // A label's whole text as its tooltip, only while its bounds cut it short
 // (roughly, for a label tall enough to wrap onto more lines).
@@ -214,6 +217,22 @@ private:
     bool right;
 };
 
+// A fold's chevron in `arrow` (8 px square): down when open, right when folded.
+inline void drawFold(juce::Graphics& g, juce::Rectangle<float> arrow, bool open, juce::Colour colour) {
+    juce::Path chevron;
+    if (open) {
+        chevron.startNewSubPath(arrow.getX(), arrow.getY() + 2);
+        chevron.lineTo(arrow.getCentreX(), arrow.getBottom() - 2);
+        chevron.lineTo(arrow.getRight(), arrow.getY() + 2);
+    } else {
+        chevron.startNewSubPath(arrow.getX() + 2, arrow.getY());
+        chevron.lineTo(arrow.getRight() - 2, arrow.getCentreY());
+        chevron.lineTo(arrow.getX() + 2, arrow.getBottom());
+    }
+    g.setColour(colour);
+    g.strokePath(chevron, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+
 // "More" / "Less" (or its own words): a caption with a chevron that folds a
 // section open.
 class Disclosure final : public juce::Button {
@@ -225,20 +244,7 @@ public:
     void paintButton(juce::Graphics& g, bool highlighted, bool) override {
         auto area = getLocalBounds().toFloat();
         const auto open = getToggleState();
-        const auto colour = highlighted ? osci::Colours::text() : osci::Colours::textMuted();
-        const auto arrow = area.removeFromLeft(12).withSizeKeepingCentre(8, 8);
-        juce::Path chevron;
-        if (open) {
-            chevron.startNewSubPath(arrow.getX(), arrow.getY() + 2);
-            chevron.lineTo(arrow.getCentreX(), arrow.getBottom() - 2);
-            chevron.lineTo(arrow.getRight(), arrow.getY() + 2);
-        } else {
-            chevron.startNewSubPath(arrow.getX() + 2, arrow.getY());
-            chevron.lineTo(arrow.getRight() - 2, arrow.getCentreY());
-            chevron.lineTo(arrow.getX() + 2, arrow.getBottom());
-        }
-        g.setColour(colour);
-        g.strokePath(chevron, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        drawFold(g, area.removeFromLeft(12).withSizeKeepingCentre(8, 8), open, highlighted ? osci::Colours::text() : osci::Colours::textMuted());
         g.setFont(caption());
         g.drawText(open ? opened : closed, area.withTrimmedLeft(2), juce::Justification::centredLeft, false);
     }

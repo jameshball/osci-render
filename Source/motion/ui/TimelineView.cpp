@@ -1252,7 +1252,7 @@ juce::String MotionTimelineView::dragLabel() const {
         } else if constexpr (std::is_same_v<Drag, KeyDrag>) {
             return drag.keys.size() > 1 ? "Move keys" : "Move key";
         } else if constexpr (std::is_same_v<Drag, BeamDrag>) {
-            return "Change Beam";
+            return "Change Beam share";
         } else if constexpr (std::is_same_v<Drag, LoopDrag>) {
             return "Move loop";
         } else if constexpr (std::is_same_v<Drag, CutDrag>) {

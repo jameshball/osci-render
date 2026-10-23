@@ -981,6 +981,6 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     output = std::move(project);
     return juce::Result::ok();
 } catch (const std::exception& error) {
-    return juce::Result::fail("Cannot prepare project: " + juce::String(error.what()));
+    return juce::Result::fail("Couldn't prepare the project: " + juce::String(error.what()));
 }
 }

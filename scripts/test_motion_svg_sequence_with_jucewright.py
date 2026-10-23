@@ -68,7 +68,7 @@ try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     step("drop the frames", "drop-files", *sum([["--file", frame] for frame in reversed(frames)], []), "--class", "MotionEditor", "--exact")
-    command("wait-for-locator", "--name", "Import SVGs", "--exact")
+    command("wait-for-locator", "--name", "Add SVGs", "--exact")
     time.sleep(2.5)
     step("animation screenshot", "screenshot", "--file", session.artifact_dir / "animation.png", "--scale", "2")
     time.sleep(.35)
@@ -77,7 +77,7 @@ try:
     time.sleep(.3)
     step("separate screenshot", "screenshot", "--file", session.artifact_dir / "separate.png", "--scale", "2")
     step("animation", "set-value", "--name", "Import as", "--role", "comboBox", "--exact", "Animation")
-    step("import", "click", "--name", "Import SVGs", "--exact")
+    step("add", "click", "--name", "Add SVGs", "--exact")
     session.wait_for_undo("Import source", 60)
     if track_names() != ["spin"]:
         raise RuntimeError("The sequence should be one source named for its frames: " + str(track_names()))

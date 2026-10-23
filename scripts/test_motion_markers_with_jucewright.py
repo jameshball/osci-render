@@ -58,13 +58,13 @@ try:
     step("add ruler marker", "click", "--name", "Add marker here...", "--role", "menuItem", "--exact")
     edit("Marker name", "Verse")
     edit("Marker position", "2s")
-    step("save verse marker", "click", "--name", "Save marker", "--exact")
+    step("add verse marker", "click", "--name", "Add marker", "--exact")
     command("wait-for-locator", "--name", "Undo Add marker", "--role", "label", "--exact")
     assert markers() == {"Verse": 2}
     step("marker shortcut", "press", "m", "--class", "MotionTimelineView")
     edit("Marker name", "Chorus")
     edit("Marker position", "6s")
-    step("save chorus marker", "click", "--name", "Save marker", "--exact")
+    step("add chorus marker", "click", "--name", "Add marker", "--exact")
     assert markers() == {"Verse": 2, "Chorus": 6}
     step("drag verse one second", "drag", "--class", "MotionTimelineView", "--position", "334,36", "--dx", 70, "--dy", 0, "--steps", 12)
     assert markers() == {"Verse": 3, "Chorus": 6}
@@ -99,10 +99,10 @@ try:
     step("edit chorus", "click", "--name", "Edit marker...", "--role", "menuItem", "--exact")
     edit("Marker name", "Final chorus")
     edit("Marker position", "3s")
-    step("reject occupied position", "click", "--name", "Save marker", "--exact")
+    step("reject occupied position", "click", "--name", "Apply marker", "--exact")
     command("wait-for-locator", "--name", "A marker already exists at this position.", "--role", "label", "--exact")
     edit("Marker position", "5s")
-    step("save edited chorus", "click", "--name", "Save marker", "--exact")
+    step("apply edited chorus", "click", "--name", "Apply marker", "--exact")
     assert markers() == {"Verse": 3, "Final chorus": 5}
     step("marker lane screenshot", "screenshot", "--file", session.artifact_dir / "markers.png")
     session.keep_app = False

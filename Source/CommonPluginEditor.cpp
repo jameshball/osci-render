@@ -667,6 +667,10 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
 
 #if OSCI_PREMIUM
+void CommonPluginEditor::showOfflineRenderFailure(const juce::String& errorMessage, const juce::File&) {
+    osci::showOverlayMessage(*this, "Render Failed", errorMessage.isNotEmpty() ? errorMessage : "An error occurred while rendering.");
+}
+
 bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void(bool succeeded)> completion, std::shared_ptr<VisualiserParameters> beam) {
     // The renderer owns its onFinished closure until after its destructor has
     // joined the worker and detached GL. This guard therefore safely retains
@@ -744,7 +748,7 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
     auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize, offlineRenderTitle());
     *overlayHolder = overlay.get();
 
-    overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder] {
+    overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder, outputFile] {
         if (safeThis == nullptr) {
             return;
         }
@@ -757,7 +761,7 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
         if (resultHolder != nullptr && resultHolder->has_value()) {
             const auto& r = resultHolder->value();
             if (!r.success && !r.cancelled) {
-                osci::showOverlayMessage(*safeThis.getComponent(), "Render Failed", r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
+                safeThis->showOfflineRenderFailure(r.errorMessage, outputFile);
             }
         }
     };

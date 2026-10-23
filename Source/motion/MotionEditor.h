@@ -104,6 +104,8 @@ private:
     void setUpCompositionNavigation();
     void setUpScene();
     void setUpScope();
+    // The canvas popover (any size), from the composition's Canvas field.
+    void showCanvasSettings(juce::Component& anchor);
     void setUpTransport();
     void setUpLibrary();
     void setUpProperties();
@@ -112,7 +114,9 @@ private:
     void showAddSourceMenu();
     bool openSourceFile(const juce::File& file) override;
 #if OSCI_PREMIUM
-    juce::String offlineRenderTitle() const override { return "Export video"; }
+    // The title of the sheet that prepares it, so the two steps read as one.
+    juce::String offlineRenderTitle() const override { return "Exporting video"; }
+    void showOfflineRenderFailure(const juce::String& errorMessage, const juce::File& outputFile) override;
 #endif
     struct SourceRequest {
         juce::File file;
@@ -428,6 +432,9 @@ private:
     // A 3D object's size, from Properties: fitted or its file's own.
     void setModelOriginalSize(motion::Id asset, bool original);
     MotionCompositionPanel compositionSettings { processor };
+    // With nothing selected, Properties ends with the composition's effects
+    // and then the project's description.
+    osci::SectionStack compositionTrail;
     struct QueuedTextAnimation {
         motion::Id asset;
         motion::TextSettings settings;
@@ -548,9 +555,9 @@ private:
     };
     std::shared_ptr<ExportState> exportState;
     juce::ThreadPool exports { 1 };
-    double exportProgress = 0;
-    juce::ProgressBar exportBar { exportProgress };
-    juce::TextButton cancelExport { "Cancel" };
+    // An audio export's line in the status bar ("Exporting name.wav"),
+    // while one runs.
+    juce::String exportTask;
     juce::String lastPreparationError;
 
     MainMenuBarModel menus;

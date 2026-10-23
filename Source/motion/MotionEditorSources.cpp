@@ -167,7 +167,7 @@ void MotionEditor::openExample(const juce::String& resource) {
         // Read from a copy, as any project is.
         const auto file = writeExample(resource);
         if (!file.has_value()) {
-            owner->statusBar.show("Could not prepare the example " + name + ".");
+            owner->statusBar.show("Couldn't prepare the example " + name + ".");
             return;
         }
         owner->loadProject(*file, true);
@@ -567,17 +567,19 @@ void MotionEditor::showNextPreparationSettings() {
     }
     // A source edited, or relinked to this file, starts from its own settings.
     const auto previous = request.replacement != nullptr ? request.replacement : request.relink != 0 ? motion::findAsset(processor.document.mainProject().assets, request.relink) : nullptr;
+    // A source already in the project has its settings applied; a new one is added.
+    const auto existing = previous != nullptr;
     if (raster) {
         // A video's frame is traced from the file, or the bytes of the source
         // it replaces, when FFmpeg is already here.
         auto panel = std::make_unique<MotionRasterSettingsPanel>(previous != nullptr ? previous->rasterSettings : motion::RasterSettings(), video, name,
             std::move(data), processor.document.project().scope.xyOnly, request.replacement != nullptr ? request.replacement->linked : request.file,
-            processor.getFFmpegFile().existsAsFile() ? processor.getFFmpegFile() : juce::File());
+            processor.getFFmpegFile().existsAsFile() ? processor.getFFmpegFile() : juce::File(), std::nullopt, existing);
         imagePanel = panel.get();
         content = std::move(panel);
     } else if (fractal) {
         const auto initialDepth = request.fractalDepth.value_or(previous != nullptr ? previous->fractalDepth : 3);
-        auto panel = std::make_unique<MotionFractalSettingsPanel>(initialDepth, name, data.toString());
+        auto panel = std::make_unique<MotionFractalSettingsPanel>(initialDepth, name, data.toString(), existing);
         fractalPanel = panel.get();
         content = std::move(panel);
     }
@@ -901,7 +903,7 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
     editor.onDone = [this](const motion::drawing::Drawing& drawing, const juce::String& text) {
         const auto file = writeTemporary("drawings", juce::File::createLegalFileName(text) + ".svg", motion::drawing::toSvg(drawing));
         if (!file.has_value()) {
-            statusBar.show("Could not save the drawing.");
+            statusBar.show("Couldn't save the drawing.");
             return;
         }
         const auto asset = drawingAsset;
@@ -982,7 +984,7 @@ void MotionEditor::showLuaEditor(SourceRequest request) {
             // A new file edited before it is added imports from a copy.
             const auto copy = writeTemporary("lua", next.file.getFileName(), written);
             if (!copy.has_value()) {
-                statusBar.show("Could not save the edited script.");
+                statusBar.show("Couldn't save the edited script.");
                 return;
             }
             next.file = *copy;
@@ -1122,7 +1124,7 @@ void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView
         };
         auto part = prepare(split->part), rest = prepare(split->rest);
         if (part == nullptr || rest == nullptr) {
-            statusBar.show("The parts could not be prepared.");
+            statusBar.show("Couldn't prepare the parts.");
             return;
         }
         splits.push_back({clipId, std::move(part), std::move(rest), name});
@@ -1169,7 +1171,7 @@ void MotionEditor::newScript() {
     }
     const auto file = writeTemporary("scripts", name + ".lua", juce::String(script));
     if (!file.has_value()) {
-        statusBar.show("Could not start a new script.");
+        statusBar.show("Couldn't start a new script.");
         return;
     }
     importSourceFile(*file, 0);
@@ -1182,7 +1184,7 @@ void MotionEditor::importExample(const juce::String& resource) {
     if (name.isEmpty()) { return; }
     const auto file = writeExample(resource);
     if (!file.has_value()) {
-        statusBar.show("Could not prepare the example " + name + ".");
+        statusBar.show("Couldn't prepare the example " + name + ".");
         return;
     }
     importSourceFile(*file, 0);

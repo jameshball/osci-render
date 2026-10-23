@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A dropped video's Prepare video sheet shows one of its frames, traced as the settings will trace it."""
+"""A dropped video's Add video sheet shows one of its frames, traced as the settings will trace it."""
 import json
 import subprocess
 from jucewright_osci_browser.cli import parse_args
@@ -57,7 +57,7 @@ def caption():
     for node in nodes(snapshot()):
         if "Source preview" in (node.get("name"), node.get("title"), node.get("componentName")):
             return node
-    raise RuntimeError("The Prepare video sheet should show a preview")
+    raise RuntimeError("The Add video sheet should show a preview")
 
 
 try:
@@ -70,7 +70,7 @@ try:
         step("download FFmpeg", "click", "--name", "Yes", "--exact")
         time.sleep(3)
         step("downloading screenshot", "screenshot", "--file", session.artifact_dir / "downloading.png", "--scale", "2")
-    command("wait-for-locator", "--name", "Prepare video", "--exact", "--timeout-ms", "240000")
+    command("wait-for-locator", "--name", "Add video", "--exact", "--timeout-ms", "240000")
     time.sleep(4)
     step("outlines screenshot", "screenshot", "--file", session.artifact_dir / "outlines.png", "--scale", "2")
     caption()
@@ -80,7 +80,7 @@ try:
     step("Scanlines", "set-value", "--name", "Image trace mode", "--exact", "Scanlines")
     time.sleep(3)
     step("scanlines screenshot", "screenshot", "--file", session.artifact_dir / "scanlines.png", "--scale", "2")
-    # The whole video prepares behind the still, then plays; Prepare keeps it.
+    # The whole video prepares behind the still, then plays; Add keeps it.
     step("Hilbert again", "set-value", "--name", "Image trace mode", "--exact", "Hilbert")
     time.sleep(1)
     step("preparing screenshot", "screenshot", "--file", session.artifact_dir / "preparing.png", "--scale", "2")
@@ -90,7 +90,7 @@ try:
     step("playing later screenshot", "screenshot", "--file", session.artifact_dir / "playing-2.png", "--scale", "2")
     time.sleep(float(os.environ.get("MOTION_PREPARE_WAIT", "0")))
     began = time.monotonic()
-    step("prepare", "click", "--name", "Prepare video", "--role", "button", "--exact")
+    step("add", "click", "--name", "Add video", "--role", "button", "--exact")
     session.wait_for_undo("Import source", 60)
     print("Prepared in", round(time.monotonic() - began, 2), "s", flush=True)
     print("Motion video preview passed", flush=True)

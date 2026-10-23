@@ -4,7 +4,7 @@
 #include "Sheet.h"
 
 // The keyboard and gesture reference: sections of actions, each with its
-// keys as caps on the right, under a search field.
+// keys as a cap on the right (a gesture in plain words), under a search field.
 class MotionShortcutsOverlay final : public motion::ui::Sheet {
 public:
     struct Entry { juce::String keys, action; };
@@ -61,12 +61,38 @@ private:
             }
             return std::max(height, 60);
         }
-        // Keys as caps, right-aligned: a shortcut's glyphs share one cap,
-        // a gesture's words sit in plain text.
-        static void paintKeys(juce::Graphics& g, const juce::String& keys, juce::Rectangle<int> area) {
+        // A key on a keyboard: a letter or symbol, a named key or a modifier.
+        static bool isKey(const juce::String& token) {
+            static const juce::StringArray named {"Cmd", "Ctrl", "Alt", "Shift", "Left", "Right", "Up", "Down", "arrows", "Delete", "Space", "Home", "End", "Return", "Tab", "Esc"};
+            return token.length() == 1 || named.contains(token) || (token.length() > 1 && token.startsWithChar('F') && token.substring(1).containsOnly("0123456789"));
+        }
+        // Keys alone (Cmd+Shift+Z, V / B / S / R); a word such as click,
+        // drag or wheel makes it a gesture.
+        static bool isShortcut(juce::String keys) {
+            while (keys.isNotEmpty()) {
+                const auto split = keys.indexOf(" / ");
+                const auto alternative = split < 0 ? keys : keys.substring(0, split);
+                keys = split < 0 ? juce::String() : keys.substring(split + 3);
+                const auto parts = juce::StringArray::fromTokens(alternative, "+", "");
+                if (parts.isEmpty()) { return false; }
+                for (const auto& part : parts) {
+                    if (!isKey(part)) { return false; }
+                }
+            }
+            return true;
+        }
+        // Keys right-aligned, a shortcut's glyphs in one cap and a gesture's
+        // words in muted text; returns the width they take.
+        static int paintKeys(juce::Graphics& g, const juce::String& keys, juce::Rectangle<int> area) {
             const auto text = motion::style::shortcutText(keys);
             g.setFont(motion::style::body());
-            const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::body(), text)) + 12;
+            const auto textWidth = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::body(), text));
+            if (!isShortcut(keys)) {
+                g.setColour(osci::Colours::textMuted());
+                g.drawText(text, area.removeFromRight(textWidth + 2), juce::Justification::centredRight, false);
+                return textWidth + 2;
+            }
+            const auto width = textWidth + 12;
             const auto cap = area.removeFromRight(width).withSizeKeepingCentre(width, 18).toFloat();
             g.setColour(osci::Colours::surfaceRaised().brighter(.08f));
             g.fillRoundedRectangle(cap, motion::style::radiusControl);
@@ -74,6 +100,7 @@ private:
             g.drawRoundedRectangle(cap.reduced(.5f), motion::style::radiusControl, 1.0f);
             g.setColour(osci::Colours::text());
             g.drawText(text, cap, juce::Justification::centred, false);
+            return width;
         }
         void paint(juce::Graphics& g) override {
             int y = 0;
@@ -95,10 +122,10 @@ private:
                 g.drawText(section.title, 0, y + 12, getWidth(), 16, juce::Justification::centredLeft);
                 y += headingHeight;
                 for (const auto* entry : shown) {
+                    const auto keysWidth = paintKeys(g, entry->keys, juce::Rectangle<int>(0, y, getWidth(), rowHeight));
                     g.setFont(motion::style::body());
                     g.setColour(osci::Colours::text().withAlpha(.85f));
-                    g.drawText(entry->action, 0, y, getWidth() - 160, rowHeight, juce::Justification::centredLeft, true);
-                    paintKeys(g, entry->keys, juce::Rectangle<int>(0, y, getWidth(), rowHeight));
+                    g.drawText(entry->action, 0, y, getWidth() - keysWidth - 16, rowHeight, juce::Justification::centredLeft, true);
                     y += rowHeight;
                 }
             }

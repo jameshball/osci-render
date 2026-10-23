@@ -35,7 +35,13 @@ public:
         action.setMouseCursor(juce::MouseCursor::PointingHandCursor);
         action.onClick = [this] {
             auto act = std::move(onAction);
-            clear();
+            // A task's action (Cancel) leaves its line until the task ends.
+            if (task) {
+                action.setVisible(false);
+                resized();
+            } else {
+                clear();
+            }
             if (act) { act(); }
         };
         addChildComponent(action);
@@ -64,6 +70,10 @@ public:
     // `actionLabel` and `act`, when given: a button after the message that
     // does what it suggests, and clears it.
     void show(const juce::String& text, Kind kind = Kind::error, const juce::String& actionLabel = {}, std::function<void()> act = {}) {
+        if (task) {
+            held = {text, kind, actionLabel, std::move(act), false};
+            return;
+        }
         if (text.isEmpty()) { clear(); return; }
         current = kind;
         onAction = std::move(act);
@@ -80,12 +90,56 @@ public:
     }
     // A notice that stays while the work it describes goes on.
     void showWorking(const juce::String& text) {
+        if (task) {
+            held = {text, Kind::notice, {}, {}, true};
+            return;
+        }
         show(text, Kind::notice);
         stopTimer();
         dismiss.setVisible(false);
         resized();
     }
+    // Work the user may stop (an export): a working notice with an action
+    // (Cancel) and no dismiss, kept until endTask(). Messages shown
+    // meanwhile wait behind it, the latest of them shown when it ends.
+    void showTask(const juce::String& text, const juce::String& actionLabel, std::function<void()> act) {
+        if (task) { endTask(); }
+        held = {};
+        showWorking(text);
+        onAction = std::move(act);
+        action.setButtonText(actionLabel);
+        action.setTitle(actionLabel);
+        action.setVisible(onAction != nullptr);
+        task = true;
+        resized();
+        repaint();
+    }
+    // The task's line as it goes on ("Exporting name.wav · 42%").
+    void updateTask(const juce::String& text) {
+        if (!task || message.getText() == text) { return; }
+        message.setText(text, juce::dontSendNotification);
+        resized();
+        repaint();
+    }
+    void endTask() {
+        if (!task) { return; }
+        task = false;
+        auto next = std::move(held);
+        held = {};
+        clear();
+        if (next.text.isEmpty()) { return; }
+        if (next.working) {
+            showWorking(next.text);
+        } else {
+            show(next.text, next.kind, next.actionLabel, std::move(next.act));
+        }
+    }
     void clear() {
+        // During a task, what is cleared is any message waiting behind it.
+        if (task) {
+            held = {};
+            return;
+        }
         stopTimer();
         message.setText({}, juce::dontSendNotification);
         message.setTooltip({});
@@ -94,7 +148,8 @@ public:
         onAction = nullptr;
         repaint();
     }
-    juce::String text() const { return message.getText(); }
+    // The latest message; during a task, the one waiting behind it.
+    juce::String text() const { return task ? held.text : message.getText(); }
     // The rates on the right were clicked: where they are set.
     std::function<void()> onStatisticsClicked;
     void mouseUp(const juce::MouseEvent& event) override {
@@ -176,4 +231,13 @@ private:
     juce::Rectangle<int> pill;
     osci::CloseButton dismiss {"Dismiss message"};
     Kind current = Kind::notice;
+    struct Held {
+        juce::String text;
+        Kind kind = Kind::notice;
+        juce::String actionLabel;
+        std::function<void()> act;
+        bool working = false;
+    };
+    bool task = false;
+    Held held;
 };

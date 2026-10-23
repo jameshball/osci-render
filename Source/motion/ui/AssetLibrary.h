@@ -102,6 +102,9 @@ private:
     juce::String editLabel(int row) const;
     void editRow(int row);
     void placeEdit();
+    // Whether the sources outnumber what the list shows at once (or a
+    // search is under way), so searching them helps.
+    bool wantsSearch() const;
     void scrollBarMoved(juce::ScrollBar*, double) override { placeEdit(); }
     void returnKeyPressed(int row) override { insert(row); }
 

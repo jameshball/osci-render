@@ -23,7 +23,7 @@ public:
         }
         return write(PreparedComposition(snapshot, sampleRate, &cancel, CompositionPurpose::signal, reach), destination, sampleRate, cancel, progress, baked, nullptr, mode);
     } catch (...) {
-        return juce::Result::fail("Cannot prepare the composition for signal export.");
+        return juce::Result::fail("Couldn't prepare the beam for export.");
     }
 
     static juce::Result write(const PreparedComposition& composition, const juce::File& destination, double sampleRate, const std::atomic<bool>& cancel, std::atomic<double>* progress = nullptr, const hidden::Bake* baked = nullptr, const Stretches* stretches = nullptr, OutputMode mode = OutputMode::xyrgb) {

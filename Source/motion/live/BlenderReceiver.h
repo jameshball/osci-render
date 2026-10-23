@@ -50,7 +50,7 @@ public:
             }
         }
         requestedPort = port;
-        if (!startThread()) { setState(State::failed, "Could not start the Blender receiver."); }
+        if (!startThread()) { setState(State::failed, "Couldn't start listening for Blender."); }
     }
     void stop() {
         signalThreadShouldExit();
@@ -177,7 +177,7 @@ private:
         try {
             source = prepareBlenderFrame(*frame);
         } catch (...) {
-            reject("Could not prepare the incoming Blender frame.");
+            reject("Couldn't prepare the incoming Blender frame.");
             return;
         }
         Snapshot old;
@@ -190,7 +190,7 @@ private:
     }
     void run() override {
         try { receive(); }
-        catch (...) { setState(State::failed, "Could not prepare the incoming Blender frame."); }
+        catch (...) { setState(State::failed, "Couldn't prepare the incoming Blender frame."); }
     }
     void receive() {
         juce::StreamingSocket listener;

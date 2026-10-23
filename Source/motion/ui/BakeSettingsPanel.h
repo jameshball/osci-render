@@ -21,11 +21,13 @@ public:
         bpm.setName("Bake tempo");
         duration.setSpec(durationSpec);
         bpm.setSpec(tempoSpec);
+        // Whole tempos as the top bar shows them: 120 BPM.
+        bpm.setNotation({ [](double value) { return motion::style::bpm(value); }, [](const juce::String& text) { return motion::ui::parseNumber(text, "BPM"); } });
         seed.setSpec(seedSpec);
         duration.setValue(initial.duration);
         bpm.setValue(initial.bpm);
         seed.setValue(initial.seed);
-        samples.setTooltip("Samples per frame");
+        samples.setTooltip("Points per frame");
         seed.setTooltip("Keeps random source generation repeatable.");
         bpm.setTooltip("Fixed tempo used while evaluating the source.");
         rates = { 24, 25, 30, 50, 60, 120 };
@@ -50,7 +52,7 @@ public:
             field->onCommit = field->onChange;
         }
         motion::style::inspector::styleHeading(title, "Bake");
-        for (auto [caption, text] : { std::pair { &durationLabel, "Duration" }, std::pair { &rateLabel, "Frame rate" }, std::pair { &samplesLabel, "Samples" }, std::pair { &seedLabel, "Seed" }, std::pair { &bpmLabel, "Tempo" } }) {
+        for (auto [caption, text] : { std::pair { &durationLabel, "Duration" }, std::pair { &rateLabel, "Frame rate" }, std::pair { &samplesLabel, "Points" }, std::pair { &seedLabel, "Seed" }, std::pair { &bpmLabel, "Tempo" } }) {
             motion::style::inspector::styleCaption(*caption, text);
         }
         summary.setName("Bake prepared payload estimate");
@@ -112,7 +114,7 @@ private:
         const auto strideIndex = samples.getSelectedId() - 1;
         juce::String message;
         if (rateIndex < 0 || strideIndex < 0 || static_cast<std::size_t>(rateIndex) >= rates.size() || static_cast<std::size_t>(strideIndex) >= strides.size()) {
-            message = "Choose a frame rate and samples per frame.";
+            message = "Choose a frame rate and points per frame.";
         } else {
             next.frameRate = rates[static_cast<std::size_t>(rateIndex)];
             next.pointsPerFrame = strides[static_cast<std::size_t>(strideIndex)];
@@ -127,8 +129,8 @@ private:
         }
         settings = next;
         const auto frames = next.frameCount();
-        const auto mib = static_cast<double>(frames) * next.pointsPerFrame * sizeof(motion::PointSample) / (1024 * 1024);
-        summary.setText(juce::String(static_cast<juce::int64>(frames)) + " frames" + motion::style::dot() + juce::String(mib, 2) + " MiB", juce::dontSendNotification);
+        const auto megabytes = static_cast<double>(frames) * next.pointsPerFrame * sizeof(motion::PointSample) / 1.0e6;
+        summary.setText(juce::String(static_cast<juce::int64>(frames)) + " frames" + motion::style::dot() + juce::String(megabytes, 1) + " MB", juce::dontSendNotification);
         if (onChanged) { onChanged(); }
     }
     motion::BakeSettings settings;

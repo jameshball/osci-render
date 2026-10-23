@@ -4,24 +4,6 @@
 #include "../model/BlenderSourceSettings.h"
 #include "../live/BlenderCapture.h"
 
-// Record, with the red dot every recorder uses before its name.
-class MotionRecordButton final : public juce::TextButton {
-public:
-    static constexpr int inset = 10, dot = 8, gap = 6;
-    int bestWidth() { return inset + dot + gap + juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::buttonFont(*this), getButtonText()))) + inset; }
-    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
-        getLookAndFeel().drawButtonBackground(g, *this, findColour(buttonColourId), highlighted, down);
-        auto area = getLocalBounds().reduced(inset, 0);
-        const auto alpha = isEnabled() ? 1.0f : .4f;
-        g.setColour(motion::style::error().withMultipliedAlpha(alpha));
-        g.fillEllipse(area.removeFromLeft(dot).withSizeKeepingCentre(dot, dot).toFloat());
-        area.removeFromLeft(gap);
-        g.setColour(osci::Colours::text().withMultipliedAlpha(isEnabled() ? 1.0f : .5f));
-        g.setFont(motion::style::buttonFont(*this));
-        g.drawText(getButtonText(), area, juce::Justification::centredLeft, false);
-    }
-};
-
 // A live source fed by Blender's add-on: its name, the local port it listens
 // on and what it shows when Blender goes away, then the connection's state
 // with a switch to listen, and capture to a portable recording. Each state
@@ -69,9 +51,9 @@ public:
         record.setButtonText("Record");
         record.setName("Record Blender capture");
         record.setTitle("Record Blender capture");
-        saveCapture.setButtonText("Save");
-        saveCapture.setName("Save Blender capture");
-        saveCapture.setTitle("Save Blender capture");
+        saveCapture.setButtonText("Stop and keep");
+        saveCapture.setName("Stop and keep Blender capture");
+        saveCapture.setTitle("Stop and keep Blender capture");
         saveCapture.setTooltip("Stop recording and add the capture as a source");
         cancelCapture.setButtonText("Discard");
         cancelCapture.setName("Cancel capture");

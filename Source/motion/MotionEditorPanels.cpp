@@ -154,7 +154,6 @@ void MotionEditor::setUpScene() {
 void MotionEditor::setUpScope() {
     outputHeader.setName("Scope");
     using Control = VisualiserComponent::Control;
-    scopeTools.textureOutput.onClick = [this] { visualiser.clickControl(Control::textureOutput, &scopeTools.textureOutput); };
     scopeTools.settings.onClick = [this] { visualiser.clickControl(Control::settings, &scopeTools.settings); };
     scopeTools.popout.onClick = [this] { visualiser.clickControl(Control::popout, &scopeTools.popout); };
     scopeTools.fullScreen.onClick = [this] { visualiser.clickControl(Control::fullScreen, &scopeTools.fullScreen); };
@@ -162,25 +161,29 @@ void MotionEditor::setUpScope() {
         const auto next = mode == FullScreenMode::TOGGLE ? !scopeFullScreen : mode == FullScreenMode::FULL_SCREEN;
         setScopeFullScreen(next);
     });
-    scopeTools.canvas.onClick = [this] {
-        auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize());
-        // The canvas size depends on nothing else, so other edits meanwhile don't stop it.
-        const auto apply = popoverEdit(panel.get(), {}, Requires::sameProject);
-        panel->onApply = [apply](VisualiserRenderSize size) {
-            apply([size](motion::Document& document) {
-                // The frame is the project's: an edit, saved and undone with it.
-                const auto& current = document.mainProject().exportSettings;
-                if (size.width != current.width || size.height != current.height) {
-                    document.edit("Change the canvas", [size](motion::Project& project) {
-                        project.exportSettings.width = size.width;
-                        project.exportSettings.height = size.height;
-                    });
-                }
-                return juce::Result::ok();
-            });
-        };
-        showPopover(std::move(panel), getLocalArea(&scopeTools, scopeTools.canvas.getBounds()));
+    // Sharing the picture (Syphon/Spout) is a switch in Scope settings; the
+    // visualiser keeps its premium check.
+    scopePanel.onSharePicture = [this] { visualiser.clickControl(Control::textureOutput, nullptr); };
+}
+
+void MotionEditor::showCanvasSettings(juce::Component& anchor) {
+    auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize());
+    // The canvas size depends on nothing else, so other edits meanwhile don't stop it.
+    const auto apply = popoverEdit(panel.get(), {}, Requires::sameProject);
+    panel->onApply = [apply](VisualiserRenderSize size) {
+        apply([size](motion::Document& document) {
+            // The frame is the project's: an edit, saved and undone with it.
+            const auto& current = document.mainProject().exportSettings;
+            if (size.width != current.width || size.height != current.height) {
+                document.edit("Change the canvas", [size](motion::Project& project) {
+                    project.exportSettings.width = size.width;
+                    project.exportSettings.height = size.height;
+                });
+            }
+            return juce::Result::ok();
+        });
     };
+    showPopover(std::move(panel), getLocalArea(&anchor, anchor.getLocalBounds()));
 }
 
 void MotionEditor::setUpLibrary() {
@@ -427,6 +430,16 @@ void MotionEditor::setUpProperties() {
         request.textSettings = merged;
         beginSourceImport(request);
     };
+    // The composition's Canvas field offers presets; Custom... opens the
+    // popover that sets any size.
+    compositionSettings.onCustomCanvas = [this](juce::Component& anchor) { showCanvasSettings(anchor); };
+    // The project's description follows the composition's effects.
+    compositionTrail.add(effectStack, [this] { return effectStack.preferredHeight(); });
+    compositionTrail.add(compositionSettings.about(), [this] { return compositionSettings.about().preferredHeight(); });
+    compositionSettings.about().onHeightChanged = [this] {
+        propertyInspector.relayout();
+        compositionTrail.resized();
+    };
     // The owner's effects follow its properties.
     propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); }, "Effects");
     propertyInspector.onPropertySelected = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, selectionIsCamera(), true); };
@@ -486,7 +499,7 @@ void MotionEditor::setUpTimeline() {
         const auto& changes = processor.document.project().tempoChanges;
         const auto existing = changes != nullptr && replacing.has_value() ? std::find_if(changes->begin(), changes->end(), [&](const auto& change) { return change.beat == *replacing; }) : std::vector<motion::TempoChange>::const_iterator();
         const auto ramped = changes != nullptr && replacing.has_value() && existing != changes->end() && existing->ramp;
-        auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar, ramped);
+        auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar, replacing.has_value(), ramped);
         const juce::Component::SafePointer<MotionTempoPanel> tempoPanel(panel.get());
         const auto apply = popoverEdit(panel.get(), [tempoPanel](const juce::String& error) { if (tempoPanel != nullptr) { tempoPanel->setError(error); } });
         panel->onApply = [apply, beat, replacing](double value, bool glide) {
@@ -507,7 +520,7 @@ void MotionEditor::setUpTimeline() {
             name = found->name;
             time = found->time;
         }
-        auto panel = std::make_unique<MotionMarkerPanel>(name, time, project.timeGrid(), project.duration);
+        auto panel = std::make_unique<MotionMarkerPanel>(name, time, project.timeGrid(), project.duration, id != 0);
         const juce::Component::SafePointer<MotionMarkerPanel> markerPanel(panel.get());
         const auto apply = popoverEdit(panel.get(), [markerPanel](const juce::String& error) { if (markerPanel != nullptr) { markerPanel->setError(error); } });
         panel->onApply = [apply, id](juce::String name, double time) {

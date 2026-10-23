@@ -56,7 +56,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // Tools live inside the Scene, Blender style; the header keeps its title
     // and the view presets.
     addAndMakeVisible(sceneTools);
-    addChildComponent(exportBar);
     addAndMakeVisible(libraryTabs);
     addChildComponent(graphSideViewport);
     addChildComponent(modulatorLibrary);
@@ -71,14 +70,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     scopeTransport.onPlay = [this] { togglePlayback(); };
     scopeTransport.onSeek = [this](double time) { processor.seek(time); };
     scopeTransport.onSpeedMenu = [this](juce::Component& anchor) { showSpeedMenu(anchor); };
-    // Full screen, the tool strip shows and fades with the transport, and
-    // the pointer resting on it keeps both up.
-    scopeTransport.onFade = [this](float alpha, bool interactive) {
-        if (!scopeFullScreen) { return; }
-        scopeTools.setAlpha(alpha);
-        scopeTools.setInterceptsMouseClicks(interactive, interactive);
-    };
-    scopeTransport.holds = [this] { return scopeTools.isMouseOverOrDragging(true); };
+    // Full screen, the transport is the only bar; it ends with the way out.
+    scopeTransport.onExit = [this] { setScopeFullScreen(false); };
     addAndMakeVisible(outputButton);
     addAndMakeVisible(outputLabel);
     addAndMakeVisible(loopButton);
@@ -99,7 +92,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     undoButton.onPopupMenu = [this] { osci::showUndoHistory(processor.getUndoManager(), false, undoButton, [this] { refreshUndo(); }); };
     redoButton.onPopupMenu = [this] { osci::showUndoHistory(processor.getUndoManager(), true, redoButton, [this] { refreshUndo(); }); };
     addChildComponent(effectLibrary);
-    addChildComponent(cancelExport);
     addChildComponent(curveList);
     setUpMenus();
     setUpCompositionNavigation();
@@ -362,8 +354,6 @@ void MotionEditor::setUpTransport() {
             }
         }
     };
-    exportBar.setName("Signal export progress");
-    cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
     playButton.onClick = [this] { togglePlayback(); };
 }
 
@@ -473,7 +463,8 @@ void MotionEditor::dismissPopover(juce::Component* content) {
     if (box != nullptr) { box->dismiss(); }
 }
 
-// Full screen, the Scope covers the window and keeps Motion's strip; the
+// Full screen, the Scope covers the window with only its transport, which
+// ends with Exit full screen; the tool strip waits in the header. The
 // visualiser's own full-screen mode would bring back its built-in row.
 void MotionEditor::setScopeFullScreen(bool value) {
     if (value == scopeFullScreen) { return; }
@@ -483,12 +474,7 @@ void MotionEditor::setScopeFullScreen(bool value) {
         scopeTransport.wake();
     } else {
         scopeTransport.sleep();
-        // Back in the header, the tool strip is always shown.
-        scopeTools.setAlpha(1.0f);
-        scopeTools.setInterceptsMouseClicks(true, true);
     }
-    scopeTools.fullScreen.setIcon(value ? motion::icons::Icon::fullscreenExit : motion::icons::Icon::fullscreen);
-    scopeTools.fullScreen.setTooltip(value ? "Exit full screen (Esc)" : "Full screen");
     resized();
     if (value) { visualiser.grabKeyboardFocus(); }
 }
@@ -549,11 +535,12 @@ void MotionEditor::timerCallback() {
     if (std::abs(previewRate.getValueUnnormalised() - projectFrameRate) > 0.005f) {
         previewRate.setUnnormalisedValueNotifyingHost(projectFrameRate);
     }
-    scopeTools.canvas.setEnabled(exportState == nullptr);
+    compositionSettings.setCanvasEnabled(exportState == nullptr);
     {
         using Control = VisualiserComponent::Control;
-        // The strip shows what the visualiser is doing, however it started.
-        scopeTools.textureOutput.setToggleState(visualiser.isControlOn(Control::textureOutput), juce::dontSendNotification);
+        // The strip and Scope settings show what the visualiser is doing,
+        // however it started.
+        scopePanel.setSharingPicture(visualiser.isControlOn(Control::textureOutput));
         scopeTools.popout.setToggleState(visualiser.isControlOn(Control::popout), juce::dontSendNotification);
         const auto settingsShown = visualiser.hasControl(Control::settings), popoutShown = visualiser.hasControl(Control::popout);
         if (scopeTools.settings.isVisible() != settingsShown || scopeTools.popout.isVisible() != popoutShown) {
@@ -615,8 +602,8 @@ void MotionEditor::timerCallback() {
     if (preparationError != lastPreparationError) {
         lastPreparationError = preparationError;
         if (preparationError.isNotEmpty()) {
-            statusBar.show("The latest edit cannot play: " + preparationError + " Playing the last valid version.", MotionStatusBar::Kind::warning);
-        } else if (statusBar.text().startsWith("The latest edit cannot play")) {
+            statusBar.show("The latest edit can't play: " + preparationError + " Playing the last valid version.", MotionStatusBar::Kind::warning);
+        } else if (statusBar.text().startsWith("The latest edit can't play")) {
             statusBar.clear();
         }
     }
@@ -627,10 +614,9 @@ void MotionEditor::timerCallback() {
         assetLibrary.setImportStatus(task->cancelled.load() ? "Cancelling import..." : "Preparing " + task->name + "\n" + juce::String(juce::roundToInt(task->progress.load() * 100)) + "%"
             + (pendingImports.size() > 1 ? "  (" + juce::String(static_cast<int>(pendingImports.size() - 1)) + " queued)" : ""));
     }
-    if (exportState != nullptr) {
-        exportProgress = exportState->videoWithAudio
-            ? (exportState->progress.load() + exportState->soundtrackProgress.load()) * 0.5
-            : exportState->progress.load();
+    // An audio export's progress, on its line in the status bar.
+    if (exportState != nullptr && exportTask.isNotEmpty()) {
+        statusBar.updateTask(exportState->cancelled.load() ? juce::String("Cancelling the export...") : exportTask + motion::style::dot() + juce::String(juce::roundToInt(exportState->progress.load() * 100)) + "%");
     }
     const auto playing = processor.playing.load();
     playButton.setIcon(playing ? motion::icons::Icon::pause : motion::icons::Icon::play);
@@ -962,6 +948,11 @@ void MotionEditor::refreshInspector() {
     // The Scope has no effects; its fixed options follow its rows instead.
     if (scopeSelected) {
         propertyInspector.setTrail(&scopePanel, [] { return MotionScopePanel::preferredHeight(); }, {}, true);
+    } else if (selection == 0) {
+        // The composition's effects, then the project's description.
+        if (effectStack.getParentComponent() != &compositionTrail) { compositionTrail.addChildComponent(effectStack); }
+        propertyInspector.setTrail(&compositionTrail, [this] { return compositionTrail.preferredHeight(); }, "Effects");
+        compositionTrail.resized();
     } else {
         propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); }, "Effects");
     }

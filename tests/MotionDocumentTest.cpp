@@ -2506,18 +2506,18 @@ public:
         beginTest("Corrupt media, absent decoder, bounded output and cancellation reject cleanly");
         juce::MemoryBlock corrupt; expect(fixtures.getChildFile("corrupt.mp4").loadFileAsData(corrupt));
         const auto corruptResult = motion::VideoSourcePreparer::prepare(corrupt, decoder, reference->rasterSettings);
-        expect(!corruptResult && juce::String(corruptResult.error).contains("Cannot decode"), juce::String(corruptResult.error));
+        expect(!corruptResult && juce::String(corruptResult.error).contains("Couldn't decode"), juce::String(corruptResult.error));
         expect(!motion::VideoSourcePreparer::prepare(reference->data, {}, reference->rasterSettings));
 #if JUCE_MAC || JUCE_LINUX
         juce::TemporaryFile failingDecoder(".sh");
         expect(failingDecoder.getFile().replaceWithText("#!/bin/sh\nfor last; do :; done\nhead -c 16384 /dev/zero > \"$last\"\nexit 1\n", false, false, "\n"));
         expect(failingDecoder.getFile().setExecutePermission(true));
         const auto partialFailure = motion::VideoSourcePreparer::prepare(reference->data, failingDecoder.getFile(), reference->rasterSettings);
-        expect(!partialFailure && juce::String(partialFailure.error).contains("Cannot decode"), "A failing decoder must not publish its complete but partial output: " + juce::String(partialFailure.error));
+        expect(!partialFailure && juce::String(partialFailure.error).contains("Couldn't decode"), "A failing decoder must not publish its complete but partial output: " + juce::String(partialFailure.error));
         expect(failingDecoder.getFile().replaceWithText("#!/bin/sh\nfor last; do :; done\nhead -c 16384 /dev/zero > \"$last\"\nkill -KILL $$\n", false, false, "\n"));
         expect(failingDecoder.getFile().setExecutePermission(true));
         const auto crashed = motion::VideoSourcePreparer::prepare(reference->data, failingDecoder.getFile(), reference->rasterSettings);
-        expect(!crashed && juce::String(crashed.error).contains("Cannot decode"), "A crashed decoder must not publish partial output: " + juce::String(crashed.error));
+        expect(!crashed && juce::String(crashed.error).contains("Couldn't decode"), "A crashed decoder must not publish partial output: " + juce::String(crashed.error));
 #endif
 
         motion::VideoSourcePreparer::Limits limits; limits.rawBytes = 64 * 64 * 4 * 4;
