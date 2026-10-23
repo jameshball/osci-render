@@ -1014,7 +1014,10 @@ bool MotionEditor::keyPressed(const juce::KeyPress& key) {
     // has been answered, so it holds nothing back.
     const auto sheetUp = std::any_of(activeOverlays.begin(), activeOverlays.end(), [](const auto& overlay) { return !overlay->isDismissing(); });
     if (sheetUp) { return true; }
-    // A popover's keys are its own; what it doesn't use goes to the window.
+    // A popover's keys are its own; what it doesn't use goes to the window,
+    // so saving and undoing work as the buttons do while one is open (the
+    // colour picker edits live; a popover that applies on closing notices a
+    // project changed under it).
     if (popover != nullptr) { return false; }
     if (scopeFullScreen && key == juce::KeyPress::escapeKey) {
         setScopeFullScreen(false);
