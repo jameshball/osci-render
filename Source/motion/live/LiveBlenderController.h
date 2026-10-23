@@ -108,8 +108,9 @@ public:
             const bool visible = asset->blenderSettings.freezeOnDisconnect
                 || (status.state == BlenderReceiver::State::connected && frame.connection == status.connection);
             // A live source with nothing to show resolves to nothing anyway, so
-            // only those drawing are published: stopped sessions can't fill the set.
-            if (visible && frame.source != nullptr && entries.size() < LiveSourceFrames::maximumSources) { entries.push_back({asset->liveIdentity, frame.source}); }
+            // only those drawing are published: stopped sessions can't fill the
+            // set, and the 16 live pictures published beside them always fit.
+            if (visible && frame.source != nullptr && entries.size() < LiveSourceFrames::maximumSources - 16) { entries.push_back({asset->liveIdentity, frame.source}); }
         }
         bool changed = entries.size() != previous.size();
         for (std::size_t index = 0; !changed && index < entries.size(); ++index) {
