@@ -1,5 +1,7 @@
 #pragma once
 
+#include <set>
+
 #include "MotionIcons.h"
 #include "PreviewGesture.h"
 #include "Chip.h"
@@ -237,6 +239,9 @@ private:
     std::function<int()> leadHeight;
     std::vector<motion::PropertySpec> specList;
     motion::Id target = 0;
+    // Rows shown only while in use that have been shown for `keptFor`.
+    std::set<std::string> keptRows;
+    motion::Id keptFor = 0;
     juce::String layoutSignature = "none";
     motion::ui::PreviewGesture gesture {processor.document};
     motion::Id gestureTarget = 0;

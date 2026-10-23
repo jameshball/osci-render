@@ -130,15 +130,29 @@ void MotionPropertyInspector::refresh() {
         // Lit by lights does nothing without a light, and a light's opacity
         // only dims it as its intensity does: each shows only when there is
         // a light, or when it is already in use. The Graph still lists them.
+        // Once shown, such a row stays while the same thing is selected: a
+        // drag back to the default must not take the field from under it.
         std::optional<bool> lights;
+        if (keptFor != target) {
+            keptRows.clear();
+            keptFor = target;
+        }
+        const auto used = [&](const motion::PropertySpec& spec) {
+            const std::string id(spec.id);
+            if (keptRows.contains(id) || inUse(spec)) {
+                keptRows.insert(id);
+                return true;
+            }
+            return false;
+        };
         const auto shown = [&](const motion::PropertySpec& spec) {
             if (!motion::hasProperty(generator, spec.id, surface)) { return false; }
             if (spec.id == "lit") {
                 if (live) { return false; }
                 if (!lights.has_value()) { lights = projectHasLight(); }
-                return *lights || inUse(spec);
+                return *lights || used(spec);
             }
-            return !(light && spec.id == "opacity") || inUse(spec);
+            return !(light && spec.id == "opacity") || used(spec);
         };
         std::copy_if(base.begin(), base.end(), std::back_inserter(specList), shown);
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
