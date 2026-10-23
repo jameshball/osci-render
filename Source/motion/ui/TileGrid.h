@@ -58,30 +58,50 @@ public:
     juce::Button& tile(std::size_t index) { return *tiles[index]; }
     const juce::String& nameOf(std::size_t index) const { return tiles[index]->choice.name; }
 
+    // Pictures no taller than `pictureHeight`, their names in a shorter
+    // line, so the grid stays low; below `narrowWidth` a tile, `narrowColumns`
+    // columns instead.
+    void setCompact(int pictureHeight, int narrowWidth, int narrowColumns) {
+        pictureLimit = pictureHeight;
+        narrowTileWidth = narrowWidth;
+        narrowColumnCount = narrowColumns;
+        for (auto& tile : tiles) { tile->compact = true; }
+        resized();
+    }
+
     int heightFor(int width) const {
-        const auto rows = (static_cast<int>(tiles.size()) + columnCount - 1) / columnCount;
+        const auto columns = columnsFor(width);
+        const auto rows = (static_cast<int>(tiles.size()) + columns - 1) / columns;
         return rows * tileHeight(width) + (rows - 1) * motion::style::gap;
     }
     void resized() override {
         const auto width = getWidth();
-        const auto tileWidth = (width - (columnCount - 1) * motion::style::gap) / columnCount;
+        const auto columns = columnsFor(width);
+        const auto tileWidth = (width - (columns - 1) * motion::style::gap) / columns;
         // The spare pixels go to the first columns, so the grid fills the width exactly.
-        const auto spare = width - (tileWidth * columnCount + (columnCount - 1) * motion::style::gap);
+        const auto spare = width - (tileWidth * columns + (columns - 1) * motion::style::gap);
         const auto height = tileHeight(width);
         for (std::size_t index = 0; index < tiles.size(); ++index) {
-            const auto column = static_cast<int>(index) % columnCount, row = static_cast<int>(index) / columnCount;
+            const auto column = static_cast<int>(index) % columns, row = static_cast<int>(index) / columns;
             const auto x = column * (tileWidth + motion::style::gap) + std::min(column, spare);
             tiles[index]->setBounds(x, row * (height + motion::style::gap), tileWidth + (column < spare ? 1 : 0), height);
         }
     }
 
 private:
-    // A picture tile's picture is as tall as it is wide less its margins,
-    // with its name below; a chip is a control's height.
-    static constexpr int nameHeight = 18, chipHeight = motion::style::controlHeight + 2;
+    // A picture tile's picture is as tall as it is wide less its margins
+    // (or its limit), with its name below; a chip is a control's height.
+    static constexpr int nameHeight = 18, compactNameHeight = 14, chipHeight = motion::style::controlHeight + 2;
+    int columnsFor(int width) const {
+        if (narrowColumnCount <= 0) { return columnCount; }
+        const auto tileWidth = (width - (columnCount - 1) * motion::style::gap) / columnCount;
+        return tileWidth < narrowTileWidth ? narrowColumnCount : columnCount;
+    }
     int tileHeight(int width) const {
         if (look == Look::chips) { return chipHeight; }
-        const auto tileWidth = (width - (columnCount - 1) * motion::style::gap) / columnCount;
+        const auto columns = columnsFor(width);
+        const auto tileWidth = (width - (columns - 1) * motion::style::gap) / columns;
+        if (pictureLimit > 0) { return std::min(tileWidth - 2 * motion::style::gap, pictureLimit) + compactNameHeight + 2 * motion::style::gap; }
         return tileWidth - 2 * motion::style::gap + nameHeight + motion::style::gap;
     }
 
@@ -125,7 +145,9 @@ private:
                 return;
             }
             auto area = getLocalBounds().reduced(motion::style::gap);
-            const auto name = area.removeFromBottom(nameHeight);
+            // Compact, the name takes the tile's whole width: a small tile's
+            // longest name still fits.
+            const auto name = compact ? area.removeFromBottom(compactNameHeight).withX(1).withWidth(getWidth() - 2) : area.removeFromBottom(nameHeight);
             auto well = area.toFloat();
             well = well.withSizeKeepingCentre(std::min(well.getWidth(), well.getHeight()), std::min(well.getWidth(), well.getHeight()));
             motion::style::fillWell(g, area.toFloat());
@@ -165,12 +187,13 @@ private:
 
         Choice choice;
         Look look;
+        bool compact = false;
         juce::String amount;
         Moves moves = Moves::no;
         motion::style::Fade fade {*this};
     };
 
-    int columnCount;
+    int columnCount, pictureLimit = 0, narrowTileWidth = 0, narrowColumnCount = 0;
     Look look;
     std::vector<std::unique_ptr<Tile>> tiles;
 };

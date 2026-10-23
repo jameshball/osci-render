@@ -99,6 +99,8 @@ try:
     scope = next(n["bounds"] for n in nodes(tree) if n.get("class") == "VisualiserComponent")
 
     add("Generate", "Box")
+    # With no light yet, being lit by lights would do nothing: no row for it.
+    field("lit", present=False)
     # White, so a light's colour is what it is drawn in.
     for channel in ("red", "green", "blue"):
         step("white " + channel, "set-value", field(channel)["ref"], "1")
@@ -112,6 +114,8 @@ try:
     if field("light.cone").get("value") in (None, ""):
         raise RuntimeError("A spot light's Properties have its cone")
     field("beam", present=False)
+    # A light's opacity only dims it as its intensity does: shown only once used.
+    field("opacity", present=False)
     settle_bake()
     time.sleep(1)
     command("screenshot", "--file", session.artifact_dir / "spot.png")

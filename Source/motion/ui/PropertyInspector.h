@@ -5,6 +5,7 @@
 #include "Chip.h"
 #include "KeyframeButton.h"
 #include "TileGrid.h"
+#include "PropertyRow.h"
 
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
@@ -90,16 +91,16 @@ private:
         void setColour(juce::Colour value);
         juce::Colour colour = juce::Colours::white;
     };
-    struct Row : juce::Component {
+    // A group of a property's axes (Position: X, Y, Z), on the shared row's
+    // gutter: its name above them, or beside a single value.
+    struct Row : motion::ui::PropertyRow {
         juce::String group, section;
-        // A generator's own numbers: what makes it, so they come first, above
-        // the clip's timing.
+        // What makes it (a generator's numbers, a fractal's depth, a
+        // script's sliders, a light's colour), so it comes first, above the
+        // clip's timing.
         bool first = false;
         std::vector<std::unique_ptr<Field>> fields;
         std::unique_ptr<Swatch> swatch;
-        motion::ui::KeyframeButton key;
-        motion::ui::Chip modulate {"Modulate", motion::icons::Icon::wave};
-        motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
         // Position: one spatial path; Rotation: quaternion orientation.
         std::unique_ptr<motion::ui::Chip> mode;
         bool misaligned = false; // mode on, but axes no longer share key times
@@ -110,65 +111,16 @@ private:
         int preferredHeight() const { return compact() ? motion::style::controlHeight : 17 + motion::style::controlHeight; }
         void paint(juce::Graphics& g) override;
         void resized() override;
-        // Hovered, a diamond with no keys yet opens into "Animate", saying
-        // what it does; a property's first key pulses once round it.
-        void paintOverChildren(juce::Graphics& g) override;
-        // A diamond with no keys recedes, and the modulate glyph shows only
-        // while the row is hovered, a modulator is dragged, or the row is
-        // driven, keeping its column so the values never shift: the rows
-        // that are keyed or driven stand out.
-        Row() {
-            key.restAlpha = .45f;
-            modulate.showsOff = false;
-            addMouseListener(&hover, true);
-        }
-        ~Row() override { removeMouseListener(&hover); }
-        // The pointer over the row or anything in it. A listener of its own,
-        // not the row, so wheel events still pass up once to the scroller.
-        struct Hover final : juce::MouseListener {
-            explicit Hover(Row& owner) : row(owner) {}
-            void mouseEnter(const juce::MouseEvent& event) override {
-                row.hoverKey(event, true);
-                row.showModulate();
-            }
-            void mouseExit(const juce::MouseEvent& event) override {
-                row.hoverKey(event, false);
-                row.showModulate();
-            }
-            Row& row;
-        };
-        Hover hover {*this};
-        void setModulatorDrag(bool active) {
-            modulatorDrag = active;
-            showModulate();
-        }
-        void showModulate() {
-            const auto shown = modulatorDrag || isMouseOver(true);
-            if (modulate.showsOff == shown) { return; }
-            modulate.showsOff = shown;
-            modulate.repaint();
-        }
-        bool modulatorDrag = false;
-        void hoverKey(const juce::MouseEvent& event, bool over) {
-            if (event.eventComponent != &key || keyHovered == over) { return; }
-            keyHovered = over;
-            repaint();
-        }
-        bool keyHovered = false;
-        void showState(motion::ui::KeyframeButton::State state, motion::Id target);
-        motion::ui::KeyframeButton::State shownState = motion::ui::KeyframeButton::State::unanimated;
-        motion::Id shownTarget = 0;
-        double pulseStart = 0;
-        static constexpr double pulseLength = 650;
-        juce::TimedCallback pulseFrames {[this] {
-            if (juce::Time::getMillisecondCounterHiRes() - pulseStart > pulseLength) { pulseFrames.stopTimer(); }
-            repaint();
-        }};
     };
     // The scrolled page: rows, and between groups of them a hairline and the
-    // group's heading (Transform, Appearance, ...).
+    // group's heading (Transform, Appearance, ...), which may carry a muted
+    // note at its right (Effects, when there are none: where they come from).
     struct Content : juce::Component {
-        std::vector<std::pair<int, juce::String>> sections;
+        struct Section {
+            int y = 0;
+            juce::String title, note;
+        };
+        std::vector<Section> sections;
         void paint(juce::Graphics& g) override;
     };
     static constexpr int sectionGap = 10, sectionHeading = 26;
@@ -195,8 +147,15 @@ private:
     bool refreshTiles(const motion::PropertyTarget& found, double time);
     // Which heading a property group sits under.
     juce::String sectionOf(const motion::PropertySpec& spec) const;
-    // A generator's own number: what makes it.
+    // A generator's own number.
     bool isGeneratorSpec(const motion::PropertySpec& spec) const;
+    // What makes it, which opens the page with no heading of its own: a
+    // generator's numbers (and a light's colour), a fractal's depth, a
+    // script's sliders.
+    bool isMakingSpec(const motion::PropertySpec& spec) const;
+    // Whether the project has a light, so that being lit by lights means
+    // something.
+    bool projectHasLight() const;
 
     // Driven by a link or a shared modulator route.
     bool isModulated(const std::string& property) const;
@@ -236,15 +195,15 @@ private:
     void showKeyMenu(Row& row);
     void jumpToKey(Row& row, bool forward);
 
-    // What a clip shows, named by its source rather than "Object".
+    // What a clip shows, named by its source rather than "Object"; a
+    // generator's by the generator (Sphere, Point light).
     juce::String sourceKind(motion::Id clip) const;
     // Sliders a Lua clip's script reads (slider_a ...), plus any it already
     // animates. Their curves are created on first edit.
     std::vector<motion::PropertySpec> luaSliders() const;
     // An L-system clip's depth, at the depth its source was imported at.
     std::optional<motion::PropertySpec> fractalDepthSpec() const;
-    // A generator clip's parameters, under a heading of the generator's name
-    // above its transform.
+    // What generates the target clip, whose parameters open its page.
     const motion::GeneratorDefinition* targetGenerator() const;
     // A Lua slider's or generator parameter's curve, made on first edit.
     motion::Curve* createSlider(motion::Project& project, const std::string& property) const;

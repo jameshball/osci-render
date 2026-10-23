@@ -17,17 +17,18 @@ inline juce::String motionModelSizeNote(bool original, double scale) {
     return "Centred and scaled " + times + factor + " to fill the screen.";
 }
 
-// A 3D object clip's size, under its timing in Properties: fitted to the
-// screen or kept at its file's own size, and what that amounts to. It
-// belongs to the source, so every clip of it follows; a change prepares the
-// source again.
+// A 3D object clip's size, one row under its timing in Properties: fitted
+// to the screen or kept at its file's own size, what that amounts to in its
+// tooltip. It belongs to the source, so every clip of it follows; a change
+// prepares the source again.
 class MotionModelSizeInspector final : public juce::Component {
 public:
     explicit MotionModelSizeInspector(MotionProcessor& owner) : processor(owner) {
         setName("3D object size inspector");
-        motion::style::inspector::styleHeading(title, "3D object");
-        addAndMakeVisible(title);
-        size.setTooltip("Fit to screen centres the object and scales it to fill the screen; Original keeps its file's own size and place");
+        motion::style::inspector::styleCaption(caption, "Size");
+        // On the property rows' edge, as their names are.
+        caption.setBorderSize({});
+        addAndMakeVisible(caption);
         size.onChange = [this](int index) {
             const auto* asset = modelAsset();
             const auto original = index == 1;
@@ -40,10 +41,6 @@ public:
             refresh();
         };
         addAndMakeVisible(size);
-        motion::style::inspector::styleCaption(note, {});
-        note.setJustificationType(juce::Justification::centredLeft);
-        note.setBorderSize({});
-        addAndMakeVisible(note);
     }
 
     std::function<void(motion::Id, bool original)> onChange;
@@ -54,7 +51,7 @@ public:
         refresh();
     }
     int preferredHeight() const {
-        return modelAsset() != nullptr ? motion::style::inspector::headingHeight + motion::style::inspector::row + noteHeight + 8 : 0;
+        return modelAsset() != nullptr ? motion::style::inspector::row : 0;
     }
     void refresh() {
         const auto previous = lastHeight;
@@ -63,22 +60,23 @@ public:
         const auto original = current();
         size.setSelected(original ? 1 : 0);
         size.setEnabled(asset != nullptr && !isLocked());
-        note.setText(asset != nullptr ? motionModelSizeNote(original, asset->fittedScale) : juce::String(), juce::dontSendNotification);
+        const juce::String choices = "Fit to screen centres the object and scales it to fill the screen; Original keeps its file's own size and place.";
+        // What the choice amounts to first, then what each does.
+        size.setTooltip(asset != nullptr ? motionModelSizeNote(original, asset->fittedScale) + " " + choices : choices);
         lastHeight = preferredHeight();
         resized();
         if (lastHeight != previous && onHeightChanged) { onHeightChanged(); }
     }
     void resized() override {
-        auto area = getLocalBounds();
-        title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
-        // The choice ends with Properties' value columns, as the fields below do.
-        const motion::style::PropertyGrid grid(area.getWidth());
-        size.setBounds(area.removeFromTop(motion::style::inspector::row).reduced(0, 3).withWidth(grid.value + grid.column));
-        note.setBounds(area.removeFromTop(noteHeight).withWidth(grid.value + grid.column));
+        // Its caption, then the choice across the value columns, ending with
+        // them as the Camera's rig and the timing fields above do.
+        const motion::style::PropertyGrid grid(getWidth());
+        auto row = getLocalBounds().removeFromTop(motion::style::inspector::row).withWidth(grid.value + grid.column).reduced(0, 2);
+        caption.setBounds(row.removeFromLeft(grid.column + motion::style::gap));
+        size.setBounds(row);
     }
 
 private:
-    static constexpr int noteHeight = 18;
     const motion::Asset* modelAsset() const {
         const auto& project = processor.document.project();
         const auto* clip = motion::findClip(project, selected);
@@ -100,6 +98,6 @@ private:
     motion::Id selected = 0;
     std::optional<std::pair<motion::Id, bool>> pending;
     int lastHeight = 0;
-    juce::Label title, note;
+    juce::Label caption;
     motion::ui::SegmentedControl size {"3D object size", {"Fit to screen", "Original"}};
 };

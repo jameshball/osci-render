@@ -103,8 +103,8 @@ try:
                     return found
         return None
     card = first(tree, lambda node: str(node.get("class", "")).endswith("Card") and node.get("componentName") == "LFO 1")["bounds"]
-    # Properties opens with Surface's tiles, so Y may be below the panel's
-    # fold: scroll it into view.
+    # Transform follows the clip's timing in Properties, so on a short panel
+    # Y may still be below the fold: scroll it into view.
     inspector = first(tree, lambda node: node.get("class") == "MotionPropertyInspector")["bounds"]
     field = first(tree, lambda node: node.get("componentName") == "position.y" and "ScrubField" in str(node.get("class", "")))["bounds"]
     for _ in range(30):

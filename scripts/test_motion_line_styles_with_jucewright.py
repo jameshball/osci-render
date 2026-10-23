@@ -63,12 +63,24 @@ def tile(name):
 
 
 def toggle(name, undo, combine=False):
-    """A click draws by that style alone; Shift-click adds or removes it."""
-    if combine:
-        bounds = tile(name)["bounds"]
-        step(name, "click-xy", bounds["x"] + bounds["w"] // 2, bounds["y"] + bounds["h"] // 2, "--modifiers", "shift")
-    else:
+    """A click draws by that style alone; Shift-click adds or removes it.
+    Surface closes Properties, so the click by name scrolls the tile into view."""
+    if not combine:
         step(name, "click", "--name", "Surface styles: " + name, "--exact")
+        session.wait_for_undo(undo)
+        return
+    # Shift reaches the tile only as a real pointer click (a locator click
+    # sets no modifier keys), so it is scrolled into view and clicked there.
+    node = tile(name)
+    for _ in range(12):
+        area = find(lambda n: n.get("class") == "MotionPropertyInspector")["bounds"]
+        bounds = node["bounds"]
+        if bounds["y"] >= area["y"] + 34 and bounds["y"] + bounds["h"] <= area["y"] + area["h"]:
+            break
+        command("wheel", area["x"] + area["w"] // 2, area["y"] + area["h"] // 2, "--dy", -0.4)
+        time.sleep(.3)
+        node = tile(name)
+    step(name, "click-xy", bounds["x"] + bounds["w"] // 2, bounds["y"] + bounds["h"] // 2, "--modifiers", "shift")
     session.wait_for_undo(undo)
 
 

@@ -8,6 +8,7 @@
 #include "Chip.h"
 #include "FormControls.h"
 #include "KeyframeButton.h"
+#include "PropertyRow.h"
 
 #include "../MotionProcessor.h"
 #include "../model/PropertySchema.h"
@@ -15,9 +16,10 @@
 #include <set>
 
 // The effects of one owner (a clip, track, group or the composition), shown
-// in Properties under the owner's own settings. Each effect is a card: a
-// header that folds it, a switch, its name and a quiet remove button, then
-// its parameters on Properties' grid (value, modulation, keys).
+// in Properties under the owner's own settings. Each effect is a section of
+// its own, unboxed: a hairline, a header that folds it (a switch, its name,
+// and a remove button shown while hovered), then its parameters as
+// Properties' own rows (value, modulation, keys).
 // Effects arrive by dragging them from the Effects library; cards reorder by
 // dragging their header. Other stages with effects are listed as chips.
 class MotionEffectStack final : public juce::Component, public juce::DragAndDropTarget {
@@ -58,17 +60,24 @@ public:
     void addEffect(const std::string& type, int index = -1);
 
 private:
-    static constexpr int chipHeight = 22, dropZoneHeight = 36, hintHeight = 20;
+    static constexpr int chipHeight = 22, dropZoneHeight = 36;
 
     // One effect: header (on/off, name, close) and a row per parameter.
     class Card final : public juce::Component {
     public:
         Card(MotionEffectStack& owner, motion::Id effectId);
+        ~Card() override { removeMouseListener(&hover); }
         int preferredHeight() const {
             if (folded()) { return headerHeight; }
-            return headerHeight + static_cast<int>(rows.size()) * (motion::style::controlHeight + motion::style::gap) + motion::style::gap;
+            return headerHeight + static_cast<int>(rows.size()) * (motion::style::controlHeight + motion::style::gap);
         }
         motion::Id getEffectId() const { return id; }
+        // A hairline above it, parting it from the effect before.
+        void setRuled(bool value) {
+            if (ruled == value) { return; }
+            ruled = value;
+            repaint();
+        }
         void update();
         void resized() override;
         void paint(juce::Graphics& g) override;
@@ -81,22 +90,33 @@ private:
         static constexpr int headerHeight = 28;
         bool folded() const { return stack.folded.contains(id); }
         void jump(const std::string& property, bool forward);
-        struct Row {
+        // A parameter, drawn as a property's row: its name, muted, then its
+        // value in the grid's last column, beside its keys.
+        struct Row final : motion::ui::PropertyRow {
             std::string id;
             juce::String label;
             motion::ui::ScrubField field;
-            motion::ui::KeyframeButton key;
-            motion::ui::Chip modulate {"Modulate", motion::icons::Icon::wave};
-            motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
+            bool dimmed = false; // its effect is off
+            void paint(juce::Graphics& g) override;
+            void resized() override;
         };
+        // The pointer over the effect or anything in it shows its remove button.
+        struct Hover final : juce::MouseListener {
+            explicit Hover(Card& owner) : card(owner) {}
+            void mouseEnter(const juce::MouseEvent&) override { card.showClose(); }
+            void mouseExit(const juce::MouseEvent&) override { card.showClose(); }
+            Card& card;
+        };
+        void showClose();
         MotionEffectStack& stack;
         motion::Id id;
         juce::String name;
-        bool enabled = true;
+        bool enabled = true, ruled = false;
         juce::Rectangle<float> fold;
         motion::ui::Switch power {"Effect on"};
         motion::icons::Button close {"Remove effect", motion::icons::Icon::close};
         std::vector<std::unique_ptr<Row>> rows;
+        Hover hover {*this};
     };
     // Cards folded to their header (view state, kept while the editor is open).
     std::set<motion::Id> folded;
@@ -138,6 +158,6 @@ private:
     std::vector<float> cardShift;
     int dragged = -1, gapIndex = -1, gapHeight = 0;
     juce::TimedCallback cardAnimation {[this] { stepCards(); }};
-    juce::Rectangle<int> dropZone, hint, stagesCaption;
+    juce::Rectangle<int> dropZone, stagesCaption;
     bool cancelledGesture = false, dragActive = false, dropHover = false;
 };

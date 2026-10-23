@@ -21,12 +21,12 @@ constexpr std::array<SurfaceStyle, 6> surfaceStyles {{
     {"rings", "Rings", "Rings centred on its front", Look::rings},
 }};
 
-// The heading each property group sits under (a generator's own numbers sit
-// under its name, a script's sliders under theirs, an L-system's depth under
-// Fractal; anything else is Beam).
+// The heading each property group sits under (a generator's own numbers, a
+// script's sliders and an L-system's depth open the page with none; anything
+// else is the Scope's Picture).
 constexpr std::array<std::pair<std::string_view, std::string_view>, 23> sectionOfGroup {{
     {"Position", "Transform"}, {"Rotation", "Transform"}, {"Scale", "Transform"}, {"Anchor", "Transform"},
-    {"Colour", "Appearance"}, {"Opacity", "Appearance"}, {"Lit by lights", "Appearance"}, {"Beam", "Appearance"},
+    {"Colour", "Appearance"}, {"Opacity", "Appearance"}, {"Lit by lights", "Appearance"}, {"Beam share", "Appearance"},
     {"Edges", "Surface"}, {"Outline", "Surface"}, {"Spiral", "Surface"}, {"Noise", "Surface"}, {"Slices", "Surface"}, {"Rings", "Surface"},
     {"Fill detail", "Surface"}, {"Noise phase", "Surface"}, {"Noise flow", "Surface"}, {"Mirror", "Surface"},
     {"Solid", "Surface"}, {"Hatching", "Shading"}, {"Hatch detail", "Shading"},
@@ -118,10 +118,34 @@ void MotionPropertyInspector::refresh() {
         const auto base = motion::propertySpecs(*found);
         const auto surface = motion::hasSurface(processor.document.project(), target);
         const auto live = motion::drawsLive(processor.document.project(), target);
-        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), [generator, surface, live](const auto& spec) { return motion::hasProperty(generator, spec.id, surface) && !(live && spec.id == "lit"); });
+        const auto light = generator != nullptr && generator->category == motion::GeneratorCategory::light;
+        const auto routed = routedProperties();
+        // In use: away from its default, keyed, or driven.
+        const auto inUse = [&](const motion::PropertySpec& spec) {
+            const std::string id(spec.id);
+            if (isDriven(*found, routed, id)) { return true; }
+            const auto* curve = found->curve(id);
+            return curve != nullptr && (curve->animated() || std::abs(curve->evaluateBase(0) - spec.defaultValue) > 1.0e-9);
+        };
+        // Lit by lights does nothing without a light, and a light's opacity
+        // only dims it as its intensity does: each shows only when there is
+        // a light, or when it is already in use. The Graph still lists them.
+        std::optional<bool> lights;
+        const auto shown = [&](const motion::PropertySpec& spec) {
+            if (!motion::hasProperty(generator, spec.id, surface)) { return false; }
+            if (spec.id == "lit") {
+                if (live) { return false; }
+                if (!lights.has_value()) { lights = projectHasLight(); }
+                return *lights || inUse(spec);
+            }
+            return !(light && spec.id == "opacity") || inUse(spec);
+        };
+        std::copy_if(base.begin(), base.end(), std::back_inserter(specList), shown);
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
         const auto depth = fractalDepthSpec();
         if (depth.has_value()) { specList.insert(specList.begin(), *depth); }
+        // What makes it opens the page, whatever kind of source it is.
+        std::stable_partition(specList.begin(), specList.end(), [this](const auto& spec) { return isMakingSpec(spec); });
     }
     const auto specs = std::span<const motion::PropertySpec>(specList);
     const auto modes = currentModes();
@@ -169,7 +193,9 @@ void MotionPropertyInspector::refresh() {
     if (!title.isBeingEdited()) { title.setText(editable ? juce::String(found->name.data(), found->name.size()) : heading.has_value() ? heading->first : juce::String("Properties"), juce::dontSendNotification); }
     // With several clips selected the header says so; edits apply to the
     // one named.
-    const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->beam ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : sourceKind(target);
+    auto kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->beam ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : sourceKind(target);
+    // Never the same word twice: a camera named Camera is just Camera.
+    if (kindText.equalsIgnoreCase(title.getText().trim())) { kindText.clear(); }
     const auto shownKind = editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText;
     if (shownKind != kind.getText()) {
         kind.setText(shownKind, juce::dontSendNotification);
@@ -220,7 +246,7 @@ void MotionPropertyInspector::refreshValues() {
         row->previous.setEnabled(earlier);
         row->next.setEnabled(later);
         row->modulate.setToggleState(modulated, juce::dontSendNotification);
-        if (row->group == "Beam") {
+        if (row->group == "Beam share") {
             const auto share = beamShare ? beamShare(target) : std::nullopt;
             const auto note = !share.has_value() ? juce::String() : *share > .999 ? juce::String("all of the beam")
                 : *share <= 0 ? juce::String("not drawn here") : juce::String(std::max(1, juce::roundToInt(*share * 100))) + "% of the beam";
@@ -236,7 +262,18 @@ void MotionPropertyInspector::refreshValues() {
 
 void MotionPropertyInspector::setModulatorDrag(bool active) {
     modulatorDrag = active;
-    for (auto& row : rows) { row->setModulatorDrag(active); }
+    // Its own rows and its effects' rows alike.
+    std::function<void(juce::Component&)> visit = [&](juce::Component& parent) {
+        for (auto* child : parent.getChildren()) {
+            auto* row = dynamic_cast<motion::ui::PropertyRow*>(child);
+            if (row != nullptr) {
+                row->setModulatorDrag(active);
+            } else {
+                visit(*child);
+            }
+        }
+    };
+    visit(content);
     if (!active) {
         dropTarget = nullptr;
         if (previewingRoute && onRoutePreview) { onRoutePreview(std::nullopt); }
@@ -376,10 +413,7 @@ void MotionPropertyInspector::Row::resized() {
         area.removeFromTop(1);
     }
     auto line = area.removeFromTop(motion::style::controlHeight);
-    next.setBounds(line.removeFromRight(12));
-    key.setBounds(line.removeFromRight(18));
-    previous.setBounds(line.removeFromRight(12));
-    modulate.setBounds(juce::Rectangle<int>(grid.modulate, line.getY(), motion::style::PropertyGrid::modulateWidth, line.getHeight()).reduced(0, 3));
+    layoutGutter(line, grid);
     if (compact()) {
         fields.front()->editor.setBounds(line.withX(grid.value).withWidth(grid.column));
         return;
@@ -389,58 +423,19 @@ void MotionPropertyInspector::Row::resized() {
     }
 }
 
-void MotionPropertyInspector::Row::showState(motion::ui::KeyframeButton::State state, motion::Id owner) {
-    // Animated just now, not by choosing something that already was.
-    if (owner == shownTarget && shownState == motion::ui::KeyframeButton::State::unanimated && state != motion::ui::KeyframeButton::State::unanimated) {
-        pulseStart = juce::Time::getMillisecondCounterHiRes();
-        pulseFrames.startTimerHz(60);
-    }
-    shownState = state;
-    shownTarget = owner;
-    key.setState(state);
-    repaint();
-}
-
-void MotionPropertyInspector::Row::paintOverChildren(juce::Graphics& g) {
-    const auto centre = key.getBounds().toFloat().getCentre();
-    const auto since = juce::Time::getMillisecondCounterHiRes() - pulseStart;
-    if (pulseFrames.isTimerRunning() && since < pulseLength) {
-        const auto t = static_cast<float>(since / pulseLength);
-        const auto eased = 1.0f - (1.0f - t) * (1.0f - t);
-        const auto radius = 5.0f + 9.0f * eased;
-        g.setColour(motion::style::accent().withAlpha(.85f * (1.0f - t)));
-        juce::Path ring;
-        ring.addPolygon(centre, 4, radius * 1.15f, 0.0f);
-        g.strokePath(ring, juce::PathStrokeType(1.5f));
-    }
-    if (!key.isEnabled() || !keyHovered || shownState != motion::ui::KeyframeButton::State::unanimated) { return; }
-    const auto text = juce::String("Animate");
-    const auto textWidth = std::ceil(juce::TextLayout::getStringWidth(motion::style::caption(), text));
-    const auto height = static_cast<float>(key.getHeight()) - 6.0f;
-    // A label floating over the row's end, ending in the diamond it explains.
-    const auto pill = juce::Rectangle<float>(centre.x + 10.0f - (textWidth + 34.0f), centre.y - height * .5f, textWidth + 34.0f, height);
-    juce::Path shape;
-    shape.addRoundedRectangle(pill, height * .5f);
-    juce::DropShadow(juce::Colours::black.withAlpha(.45f), 8, {0, 1}).drawForPath(g, shape);
-    g.setColour(osci::Colours::surfaceRaised().brighter(.12f));
-    g.fillPath(shape);
-    g.setColour(motion::style::hairline().brighter(.2f));
-    g.strokePath(shape, juce::PathStrokeType(1.0f));
-    juce::Path diamond;
-    diamond.addPolygon(centre, 4, 5.0f, 0.0f);
-    g.setColour(osci::Colours::text());
-    g.strokePath(diamond, juce::PathStrokeType(1.2f));
-    g.setFont(motion::style::caption());
-    g.drawText(text, pill.withTrimmedLeft(10.0f).withWidth(textWidth + 2.0f), juce::Justification::centredLeft, false);
-}
-
 void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
-    for (const auto& [y, title] : sections) {
+    for (const auto& section : sections) {
         g.setColour(motion::style::hairline());
-        g.fillRect(0, y, getWidth(), 1);
+        g.fillRect(0, section.y, getWidth(), 1);
+        auto line = juce::Rectangle<int>(motion::style::padding, section.y + sectionGap, getWidth() - motion::style::padding * 2, sectionHeading - sectionGap);
         g.setFont(motion::style::heading());
         g.setColour(osci::Colours::text());
-        g.drawText(title, motion::style::padding, y + sectionGap, getWidth() - motion::style::padding * 2, sectionHeading - sectionGap, juce::Justification::centredLeft, true);
+        const auto titleWidth = juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::heading(), section.title)));
+        g.drawText(section.title, line, juce::Justification::centredLeft, true);
+        if (section.note.isEmpty()) { continue; }
+        g.setFont(motion::style::caption());
+        g.setColour(osci::Colours::textMuted().withAlpha(.6f));
+        g.drawText(section.note, line.withTrimmedLeft(titleWidth + motion::style::padding), juce::Justification::centredRight, true);
     }
 }
 
@@ -450,13 +445,37 @@ bool MotionPropertyInspector::isGeneratorSpec(const motion::PropertySpec& spec) 
     return std::any_of(generator->parameters.begin(), generator->parameters.end(), [&](const auto& own) { return own.id == spec.id; });
 }
 
+bool MotionPropertyInspector::isMakingSpec(const motion::PropertySpec& spec) const {
+    if (spec.id.starts_with("slider.") || spec.id.starts_with("fractal.") || isGeneratorSpec(spec)) { return true; }
+    // A light's colour is half of what it is.
+    const auto* generator = targetGenerator();
+    return spec.group == "Colour" && generator != nullptr && generator->category == motion::GeneratorCategory::light;
+}
+
+bool MotionPropertyInspector::projectHasLight() const {
+    // Anywhere in the project: a light outside a composition being edited
+    // still lights what it holds.
+    const auto& project = processor.document.mainProject();
+    const auto holdsLight = [&](const motion::Composition& composition) {
+        return std::any_of(composition.tracks.begin(), composition.tracks.end(), [&](const auto& track) {
+            return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {
+                const auto asset = clip.asset != 0 ? motion::findAsset(project.assets, clip.asset) : nullptr;
+                const auto* generator = asset != nullptr ? motion::generatorOf(*asset) : nullptr;
+                return generator != nullptr && generator->category == motion::GeneratorCategory::light;
+            });
+        });
+    };
+    return holdsLight(project) || std::any_of(project.definitions.begin(), project.definitions.end(), [&](const auto& definition) { return definition != nullptr && holdsLight(*definition); });
+}
+
 bool MotionPropertyInspector::isAdvanced(const Row& row) {
     if (row.section == "Shading") { return true; }
     return row.section == "Surface" && !(row.fields.size() == 1 && row.fields.front()->spec.id == "reflects");
 }
 
 juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec) const {
-    if (isGeneratorSpec(spec)) {
+    // A light's colour sits with the rest of what makes it.
+    if (isGeneratorSpec(spec) || (spec.group == "Colour" && isMakingSpec(spec))) {
         const auto* generator = targetGenerator();
         return juce::String(generator->name.data(), generator->name.size());
     }
@@ -465,7 +484,8 @@ juce::String MotionPropertyInspector::sectionOf(const motion::PropertySpec& spec
     if (spec.group == "Field of view") { return "Lens"; }
     if (spec.group.starts_with("Slider")) { return "Script sliders"; }
     if (spec.id.starts_with("fractal.")) { return "Fractal"; }
-    return "Beam";
+    // The Scope's own rows: its picture.
+    return "Picture";
 }
 
 bool MotionPropertyInspector::isModulated(const std::string& property) const {
@@ -493,29 +513,18 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
     if (trail != nullptr) { content.addChildComponent(trail); }
     for (const auto& spec : specs) {
         // A generator's own Rings is not the Rings pattern.
-        if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size()) || rows.back()->first != isGeneratorSpec(spec)) {
+        if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size()) || rows.back()->first != isMakingSpec(spec)) {
             auto row = std::make_unique<Row>();
             row->group = juce::String(spec.group.data(), spec.group.size());
             row->section = sectionOf(spec);
-            row->first = isGeneratorSpec(spec);
+            row->first = isMakingSpec(spec);
             row->key.setName("Key " + row->group.toLowerCase());
-            // Keys are neutral: filled on a key, outlined off one.
-            row->key.setColour(motion::ui::KeyframeButton::keyColourId, osci::Colours::text());
             row->key.setTitle(row->key.getName());
             row->previous.setName("Previous " + row->group.toLowerCase() + " key");
             row->next.setName("Next " + row->group.toLowerCase() + " key");
-            row->previous.setTooltip("Go to the previous key");
-            row->next.setTooltip("Go to the next key");
-            row->addAndMakeVisible(row->previous);
-            row->addAndMakeVisible(row->next);
-            row->modulate.setClickingTogglesState(false);
-            row->modulate.quiet = true;
-            row->modulate.setOnColour(motion::style::result().withAlpha(.16f));
-            row->modulate.onContent = motion::style::result();
             row->modulate.setName("Modulate " + row->group.toLowerCase());
             row->modulate.setTitle(row->modulate.getName());
             row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + " in the Graph");
-            row->addAndMakeVisible(row->modulate);
             auto* raw = row.get();
             row->modulate.onClick = [this, raw] {
                 if (raw->fields.empty() || !onModulate) { return; }
@@ -529,8 +538,6 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             };
             row->key.onClick = [this, raw] { toggleKeys(*raw); };
             row->key.onPopupMenu = [this, raw] { showKeyMenu(*raw); };
-            // Like Motion's other icon buttons: no focus ring after a click.
-            row->key.setWantsKeyboardFocus(false);
             if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
                 const bool path = row->group == "Position";
                 row->mode = std::make_unique<motion::ui::Chip>(path ? "Spatial path" : "Quaternion rotation", path ? motion::icons::Icon::path : motion::icons::Icon::rotate);
@@ -576,7 +583,6 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             }
             row->previous.onClick = [this, raw] { jumpToKey(*raw, false); };
             row->next.onClick = [this, raw] { jumpToKey(*raw, true); };
-            row->addAndMakeVisible(row->key);
             content.addAndMakeVisible(*row);
             rows.push_back(std::move(row));
         }
@@ -608,13 +614,13 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         rows.back()->addAndMakeVisible(editor);
         rows.back()->fields.push_back(std::move(field));
     }
-    // The sections that open with tiles come first after what makes it:
-    // they're what is seen without scrolling. Mirror leads Surface's rows,
-    // above its advanced ones.
-    const auto tiled = [](const auto& row) { return row->section == "Surface" || row->section == "Shading"; };
-    const auto made = std::find_if(rows.begin(), rows.end(), [](const auto& row) { return !row->first; });
-    const auto tiledEnd = std::stable_partition(made, rows.end(), tiled);
-    std::stable_partition(made, tiledEnd, [](const auto& row) { return !isAdvanced(*row); });
+    // One order for every target, the specs': what makes it, then (after
+    // the lead's timing) Transform, Lens or Audio, Appearance, and how it
+    // draws, Surface or Shading, last. Mirror leads Surface's rows, above
+    // its advanced ones.
+    const auto surfaceBegin = std::find_if(rows.begin(), rows.end(), [](const auto& row) { return row->section == "Surface"; });
+    const auto surfaceEnd = std::find_if(surfaceBegin, rows.end(), [](const auto& row) { return row->section != "Surface"; });
+    std::stable_partition(surfaceBegin, surfaceEnd, [](const auto& row) { return !isAdvanced(*row); });
     advanced.onClick = [this] {
         refreshValues();
         layoutContent();
@@ -643,7 +649,10 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         for (const auto& style : surfaceStyles) {
             choices.push_back({juce::String(style.name.data(), style.name.size()), juce::String(style.tooltip.data(), style.tooltip.size()) + ". Shift-click to combine styles", motion::ui::pictures::surfacePicture(style.look)});
         }
-        surfaceTiles = std::make_unique<motion::ui::TileGrid>("Surface styles", std::move(choices), 3);
+        // One row of small pictures, so Surface takes little room; three
+        // columns of them when the panel is too narrow for six.
+        surfaceTiles = std::make_unique<motion::ui::TileGrid>("Surface styles", std::move(choices), 6);
+        surfaceTiles->setCompact(34, 40, 3);
         surfaceTiles->onClick = [this](std::size_t index) {
             const auto found = motion::findPropertyTarget(processor.document.project(), target);
             if (!found.has_value() || found->locked) { return; }
@@ -791,15 +800,17 @@ void MotionPropertyInspector::layoutContent() {
     content.sections.clear();
     int y = 0;
     // Rows from `from` up to `to`, each group opening with a hairline and its
-    // heading; `after` when something is above them.
+    // heading (unless `headed` is false); `after` when something is above them.
     const auto inner = width - motion::style::padding * 2;
-    const auto place = [&](std::size_t from, std::size_t to, bool after) {
+    const auto place = [&](std::size_t from, std::size_t to, bool after, bool headed) {
         for (auto index = from; index < to; ++index) {
             auto& row = rows[index];
             if (index == from || row->section != rows[index - 1]->section) {
                 if (index > from || after) { y += motion::style::gap; }
-                content.sections.emplace_back(y, row->section);
-                y += sectionHeading + motion::style::gap;
+                if (headed) {
+                    content.sections.push_back({y, row->section, {}});
+                    y += sectionHeading + motion::style::gap;
+                }
                 // Surface (whether it is solid, then how it draws itself) and
                 // Shading open with their tiles; their rows below are those on.
                 const auto openWith = [&](motion::ui::TileGrid* tiles) {
@@ -835,16 +846,14 @@ void MotionPropertyInspector::layoutContent() {
     advanced.setVisible(false);
     std::size_t first = 0;
     while (first < rows.size() && rows[first]->first) { ++first; }
-    // What makes it, then the sections that open with tiles.
-    auto tiled = first;
-    while (tiled < rows.size() && (rows[tiled]->section == "Surface" || rows[tiled]->section == "Shading")) { ++tiled; }
-    place(0, first, false);
-    place(first, tiled, first > 0);
-    first = tiled;
+    // What makes it opens the page under the panel's header, which already
+    // names it (Sphere, Point light), so with no heading of its own.
+    if (first > 0) { y = motion::style::padding; }
+    place(0, first, false, false);
     // A light's presets, under what it is.
     if (presetTiles != nullptr) {
         if (first > 0) { y += motion::style::gap; }
-        content.sections.emplace_back(y, "Presets");
+        content.sections.push_back({y, "Presets", {}});
         y += sectionHeading + motion::style::gap;
         const auto height = presetTiles->heightFor(inner);
         presetTiles->setBounds(motion::style::padding, y, inner, height);
@@ -855,7 +864,7 @@ void MotionPropertyInspector::layoutContent() {
         // A rule, then the lead's own heading on the same rhythm as the
         // sections around it.
         if (first > 0) { y += motion::style::gap; }
-        content.sections.emplace_back(y, juce::String());
+        content.sections.push_back({y, {}, {}});
         y += sectionGap;
     }
     if (lead != nullptr) {
@@ -863,13 +872,20 @@ void MotionPropertyInspector::layoutContent() {
         lead->setVisible(leading > 0);
         y += leading > 0 ? leading + motion::style::gap : 0;
     }
-    place(first, rows.size(), first > 0 && leading == 0);
+    place(first, rows.size(), first > 0 && leading == 0, true);
     const auto trailing = trail != nullptr && trailHeight ? trailHeight() : 0;
     if (trail != nullptr) {
-        if (trailing > 0 && trailTitle.isNotEmpty()) {
+        // An empty trail can still say something beside its heading (no
+        // effects: where they come from), on one line.
+        // (or one of its parts', when the trail is a stack of them).
+        auto note = trail->getProperties()[motion::style::headingNote].toString();
+        for (auto* part : trail->getChildren()) {
+            if (note.isEmpty()) { note = part->getProperties()[motion::style::headingNote].toString(); }
+        }
+        if ((trailing > 0 || note.isNotEmpty()) && trailTitle.isNotEmpty()) {
             if (!rows.empty()) { y += motion::style::gap; }
-            content.sections.emplace_back(y, trailTitle);
-            y += sectionHeading + motion::style::gap;
+            content.sections.push_back({y, trailTitle, note});
+            y += sectionHeading + (trailing > 0 ? motion::style::gap : 0);
         }
         const auto inset = trailFullWidth ? 0 : motion::style::padding;
         trail->setBounds(inset, y, width - inset * 2, trailing);
@@ -1073,7 +1089,11 @@ juce::String MotionPropertyInspector::sourceKind(motion::Id clip) const {
     if (item == nullptr) { return "Object"; }
     if (item->composition != 0) { return "Composition"; }
     const auto found = motion::findAsset(project.assets, item->asset);
-    return found != nullptr ? motion::ui::sourceKind(*found) : juce::String("Object");
+    if (found == nullptr) { return "Object"; }
+    // A generator by its own name (Point light, not Light): renamed, the
+    // clip still says what it is.
+    const auto* generator = motion::generatorOf(*found);
+    return generator != nullptr ? juce::String(generator->name.data(), generator->name.size()) : motion::ui::sourceKind(*found);
 }
 
 std::vector<motion::PropertySpec> MotionPropertyInspector::luaSliders() const {

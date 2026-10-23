@@ -37,8 +37,10 @@ int MotionEffectStack::preferredHeight() const {
     if (!owner.has_value()) { return 0; }
     int height = 0;
     for (const auto& card : cards) { height += card->preferredHeight() + motion::style::gap; }
-    if (cards.empty()) { height += dragActive ? dropZoneHeight : hintHeight; }
-    if (!stages.empty()) { height += chipHeight + motion::style::padding; }
+    // With none, the hint sits beside the heading, so nothing is left here
+    // but the drop zone while an effect is dragged.
+    if (cards.empty() && dragActive) { height += dropZoneHeight; }
+    if (!stages.empty()) { height += chipHeight + (height > 0 ? motion::style::padding : 0); }
     return height;
 }
 
@@ -83,14 +85,16 @@ void MotionEffectStack::refresh() {
 
 void MotionEffectStack::resized() {
     auto area = getLocalBounds();
-    for (auto& card : cards) {
-        card->setBounds(area.removeFromTop(card->preferredHeight()));
+    for (std::size_t index = 0; index < cards.size(); ++index) {
+        cards[index]->setRuled(index > 0);
+        cards[index]->setBounds(area.removeFromTop(cards[index]->preferredHeight()));
         area.removeFromTop(motion::style::gap);
     }
     dropZone = dragActive && cards.empty() ? area.removeFromTop(dropZoneHeight) : juce::Rectangle<int>();
-    hint = !dragActive && cards.empty() ? area.removeFromTop(hintHeight) : juce::Rectangle<int>();
+    // Where effects come from, said beside the heading while there are none.
+    getProperties().set(motion::style::headingNote, owner.has_value() && !dragActive && cards.empty() ? juce::String("drag from the Effects tab") : juce::String());
     if (!stages.empty()) {
-        area.removeFromTop(motion::style::padding);
+        if (area.getY() > 0) { area.removeFromTop(motion::style::padding); }
         auto row = area.removeFromTop(chipHeight);
         stagesCaption = row.removeFromLeft(72);
         for (auto& chip : stages) {
@@ -102,11 +106,6 @@ void MotionEffectStack::resized() {
 }
 
 void MotionEffectStack::paint(juce::Graphics& g) {
-    if (!hint.isEmpty()) {
-        g.setColour(osci::Colours::textMuted().withAlpha(.6f));
-        g.setFont(motion::style::caption());
-        g.drawText("Drag effects here from the Effects tab", hint, juce::Justification::centredLeft, true);
-    }
     if (!stages.empty()) {
         g.setColour(osci::Colours::textMuted().withAlpha(.6f));
         g.setFont(motion::style::caption());
@@ -193,9 +192,12 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
     setRepaintsOnMouseActivity(true);
     close.iconSize = motion::style::iconSmall;
     close.onClick = [this] { juce::MessageManager::callAsync([safe = juce::Component::SafePointer<Card>(this)] { if (safe != nullptr) { safe->stack.remove(safe->id); } }); };
+    // Out of sight until the effect is hovered (its menu removes it too).
+    close.setAlpha(0.0f);
     addAndMakeVisible(close);
     power.onClick = [this] { stack.setEnabled(id, power.getToggleState()); };
     addAndMakeVisible(power);
+    addMouseListener(&hover, true);
     if (definition == nullptr) { return; }
     for (const auto& parameter : definition->parameters) {
         auto row = std::make_unique<Row>();
@@ -207,13 +209,7 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->field.getProperties().set("routeTarget", juce::String(static_cast<juce::int64>(id)));
         row->field.getProperties().set("routeProperties", juce::String(parameter.id));
         row->key.setName("Key effect " + juce::String(parameter.id));
-        row->key.setColour(motion::ui::KeyframeButton::keyColourId, osci::Colours::text());
         row->key.setTitle(row->key.getName());
-        row->key.setWantsKeyboardFocus(false);
-        row->modulate.setClickingTogglesState(false);
-        row->modulate.quiet = true;
-        row->modulate.setOnColour(motion::style::result().withAlpha(.16f));
-        row->modulate.onContent = motion::style::result();
         row->modulate.setName("Modulate effect " + juce::String(parameter.id));
         row->modulate.setTooltip("Modulate " + juce::String(parameter.name).toLowerCase() + " in the Graph");
         const auto property = parameter.id;
@@ -226,9 +222,16 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->modulate.onClick = [this, property] { if (stack.onPropertySelected) { stack.onPropertySelected(id, property); } };
         row->previous.onClick = [this, property] { jump(property, false); };
         row->next.onClick = [this, property] { jump(property, true); };
-        for (auto* child : std::initializer_list<juce::Component*> {&row->field, &row->key, &row->modulate, &row->previous, &row->next}) { addAndMakeVisible(child); }
+        row->addAndMakeVisible(row->field);
+        addAndMakeVisible(*row);
         rows.push_back(std::move(row));
     }
+}
+
+void MotionEffectStack::Card::showClose() {
+    const auto shown = isMouseOver(true);
+    if ((close.getAlpha() > 0.0f) == shown) { return; }
+    close.setAlpha(shown ? 1.0f : 0.0f);
 }
 
 void MotionEffectStack::Card::update() {
@@ -239,7 +242,11 @@ void MotionEffectStack::Card::update() {
     power.setToggleState(enabled, juce::dontSendNotification);
     if (enabled != wasEnabled) { repaint(); }
     for (auto& row : rows) {
-        for (auto* child : std::initializer_list<juce::Component*> {&row->field, &row->key, &row->modulate}) { child->setVisible(!folded()); }
+        row->setVisible(!folded());
+        if (row->dimmed != !enabled) {
+            row->dimmed = !enabled;
+            row->repaint();
+        }
     }
     const auto target = motion::findPropertyTarget(project, id);
     if (!target.has_value()) { return; }
@@ -255,11 +262,11 @@ void MotionEffectStack::Card::update() {
         if (curve == nullptr) { continue; }
         if (!row->field.isEditing()) { row->field.setValue(curve->evaluateBase(local)); }
         const bool keyed = curve->hasKeyAt(local);
-        row->key.setState(keyed ? motion::ui::KeyframeButton::State::keyed : (curve->animated() ? motion::ui::KeyframeButton::State::animated : motion::ui::KeyframeButton::State::unanimated));
+        row->showState(keyed ? motion::ui::KeyframeButton::State::keyed : (curve->animated() ? motion::ui::KeyframeButton::State::animated : motion::ui::KeyframeButton::State::unanimated), id);
         const auto driven = stack.isDriven(id, row->id);
         row->field.setAccent(driven ? std::optional<juce::Colour>(motion::style::result()) : std::nullopt);
         row->modulate.setToggleState(driven, juce::dontSendNotification);
-        const auto animated = curve->animated() && !folded();
+        const auto animated = curve->animated();
         row->previous.setVisible(animated);
         row->next.setVisible(animated);
         row->previous.setEnabled(neighbourKey(*curve, local, false).has_value());
@@ -277,53 +284,48 @@ void MotionEffectStack::Card::jump(const std::string& property, bool forward) {
 
 void MotionEffectStack::Card::resized() {
     auto area = getLocalBounds();
-    auto header = area.removeFromTop(headerHeight).reduced(motion::style::padding, 0);
+    // The header starts where the rows' names do, as a section's heading.
+    auto header = area.removeFromTop(headerHeight);
     fold = header.removeFromLeft(12).toFloat();
     header.removeFromLeft(4);
     power.setBounds(header.removeFromLeft(motion::ui::Switch::width).withSizeKeepingCentre(motion::ui::Switch::width, headerHeight));
-    close.setBounds(header.removeFromRight(22).withSizeKeepingCentre(22, 22));
+    // The remove button over the keys' gutter.
+    close.setBounds(header.removeFromRight(motion::style::PropertyGrid::keyButtons).withSizeKeepingCentre(22, 22));
     // Rows sit on Properties' own grid, so fields and the keys' gutter line
-    // up with the rows above the card; only the captions are inset.
-    const motion::style::PropertyGrid grid(area.getWidth());
+    // up with the rows above.
     for (auto& row : rows) {
-        auto line = area.removeFromTop(motion::style::controlHeight);
+        row->setBounds(area.removeFromTop(motion::style::controlHeight));
         area.removeFromTop(motion::style::gap);
-        row->next.setBounds(line.removeFromRight(12));
-        row->key.setBounds(line.removeFromRight(18));
-        row->previous.setBounds(line.removeFromRight(12));
-        row->modulate.setBounds(juce::Rectangle<int>(line.getX() + grid.modulate, line.getY(), motion::style::PropertyGrid::modulateWidth, line.getHeight()).reduced(0, 3));
-        row->field.setBounds(line.withX(line.getX() + grid.value).withWidth(grid.column));
     }
 }
 
 void MotionEffectStack::Card::paint(juce::Graphics& g) {
-    const auto bounds = getLocalBounds().toFloat();
-    // A raised card with a hairline edge, so it reads clearly against the panel.
-    g.setColour(osci::Colours::surfaceRaised().withAlpha(.6f));
-    g.fillRoundedRectangle(bounds, motion::style::radiusControl);
-    g.setColour(motion::style::hairline());
-    g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radiusControl, 1.0f);
-    const auto header = getLocalBounds().removeFromTop(headerHeight);
-    if (isMouseOver(true) && getMouseXYRelative().y < headerHeight) {
-        g.setColour(motion::style::hoverFill());
-        g.fillRoundedRectangle(header.toFloat(), motion::style::radiusControl);
+    if (ruled) {
+        g.setColour(motion::style::hairline());
+        g.fillRect(0, 0, getWidth(), 1);
     }
-    // The fold triangle: down when open, right when folded.
-    juce::Path triangle;
-    const auto c = fold.getCentre();
-    if (folded()) { triangle.addTriangle(c.x - 2, c.y - 4, c.x + 3, c.y, c.x - 2, c.y + 4); } else { triangle.addTriangle(c.x - 4, c.y - 2, c.x + 4, c.y - 2, c.x, c.y + 3); }
-    g.setColour(osci::Colours::text().withAlpha(.6f));
-    g.fillPath(triangle);
-    g.setColour(osci::Colours::text().withAlpha(enabled ? .95f : .45f));
-    g.setFont(motion::style::body());
+    const auto header = getLocalBounds().removeFromTop(headerHeight);
+    // Hovered, the header brightens: it folds at a click, and drags.
+    const auto hovered = isMouseOver(true) && getMouseXYRelative().y < headerHeight;
+    motion::style::drawFold(g, fold.withSizeKeepingCentre(8, 8), !folded(), hovered ? osci::Colours::text() : osci::Colours::textMuted());
+    g.setColour(osci::Colours::text().withAlpha(enabled ? (hovered ? 1.0f : .9f) : .45f));
+    g.setFont(motion::style::heading());
     const auto nameArea = header.withTrimmedLeft(power.getRight() + 8).withTrimmedRight(getWidth() - close.getX() + 4);
     g.drawText(name, nameArea, juce::Justification::centredLeft, true);
-    if (folded()) { return; }
+}
+
+void MotionEffectStack::Card::Row::paint(juce::Graphics& g) {
+    const motion::style::PropertyGrid grid(getWidth());
     g.setFont(motion::style::caption());
-    g.setColour(osci::Colours::text().withAlpha(enabled ? .78f : .4f));
-    for (const auto& row : rows) {
-        g.drawText(row->label, row->field.getBounds().withX(motion::style::padding).withRight(row->field.getX() - motion::style::gap), juce::Justification::centredLeft, true);
-    }
+    g.setColour(osci::Colours::textMuted().withMultipliedAlpha(dimmed ? .6f : 1.0f));
+    g.drawText(label, getLocalBounds().withRight(grid.value - motion::style::gap), juce::Justification::centredLeft, true);
+}
+
+void MotionEffectStack::Card::Row::resized() {
+    const motion::style::PropertyGrid grid(getWidth());
+    const auto line = getLocalBounds();
+    layoutGutter(line, grid);
+    field.setBounds(line.withX(grid.value).withWidth(grid.column));
 }
 
 void MotionEffectStack::Card::mouseDown(const juce::MouseEvent& event) {

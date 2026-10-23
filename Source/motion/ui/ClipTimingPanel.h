@@ -67,8 +67,14 @@ public:
             if (!values[i].isBeingEdited()) { values[i].setText(current[i], juce::dontSendNotification); }
         }
         updating = false;
-        // Which clock the clip keeps, on the heading line.
-        details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "follows tempo" : "ignores tempo", juce::dontSendNotification);
+        // Which clock the clip keeps: only the exception, a clip in bars and
+        // beats, says so on the heading line; both say so in its tooltip.
+        const auto beats = clip != nullptr && clip->timeBase == motion::ClipTimeBase::beats;
+        details.setText(beats ? "follows tempo" : juce::String(), juce::dontSendNotification);
+        const juce::String clock = clip == nullptr ? juce::String() : beats ? "Follows tempo: keeps its place in bars and beats when the tempo changes"
+            : "Ignores tempo: keeps its time in seconds when the tempo changes";
+        title.setTooltip(clock);
+        details.setTooltip(clock);
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
         status.setVisible(clip != nullptr && status.getText().isNotEmpty());
@@ -79,7 +85,7 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         auto heading = area.removeFromTop(motion::style::inspector::headingHeight);
-        // What clock the clip keeps qualifies the heading: "Timing  ignores tempo".
+        // A clip that follows tempo says so beside the heading: "Timing  follows tempo".
         title.setBounds(heading);
         details.setBounds(heading.withTrimmedLeft(juce::roundToInt(juce::TextLayout::getStringWidth(title.getFont(), title.getText())) + 8));
         // Rows a gap below the heading, as Properties' sections have them.
