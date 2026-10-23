@@ -45,7 +45,8 @@ std::vector<double> timesOf(const juce::ArgumentList& args, double duration) {
     const auto at = args.getValueForOption("--at");
     if (at.isNotEmpty()) {
         std::vector<double> times;
-        for (const auto& time : juce::StringArray::fromTokens(at, ",", {})) { times.push_back(time.getDoubleValue()); }
+        // Kept within the composition: past its end is its last frame.
+        for (const auto& time : juce::StringArray::fromTokens(at, ",", {})) { times.push_back(motion::Stretches::within(time.getDoubleValue(), duration)); }
         return times;
     }
     const auto count = args.getValueForOption("--frames");
@@ -173,7 +174,7 @@ void make(const juce::ArgumentList& args) {
     // project's picture (see ProjectSummary).
     const auto picture = juce::JSON::parse(recipe.loadFileAsString()).getProperty("picture", {});
     if (!picture.isVoid()) {
-        const std::vector<double> times {static_cast<double>(picture)};
+        const std::vector<double> times {motion::Stretches::within(static_cast<double>(picture), project.duration)};
         const juce::TemporaryFile video(videoExtension(destination)), still(".png");
         renderVideo(args, destination, video.getFile(), times);
         const auto at = motion::Stretches::upTo(times, project.frameRate, project.duration).exportTime(0, times[0]) + .5 / (project.frameRate > 0 ? project.frameRate : 60.0);
