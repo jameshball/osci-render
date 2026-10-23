@@ -2,7 +2,6 @@
 
 #include "../model/Cancellation.h"
 #include "RasterBeamBuilder.h"
-#include "VideoDecoderProcess.h"
 #include "../model/RasterSettings.h"
 #include <JuceHeader.h>
 
@@ -49,16 +48,16 @@ public:
         juce::StringArray args {executable.getFullPathName(), "-nostdin", "-hide_banner", "-loglevel", "error", "-xerror", "-y",
             "-protocol_whitelist", "file,pipe", "-i", input.getFullPathName(), "-map", "0:v:0", "-an", "-sn", "-dn",
             "-vf", filter, "-frames:v", juce::String(static_cast<juce::int64>(maximumFrames + 1)), "-pix_fmt", "rgba", "-f", "rawvideo", output.getFile().getFullPathName()};
-        VideoDecoderProcess decoder;
-        if (!decoder.start(args)) { return {nullptr, "Cannot start the video decoder."}; }
+        osci::Subprocess decoder;
+        if (!decoder.start(args, osci::Subprocess::Output::discard)) { return {nullptr, "Cannot start the video decoder."}; }
         const auto started = juce::Time::getMillisecondCounterHiRes();
-        while (!decoder.waitForProcessToFinish(30)) {
+        while (!decoder.wait(30)) {
             if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
             if (juce::Time::getMillisecondCounterHiRes() - started > limits.decodeMilliseconds) { return {nullptr, "Video decoding timed out. Try a shorter or lower-resolution source."}; }
             if (output.getFile().getSize() > static_cast<juce::int64>((maximumFrames + 1) * frameBytes)) { return {nullptr, "Decoded video exceeds the temporary storage limit."}; }
         }
         if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
-        if (!decoder.wasSuccessful()) { return {nullptr, "Cannot decode this video. Check that it contains a supported, undamaged video stream."}; }
+        if (!decoder.exitedCleanly()) { return {nullptr, "Cannot decode this video. Check that it contains a supported, undamaged video stream."}; }
         const auto bytes = output.getFile().getSize();
         if (bytes <= 0 || static_cast<std::uint64_t>(bytes) % frameBytes != 0) { return {nullptr, "Video decoder returned no complete frames."}; }
         const auto frames = static_cast<std::uint64_t>(bytes) / frameBytes;
@@ -90,15 +89,15 @@ public:
         juce::StringArray args {executable.getFullPathName(), "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-protocol_whitelist", "file,pipe", "-i", video.getFullPathName(), "-map", "0:v:0", "-an", "-sn", "-dn",
             "-vf", "thumbnail=60," + fitFilter(dimension), "-frames:v", "1", "-pix_fmt", "rgba", "-f", "rawvideo", output.getFile().getFullPathName()};
-        VideoDecoderProcess decoder;
-        if (!decoder.start(args)) { return {}; }
+        osci::Subprocess decoder;
+        if (!decoder.start(args, osci::Subprocess::Output::discard)) { return {}; }
         const auto started = juce::Time::getMillisecondCounterHiRes();
-        while (!decoder.waitForProcessToFinish(30)) {
+        while (!decoder.wait(30)) {
             if (cancelled(cancel) || juce::Time::getMillisecondCounterHiRes() - started > 20000) { return {}; }
         }
         const auto bytes = static_cast<std::size_t>(dimension) * static_cast<std::size_t>(dimension) * 4;
         juce::MemoryBlock data;
-        if (!decoder.wasSuccessful() || !output.getFile().loadFileAsData(data) || data.getSize() != bytes) { return {}; }
+        if (!decoder.exitedCleanly() || !output.getFile().loadFileAsData(data) || data.getSize() != bytes) { return {}; }
         const auto* first = static_cast<const std::uint8_t*>(data.getData());
         return {first, first + bytes};
     }

@@ -55,22 +55,19 @@ struct ScopeRender {
             source = made.getFile();
         }
         destination.deleteFile();
-        juce::ChildProcess process;
         juce::StringArray command {app.getFullPathName(), "--render-video", destination.getFullPathName(), source.getFullPathName()};
         if (!stills.empty()) {
             juce::StringArray times;
             for (const auto time : stills) { times.add(juce::String(time, 6)); }
             command.add("--stills=" + times.joinIntoString(","));
         }
-        if (!process.start(command)) {
+        osci::Subprocess process;
+        if (!process.start(command, osci::Subprocess::Output::capture)) {
             return juce::Result::fail("Couldn't start " + app.getFullPathName() + ".");
         }
-        const auto output = process.readAllProcessOutput();
-        // Its exit code is known only once it has finished, not merely closed its output.
-        process.waitForProcessToFinish(-1);
-        const auto exitCode = process.getExitCode();
+        const auto output = readAll(process);
         if (said != nullptr) { *said = output; }
-        if (exitCode != 0 || !destination.existsAsFile()) {
+        if (!process.exitedCleanly() || !destination.existsAsFile()) {
             return juce::Result::fail("The app couldn't render it" + (output.trim().isEmpty() ? juce::String(".") : ":\n" + output.trim()));
         }
         return juce::Result::ok();
@@ -81,16 +78,29 @@ struct ScopeRender {
         const auto tool = ffmpeg();
         if (!tool.existsAsFile()) { return juce::Result::fail("FFmpeg isn't at " + tool.getFullPathName() + ": export a video from the app once to download it."); }
         image.deleteFile();
-        juce::ChildProcess process;
         const juce::StringArray command {tool.getFullPathName(), "-v", "error", "-ss", juce::String(std::max(0.0, time), 3), "-i", video.getFullPathName(), "-frames:v", "1", "-y", image.getFullPathName()};
-        if (!process.start(command)) { return juce::Result::fail("Couldn't start FFmpeg."); }
-        const auto output = process.readAllProcessOutput();
-        process.waitForProcessToFinish(-1);
-        if (process.getExitCode() != 0 || !image.existsAsFile()) { return juce::Result::fail("FFmpeg couldn't take the frame at " + juce::String(time, 3) + " s: " + output.trim()); }
+        osci::Subprocess process;
+        if (!process.start(command, osci::Subprocess::Output::capture)) { return juce::Result::fail("Couldn't start FFmpeg."); }
+        const auto output = readAll(process);
+        if (!process.exitedCleanly() || !image.existsAsFile()) { return juce::Result::fail("FFmpeg couldn't take the frame at " + juce::String(time, 3) + " s: " + output.trim()); }
         return juce::Result::ok();
     }
 
 private:
+    // All it says, once it has finished: its exit is known only then, not
+    // merely once it has closed its output.
+    static juce::String readAll(osci::Subprocess& process) {
+        juce::MemoryOutputStream output;
+        char buffer[4096];
+        for (;;) {
+            const auto count = process.read(buffer, sizeof(buffer));
+            if (count <= 0) { break; }
+            output.write(buffer, static_cast<std::size_t>(count));
+        }
+        process.wait(-1);
+        return output.toString();
+    }
+
     // A macOS bundle's program, or the file itself.
     static juce::File executableOf(const juce::File& file) {
         if (file.isDirectory() && file.hasFileExtension(".app")) { return file.getChildFile("Contents/MacOS").getChildFile(file.getFileNameWithoutExtension()); }

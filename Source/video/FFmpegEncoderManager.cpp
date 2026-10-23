@@ -2,152 +2,6 @@
 #include <cmath>
 #include <string>
 #include <thread>
-#if JUCE_MAC || JUCE_LINUX
-#include <cerrno>
-#include <fcntl.h>
-#include <signal.h>
-#include <spawn.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#if JUCE_MAC
-#include <crt_externs.h>
-#else
-extern char** environ;
-#endif
-#endif
-
-namespace {
-// JUCE's POSIX ChildProcess reports a child killed by a signal (a crash, or
-// out of memory) as having exited with 0, so on POSIX the mux keeps its own
-// wait status: a killed FFmpeg can never pass off a partial file as done.
-// Output is read on one thread while another waits, as with ChildProcess.
-class MuxProcess {
-public:
-    MuxProcess() = default;
-    ~MuxProcess() {
-#if JUCE_MAC || JUCE_LINUX
-        kill();
-        waitForProcessToFinish(-1);
-        if (readEnd >= 0) {
-            close(readEnd);
-        }
-#endif
-    }
-
-    bool start(const juce::StringArray& arguments) {
-#if JUCE_MAC || JUCE_LINUX
-        int ends[2] = {-1, -1};
-        if (arguments.isEmpty() || pipe(ends) != 0) {
-            return false;
-        }
-        // Only the child's standard output and error keep the pipe.
-        fcntl(ends[0], F_SETFD, FD_CLOEXEC);
-        fcntl(ends[1], F_SETFD, FD_CLOEXEC);
-        std::vector<char*> argv;
-        for (const auto& argument : arguments) {
-            argv.push_back(const_cast<char*>(argument.toRawUTF8()));
-        }
-        argv.push_back(nullptr);
-        posix_spawn_file_actions_t actions;
-        if (posix_spawn_file_actions_init(&actions) != 0) {
-            close(ends[0]);
-            close(ends[1]);
-            return false;
-        }
-        const auto output = posix_spawn_file_actions_adddup2(&actions, ends[1], STDOUT_FILENO);
-        const auto error = posix_spawn_file_actions_adddup2(&actions, ends[1], STDERR_FILENO);
-#if JUCE_MAC
-        auto environment = *_NSGetEnviron();
-#else
-        auto environment = environ;
-#endif
-        const auto spawned = output == 0 && error == 0 ? posix_spawn(&pid, argv.front(), &actions, nullptr, argv.data(), environment) : EINVAL;
-        posix_spawn_file_actions_destroy(&actions);
-        close(ends[1]);
-        if (spawned != 0) {
-            close(ends[0]);
-            pid = -1;
-            return false;
-        }
-        readEnd = ends[0];
-        return true;
-#else
-        return process.start(arguments, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr);
-#endif
-    }
-
-    // 0 at the end of its output.
-    int readProcessOutput(void* buffer, int size) {
-#if JUCE_MAC || JUCE_LINUX
-        for (;;) {
-            const auto count = read(readEnd, buffer, static_cast<std::size_t>(size));
-            if (count < 0 && errno == EINTR) {
-                continue;
-            }
-            return count > 0 ? static_cast<int>(count) : 0;
-        }
-#else
-        return process.readProcessOutput(buffer, size);
-#endif
-    }
-
-    // -1 waits for as long as it takes.
-    bool waitForProcessToFinish(int milliseconds) {
-#if JUCE_MAC || JUCE_LINUX
-        // Never started: waitpid(-1) would reap some other child instead.
-        if (pid <= 0 || finished) {
-            return true;
-        }
-        const auto deadline = juce::Time::getMillisecondCounterHiRes() + milliseconds;
-        do {
-            int status = 0;
-            const auto result = waitpid(pid, &status, WNOHANG);
-            if (result == pid) {
-                succeeded = WIFEXITED(status) && WEXITSTATUS(status) == 0;
-                finished = true;
-                return true;
-            }
-            if (result < 0 && errno != EINTR) {
-                finished = true;
-                return true;
-            }
-            juce::Thread::sleep(2);
-        } while (milliseconds < 0 || juce::Time::getMillisecondCounterHiRes() < deadline);
-        return false;
-#else
-        const auto complete = process.waitForProcessToFinish(milliseconds);
-        if (complete) {
-            succeeded = process.getExitCode() == 0;
-        }
-        return complete;
-#endif
-    }
-
-    void kill() {
-#if JUCE_MAC || JUCE_LINUX
-        if (pid > 0 && !finished) {
-            ::kill(pid, SIGKILL);
-        }
-#else
-        process.kill();
-#endif
-    }
-
-    // Finished by exiting with 0, not killed or crashed.
-    bool exitedCleanly() const { return succeeded; }
-
-private:
-    bool succeeded = false;
-#if JUCE_MAC || JUCE_LINUX
-    pid_t pid = -1;
-    int readEnd = -1;
-    bool finished = false;
-#else
-    juce::ChildProcess process;
-#endif
-    JUCE_DECLARE_NON_COPYABLE(MuxProcess)
-};
-}
 
 FFmpegEncoderManager::FFmpegEncoderManager(const juce::File& ffmpegExecutable)
     : ffmpegExecutable(ffmpegExecutable) {
@@ -215,8 +69,8 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
     command.addArray(audioCodecArgs);
     command.addArray({ "-shortest", "-y", output.getFullPathName() });
 
-    MuxProcess process;
-    if (!process.start(command)) {
+    osci::Subprocess process;
+    if (!process.start(command, osci::Subprocess::Output::capture)) {
         error = "Failed to start FFmpeg for audio mux.";
         return false;
     }
@@ -228,7 +82,7 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
         constexpr std::size_t maxOutputBytes = 64 * 1024;
         char buffer[4096];
         for (;;) {
-            const int count = process.readProcessOutput(buffer, sizeof(buffer));
+            const int count = process.read(buffer, sizeof(buffer));
             if (count <= 0) {
                 return;
             }
@@ -241,7 +95,7 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
 
     bool cancelled = false;
     auto* exportJob = juce::ThreadPoolJob::getCurrentThreadPoolJob();
-    while (!process.waitForProcessToFinish(200)) {
+    while (!process.wait(200)) {
         if ((cancelRequested != nullptr && cancelRequested->load()) || juce::Thread::currentThreadShouldExit()
             || (exportJob != nullptr && exportJob->shouldExit())) {
             process.kill();
@@ -251,7 +105,7 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
     }
     outputReader.join();
     if (cancelled) {
-        process.waitForProcessToFinish(200);
+        process.wait(200);
         error = "Cancelled.";
         return false;
     }
