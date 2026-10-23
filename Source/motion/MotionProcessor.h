@@ -55,6 +55,9 @@ public:
     // that much faster; the beam keeps its own frequency, and the soundtrack
     // plays faster and higher, as a tape would. Exports always play at 1x.
     static constexpr std::array<double, 5> playbackSpeeds { 0.25, 0.5, 1.0, 2.0, 4.0 };
+    // The most outputs it plays on: JUCE's audio player allocates on every
+    // callback for 32 channels or more.
+    static constexpr int mostOutputs = 31;
     std::atomic<double> playbackSpeed { 1.0 };
     void seek(double seconds) {
         seekSerial.fetch_add(1);

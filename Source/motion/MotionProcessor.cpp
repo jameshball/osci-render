@@ -121,8 +121,8 @@ void MotionProcessor::handleAsyncUpdate() {
 
 bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     const auto channels = layouts.getMainOutputChannelSet().size();
-    // Two for the sound alone, more for the beam beside it (up to an interface's worth).
-    return layouts.getMainInputChannelSet().isDisabled() && channels >= 2 && channels <= 64;
+    // Two for the sound alone, more for the beam beside it.
+    return layouts.getMainInputChannelSet().isDisabled() && channels >= 2 && channels <= mostOutputs;
 }
 
 void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {

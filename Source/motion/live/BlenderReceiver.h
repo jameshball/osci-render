@@ -136,11 +136,14 @@ private:
         return true;
     }
     // `newest` is false while more is already waiting: such a frame is only
-    // counted and captured, not prepared, so a slow preparation drops frames
-    // rather than falling behind.
+    // counted and captured, and held, so a slow preparation drops frames
+    // rather than falling behind; the held one is shown if nothing follows.
     bool consume(std::string_view message, bool newest = true) {
         if (!message.empty() && message.back() == '\r') { message.remove_suffix(1); }
-        if (message == "CLOSE") { return false; }
+        if (message == "CLOSE") {
+            showHeld();
+            return false;
+        }
         if (message.empty()) { return true; }
         if (!validBase64(message) || !message.starts_with("R1BMQSAg")) {
             reject("Invalid Blender frame encoding.");
@@ -157,28 +160,33 @@ private:
             return true;
         }
         auto frame = std::make_shared<const BlenderFrame>(std::move(*decoded.frame));
-        if (!newest) {
+        {
             const juce::SpinLock::ScopedLockType guard(lock);
             ++status.acceptedFrames;
             if (capture != nullptr) { capture->append(nowSeconds(), frame); }
-            return true;
         }
+        held = std::move(frame);
+        if (newest) { showHeld(); }
+        return true;
+    }
+    // Prepares the last frame received and shows it.
+    void showHeld() {
+        if (held == nullptr) { return; }
+        auto frame = std::move(held);
         std::shared_ptr<const PreparedSource> source;
         try {
             source = prepareBlenderFrame(*frame);
         } catch (...) {
             reject("Could not prepare the incoming Blender frame.");
-            return true;
+            return;
         }
         Snapshot old;
         {
             const juce::SpinLock::ScopedLockType guard(lock);
             old = std::move(latest);
-            latest = {std::move(frame), std::move(source), status.connection, ++status.acceptedFrames, nowSeconds()};
-            if (capture != nullptr) { capture->append(latest.receivedSeconds, latest.frame); }
+            latest = {std::move(frame), std::move(source), status.connection, status.acceptedFrames, nowSeconds()};
             status.message.clear();
         }
-        return true;
     }
     void run() override {
         try { receive(); }
@@ -232,12 +240,16 @@ private:
                     }
                 }
             }
+            // Closed without CLOSE (or after an error): its last frame still shows.
+            if (!threadShouldExit()) { showHeld(); }
+            held.reset();
             connection->close();
             if (!threadShouldExit()) {
                 setState(State::listening, {});
             }
         }
     }
+    std::shared_ptr<const BlenderFrame> held; // Listener thread only.
     mutable juce::SpinLock lock;
     Status status;
     Snapshot latest;
