@@ -68,7 +68,7 @@ try:
         step("import " + source, "drop-files", "--file", session.root_dir / source, "--class", "MotionEditor", "--exact")
         session.wait_for_undo("Import source")
     sources = find(lambda n: n.get("componentID") == "motion.assets" or n.get("name") == "Motion assets")["bounds"]
-    cat_row = [sources["x"] + sources["w"] // 2, sources["y"] + 44 + 22]
+    cat_row = [sources["x"] + sources["w"] // 2, sources["y"] + 48 + 24]
     step("hover the cat", "mouse-move", *cat_row)
     time.sleep(.3)
     step("hover screenshot", "screenshot", "--file", session.artifact_dir / "hover.png", "--scale", "2")

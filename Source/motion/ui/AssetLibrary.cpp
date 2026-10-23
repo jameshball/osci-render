@@ -8,7 +8,7 @@
 MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(document), list("Motion assets", this) {
     setName("Asset library");
     list.setComponentID("motion.assets");
-    list.setRowHeight(motion::style::libraryRow::pitch);
+    list.setRowHeight(motion::ui::LibraryCard::pitch);
     list.setMultipleSelectionEnabled(false);
     list.setColour(juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     list.setOutlineThickness(0);
@@ -212,11 +212,17 @@ void MotionAssetLibrary::placeEdit() {
     edit.toFront(false);
 }
 
-// An empty project's list is blank: the Scene's hint says what to do. A
-// search that finds nothing says so.
+// An empty list says where sources come from (the search field hides
+// then); a search that finds nothing says so.
 void MotionAssetLibrary::paint(juce::Graphics& graphics) {
+    if (!assets.empty() || !definitions.empty()) { return; }
     const auto filter = search.getText().trim();
-    if (!assets.empty() || !definitions.empty() || filter.isEmpty()) { return; }
+    if (filter.isEmpty()) {
+        graphics.setColour(osci::Colours::textMuted());
+        graphics.setFont(motion::style::caption());
+        graphics.drawFittedText("Drop files here", list.getBounds().reduced(12), juce::Justification::centred, 2);
+        return;
+    }
     graphics.setColour(osci::Colours::text().withAlpha(0.6f));
     graphics.setFont(motion::style::body());
     graphics.drawFittedText("No sources match " + juce::String::fromUTF8("\xe2\x80\x9c") + filter + juce::String::fromUTF8("\xe2\x80\x9d"), list.getBounds().reduced(12), juce::Justification::centred, 3);
@@ -237,43 +243,83 @@ juce::String MotionAssetLibrary::getNameForRow(int row) {
         : validAssetRow(row) ? assets[static_cast<std::size_t>(row)]->name : juce::String();
 }
 
-void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int width, int height, bool selected) {
+// A row's card: the source's picture (a linked file's badge in its corner),
+// its name and what the picture and name don't already say; on the row
+// under the pointer, a + that adds it at the playhead, its edit button
+// (the library's own, laid over it) beside that.
+class MotionAssetLibrary::SourceCard final : public motion::ui::LibraryCard {
+public:
+    explicit SourceCard(MotionAssetLibrary& library) : owner(library) {
+        setMargin(rowMargin());
+        // The row under it takes the pointer, and is what screen readers read.
+        setInterceptsMouseClicks(false, false);
+        setAccessible(false);
+    }
+    void show(int newRow, bool selected) {
+        if (row != newRow) {
+            row = newRow;
+            repaint();
+        }
+        setSelected(selected);
+        setHovered(row == owner.hoveredRow);
+        const auto [caption, colour] = owner.captionFor(row);
+        // The name as the timeline and renaming show it, file extension and all.
+        setText(owner.getNameForRow(row), caption, colour);
+    }
+    int row = -1;
+
+private:
+    void paintPicture(juce::Graphics& g, juce::Rectangle<float> well, float) override { owner.paintThumbnail(g, row, well); }
+    int textClearance() const override {
+        if (row != owner.hoveredRow) { return 0; }
+        // The edit button covers the hovered row's end, and the + its very end.
+        if (owner.editLabel(row).isNotEmpty()) { return 72; }
+        return owner.addable(row) ? getWidth() - addArea(getWidth(), getHeight()).getX() + 4 : 0;
+    }
+    void paintOver(juce::Graphics& g, float) override {
+        // A file linked rather than held: a link in the picture's corner.
+        if (owner.validAssetRow(row) && owner.assets[static_cast<std::size_t>(row)]->isLinked()) {
+            const auto badge = linkBadge(getWidth(), getHeight());
+            g.setColour(osci::Colours::surface());
+            g.fillEllipse(badge.expanded(1));
+            // A badge's glyph, smaller than any button's.
+            motion::icons::draw(g, motion::icons::Icon::link, badge, osci::Colours::text().withAlpha(.8f), 12.0f);
+        }
+        if (row == owner.hoveredRow && owner.addable(row)) {
+            // Drawn as the edit button beside it is drawn when hovered.
+            const auto add = addArea(getWidth(), getHeight()).toFloat();
+            g.setColour(motion::style::hoverFill());
+            g.fillRoundedRectangle(add.reduced(1.0f), motion::style::radiusControl);
+            motion::icons::draw(g, motion::icons::Icon::add, add, osci::Colours::text().withAlpha(.72f), motion::style::iconLarge);
+        }
+    }
+    MotionAssetLibrary& owner;
+};
+
+juce::Component* MotionAssetLibrary::refreshComponentForRow(int row, bool selected, juce::Component* existing) {
     if (!validRow(row)) {
-        return;
+        delete existing;
+        return nullptr;
     }
-    namespace libraryRow = motion::style::libraryRow;
-    const auto face = rowFace(width, height);
-    libraryRow::paintFace(graphics, face.toFloat(), row == hoveredRow ? 1.0f : 0.0f, selected);
-    // A small picture of the source, like a project panel thumbnail.
-    paintThumbnail(graphics, row, thumbnailArea(width, height));
-    // A file linked rather than held: a link in the picture's corner.
-    if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->isLinked()) {
-        const auto badge = linkBadge(width, height);
-        graphics.setColour(osci::Colours::surface());
-        graphics.fillEllipse(badge.expanded(1));
-        // A badge's glyph, smaller than any button's.
-        motion::icons::draw(graphics, motion::icons::Icon::link, badge, osci::Colours::text().withAlpha(.8f), 12.0f);
+    auto* card = dynamic_cast<SourceCard*>(existing);
+    if (card == nullptr) {
+        delete existing;
+        card = new SourceCard(*this);
     }
-    auto text = libraryRow::textArea(face);
-    // The edit button covers the hovered row's end.
-    if (row == hoveredRow && editLabel(row).isNotEmpty()) { text.setRight(width - 72); }
-    if (row == hoveredRow && addable(row)) {
-        const auto add = addArea(width, height).toFloat();
-        text.setRight(std::min(text.getRight(), juce::roundToInt(add.getX()) - 4));
-        // Drawn as the edit button beside it is drawn when hovered.
-        graphics.setColour(motion::style::hoverFill());
-        graphics.fillRoundedRectangle(add.reduced(1.0f), motion::style::radiusControl);
-        motion::icons::draw(graphics, motion::icons::Icon::add, add, osci::Colours::text().withAlpha(.72f), motion::style::iconLarge);
-    }
+    card->show(row, selected);
+    return card;
+}
+
+std::pair<juce::String, juce::Colour> MotionAssetLibrary::captionFor(int row) const {
     // Only what the picture and the name don't already say.
     juce::StringArray detail;
-    auto detailColour = osci::Colours::text().withAlpha(0.55f);
+    auto colour = osci::Colours::text().withAlpha(0.55f);
     if (definitionRow(row)) {
         const auto& definition = *definitions[static_cast<std::size_t>(row) - assets.size()];
         const auto clip = motion::Document::makeCompositionClip(0, definition, 0);
         detail.add("Composition");
         detail.add(juce::String(clip.duration, 1) + " s");
-    } else {
+    } else if (validAssetRow(row)) {
         const auto& asset = *assets[static_cast<std::size_t>(row)];
         // A generator's picture shows what it is.
         const auto kind = motion::generatorOf(asset) != nullptr ? juce::String() : motion::ui::sourceKind(asset);
@@ -289,11 +335,10 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
         if (asset.missing) {
             detail.clearQuick();
             detail.add(asset.linked.existsAsFile() ? "File changed" : "File missing");
-            detailColour = motion::style::error();
+            colour = motion::style::error();
         }
     }
-    // The name as the timeline and renaming show it, file extension and all.
-    libraryRow::paintText(graphics, text, getNameForRow(row), detail.joinIntoString(motion::style::dot()), detailColour);
+    return {detail.joinIntoString(motion::style::dot()), colour};
 }
 
 juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {
@@ -304,9 +349,9 @@ juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {
     return motion::ui::traceSource(*asset.source, asset.source->frameCount() / 2, 2000);
 }
 
-void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const {
-    motion::style::fillWell(graphics, box.toFloat());
-    const auto area = box.toFloat().reduced(4);
+void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<float> well) const {
+    if (!validRow(row)) { return; }
+    const auto area = well.reduced(4);
     graphics.setColour(motion::style::key().withAlpha(.85f));
     if (definitionRow(row)) {
         // A composition: stacked layers.
@@ -346,21 +391,26 @@ void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce:
     graphics.strokePath(path, juce::PathStrokeType(1.0f));
 }
 
-// The + under the pointer is a button: it points.
+// The + under the pointer is a button: it points. The rest of a row is a
+// card to drag.
 void MotionAssetLibrary::mouseMove(const juce::MouseEvent& event) {
     hover(event.getEventRelativeTo(&list).getPosition());
     auto* under = event.eventComponent;
     if (under == nullptr || !list.isParentOf(under)) { return; }
     const auto onAdd = addable(hoveredRow) && addArea(under->getWidth(), under->getHeight()).contains(event.getPosition());
-    under->setMouseCursor(onAdd ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    under->setMouseCursor(onAdd ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor);
 }
 
 void MotionAssetLibrary::hover(juce::Point<int> inList) {
     const auto row = list.getLocalBounds().contains(inList) ? list.getRowContainingPosition(inList.x, inList.y) : -1;
     if (row == hoveredRow) { return; }
-    list.repaintRow(hoveredRow);
-    hoveredRow = row;
-    list.repaintRow(hoveredRow);
+    const auto previous = std::exchange(hoveredRow, row);
+    for (const auto changed : {previous, row}) {
+        if (changed < 0) { continue; }
+        auto* card = dynamic_cast<SourceCard*>(list.getComponentForRowNumber(changed));
+        if (card != nullptr) { card->setHovered(changed == hoveredRow); }
+        list.repaintRow(changed);
+    }
     placeEdit();
 }
 
@@ -429,7 +479,7 @@ void MotionAssetLibrary::beginRename(motion::Id id) {
     if (!validAssetRow(row)) { return; }
     renaming = id;
     rename.setText(assets[static_cast<std::size_t>(row)]->name, juce::dontSendNotification);
-    rename.setBounds(list.getRowPosition(row, true).translated(list.getX(), list.getY()).reduced(8, 10).withHeight(24));
+    rename.setBounds(list.getRowPosition(row, true).translated(list.getX(), list.getY()).reduced(8, (motion::ui::LibraryCard::pitch - 24) / 2));
     rename.setVisible(true);
     rename.grabKeyboardFocus();
     rename.selectAll();

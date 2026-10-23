@@ -538,9 +538,8 @@ void MotionEditor::timerCallback() {
     compositionSettings.setCanvasEnabled(exportState == nullptr);
     {
         using Control = VisualiserComponent::Control;
-        // The strip and Scope settings show what the visualiser is doing,
-        // however it started.
-        scopePanel.setSharingPicture(visualiser.isControlOn(Control::textureOutput));
+        // The strip shows what the visualiser is doing, however it started.
+        scopeTools.textureOutput.setToggleState(visualiser.isControlOn(Control::textureOutput), juce::dontSendNotification);
         scopeTools.popout.setToggleState(visualiser.isControlOn(Control::popout), juce::dontSendNotification);
         const auto settingsShown = visualiser.hasControl(Control::settings), popoutShown = visualiser.hasControl(Control::popout);
         if (scopeTools.settings.isVisible() != settingsShown || scopeTools.popout.isVisible() != popoutShown) {

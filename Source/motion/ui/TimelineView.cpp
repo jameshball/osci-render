@@ -664,9 +664,8 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         g.drawRect(*box);
     }
     paintPlayhead(g);
-    // The Scene's hint is the empty editor's one call to action; this one
-    // answers a source dragged over an empty timeline.
-    if (tracks.empty() && dropPosition.has_value() && dropAssetId != 0) {
+    // An empty timeline says where sources go.
+    if (tracks.empty()) {
         g.setColour(osci::Colours::textMuted());
         g.setFont(motion::style::caption());
         g.drawText("Drop sources here", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);

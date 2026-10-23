@@ -154,6 +154,7 @@ void MotionEditor::setUpScene() {
 void MotionEditor::setUpScope() {
     outputHeader.setName("Scope");
     using Control = VisualiserComponent::Control;
+    scopeTools.textureOutput.onClick = [this] { visualiser.clickControl(Control::textureOutput, &scopeTools.textureOutput); };
     scopeTools.settings.onClick = [this] { visualiser.clickControl(Control::settings, &scopeTools.settings); };
     scopeTools.popout.onClick = [this] { visualiser.clickControl(Control::popout, &scopeTools.popout); };
     scopeTools.fullScreen.onClick = [this] { visualiser.clickControl(Control::fullScreen, &scopeTools.fullScreen); };
@@ -161,9 +162,6 @@ void MotionEditor::setUpScope() {
         const auto next = mode == FullScreenMode::TOGGLE ? !scopeFullScreen : mode == FullScreenMode::FULL_SCREEN;
         setScopeFullScreen(next);
     });
-    // Sharing the picture (Syphon/Spout) is a switch in Scope settings; the
-    // visualiser keeps its premium check.
-    scopePanel.onSharePicture = [this] { visualiser.clickControl(Control::textureOutput, nullptr); };
 }
 
 void MotionEditor::showCanvasSettings(juce::Component& anchor) {

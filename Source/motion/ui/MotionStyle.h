@@ -297,39 +297,18 @@ inline void fadeScrolling(osci::ScrollFadeViewport& viewport, juce::Colour behin
 // Popovers sit a step above the panel they point at.
 inline juce::Colour popoverSurface() { return juce::Colour(0xff202126); }
 
-// The libraries' rows (Sources, Effects, Modulators) look alike: a face 40 px
-// tall every 44 px, a 36 px picture in a well 8 px in, then the name with
-// any detail under it. Nothing is behind a row at rest; the pointer washes
-// it, and a selected one lifts with an accent bar down its left edge.
-namespace libraryRow {
-inline constexpr int pitch = 44, face = pitch - gap, picture = 36, inset = 8;
-inline juce::Rectangle<int> pictureArea(juce::Rectangle<int> faceBounds) { return faceBounds.withTrimmedLeft(inset).withWidth(picture).withSizeKeepingCentre(picture, picture); }
-inline juce::Rectangle<int> textArea(juce::Rectangle<int> faceBounds) { return faceBounds.withTrimmedLeft(inset + picture + padding); }
-// `hover` from 0 to 1.
-inline void paintFace(juce::Graphics& g, juce::Rectangle<float> faceBounds, float hover, bool selected) {
-    if (selected) {
-        g.setColour(osci::Colours::surfaceRaised());
-        g.fillRoundedRectangle(faceBounds, radiusControl);
-        g.setColour(accent());
-        g.fillRect(faceBounds.withWidth(2.0f).reduced(0.0f, 5.0f));
-    } else if (hover > 0.0f) {
-        g.setColour(hoverFill().withMultipliedAlpha(hover));
-        g.fillRoundedRectangle(faceBounds, radiusControl);
-    }
-}
-// The name alone sits centred; with a detail, the two lines share the face.
-inline void paintText(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& name, const juce::String& detail, juce::Colour detailColour) {
-    g.setColour(osci::Colours::text());
-    g.setFont(body());
-    if (detail.isEmpty()) {
-        g.drawText(name, area, juce::Justification::centredLeft, true);
-        return;
-    }
-    g.drawText(name, area.removeFromTop(area.getHeight() / 2 + 2), juce::Justification::bottomLeft, true);
-    g.setColour(detailColour);
-    g.setFont(caption());
-    g.drawText(detail, area, juce::Justification::topLeft, true);
-}
+// A card: a picture tile, or a library's card (Sources, Effects,
+// Modulators). At rest a dark box with a neutral hairline, washed and its
+// edge brightened as the pointer fades in (`hover` 0 to 1), pressed while
+// held; on (chosen, selected) lit in the accent, as green means selection.
+inline void paintCard(juce::Graphics& g, juce::Rectangle<float> bounds, float hover, bool on, bool down = false) {
+    g.setColour(on ? accentFill().withMultipliedAlpha(1 + hover) : osci::Colours::veryDark());
+    g.fillRoundedRectangle(bounds, radiusControl);
+    // Every button's wash; an on card's own fill brightens instead.
+    g.setColour(wash(on ? 0.0f : hover, down));
+    g.fillRoundedRectangle(bounds, radiusControl);
+    g.setColour(on ? accentStrong().withMultipliedAlpha(1.2f + .6f * hover) : juce::Colours::white.withAlpha(.06f + .1f * hover));
+    g.drawRoundedRectangle(bounds.reduced(.5f), radiusControl, on ? 1.2f : 1.0f);
 }
 // Many diamonds share one path, filled once.
 inline void addDiamond(juce::Path& path, juce::Point<float> centre, float radius) {

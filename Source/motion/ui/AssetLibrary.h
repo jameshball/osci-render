@@ -4,6 +4,7 @@
 #include "DocumentMenu.h"
 #include "FormControls.h"
 #include "MotionIcons.h"
+#include "LibraryCard.h"
 
 #include "../model/Document.h"
 #include "../model/Drawing.h"
@@ -54,7 +55,15 @@ private:
     juce::String getNameForRow(int row) override;
     juce::String getTooltipForRow(int row) override;
 
-    void paintListBoxItem(int row, juce::Graphics& graphics, int width, int height, bool selected) override;
+    // Each row is a library card (SourceCard), so the list looks as
+    // Effects and Modulators do; the row under it still takes the clicks,
+    // drags and menus, and is what screen readers read.
+    void paintListBoxItem(int, juce::Graphics&, int, int, bool) override {}
+    juce::Component* refreshComponentForRow(int row, bool selected, juce::Component* existing) override;
+    juce::MouseCursor getMouseCursorForRow(int) override { return juce::MouseCursor::DraggingHandCursor; }
+    class SourceCard;
+    // What a row's card says under its name, and in what colour.
+    std::pair<juce::String, juce::Colour> captionFor(int row) const;
 
     // A source's middle frame as a path inside the unit square, broken at the
     // jumps between strokes (dark travel in baked points, long steps in
@@ -67,12 +76,12 @@ private:
     };
     mutable std::vector<Thumbnail> thumbnails;
 
-    void paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const;
-    // A row's face (what hover and selection fill), lined up with Add source;
-    // where its picture is, and the badge in its corner saying its file is
-    // linked from disk.
-    static juce::Rectangle<int> rowFace(int width, int height) { return juce::Rectangle<int>(width, height).reduced(4, motion::style::gap / 2); }
-    static juce::Rectangle<int> thumbnailArea(int width, int height) { return motion::style::libraryRow::pictureArea(rowFace(width, height)); }
+    void paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<float> well) const;
+    // A row's card face, lined up with Add source; where its picture is,
+    // and the badge in its corner saying its file is linked from disk.
+    static juce::BorderSize<int> rowMargin() { return {motion::style::gap / 2, 4, motion::style::gap / 2, 4}; }
+    static juce::Rectangle<int> rowFace(int width, int height) { return rowMargin().subtractedFrom(juce::Rectangle<int>(width, height)); }
+    static juce::Rectangle<int> thumbnailArea(int width, int height) { return motion::ui::LibraryCard::pictureIn(rowFace(width, height)); }
     static juce::Rectangle<float> linkBadge(int width, int height) {
         const auto picture = thumbnailArea(width, height).toFloat();
         return juce::Rectangle<float>(12, 12).withCentre(picture.getBottomRight() - juce::Point<float>(3, 3));

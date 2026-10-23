@@ -7,6 +7,7 @@
 #include "MotionIcons.h"
 #include "ScrubField.h"
 #include "FormControls.h"
+#include "LibraryCard.h"
 
 namespace motion::ui {
 inline constexpr PropertySpec rateHzSpec {"rate", "Rate", "", "", 0.001, 1000, 1, .01, 3, " Hz"};
@@ -123,21 +124,19 @@ public:
     void paint(juce::Graphics& g) override { g.fillAll(osci::Colours::surface()); }
 
 private:
-    // The modulator as a card: what it does, its name and how much it drives.
-    class Card final : public juce::Component {
+    // The modulator as a library card: its wave, its name and how much it
+    // drives.
+    class Card final : public motion::ui::LibraryCard {
     public:
         Card(MotionModulatorLibrary& library, const motion::Modulator& value, int routeCount);
-        void paint(juce::Graphics& g) override;
-        void mouseEnter(const juce::MouseEvent&) override { fade.setTarget(true); }
-        void mouseExit(const juce::MouseEvent&) override { fade.setTarget(false); }
+        motion::Id id() const { return modulator.id; }
         void mouseDown(const juce::MouseEvent&) override { owner.select(modulator.id); }
         // Dragging the card onto a property in Properties routes it there.
         void mouseDrag(const juce::MouseEvent& event) override;
     private:
+        void paintPicture(juce::Graphics& g, juce::Rectangle<float> well, float lit) override;
         MotionModulatorLibrary& owner;
         motion::Modulator modulator;
-        int routes;
-        motion::style::Fade fade {*this};
     };
     // One oscillator shape, drawn.
     class ShapeButton final : public juce::Button {

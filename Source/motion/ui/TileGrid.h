@@ -58,9 +58,9 @@ public:
     juce::Button& tile(std::size_t index) { return *tiles[index]; }
     const juce::String& nameOf(std::size_t index) const { return tiles[index]->choice.name; }
 
-    // Pictures no taller than `pictureHeight`, their names in a shorter
-    // line, so the grid stays low; below `narrowWidth` a tile, `narrowColumns`
-    // columns instead.
+    // Pictures no taller than `pictureHeight`, closer to the tile's edge and
+    // their names in a shorter line, so the grid stays low; below
+    // `narrowWidth` a tile, `narrowColumns` columns instead.
     void setCompact(int pictureHeight, int narrowWidth, int narrowColumns) {
         pictureLimit = pictureHeight;
         narrowTileWidth = narrowWidth;
@@ -91,7 +91,7 @@ public:
 private:
     // A picture tile's picture is as tall as it is wide less its margins
     // (or its limit), with its name below; a chip is a control's height.
-    static constexpr int nameHeight = 18, compactNameHeight = 14, chipHeight = motion::style::controlHeight + 2;
+    static constexpr int nameHeight = 18, compactNameHeight = 14, compactInset = 2, chipHeight = motion::style::controlHeight + 2;
     int columnsFor(int width) const {
         if (narrowColumnCount <= 0) { return columnCount; }
         const auto tileWidth = (width - (columnCount - 1) * motion::style::gap) / columnCount;
@@ -101,7 +101,7 @@ private:
         if (look == Look::chips) { return chipHeight; }
         const auto columns = columnsFor(width);
         const auto tileWidth = (width - (columns - 1) * motion::style::gap) / columns;
-        if (pictureLimit > 0) { return std::min(tileWidth - 2 * motion::style::gap, pictureLimit) + compactNameHeight + 2 * motion::style::gap; }
+        if (pictureLimit > 0) { return std::min(tileWidth - 2 * compactInset, pictureLimit) + compactNameHeight + 2 * compactInset; }
         return tileWidth - 2 * motion::style::gap + nameHeight + motion::style::gap;
     }
 
@@ -120,15 +120,8 @@ private:
         void paintTile(juce::Graphics& g, bool down) {
             const auto on = getToggleState();
             const auto hover = fade.value();
-            const auto bounds = getLocalBounds().toFloat();
-            const auto radius = motion::style::radiusControl;
-            g.setColour(on ? motion::style::accentFill().withMultipliedAlpha(1 + hover) : osci::Colours::veryDark());
-            g.fillRoundedRectangle(bounds, radius);
-            // Every button's wash; an on tile's own fill brightens instead.
-            g.setColour(motion::style::wash(on ? 0.0f : hover, down));
-            g.fillRoundedRectangle(bounds, radius);
-            g.setColour(on ? motion::style::accentStrong().withMultipliedAlpha(1.2f + .6f * hover) : juce::Colours::white.withAlpha(.06f + .1f * hover));
-            g.drawRoundedRectangle(bounds.reduced(.5f), radius, on ? 1.2f : 1.0f);
+            // The same card as the libraries'.
+            motion::style::paintCard(g, getLocalBounds().toFloat(), hover, on, down);
             const auto ink = on ? motion::style::key() : osci::Colours::text().withAlpha(.5f + .3f * hover);
             if (look == Look::chips) {
                 // A small icon, then the name.
@@ -144,7 +137,7 @@ private:
                 g.drawText(choice.name, area, juce::Justification::centredLeft, true);
                 return;
             }
-            auto area = getLocalBounds().reduced(motion::style::gap);
+            auto area = getLocalBounds().reduced(compact ? compactInset : motion::style::gap);
             // Compact, the name takes the tile's whole width: a small tile's
             // longest name still fits.
             const auto name = compact ? area.removeFromBottom(compactNameHeight).withX(1).withWidth(getWidth() - 2) : area.removeFromBottom(nameHeight);

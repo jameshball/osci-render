@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "LibraryCard.h"
 
 #include "../model/Effects.h"
 #include "../render/PreparedEffects.h"
@@ -47,28 +48,24 @@ public:
             const auto shown = query.isEmpty() || names[static_cast<int>(index)].containsIgnoreCase(query);
             tile->setVisible(shown);
             if (!shown) { continue; }
-            tile->setBounds(juce::Rectangle<int>(0, y, width, motion::style::libraryRow::pitch).reduced(4, motion::style::gap / 2));
-            y += motion::style::libraryRow::pitch;
+            tile->setBounds(juce::Rectangle<int>(0, y, width, motion::ui::LibraryCard::pitch).reduced(4, motion::style::gap / 2));
+            y += motion::ui::LibraryCard::pitch;
         }
         content.setSize(width, y);
     }
 
 private:
-    class Tile final : public juce::Component {
+    // A library card: what the effect does to a grid, and its name.
+    class Tile final : public motion::ui::LibraryCard {
     public:
         Tile(MotionEffectLibrary& library, const motion::EffectDefinition& effect) : owner(library), definition(effect) {
             setName(juce::String(definition.name));
             setTitle(juce::String(definition.name) + " effect");
             setDescription("Drag onto an object, a track or the Scene. Double-click adds it to what Properties shows.");
-            setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+            setText(getName());
             buildThumbnail();
         }
-        void paint(juce::Graphics& g) override {
-            namespace libraryRow = motion::style::libraryRow;
-            const auto hover = fade.value();
-            libraryRow::paintFace(g, getLocalBounds().toFloat(), hover, false);
-            const auto thumb = libraryRow::pictureArea(getLocalBounds()).toFloat();
-            motion::style::fillWell(g, thumb);
+        void paintPicture(juce::Graphics& g, juce::Rectangle<float> thumb, float hover) override {
             const auto transform = juce::AffineTransform::scale(thumb.getWidth() * .5f, -thumb.getHeight() * .5f).translated(thumb.getCentre());
             if (!before.isEmpty()) {
                 g.setColour(osci::Colours::text().withAlpha(.16f));
@@ -76,10 +73,7 @@ private:
             }
             g.setColour(tint.withAlpha(.55f + .45f * hover));
             g.strokePath(thumbnail, juce::PathStrokeType(1.0f), transform);
-            libraryRow::paintText(g, libraryRow::textArea(getLocalBounds()), getName(), {}, {});
         }
-        void mouseEnter(const juce::MouseEvent&) override { fade.setTarget(true); }
-        void mouseExit(const juce::MouseEvent&) override { fade.setTarget(false); }
         void mouseDrag(const juce::MouseEvent& event) override {
             if (event.getDistanceFromDragStart() < 4) { return; }
             auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
@@ -157,7 +151,6 @@ private:
         const motion::EffectDefinition& definition;
         juce::Path thumbnail, before;
         juce::Colour tint;
-        motion::style::Fade fade {*this};
     };
     osci::ScrollFadeViewport viewport;
     juce::Component content;

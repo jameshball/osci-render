@@ -69,24 +69,28 @@ public:
     Tool box {"Box pick", motion::icons::Icon::box}, lasso {"Lasso pick", motion::icons::Icon::lasso}, connected {"Pick pieces", motion::icons::Icon::connected};
 };
 
-// The Scope's controls: its settings, then the popout and full screen.
-// Docked, they run across the Scope's header on its own fill; on a Scope too
-// narrow for its header they float down the picture's top right as the
-// Scene's strip does (full screen, the transport takes their place). The
-// canvas is the composition's (its Format), and sharing the picture a switch
-// in Scope settings. Video is made by Export, drawn offline, never recorded
-// live.
+// The Scope's controls: sharing its picture with other apps (lit while it
+// is shared), its settings, then the popout and full screen. Docked, they
+// run across the Scope's header on its own fill; on a Scope too narrow for
+// its header they float down the picture's top right as the Scene's strip
+// does (full screen, the transport takes their place). The canvas is the
+// composition's (its Format). Video is made by Export, drawn offline, never
+// recorded live.
 class MotionScopeToolbar final : public motion::icons::ToolStrip {
 public:
     using Tool = motion::icons::Button;
 
     MotionScopeToolbar() {
         setName("Scope tools");
+        textureOutput.setTooltip("Share the Scope's picture with other apps (Syphon on macOS, Spout on Windows)");
+        // On or off, as the visualiser has it, for screen readers too.
+        textureOutput.setToggleable(true);
         settings.setTooltip("Scope settings: picture, display and jumps");
         popout.setTooltip("Open the Scope in its own window");
         fullScreen.setTooltip("Full screen");
-        setGroups({{&settings}, {&popout, &fullScreen}});
+        setGroups({{&textureOutput}, {&settings}, {&popout, &fullScreen}});
     }
+    Tool textureOutput {"Share picture", motion::icons::Icon::cast};
     Tool settings {"Scope settings", motion::icons::Icon::settings};
     Tool popout {"Pop out Scope", motion::icons::Icon::openInNew}, fullScreen {"Full screen Scope", motion::icons::Icon::fullscreen};
     void setDocked(bool value) {
@@ -122,6 +126,6 @@ public:
     }
 
 private:
-    std::array<juce::Component*, 3> tools() { return {&settings, &popout, &fullScreen}; }
+    std::array<juce::Component*, 4> tools() { return {&textureOutput, &settings, &popout, &fullScreen}; }
     bool docked = false;
 };

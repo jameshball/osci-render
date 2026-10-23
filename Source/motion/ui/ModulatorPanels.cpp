@@ -182,7 +182,7 @@ void MotionModulatorLibrary::refresh() {
             cards.push_back(std::move(card));
         }
     }
-    for (auto& card : cards) { card->repaint(); }
+    for (auto& card : cards) { card->setSelected(card->id() == selected); }
     const auto* modulator = current();
     const auto oscillator = modulator != nullptr && modulator->shape.waveform != motion::ModulationWaveform::soundtrack;
     const auto noise = oscillator && (modulator->shape.waveform == motion::ModulationWaveform::noiseHold || modulator->shape.waveform == motion::ModulationWaveform::noiseSmooth);
@@ -222,7 +222,7 @@ void MotionModulatorLibrary::resized() {
     area.removeFromTop(motion::style::gap);
     emptyHint.setVisible(cards.empty());
     if (cards.empty()) { emptyHint.setBounds(area.removeFromTop(120).withTrimmedTop(12)); }
-    for (auto& card : cards) { card->setBounds(area.removeFromTop(motion::style::libraryRow::pitch).reduced(0, motion::style::gap / 2)); }
+    for (auto& card : cards) { card->setBounds(area.removeFromTop(motion::ui::LibraryCard::pitch).reduced(0, motion::style::gap / 2)); }
     const auto* modulator = current();
     if (modulator != nullptr) {
         area.removeFromTop(motion::style::padding * 2);
@@ -272,22 +272,17 @@ void MotionModulatorLibrary::resized() {
     content.setSize(width, area.getY() + motion::style::padding);
 }
 
-MotionModulatorLibrary::Card::Card(MotionModulatorLibrary& library, const motion::Modulator& value, int routeCount) : owner(library), modulator(value), routes(routeCount) {
+// Like a Sources card: its wave in the picture, its name over what it drives.
+MotionModulatorLibrary::Card::Card(MotionModulatorLibrary& library, const motion::Modulator& value, int routeCount) : owner(library), modulator(value) {
     setName(juce::String(modulator.name));
     setTitle(juce::String(modulator.name) + " modulator");
+    const auto drives = routeCount == 0 ? juce::String("Drives nothing yet") : routeCount == 1 ? juce::String("Drives 1 property") : "Drives " + juce::String(routeCount) + " properties";
+    setText(juce::String(modulator.name), drives, routeCount == 0 ? osci::Colours::textMuted().withAlpha(.7f) : motion::style::result());
+    setSelected(modulator.id == owner.selected);
 }
 
-// Like a Sources row: its wave in the picture, its name over what it drives.
-void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
-    namespace libraryRow = motion::style::libraryRow;
-    const auto active = modulator.id == owner.selected;
-    const auto hover = fade.value();
-    libraryRow::paintFace(g, getLocalBounds().toFloat(), hover, active);
-    const auto picture = libraryRow::pictureArea(getLocalBounds()).toFloat();
-    motion::style::fillWell(g, picture);
-    motion::ui::paintModulatorShape(g, modulator, picture.reduced(5, 9), motion::style::key().withAlpha(.6f + .4f * (active ? 1.0f : hover)), 1.2f);
-    const auto drives = routes == 0 ? juce::String("Drives nothing yet") : routes == 1 ? juce::String("Drives 1 property") : "Drives " + juce::String(routes) + " properties";
-    libraryRow::paintText(g, libraryRow::textArea(getLocalBounds()), juce::String(modulator.name), drives, routes == 0 ? osci::Colours::textMuted().withAlpha(.7f) : motion::style::result());
+void MotionModulatorLibrary::Card::paintPicture(juce::Graphics& g, juce::Rectangle<float> well, float lit) {
+    motion::ui::paintModulatorShape(g, modulator, well.reduced(5, 9), motion::style::key().withAlpha(.6f + .4f * lit), 1.2f);
 }
 
 void MotionModulatorLibrary::Card::mouseDrag(const juce::MouseEvent& event) {

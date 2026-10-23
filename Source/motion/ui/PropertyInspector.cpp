@@ -628,13 +628,16 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         rows.back()->addAndMakeVisible(editor);
         rows.back()->fields.push_back(std::move(field));
     }
-    // One order for every target, the specs': what makes it, then (after
-    // the lead's timing) Transform, Lens or Audio, Appearance, and how it
-    // draws, Surface or Shading, last. Mirror leads Surface's rows, above
-    // its advanced ones.
+    // One order for every target: what makes it, then how it draws
+    // (Surface, its pictures a reference to play with, in view without
+    // scrolling), then (after the lead's timing) the specs' order:
+    // Transform, Lens or Audio, Appearance, and Shading last. Mirror leads
+    // Surface's rows, above its advanced ones.
     const auto surfaceBegin = std::find_if(rows.begin(), rows.end(), [](const auto& row) { return row->section == "Surface"; });
     const auto surfaceEnd = std::find_if(surfaceBegin, rows.end(), [](const auto& row) { return row->section != "Surface"; });
     std::stable_partition(surfaceBegin, surfaceEnd, [](const auto& row) { return !isAdvanced(*row); });
+    const auto making = std::find_if(rows.begin(), rows.end(), [](const auto& row) { return !row->first; });
+    if (making <= surfaceBegin) { std::rotate(making, surfaceBegin, surfaceEnd); }
     advanced.onClick = [this] {
         refreshValues();
         layoutContent();
@@ -663,10 +666,11 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         for (const auto& style : surfaceStyles) {
             choices.push_back({juce::String(style.name.data(), style.name.size()), juce::String(style.tooltip.data(), style.tooltip.size()) + ". Shift-click to combine styles", motion::ui::pictures::surfacePicture(style.look)});
         }
-        // One row of small pictures, so Surface takes little room; three
-        // columns of them when the panel is too narrow for six.
+        // One row of pictures, so Surface stays near the top without
+        // pushing Transform far down; three columns of them when the panel
+        // is too narrow for six.
         surfaceTiles = std::make_unique<motion::ui::TileGrid>("Surface styles", std::move(choices), 6);
-        surfaceTiles->setCompact(34, 40, 3);
+        surfaceTiles->setCompact(46, 40, 3);
         surfaceTiles->onClick = [this](std::size_t index) {
             const auto found = motion::findPropertyTarget(processor.document.project(), target);
             if (!found.has_value() || found->locked) { return; }
@@ -873,11 +877,16 @@ void MotionPropertyInspector::layoutContent() {
         presetTiles->setBounds(motion::style::padding, y, inner, height);
         y += height + motion::style::padding;
     }
+    // How it draws, straight under what makes it.
+    auto surfaceTo = first;
+    while (surfaceTo < rows.size() && rows[surfaceTo]->section == "Surface") { ++surfaceTo; }
+    place(first, surfaceTo, first > 0, true);
+    const auto above = first > 0 || surfaceTo > first;
     const auto leading = lead != nullptr && leadHeight ? leadHeight() : 0;
     if (leading > 0) {
         // A rule, then the lead's own heading on the same rhythm as the
         // sections around it.
-        if (first > 0) { y += motion::style::gap; }
+        if (above) { y += motion::style::gap; }
         content.sections.push_back({y, {}, {}});
         y += sectionGap;
     }
@@ -886,7 +895,7 @@ void MotionPropertyInspector::layoutContent() {
         lead->setVisible(leading > 0);
         y += leading > 0 ? leading + motion::style::gap : 0;
     }
-    place(first, rows.size(), first > 0 && leading == 0, true);
+    place(surfaceTo, rows.size(), above && leading == 0, true);
     const auto trailing = trail != nullptr && trailHeight ? trailHeight() : 0;
     if (trail != nullptr) {
         // An empty trail can still say something beside its heading (no
