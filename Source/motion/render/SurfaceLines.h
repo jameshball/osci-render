@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <map>
 #include <unordered_map>
 #include <numbers>
@@ -610,6 +611,10 @@ inline std::vector<Piece> withoutBeads(const std::vector<Vec3>& corners, const s
 }
 }
 
+// The most points a pattern cuts a surface's faces into to find its lines,
+// as many as the spiral's climb (the example projects use a fifth of it).
+inline constexpr double mostPatternPoints = 3.0e5;
+
 // A pattern over the faces, `across` lines across the surface's largest
 // side, or for slices and the spiral, up its height. A spiral winds about
 // the surface's own up (y) through its middle, slices are level across it,
@@ -716,6 +721,31 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
             default: return up / climbing + .5 - starts * (onAxis ? from : from + std::remainder(std::atan2(round.z, round.x) - from, whole)) / whole;
         }
     };
+    // As finely as its lines are spaced (by climb for a spiral); slices,
+    // level, are straight across a flat face already.
+    const auto apart = kind == Pattern::spiral ? std::min(spacing, climbing) : spacing;
+    std::vector<int> wanted(faces.size(), 1);
+    if (kind != Pattern::slices) {
+        for (std::size_t index = 0; index < faces.size(); ++index) {
+            const auto& f = faces[index];
+            const auto a = corners[f[0]], b = corners[f[1]], c = corners[f[2]];
+            const auto longest = std::max({(b - a).length(), (c - b).length(), (a - c).length()});
+            wanted[index] = std::clamp(static_cast<int>(std::ceil(longest / (apart / 6))), 1, 32);
+        }
+    }
+    // Within a budget of points over the whole surface: many big faces
+    // (filled text, a fanned polygon) are cut less finely, rather than each
+    // into a thousand triangles.
+    const auto pointsCut = [&](int most) {
+        double total = 0;
+        for (const auto want : wanted) {
+            const auto cuts = std::min(want, most);
+            total += (cuts + 1) * (cuts + 2) / 2;
+        }
+        return total;
+    };
+    auto most = 32;
+    while (most > 1 && pointsCut(most) > mostPatternPoints) { --most; }
     // Found on the faces cut finely (a few times to a spacing), so the
     // lines are as curved across a big face as the pattern is: each piece
     // then put back on the face it was cut from.
@@ -727,11 +757,7 @@ inline std::vector<Piece> pattern(const std::vector<Vec3>& corners, const std::v
     for (std::uint32_t index = 0; index < faces.size(); ++index) {
         const auto& f = faces[index];
         const auto a = corners[f[0]], b = corners[f[1]], c = corners[f[2]];
-        const auto longest = std::max({(b - a).length(), (c - b).length(), (a - c).length()});
-        // As finely as its lines are spaced (by climb for a spiral); slices,
-        // level, are straight across a flat face already.
-        const auto apart = kind == Pattern::spiral ? std::min(spacing, climbing) : spacing;
-        const auto cuts = kind == Pattern::slices ? 1 : std::clamp(static_cast<int>(std::ceil(longest / (apart / 6))), 1, 32);
+        const auto cuts = std::min(wanted[index], most);
         const auto part = climb.has_value() ? climb->faceParts[index] : detail::Climb::none;
         axis = part != detail::Climb::none ? climb->parts[part].middle() : middle;
         starts = part != detail::Climb::none ? partStarts[part] : startsRound(bounds);
@@ -814,38 +840,138 @@ struct Normals {
 // A corner's normal is its smooth neighbours' faces' normals, weighted so a
 // surface's normals hardly depend on how it is cut into faces.
 struct Smoothing {
-    // For each face's corner in turn, its smooth neighbours (the face
-    // itself among them, and which of each one's corners is at the place)
-    // from `start` to the next corner's start.
-    std::vector<std::uint32_t> start;
+    // Each face's corner takes its normal from a group: its smooth
+    // neighbours (the face itself among them, and which of each one's
+    // corners is at the place), from `start` to the next group's start.
+    // The faces at a place facing almost the same way (a fanned polygon's
+    // many triangles about its first corner) share a group, so a place is
+    // summed once for each way its faces face, not once for each face.
+    std::vector<std::uint32_t> groupOf;
+    std::vector<std::size_t> start;
     std::vector<std::pair<std::uint32_t, std::uint8_t>> neighbours;
 
+    // Past this many faces at a place that can't be grouped by how they
+    // face (more ways than mostWays, or near the crease from each other),
+    // each is left its own flat normal rather than compared with every other.
+    static constexpr std::size_t mostCompared = 1024, mostWays = 32;
+
     static Smoothing of(const std::vector<Vec3>& corners, const std::vector<Face>& faces, double crease = .7) {
+        using Corner = std::pair<std::uint32_t, std::uint8_t>;
         const auto own = faceNormals(corners, faces);
-        std::map<detail::Place, std::vector<std::pair<std::uint32_t, std::uint8_t>>> around;
+        std::map<detail::Place, std::vector<Corner>> around;
+        // Corners of faces with no area: not neighbours, but they have some.
+        std::vector<Corner> flat;
         for (std::uint32_t index = 0; index < faces.size(); ++index) {
             const auto a = detail::placeOf(corners[faces[index][0]]), b = detail::placeOf(corners[faces[index][1]]), c = detail::placeOf(corners[faces[index][2]]);
-            if (a == b || b == c || c == a) { continue; }
+            if (a == b || b == c || c == a) {
+                for (std::uint8_t corner = 0; corner < 3; ++corner) { flat.emplace_back(index, corner); }
+                continue;
+            }
             for (std::uint8_t corner = 0; corner < 3; ++corner) { around[detail::placeOf(corners[faces[index][corner]])].emplace_back(index, corner); }
         }
         const auto cosCrease = std::cos(crease);
+        // Faces within `near` (radians) of a way's first face face that way.
+        // Two ways' faces are then all smooth, or all not, unless the ways
+        // are within twice that (and rounding) of the crease apart.
+        const auto near = crease * 1.0e-3;
+        const auto cosNear = std::cos(near);
+        const auto grouping = crease > 1.0e-3 && crease < 3;
         Smoothing smoothing;
-        smoothing.start.reserve(faces.size() * 3 + 1);
-        for (std::uint32_t index = 0; index < faces.size(); ++index) {
-            for (std::uint8_t corner = 0; corner < 3; ++corner) {
-                smoothing.start.push_back(static_cast<std::uint32_t>(smoothing.neighbours.size()));
-                // A face with no area has only itself.
-                const auto found = around.find(detail::placeOf(corners[faces[index][corner]]));
-                if (found == around.end()) {
-                    smoothing.neighbours.emplace_back(index, corner);
-                    continue;
-                }
-                for (const auto& neighbour : found->second) {
-                    if (own[neighbour.first].dot(own[index]) >= cosCrease) { smoothing.neighbours.push_back(neighbour); }
+        smoothing.groupOf.assign(faces.size() * 3, 0);
+        // Group 0 is empty: its corners keep their face's own normal.
+        smoothing.start = {0, 0};
+        const auto next = [&smoothing]() { return static_cast<std::uint32_t>(smoothing.start.size() - 1); };
+        const auto close = [&smoothing]() { smoothing.start.push_back(smoothing.neighbours.size()); };
+        // A group of the faces at a place smooth with a face facing `normal`.
+        const auto compared = [&](const std::vector<Corner>& here, Vec3 normal) -> std::uint32_t {
+            if (here.size() > mostCompared) { return 0; }
+            const auto group = next();
+            for (const auto& neighbour : here) {
+                if (own[neighbour.first].dot(normal) >= cosCrease) { smoothing.neighbours.push_back(neighbour); }
+            }
+            close();
+            return group;
+        };
+        const auto plain = [](Vec3 normal) { return normal.finite() && normal.dot(normal) > .5; };
+        struct Way {
+            Vec3 normal;
+            std::uint32_t group = 0;
+            bool mixed = false;
+        };
+        std::vector<Way> ways;
+        std::vector<std::size_t> wayOf;
+        const auto wayFacing = [&](Vec3 normal) {
+            for (std::size_t way = 0; way < ways.size(); ++way) {
+                if (normal.dot(ways[way].normal) >= cosNear) { return way; }
+            }
+            return ways.size();
+        };
+        // Each place's ways, kept for the flat faces' corners there.
+        std::map<detail::Place, std::vector<Way>> placeWays;
+        for (const auto& [place, here] : around) {
+            ways.clear();
+            wayOf.assign(here.size(), std::numeric_limits<std::size_t>::max());
+            for (std::size_t member = 0; grouping && member < here.size() && ways.size() <= mostWays; ++member) {
+                const auto& normal = own[here[member].first];
+                if (!plain(normal)) { continue; }
+                wayOf[member] = wayFacing(normal);
+                if (wayOf[member] == ways.size()) { ways.push_back({normal}); }
+            }
+            if (!grouping || ways.size() > mostWays) {
+                for (const auto& [face, corner] : here) { smoothing.groupOf[static_cast<std::size_t>(face) * 3 + corner] = compared(here, own[face]); }
+                continue;
+            }
+            // Whether each way's faces are all smooth with each other way's.
+            std::vector<std::uint8_t> smooth(ways.size() * ways.size());
+            for (std::size_t one = 0; one < ways.size(); ++one) {
+                for (std::size_t other = 0; other < ways.size(); ++other) {
+                    const auto apart = std::acos(std::clamp(ways[one].normal.dot(ways[other].normal), -1.0, 1.0));
+                    const auto slack = 2 * near + 1.0e-7;
+                    if (apart + slack < crease) {
+                        smooth[one * ways.size() + other] = 1;
+                    } else if (apart - slack <= crease) {
+                        ways[one].mixed = true;
+                    }
                 }
             }
+            for (std::size_t way = 0; way < ways.size(); ++way) {
+                if (ways[way].mixed) { continue; }
+                ways[way].group = next();
+                for (std::size_t member = 0; member < here.size(); ++member) {
+                    // A face with no plain normal (no area) is smooth with all or none alike.
+                    const auto with = wayOf[member] < ways.size() ? smooth[way * ways.size() + wayOf[member]] != 0 : own[here[member].first].dot(ways[way].normal) >= cosCrease;
+                    if (with) { smoothing.neighbours.push_back(here[member]); }
+                }
+                close();
+            }
+            for (std::size_t member = 0; member < here.size(); ++member) {
+                const auto [face, corner] = here[member];
+                const auto way = wayOf[member];
+                smoothing.groupOf[static_cast<std::size_t>(face) * 3 + corner] = way < ways.size() && !ways[way].mixed ? ways[way].group : compared(here, own[face]);
+            }
+            if (!flat.empty()) { placeWays.emplace(place, ways); }
         }
-        smoothing.start.push_back(static_cast<std::uint32_t>(smoothing.neighbours.size()));
+        for (const auto& [face, corner] : flat) {
+            const auto place = detail::placeOf(corners[faces[face][corner]]);
+            const auto at = static_cast<std::size_t>(face) * 3 + corner;
+            const auto found = around.find(place);
+            if (found == around.end()) {
+                smoothing.groupOf[at] = next();
+                smoothing.neighbours.emplace_back(face, corner);
+                close();
+                continue;
+            }
+            const auto known = placeWays.find(place);
+            if (known != placeWays.end() && plain(own[face])) {
+                ways = known->second;
+                const auto way = wayFacing(own[face]);
+                if (way < ways.size() && !ways[way].mixed) {
+                    smoothing.groupOf[at] = ways[way].group;
+                    continue;
+                }
+            }
+            smoothing.groupOf[at] = compared(found->second, own[face]);
+        }
         return smoothing;
     }
 
@@ -863,15 +989,18 @@ struct Smoothing {
             const auto lengths = one.dot(one) * other.dot(other);
             return lengths > 1.0e-300 ? one.cross(other).length() / lengths : 0.0;
         };
+        std::vector<Vec3> sums(start.size() - 1);
+        for (std::size_t group = 0; group + 1 < start.size(); ++group) {
+            Vec3 sum;
+            for (auto neighbour = start[group]; neighbour < start[group + 1]; ++neighbour) {
+                const auto& [face, itsCorner] = neighbours[neighbour];
+                sum = sum + found.faces[face] * weightAt(face, itsCorner);
+            }
+            sums[group] = sum;
+        }
         for (std::size_t index = 0; index < faces.size(); ++index) {
             for (std::size_t corner = 0; corner < 3; ++corner) {
-                const auto at = index * 3 + corner;
-                Vec3 sum;
-                for (auto neighbour = start[at]; neighbour < start[at + 1]; ++neighbour) {
-                    const auto& [face, itsCorner] = neighbours[neighbour];
-                    sum = sum + found.faces[face] * weightAt(face, itsCorner);
-                }
-                found.corners[index][corner] = sum.normalized(1.0e-300).value_or(found.faces[index]);
+                found.corners[index][corner] = sums[groupOf[index * 3 + corner]].normalized(1.0e-300).value_or(found.faces[index]);
             }
         }
         return found;

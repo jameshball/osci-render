@@ -250,6 +250,34 @@ int main() {
         for (const auto turn : {.01, .25, .5, .75}) { check(!same(start, at(turn)), "it morphs on the way round: " + std::to_string(turn)); }
         check(same(at(.3), at(1.3)), "wherever it starts");
     }
+    // A polygon fanned from its first corner into thousands of triangles, the
+    // hub of a solid's cap: its smoothing keeps one group for the hub's many
+    // faces alike (not each with every other) and its normals are the cap's,
+    // and its noise is cut within the pattern's budget.
+    {
+        const auto pi = 3.14159265358979323846;
+        const int sides = 6000;
+        std::vector<Vec3> solid;
+        std::vector<Face> fanned;
+        for (int index = 0; index < sides; ++index) {
+            solid.push_back({std::cos(2 * pi * index / sides), 0, std::sin(2 * pi * index / sides)});
+            solid.push_back({std::cos(2 * pi * index / sides), 1, std::sin(2 * pi * index / sides)});
+        }
+        for (std::uint32_t index = 0; index < static_cast<std::uint32_t>(sides); ++index) {
+            const auto next = (index + 1) % static_cast<std::uint32_t>(sides);
+            fanned.push_back({2 * index, 2 * next, 2 * index + 1});
+            fanned.push_back({2 * next, 2 * next + 1, 2 * index + 1});
+        }
+        for (std::uint32_t index = 1; index + 1 < static_cast<std::uint32_t>(sides); ++index) { fanned.push_back({0, 2 * (index + 1), 2 * index}); }
+        const auto smoothing = Smoothing::of(solid, fanned);
+        check(smoothing.neighbours.size() < fanned.size() * 3 * 4, "smoothing grows with the faces, not their square: " + std::to_string(smoothing.neighbours.size()));
+        const auto normals = smoothing.normals(solid, fanned);
+        for (std::size_t face = 2 * sides; face < fanned.size(); ++face) {
+            for (const auto& normal : normals.corners[face]) { check(std::abs(std::abs(normal.y) - 1) < 1.0e-9, "the cap's corners face along its axis"); }
+        }
+        const auto pieces = pattern(solid, fanned, Pattern::noise, 40, .2);
+        check(!pieces.empty(), "a big fan still has noise");
+    }
     std::cout << "SurfaceLinesTests passed\n";
     return 0;
 }
