@@ -30,8 +30,7 @@ public:
     // Adds the shared "Listen for Special Keys" toggle item.
     void addListenForSpecialKeysMenuItem(int topLevelMenuIndex, CommonAudioProcessor& processor);
     void addProjectMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor);
-    // `sentenceCase` for menus written that way (osci-motion's).
-    void addRecentProjectsSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int recentBaseId, int clearRecentId, bool sentenceCase = false);
+    void addRecentProjectsSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int recentBaseId, int clearRecentId);
     bool handleRecentProjectMenuItem(int menuItemId, CommonAudioProcessor& processor, CommonPluginEditor& editor, int recentBaseId, int clearRecentId);
     void addRecentRecordingsSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int recentBaseId);
     bool handleRecentRecordingMenuItem(int menuItemId, CommonAudioProcessor& processor, int recentBaseId);

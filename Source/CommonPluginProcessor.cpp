@@ -26,7 +26,7 @@ namespace
 {
     osci::LicenseManager::Config makeLicenseManagerConfig() {
         osci::LicenseManager::Config config;
-        config.productSlug = osci::currentProduct().slug;
+        config.productSlug = osci::currentProductSlug();
         return config;
     }
 
@@ -238,7 +238,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
 juce::String CommonAudioProcessor::getProductSlug() const
 {
-    return osci::currentProduct().slug;
+    return osci::currentProductSlug();
 }
 
 int CommonAudioProcessor::getNumRecentProjectFiles() const

@@ -9,9 +9,6 @@
 #include "components/menu/SosciMainMenuBarModel.h"
 #include <osci_gui/osci_gui.h>
 #include "components/ProductUpdateConfig.h"
-#if OSCI_PREMIUM
-class OfflineVisualiserParameters;
-#endif
 
 #if (DEBUG || OSCI_PROFILING) && JUCE_MODULE_AVAILABLE_jucewright
     #include <jucewright/jucewright.h>
@@ -80,13 +77,12 @@ public:
 
 protected:
 #if OSCI_PREMIUM
-    // True when the most recent offline render finished successfully.
-    bool lastOfflineRenderSucceeded() const { return lastOfflineRenderSuccess; }
     // The title over an offline render's progress.
     virtual juce::String offlineRenderTitle() const { return "Render Audio File to Video"; }
     // Completion retains caller resources until the worker and OpenGL renderer
-    // have stopped. It also runs on failed launch/editor teardown: cleanup only.
-    bool startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void()> completion = {}, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot = nullptr);
+    // have stopped, and is told whether the render succeeded. It also runs
+    // (unsuccessful) on failed launch/editor teardown: cleanup only.
+    bool startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void(bool succeeded)> completion = {}, std::shared_ptr<VisualiserParameters> beam = nullptr);
 #endif
     virtual bool openSourceFile(const juce::File& file) = 0;
 
@@ -95,7 +91,6 @@ private:
     int defaultEditorWidth = 0;
     int defaultEditorHeight = 0;
     bool betaUpdatesEnabled = false;
-    bool lastOfflineRenderSuccess = false;
 public:
     PluginLookAndFeel lookAndFeel;
 

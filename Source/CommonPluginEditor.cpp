@@ -1,6 +1,5 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "ProductIdentity.h"
 #include "components/OfflineRenderOverlay.h"
 #include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
@@ -64,16 +63,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
                 // Configure the backing surface before the visualiser is shown.
                 if (FramePresenter::usesNativeSurface()) {
                     dw->setOpaque(false);
-                }
-                // A launch that only renders, from the command line, shows
-                // nothing: its window is there for the renderer to draw into,
-                // unseen, and the app takes no place in the Dock or switcher.
-                const auto* holder = juce::StandalonePluginHolder::getInstance();
-                if (holder != nullptr && holder->commandLine.contains("--render-video")) {
-                    dw->setAlpha(0.0f);
-#if JUCE_MAC
-                    juce::Process::setDockIconVisible(false);
-#endif
                 }
             }
         }
@@ -140,19 +129,11 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     // Enable keyboard focus so F11 key works immediately
     setWantsKeyboardFocus(true);
 
-    if (osci::currentProduct().hostedServicesAvailable) {
-        updatePrompt.showPendingInstallStatusIfNeeded();
-    }
+    updatePrompt.showPendingInstallStatusIfNeeded();
     const juce::Component::SafePointer<CommonPluginEditor> legalOwner(this);
     const auto legalConfig = osci::makeProductUpdateConfig();
     juce::MessageManager::callAsync([legalOwner, legalConfig] {
         if (legalOwner == nullptr) { return; }
-        if (!osci::currentProduct().hostedServicesAvailable) {
-            // A product without hosted legal and update services has nothing
-            // to accept; never query another product's documents.
-            legalOwner->audioProcessor.legalNoticePending.store(false);
-            return;
-        }
         osci::LegalOverlay::ensure(*legalOwner, osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion), [legalOwner, legalConfig] {
             if (legalOwner == nullptr) { return; }
             legalOwner->audioProcessor.legalNoticePending.store(false);
@@ -682,20 +663,20 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
 
 #if OSCI_PREMIUM
-bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void()> completion, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot) {
+bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void(bool succeeded)> completion, std::shared_ptr<VisualiserParameters> beam) {
     // The renderer owns its onFinished closure until after its destructor has
     // joined the worker and detached GL. This guard therefore safely retains
     // temporary signal/soundtrack files through success, cancellation or close.
-    auto completionGuard = std::shared_ptr<void>(nullptr, [completion = std::move(completion)](void*) noexcept {
+    auto succeeded = std::make_shared<bool>(false);
+    auto completionGuard = std::shared_ptr<void>(nullptr, [completion = std::move(completion), succeeded](void*) noexcept {
         if (completion) {
             try {
-                completion();
+                completion(*succeeded);
             } catch (...) {
                 // Resource cleanup must not throw out of component destruction.
             }
         }
     });
-    lastOfflineRenderSuccess = false;
     auto* existing = findActiveOverlay<OfflineRenderOverlay>();
     if (existing != nullptr) {
         existing->toFront(true);
@@ -726,18 +707,18 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
     auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
 
     auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(audioProcessor, audioProcessor.visualiserParameters, audioProcessor.threadManager, inputSignal, muxAudio,
-        outputFile, initialRenderMode, encodingConfiguration, std::move(beamSnapshot));
+        outputFile, initialRenderMode, encodingConfiguration, std::move(beam));
 
     content->setSize(700, 520);
 
-    content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile, completionGuard](OfflineAudioToVideoRendererComponent::Result r) {
+    content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile, completionGuard, succeeded](OfflineAudioToVideoRendererComponent::Result r) {
+        *succeeded = r.success;
         if (safeThis == nullptr) {
             offlineRenderLog.cancelled("result delivery because editor closed");
             return;
         }
 
         *resultHolder = r;
-        safeThis->lastOfflineRenderSuccess = r.success;
 
         if (r.success) {
             offlineRenderLog.completed();

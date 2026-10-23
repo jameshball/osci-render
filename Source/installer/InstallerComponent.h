@@ -69,10 +69,11 @@ namespace osci::installer {
         return path == InstallPath::SosciPremium ? "sosci" : path == InstallPath::OsciMotionPremium ? "osci-motion" : "osci-render";
     }
 
-    // The latest stable release, or a beta one while a product has no stable
-    // release yet (as osci-motion in its beta). `result` says if asking failed.
+    // The latest stable release. Only osci-motion, which has no stable release
+    // yet, falls back to its latest beta. `result` says if asking failed.
     std::optional<osci::VersionInfo> latestInstallable (juce::StringRef product, juce::StringRef variant, juce::Result& result) {
-        for (const auto track : { osci::ReleaseTrack::Stable, osci::ReleaseTrack::Beta }) {
+        const auto tracks = juce::String(product) == "osci-motion" ? std::vector<osci::ReleaseTrack> { osci::ReleaseTrack::Stable, osci::ReleaseTrack::Beta } : std::vector<osci::ReleaseTrack> { osci::ReleaseTrack::Stable };
+        for (const auto track : tracks) {
             osci::UpdateChecker checker;
             auto version = checker.checkForUpdate (product, currentInstallerVersionBaseline(), track, variant);
             result = checker.getLastResult();

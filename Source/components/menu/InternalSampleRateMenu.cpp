@@ -29,7 +29,7 @@ bool getRatioForMenuId(int menuItemId, int baseId, double& selectedRatio) noexce
 }
 
 namespace InternalSampleRateMenu {
-void addSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int baseId, bool sentenceCase) {
+void addSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int baseId) {
     juce::PopupMenu sub;
     const auto currentRatio = processor.getInternalSampleRateRatio();
     const auto& ratios = osci::IntegerRatioSampleRateAdapter::getSupportedRatios();
@@ -46,7 +46,7 @@ void addSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int base
                      std::abs(optionRatio - currentRatio) < ratioEpsilon);
     }
 
-    menu.addSubMenu(sentenceCase ? "Internal sample rate" : "Internal Sample Rate", sub);
+    menu.addSubMenu("Internal Sample Rate", sub);
 }
 
 bool handleMenuId(int menuItemId, int baseId, CommonAudioProcessor& processor, std::function<void()> showPremiumSplashScreen) {

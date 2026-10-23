@@ -635,8 +635,6 @@
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
         <FILE id="oAVr1b" name="OfflineAudioToVideoRenderer.h" compile="0"
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
-        <FILE id="OffVisP1" name="OfflineVisualiserParameters.h" compile="0"
-              resource="0" file="Source/visualiser/OfflineVisualiserParameters.h"/>
         <FILE id="Ju0mVn" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="oFrmPr0" name="FramePresenter.h" compile="0" resource="0"

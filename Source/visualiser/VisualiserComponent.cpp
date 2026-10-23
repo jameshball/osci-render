@@ -251,18 +251,12 @@ VisualiserComponent::~VisualiserComponent() {
 void VisualiserComponent::setFullScreen(bool fullScreen) {
     this->fullScreen = fullScreen;
     hideButtonRow = false;
-    if (controlsHost != nullptr) {
-        // A detached bar comes home while full screen and goes back after.
-        controlsDetached = !fullScreen;
-        if (fullScreen) { addAndMakeVisible(controls); } else { controlsHost->addAndMakeVisible(controls); }
-    }
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
 
     // Release renderingSemaphore to prevent deadlocks during layout changes
     renderingSemaphore.release();
 
     resized();
-    if (controlsHost != nullptr && !fullScreen && onControlsChanged) { onControlsChanged(); }
 }
 
 void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMode)> callback) {
@@ -628,24 +622,9 @@ void VisualiserComponent::resized() {
 
 juce::Component& VisualiserComponent::detachControls(juce::Component& host) {
     controlsDetached = true;
-    controlsHost = &host;
     host.addAndMakeVisible(controls);
     resized();
     return controls;
-}
-
-void VisualiserComponent::setControlStyle(juce::Colour iconColour, int edgeIndent) {
-    fullScreenButton.setColours(iconColour, iconColour);
-    popOutButton.setColours(iconColour, juce::Colours::red);
-    settingsButton.setColours(iconColour, iconColour);
-    audioInputButton.setColours(iconColour, juce::Colours::red);
-    textureOutputButton.setColours(iconColour, juce::Colours::red);
-    for (auto* button : std::initializer_list<juce::DrawableButton*> {&fullScreenButton, &popOutButton, &settingsButton, &audioInputButton, &textureOutputButton, &record}) { button->setEdgeIndent(edgeIndent); }
-}
-
-void VisualiserComponent::setControlButtonsHidden(bool hidden) {
-    controlButtonsHidden = hidden;
-    resized();
 }
 
 void VisualiserComponent::clickControl(Control control, juce::Component* anchor) {
@@ -713,7 +692,7 @@ int VisualiserComponent::placeControls(juce::Rectangle<int> buttons, bool apply)
             if (shown) { component.setBounds(bounds); }
         }
     };
-    const auto showButtons = !(controlButtonsHidden && controlsDetached);
+    const auto showButtons = !controlsDetached;
     place(fullScreenButton, 30, showButtons);
 #if OSCI_PREMIUM
     place(popOutButton, 30, showButtons);

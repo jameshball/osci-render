@@ -72,28 +72,20 @@ public:
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;
-    // Hands the control row (record, texture output, settings, popout, full
-    // screen and the media timeline) to a host that places it elsewhere; the
-    // picture then fills the component. Without this, the row sits under the
-    // picture as before.
-    // The host adds the bar as its own child. While full screen, the bar comes
-    // back under the picture so the controls stay on screen.
+    // Hands the control row to a host that places it elsewhere and draws its
+    // own control buttons; the picture then fills the component. Without
+    // this, the row sits under the picture as before.
+    // The host adds the bar as its own child. While detached, the built-in
+    // buttons hide (the recording stopwatch, ffmpeg download and media
+    // timeline stay) and the host's buttons act through clickControl.
     juce::Component& detachControls(juce::Component& host);
-    // Restyles the control icons for a host with its own visual language.
-    // Without a call the default style stays.
-    void setControlStyle(juce::Colour iconColour, int edgeIndent);
     int controlsPreferredWidth();
-    // For a host that draws its own control buttons: while the bar is
-    // detached its buttons hide (the recording stopwatch, ffmpeg download and
-    // media timeline stay) and the host's buttons act through clickControl.
-    // Full screen brings the built-in buttons back.
     enum class Control { record, textureOutput, settings, popout, fullScreen };
-    void setControlButtonsHidden(bool hidden);
     void clickControl(Control control, juce::Component* anchor);
     bool isControlOn(Control control) const;
     bool hasControl(Control control) const;
     // Called when the detached bar's preferred width changes (a recording
-    // stopwatch or ffmpeg download) or it returns from full screen.
+    // stopwatch or ffmpeg download).
     std::function<void()> onControlsChanged;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
@@ -206,8 +198,6 @@ private:
     };
     ControlBar controls { *this };
     bool controlsDetached = false;
-    bool controlButtonsHidden = false;
-    juce::Component::SafePointer<juce::Component> controlsHost;
     int lastControlsWidth = 0;
     int placeControls(juce::Rectangle<int> area, bool apply);
     void layoutControls();

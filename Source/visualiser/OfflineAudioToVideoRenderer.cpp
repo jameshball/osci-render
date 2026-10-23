@@ -1,6 +1,5 @@
 #include "OfflineAudioToVideoRenderer.h"
 #include "OfflineFrameSchedule.h"
-#include "OfflineVisualiserParameters.h"
 
 #if OSCI_PREMIUM
 
@@ -80,14 +79,14 @@ OfflineAudioToVideoRendererComponent::OfflineAudioToVideoRendererComponent(Commo
                                                                           const juce::File& outputVideoFile,
                                                                           VisualiserRenderer::RenderMode initialRenderMode,
                                                                           VideoEncodingConfiguration encodingConfiguration,
-                                                                          std::shared_ptr<OfflineVisualiserParameters> beamSnapshot)
+                                                                          std::shared_ptr<VisualiserParameters> beam)
     : processor(processor),
       encodingConfiguration(std::move(encodingConfiguration)),
       inputAudioFile(inputAudioFile),
       muxAudioFile(muxAudioFile),
       outputVideoFile(outputVideoFile),
-      beamSnapshot(std::move(beamSnapshot)),
-      preview(this->beamSnapshot != nullptr ? this->beamSnapshot->params : visualiserParameters, threadManager, glReadyEvent),
+      beam(std::move(beam)),
+      preview(this->beam != nullptr ? *this->beam : visualiserParameters, threadManager, glReadyEvent),
       initialRenderMode(initialRenderMode) {
     setOpaque(false);
 

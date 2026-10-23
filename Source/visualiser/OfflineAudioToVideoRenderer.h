@@ -11,8 +11,6 @@
 #include "../video/FFmpegEncoderManager.h"
 #include <osci_file_import/osci_file_import.h>
 
-class OfflineVisualiserParameters;
-
 class OfflineAudioToVideoRendererComponent;
 
 class OfflineAudioToVideoRendererComponent : public juce::Component
@@ -35,7 +33,7 @@ public:
                                         const juce::File& outputVideoFile,
                                         VisualiserRenderer::RenderMode initialRenderMode,
                                         VideoEncodingConfiguration encodingConfiguration,
-                                        std::shared_ptr<OfflineVisualiserParameters> beamSnapshot = nullptr);
+                                        std::shared_ptr<VisualiserParameters> beam = nullptr);
 
     ~OfflineAudioToVideoRendererComponent() override;
 
@@ -88,7 +86,7 @@ private:
     const juce::File outputVideoFile;
 
     // Must outlive preview: its effects/parameter references belong here.
-    const std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
+    const std::shared_ptr<VisualiserParameters> beam;
     juce::WaitableEvent glReadyEvent;
     OfflinePreviewRenderer preview;
 

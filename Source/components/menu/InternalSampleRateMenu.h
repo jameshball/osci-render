@@ -5,7 +5,6 @@
 class CommonAudioProcessor;
 
 namespace InternalSampleRateMenu {
-// `sentenceCase` for menus written that way (osci-motion's).
-void addSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int baseId, bool sentenceCase = false);
+void addSubmenu(juce::PopupMenu& menu, CommonAudioProcessor& processor, int baseId);
 bool handleMenuId(int menuItemId, int baseId, CommonAudioProcessor& processor, std::function<void()> showPremiumSplashScreen);
 }

@@ -1,19 +1,13 @@
 #pragma once
 
 namespace osci {
-struct ProductIdentity {
-    const char* name;
-    const char* slug;
-    bool hostedServicesAvailable;
-};
-
-inline constexpr ProductIdentity currentProduct() {
+inline constexpr const char* currentProductSlug() {
 #if defined(OSCI_MOTION)
-    return { "osci-motion", "osci-motion", true };
+    return "osci-motion";
 #elif defined(SOSCI)
-    return { "sosci", "sosci", true };
+    return "sosci";
 #else
-    return { "osci-render", "osci-render", true };
+    return "osci-render";
 #endif
 }
 }
