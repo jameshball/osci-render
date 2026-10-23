@@ -267,8 +267,9 @@ juce::File CommonAudioProcessor::getRecentProjectFile(int index) const
 
 void CommonAudioProcessor::addRecentProjectFile(const juce::File& file)
 {
-    if (file == juce::File() || !remembersFiles)
+    if (file == juce::File() || !remembersFiles) {
         return;
+    }
 
     recentProjectFiles.addFile(file);
 

@@ -61,7 +61,6 @@ public:
     void mouseUp(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
-    bool isRecording() const { return recordingController.isRecording(); }
     void popoutUpdated();
     void setPopoutAlwaysOnTop(bool alwaysOnTop);
     bool isPopoutAlwaysOnTop() const;

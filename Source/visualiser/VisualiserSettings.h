@@ -228,6 +228,8 @@ private:
 class SettingsWindow : public juce::DialogWindow {
 public:
     SettingsWindow(juce::String name, VisualiserSettings& component, int windowWidth, int windowHeight, int maximumWindowWidth) : juce::DialogWindow(name, osci::Colours::darker(), true, true), component(component) {
+        // Its own window has no osci look to take the fade's colour from.
+        viewport.setColour(osci::scrollFadeOverlayBackgroundColourId, osci::Colours::darker());
         setContentNonOwned(&viewport, false);
         centreWithSize(windowWidth, windowHeight);
         setResizeLimits(windowWidth, windowHeight, maximumWindowWidth, juce::jmax(windowHeight, component.getPreferredHeight(windowWidth)));

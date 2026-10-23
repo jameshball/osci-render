@@ -34,6 +34,9 @@ class MacFramePresenter final : public FramePresenter, private juce::AsyncUpdate
     juce::Colour backgroundColour;
     OsciGpuPresentationView* view = nil;
     NSView* peerView = nil;
+    // The context whose drawable is hidden, and that drawable.
+    NSOpenGLContext* hiddenContext = nil;
+    NSView* hiddenView = nil;
     std::array<Slot, 3> slots;
     std::atomic<int> pending{-1};
     int displayed = -1;
@@ -58,14 +61,25 @@ public:
         view.layer.contents = nil;
         [view removeFromSuperview];
         [view release];
+        [hiddenView release];
+        [hiddenContext release];
         for (auto& slot : slots) {
             if (slot.surface != nullptr) { CFRelease(slot.surface); }
         }
     }
     void resized(juce::Rectangle<int> area, juce::Colour background) override {
         // Hide only the native drawable; hiding the JUCE host stops rendering.
+        // Asking a context for its view takes the context's lock, which the GL
+        // thread holds through each frame, so a slow frame would stall this
+        // (message) thread: ask once per context, then hide the view kept.
         auto* nativeContext = static_cast<NSOpenGLContext*>(context.getRawContext());
-        [nativeContext.view setHidden:YES];
+        if (nativeContext != hiddenContext || hiddenView == nil) {
+            [hiddenView release];
+            [hiddenContext release];
+            hiddenContext = [nativeContext retain];
+            hiddenView = [nativeContext.view retain];
+        }
+        [hiddenView setHidden:YES];
         auto* peer = owner.getPeer();
         auto* native = peer != nullptr ? static_cast<NSView*>(peer->getNativeHandle()) : nil;
         auto* parent = native.superview;

@@ -266,11 +266,13 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
 }
 
 void MainMenuBarModel::setMenuItemEnabled(int topLevelMenuIndex, const juce::String& name, std::function<bool()> isEnabled) {
-    if (topLevelMenuIndex < 0 || topLevelMenuIndex >= (int) menuItems.size())
+    if (topLevelMenuIndex < 0 || topLevelMenuIndex >= (int) menuItems.size()) {
         return;
+    }
     for (auto& item : menuItems[(size_t) topLevelMenuIndex]) {
-        if (item.name == name)
+        if (item.name == name) {
             item.isEnabled = isEnabled;
+        }
     }
 }
 
