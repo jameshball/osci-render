@@ -99,7 +99,7 @@ try:
     step("raise it more", "mouse-move", x, edge - 10)
     step("dragging screenshot", "screenshot", "--file", session.artifact_dir / "dragging.png", "--scale", "2")
     step("let go", "mouse-up", x, edge - 10)
-    session.wait_for_undo("Change Beam")
+    session.wait_for_undo("Change Beam share")
     raised = beam_value()
     if not raised > before:
         raise RuntimeError(f"Raising the edge should raise the clip's Beam ({before} -> {raised})")
@@ -110,7 +110,7 @@ try:
     step("key the beam", "click-xy", x + 80, edge, "--modifiers", "cmd")
     step("keyed screenshot", "screenshot", "--file", session.artifact_dir / "keyed.png", "--scale", "2")
     # Keyed, Properties offers its key navigation.
-    command("wait-for-locator", "--component-name", "Next beam key", "--exact", "--timeout-ms", 5000)
+    command("wait-for-locator", "--component-name", "Next beam share key", "--exact", "--timeout-ms", 5000)
     step("undo the key", "click", "--name", "Undo", "--exact")
     step("undo the drag", "click", "--name", "Undo", "--exact")
     session.wait_for_undo("Import source")

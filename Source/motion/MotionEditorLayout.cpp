@@ -97,8 +97,6 @@ void MotionEditor::resized() {
     auto header = timeline.removeFromTop(30);
     timelineHeader.setBounds(header);
     timelineTabs.setBounds(header.removeFromLeft(timelineTabs.preferredWidth()));
-    cancelExport.setBounds(header.removeFromRight(62).reduced(2));
-    exportBar.setBounds(header.removeFromRight(180).reduced(2));
     const bool nested = processor.document.editingComposition() != 0;
     scopeBack.setVisible(nested);
     scopeLabel.setVisible(nested);
@@ -150,7 +148,7 @@ void MotionEditor::resized() {
     // The header has the title at its left; at its right the tools, then
     // what remains of the visualiser's own bar (the recording stopwatch, an
     // ffmpeg download). The title gives way first; on a Scope narrower still
-    // the tools float in its picture, as they do full screen.
+    // the tools float in its picture.
     {
         const auto controlsHere = visualiserControls != nullptr && visualiserControls->getParentComponent() == this;
         const auto controlsWidth = controlsHere ? visualiser.controlsPreferredWidth() : 0;
@@ -160,7 +158,9 @@ void MotionEditor::resized() {
         // Floating, inside the Scope: over an OpenGL view on Windows nothing
         // else would show.
         auto& host = docked ? static_cast<juce::Component&>(*this) : static_cast<juce::Component&>(visualiser);
-        if (scopeTools.getParentComponent() != &host) { host.addAndMakeVisible(scopeTools); }
+        if (scopeTools.getParentComponent() != &host) { host.addChildComponent(scopeTools); }
+        // Full screen, the transport is the only bar.
+        scopeTools.setVisible(!scopeFullScreen);
         if (controlsHere) {
             const auto width = std::min(controlsWidth, std::max(0, bar.getWidth()));
             visualiserControls->setBounds(bar.removeFromRight(width).withSizeKeepingCentre(width, 24));
@@ -199,20 +199,19 @@ void MotionEditor::resized() {
         sceneEditor->setBounds(viewportBounds);
         for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &partPickTools, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
     }
-    // Full screen, the Scope covers everything; its strip floats at the top
-    // right and fades with the transport, with the recording stopwatch
-    // beside it, which stays.
+    // Full screen, the Scope covers everything with its transport along the
+    // foot (the tool strip is hidden); the recording stopwatch, which stays,
+    // sits at the top right.
     if (scopeFullScreen) {
         visualiser.setBounds(getLocalBounds());
         visualiser.toFront(false);
-        scopeTools.setBounds(getWidth() - 8 - scopeTools.preferredWidth(), 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
         // The transport along the foot, as wide as reads well.
         const auto transportWidth = std::min(720, getWidth() - 32);
         scopeTransport.setBounds((getWidth() - transportWidth) / 2, getHeight() - 16 - MotionScopeTransport::preferredHeight, transportWidth, MotionScopeTransport::preferredHeight);
         scopeTransport.toFront(false);
         if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
             const auto width = visualiser.controlsPreferredWidth();
-            visualiserControls->setBounds(scopeTools.getX() - 8 - width, 8, width, 24);
+            visualiserControls->setBounds(getWidth() - 8 - width, 8, width, 24);
             visualiserControls->toFront(false);
         }
     }

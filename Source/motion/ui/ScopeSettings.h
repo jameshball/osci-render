@@ -39,22 +39,26 @@ private:
 };
 }
 
-// Below the Scope's animated rows, its few fixed options on the same grid:
-// the overlay drawn over the beam, upsampling, whether the display has a
-// brightness input or is XY only, and the project's scope timing (dwell,
-// travel, settle) with presets for common displays. Timing edits are one
-// undo step each; drags preview live and commit once.
+// Below the Scope's animated rows (its Picture), its few fixed options on
+// the same grid. Display: the overlay drawn over the beam, upsampling, and
+// sharing the picture with other apps. Jumps: whether the display has a
+// brightness input or is XY only, then the project's scope timing at each
+// jump (dwell, travel, settle) with presets for common displays. Timing
+// edits are one undo step each; drags preview live and commit once.
 class MotionScopePanel final : public juce::Component, private juce::ChangeListener, private juce::AudioProcessorParameter::Listener, private juce::AsyncUpdater {
 public:
     // The scope has just been set to XY only.
     std::function<void()> onXYOnly;
+    // Share picture was clicked: the visualiser turns sharing on or off (or
+    // explains it is a premium feature).
+    std::function<void()> onSharePicture;
     explicit MotionScopePanel(MotionProcessor& owner) : processor(owner) {
         setName("Scope options");
-        for (auto [label, text] : {std::pair {&displayTitle, "Display"}, std::pair {&timingTitle, "Timing"}}) {
+        for (auto [label, text] : {std::pair {&displayTitle, "Display"}, std::pair {&jumpsTitle, "Jumps"}}) {
             motion::style::inspector::styleHeading(*label, text);
             addAndMakeVisible(*label);
         }
-        for (auto [label, text] : {std::pair {&overlayCaption, "Overlay"}, std::pair {&upsampleCaption, "Upsample"}, std::pair {&xyCaption, "XY only"}}) { caption(*label, text); }
+        for (auto [label, text] : {std::pair {&overlayCaption, "Overlay"}, std::pair {&upsampleCaption, "Upsample"}, std::pair {&shareCaption, "Share picture"}, std::pair {&xyCaption, "XY only"}}) { caption(*label, text); }
         xyOnly.setName("Scope XY only");
         xyOnly.setTitle("Scope XY only");
         xyOnly.setTooltip("For a scope with no brightness input: the beam never waits dark, and brightness shows by how slowly a line is drawn");
@@ -83,6 +87,10 @@ public:
             processor.visualiserParameters.upsamplingEnabled->setBoolValueNotifyingHost(upsample.getToggleState());
         };
         addAndMakeVisible(upsample);
+        sharePicture.setTooltip("Send the Scope's picture to other apps (Syphon on macOS, Spout on Windows)");
+        // The switch then follows what the visualiser does (setSharingPicture).
+        sharePicture.onClick = [this] { if (onSharePicture) { onSharePicture(); } };
+        addAndMakeVisible(sharePicture);
         for (std::size_t index = 0; index < fields.size(); ++index) {
             auto& field = fields[index];
             const auto& spec = specs[index];
@@ -121,9 +129,12 @@ public:
     // panel, the heading, then rows on the grid.
     static constexpr int rowHeight = motion::style::controlHeight, rowGap = motion::style::gap;
     static constexpr int hairline = motion::style::gap, headingTop = 10, headingHeight = 26, headingBlock = headingHeight + motion::style::gap, sectionEnd = motion::style::padding + motion::style::gap;
-    // Each section has three rows: Overlay, Upsample and XY only; Dwell, Travel and Settle.
-    static constexpr int rowsPerSection = 3;
-    static constexpr int preferredHeight() { return hairline + 2 * (headingBlock + rowsPerSection * rowHeight + (rowsPerSection - 1) * rowGap) + sectionEnd; }
+    // Display has three rows (Overlay, Upsample, Share picture); Jumps has
+    // four (XY only, Dwell, Travel per unit, Settle).
+    static constexpr int displayRows = 3, jumpRows = 4;
+    static constexpr int preferredHeight() { return hairline + 2 * headingBlock + (displayRows + jumpRows) * rowHeight + (displayRows + jumpRows - 2) * rowGap + sectionEnd; }
+    // Whether the visualiser is sharing the picture, however it started.
+    void setSharingPicture(bool on) { sharePicture.setToggleState(on, juce::dontSendNotification); }
     void paint(juce::Graphics& g) override {
         g.setColour(motion::style::hairline());
         for (const auto y : rules) { g.fillRect(0, y, getWidth(), 1); }
@@ -174,12 +185,16 @@ public:
         auto overlayRow = line(overlayCaption);
         // Choices span the value columns, ending where the values do.
         overlay.setBounds(overlayRow.withX(area.getX() + grid.column + motion::style::gap).withRight(area.getX() + grid.value + grid.column));
-        auto upsampleRow = line(upsampleCaption);
-        upsample.setBounds(upsampleRow.withX(area.getX() + grid.value + grid.column - motion::ui::Switch::width - 2).withWidth(motion::ui::Switch::width + 2));
-        auto xyRow = line(xyCaption);
-        xyOnly.setBounds(xyRow.withX(area.getX() + grid.value + grid.column - motion::ui::Switch::width - 2).withWidth(motion::ui::Switch::width + 2));
-        auto title = section(timingTitle, 1);
+        // Switches end where the values do.
+        const auto switchRow = [&](juce::Label& caption, motion::ui::Switch& control) {
+            control.setBounds(line(caption).withX(area.getX() + grid.value + grid.column - motion::ui::Switch::width - 2).withWidth(motion::ui::Switch::width + 2));
+        };
+        switchRow(upsampleCaption, upsample);
+        switchRow(shareCaption, sharePicture);
+        auto title = section(jumpsTitle, 1);
         presets.setBounds(title.withTrimmedTop(headingTop).withHeight(headingHeight - headingTop).withX(area.getX() + grid.value + grid.column - presets.idealWidth()).withWidth(presets.idealWidth()));
+        // XY only first: it turns off the rows below it.
+        switchRow(xyCaption, xyOnly);
         for (auto& field : fields) { field.editor.setBounds(line(field.caption).withX(area.getX() + grid.value).withWidth(grid.column)); }
         repaint();
     }
@@ -255,9 +270,9 @@ private:
     }
 
     MotionProcessor& processor;
-    juce::Label displayTitle, timingTitle, overlayCaption, upsampleCaption, xyCaption;
+    juce::Label displayTitle, jumpsTitle, overlayCaption, upsampleCaption, shareCaption, xyCaption;
     juce::ComboBox overlay;
-    motion::ui::Switch upsample {"Upsample audio"}, xyOnly {"Scope XY only"};
+    motion::ui::Switch upsample {"Upsample audio"}, sharePicture {"Share picture"}, xyOnly {"Scope XY only"};
     std::array<int, 2> rules {};
     std::array<Field, 3> fields;
     motion::scope::MenuLink presets {"Presets"};

@@ -36,10 +36,11 @@ private:
 
 // The full-screen Scope's transport, along its foot as a video player's is:
 // go to start, play or pause, go to end, a bar to seek through the whole
-// composition (its loop shaded), the time, and the speed. It shows while the
-// pointer moves over the picture and fades once it rests, so the picture is
-// all there is the rest of the time. A child of the Scope, so an OpenGL view
-// never covers it.
+// composition (its loop shaded), the time, the speed, and the way out of
+// full screen (as Escape is): the full-screen Scope's only bar. It shows
+// while the pointer moves over the picture and fades once it rests, so the
+// picture is all there is the rest of the time. A child of the Scope, so an
+// OpenGL view never covers it.
 class MotionScopeTransport final : public juce::Component, private juce::Timer {
 public:
     MotionScopeTransport() {
@@ -47,7 +48,8 @@ public:
         start.setTooltip("Go to start (Home)");
         end.setTooltip("Go to end (End)");
         play.setTooltip("Play / pause (Space)");
-        for (auto* button : std::initializer_list<juce::Button*> {&start, &play, &end, &speed}) {
+        exitFullScreen.setTooltip("Exit full screen (Esc)");
+        for (auto* button : std::initializer_list<juce::Button*> {&start, &play, &end, &speed, &exitFullScreen}) {
             button->setWantsKeyboardFocus(false);
             addAndMakeVisible(button);
         }
@@ -55,8 +57,9 @@ public:
         end.onClick = [this] { if (onEnd) { onEnd(); } };
         play.onClick = [this] { if (onPlay) { onPlay(); } };
         speed.onClick = [this] { if (onSpeedMenu) { onSpeedMenu(speed); } };
+        exitFullScreen.onClick = [this] { if (onExit) { onExit(); } };
         // On its buttons is still on it.
-        for (auto* button : std::initializer_list<juce::Component*> {&start, &play, &end, &speed}) { button->addMouseListener(&buttonHover, false); }
+        for (auto* button : std::initializer_list<juce::Component*> {&start, &play, &end, &speed, &exitFullScreen}) { button->addMouseListener(&buttonHover, false); }
         setAlpha(0.0f);
         setInterceptsMouseClicks(false, false);
     }
@@ -67,15 +70,9 @@ public:
         picture.addMouseListener(&pointer, true);
     }
 
-    std::function<void()> onStart, onEnd, onPlay;
+    std::function<void()> onStart, onEnd, onPlay, onExit;
     std::function<void(double)> onSeek;
     std::function<void(juce::Component&)> onSpeedMenu;
-    // As it fades in and out, and starts or stops taking clicks, so the
-    // full-screen Scope's tool strip can follow.
-    std::function<void(float alpha, bool interactive)> onFade;
-    // True while the pointer rests on something else that keeps it shown
-    // (that tool strip).
-    std::function<bool()> holds;
 
     struct State {
         double position = 0, duration = 0, loopStart = 0, loopEnd = 0, speed = 1;
@@ -142,6 +139,8 @@ public:
         auto area = getLocalBounds().reduced(6, 0);
         const auto cell = juce::Rectangle<int>(0, 0, 28, 28);
         for (auto* button : std::initializer_list<juce::Component*> {&start, &play, &end}) { button->setBounds(cell.withCentre({area.removeFromLeft(30).getCentreX(), area.getCentreY()})); }
+        // The way out at the far right, as a video player has it.
+        exitFullScreen.setBounds(cell.withCentre({area.removeFromRight(30).getCentreX(), area.getCentreY()}));
         speed.setBounds(area.removeFromRight(38).withSizeKeepingCentre(34, 22));
     }
     void mouseDown(const juce::MouseEvent& event) override {
@@ -174,7 +173,7 @@ public:
 private:
     void timerCallback() override {
         // Held up while the pointer is on it or seeking; otherwise two seconds.
-        if (hovered || scrubbing || (holds && holds())) { lastActivity = juce::Time::getMillisecondCounterHiRes(); }
+        if (hovered || scrubbing) { lastActivity = juce::Time::getMillisecondCounterHiRes(); }
         const auto idle = juce::Time::getMillisecondCounterHiRes() - lastActivity;
         const auto target = idle < 2000 ? 1.0f : 0.0f;
         const auto alpha = getAlpha();
@@ -186,7 +185,6 @@ private:
     void show(float alpha, bool interactive) {
         setAlpha(alpha);
         setInterceptsMouseClicks(interactive, interactive);
-        if (onFade) { onFade(alpha, interactive); }
     }
     // Where the bar runs: between the buttons and the time, the length and the speed.
     juce::Rectangle<float> trackArea() const {
@@ -235,6 +233,7 @@ private:
     juce::Component::SafePointer<juce::Component> watched;
     static constexpr float timeWidth = 60.0f;
     motion::icons::Button start {"Go to start", motion::icons::Icon::start}, play {"Play", motion::icons::Icon::play}, end {"Go to end", motion::icons::Icon::end};
+    motion::icons::Button exitFullScreen {"Exit full screen", motion::icons::Icon::fullscreenExit};
     MotionSpeedChip speed;
     State state;
     double lastActivity = 0, scrubTime = 0;

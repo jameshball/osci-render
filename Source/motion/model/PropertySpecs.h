@@ -59,7 +59,7 @@ inline constexpr auto objectPropertySpecs = std::to_array<PropertySpec>({
     {"anchor.x", "Anchor X", "Anchor", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"anchor.y", "Anchor Y", "Anchor", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"anchor.z", "Anchor Z", "Anchor", "Z", -unbounded, unbounded, 0, .01, 3, ""},
-    {"beam", "Beam", "Beam", "", 0, maximumBeam, 1, .01, 2, "×"},
+    {"beam", "Beam share", "Beam share", "", 0, maximumBeam, 1, .01, 2, "×"},
     {"lit", "Lit by lights", "Lit by lights", "", 0, 100, 100, 1, 0, "%"},
     {"reflects", "Mirror", "Mirror", "", 0, 100, 0, 1, 0, "%"},
     {"solid", "Solid", "Solid", "", 0, 100, 100, 1, 0, "%"},

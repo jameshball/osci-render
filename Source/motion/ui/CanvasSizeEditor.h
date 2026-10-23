@@ -84,15 +84,16 @@ private:
     motion::ui::ScrubField width, height;
 };
 
-// The output canvas, from the Scope's tools.
+// The output canvas at any size, from Custom... in the composition's Canvas
+// field.
 class MotionCanvasSettings final : public motion::ui::Popover {
 public:
-    explicit MotionCanvasSettings(VisualiserRenderSize size) : Popover("Output canvas", "Apply", "Apply canvas"), canvas(size, caption, row, rowGap) {
+    explicit MotionCanvasSettings(VisualiserRenderSize size) : Popover("Canvas", "Apply", "Apply canvas"), canvas(size, caption, row, rowGap) {
         addAndMakeVisible(canvas);
         canvas.onChange = [this] { setError({}); };
         primary.onClick = [this] {
             const auto value = canvas.value();
-            if (!value.has_value()) { setError("Even sizes, 128-4096 px"); return; }
+            if (!value.has_value()) { setError(juce::String::fromUTF8("Even sizes, 128\xe2\x80\x93" "4096 px")); return; }
             if (onApply) { onApply(*value); }
         };
         setSize(widthFor(284), heightFor(MotionCanvasSizeEditor::rows));
