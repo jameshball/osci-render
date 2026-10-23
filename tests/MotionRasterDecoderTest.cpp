@@ -1,6 +1,6 @@
 #include <JuceHeader.h>
 #include "RepositoryRoot.h"
-#include <osci_file_import/img/osci_RasterDecoder.h>
+#include "../Source/motion/import/RasterDecoder.h"
 
 namespace motion_raster_test {
 using Bytes = std::vector<std::uint8_t>;
@@ -35,7 +35,7 @@ static void frame(Bytes& bytes, unsigned x, unsigned y, unsigned width, unsigned
     }
     bytes.push_back(0);
 }
-static osci::RasterDecoder::Result decode(Bytes bytes) { bytes.push_back(0x3b); return osci::RasterDecoder::decode(bytes.data(), bytes.size()); }
+static motion::RasterDecoder::Result decode(Bytes bytes) { bytes.push_back(0x3b); return motion::RasterDecoder::decode(bytes.data(), bytes.size()); }
 // Independent reference for this test's generated 2x2 RGBA8 PNG: inflate IDAT
 // through JUCE/zlib and reverse the first scanline's PNG filter. This inspects
 // the writer's straight-alpha bytes without using our stb-backed decoder.
@@ -62,7 +62,7 @@ static std::optional<std::array<std::uint8_t, 8>> pngFirstRow(const void* source
     }
     return row;
 }
-static juce::Colour pixel(const osci::RasterImage& image, std::size_t frame, unsigned x, unsigned y = 0) {
+static juce::Colour pixel(const motion::RasterImage& image, std::size_t frame, unsigned x, unsigned y = 0) {
     const auto offset = (static_cast<std::size_t>(y) * image.width + x) * 4;
     const auto* p = image.frames[frame].rgba.data() + offset;
     return juce::Colour(p[0], p[1], p[2], p[3]);
@@ -96,7 +96,7 @@ public:
         juce::MemoryOutputStream png;
         juce::PNGImageFormat pngFormat;
         expect(pngFormat.writeImageToStream(input, png));
-        const auto decodedPng = osci::RasterDecoder::decode(png.getData(), png.getDataSize());
+        const auto decodedPng = motion::RasterDecoder::decode(png.getData(), png.getDataSize());
         expect(static_cast<bool>(decodedPng), juce::String(decodedPng.error));
         if (decodedPng) {
             expectEquals(static_cast<int>(decodedPng.image->width), 2);
@@ -117,7 +117,7 @@ public:
         juce::JPEGImageFormat jpegFormat;
         juce::Image solid(juce::Image::RGB, 8, 8, true); solid.clear(solid.getBounds(), juce::Colours::red);
         expect(jpegFormat.writeImageToStream(solid, jpeg));
-        const auto decodedJpeg = osci::RasterDecoder::decode(jpeg.getData(), jpeg.getDataSize());
+        const auto decodedJpeg = motion::RasterDecoder::decode(jpeg.getData(), jpeg.getDataSize());
         expect(static_cast<bool>(decodedJpeg), juce::String(decodedJpeg.error));
         if (decodedJpeg) { expect(pixel(*decodedJpeg.image, 0, 0).getRed() > 245); expectEquals(static_cast<int>(pixel(*decodedJpeg.image, 0, 0).getAlpha()), 255); }
 
@@ -179,7 +179,7 @@ public:
             "wDq0WBstQKIHEiFw6mARd51nAwnwuHnxCvxGAQROaVBAVNd1cK4CCAwNutL3Yn5BjfMlIK5L9VVwAWAN1D1A7NWFpOGsFDQ1QAT4"
             "qtaxGKKxhwhgAFIpQFgM8Lh9KYkBCwgIADs="
         ));
-        const auto dictionary = osci::RasterDecoder::decode(dictionaryGif.getData(), dictionaryGif.getDataSize());
+        const auto dictionary = motion::RasterDecoder::decode(dictionaryGif.getData(), dictionaryGif.getDataSize());
         expect(static_cast<bool>(dictionary), juce::String(dictionary.error));
         if (dictionary) {
             std::uint32_t state = 17;
@@ -203,7 +203,7 @@ public:
             const auto file = fixtureDirectory.getChildFile(name);
             juce::MemoryBlock encodedFixture;
             expect(file.loadFileAsData(encodedFixture), "Could not load fixture: " + file.getFullPathName());
-            const auto decoded = osci::RasterDecoder::decode(encodedFixture.getData(), encodedFixture.getSize());
+            const auto decoded = motion::RasterDecoder::decode(encodedFixture.getData(), encodedFixture.getSize());
             expect(static_cast<bool>(decoded), juce::String(decoded.error));
             if (!decoded) { continue; }
             const auto random = juce::String(name) == "lzw_saturation.gif";
@@ -236,8 +236,8 @@ public:
 
         beginTest("Malformed inputs, bounds and cancellation return no partial images");
         animation.push_back(0x3b);
-        for (std::size_t count = 0; count < animation.size(); ++count) { expect(!osci::RasterDecoder::decode(animation.data(), count)); }
-        auto invalid = animation; invalid.push_back(0); expect(!osci::RasterDecoder::decode(invalid.data(), invalid.size()));
+        for (std::size_t count = 0; count < animation.size(); ++count) { expect(!motion::RasterDecoder::decode(animation.data(), count)); }
+        auto invalid = animation; invalid.push_back(0); expect(!motion::RasterDecoder::decode(invalid.data(), invalid.size()));
         auto huge = gif(65535, 65535); expect(!decode(huge));
         auto beyondCanvas = gif(1, 1); frame(beyondCanvas, 1, 0, 1, 1, { 1 }); expect(!decode(beyondCanvas));
         auto shortRaster = gif(2, 1); frame(shortRaster, 0, 0, 2, 1, { 1 }); expect(!decode(shortRaster));
@@ -250,14 +250,14 @@ public:
         for (int i = 0; i < 10001; ++i) { frame(tooMany, 0, 0, 1, 1, { 1 }); }
         expect(!decode(tooMany));
         std::atomic<bool> cancel { true };
-        expect(!osci::RasterDecoder::decode(animation.data(), animation.size(), &cancel));
-        expect(!osci::RasterDecoder::decode(png.getData(), png.getDataSize(), &cancel));
-        expect(!osci::RasterDecoder::decode(jpeg.getData(), jpeg.getDataSize() - 1));
-        expect(!osci::RasterDecoder::decode(png.getData(), png.getDataSize() - 1));
+        expect(!motion::RasterDecoder::decode(animation.data(), animation.size(), &cancel));
+        expect(!motion::RasterDecoder::decode(png.getData(), png.getDataSize(), &cancel));
+        expect(!motion::RasterDecoder::decode(jpeg.getData(), jpeg.getDataSize() - 1));
+        expect(!motion::RasterDecoder::decode(png.getData(), png.getDataSize() - 1));
         auto damagedPng = png.getMemoryBlock(); static_cast<std::uint8_t*>(damagedPng.getData())[damagedPng.getSize() - 1] ^= 1;
-        expect(!osci::RasterDecoder::decode(damagedPng.getData(), damagedPng.getSize()));
-        expect(!osci::RasterDecoder::decode(nullptr, 1));
-        expect(!osci::RasterDecoder::decode(animation.data(), osci::RasterDecoder::maximumEncodedBytes + 1));
+        expect(!motion::RasterDecoder::decode(damagedPng.getData(), damagedPng.getSize()));
+        expect(!motion::RasterDecoder::decode(nullptr, 1));
+        expect(!motion::RasterDecoder::decode(animation.data(), motion::RasterDecoder::maximumEncodedBytes + 1));
     }
 };
 static MotionRasterDecoderTest motionRasterDecoderTest;

@@ -4,7 +4,7 @@
 #include "../model/PreparedSource.h"
 #include "../model/RasterSettings.h"
 #include "RasterBeamBuilder.h"
-#include <osci_file_import/osci_file_import.h>
+#include "RasterDecoder.h"
 #include <atomic>
 
 namespace motion {
@@ -19,7 +19,7 @@ public:
     static Result prepare(const void* data, std::size_t bytes, const RasterSettings& settings, const std::atomic<bool>* cancel = nullptr, std::atomic<double>* progress = nullptr) {
         const auto error = settings.validate();
         if (!error.empty()) { return {nullptr, error}; }
-        const auto decoded = osci::RasterDecoder::decode(data, bytes, cancel);
+        const auto decoded = RasterDecoder::decode(data, bytes, cancel);
         if (!decoded) { return {nullptr, decoded.error}; }
         const auto& image = *decoded.image;
         std::vector<std::uint32_t> delays;
