@@ -439,6 +439,10 @@
             resource="0" file="Source/motion/MotionEditorPanels.cpp"/>
       <FILE id="MotMotionEditorSourcescpp" name="MotionEditorSources.cpp"
             compile="1" resource="0" file="Source/motion/MotionEditorSources.cpp"/>
+      <FILE id="MotOutputChannelscpp" name="OutputChannels.cpp" compile="1"
+            resource="0" file="Source/motion/OutputChannels.cpp"/>
+      <FILE id="MotOutputChannelsh" name="OutputChannels.h" compile="0" resource="0"
+            file="Source/motion/OutputChannels.h"/>
       <FILE id="MotionMotionProcessorcpp" name="MotionProcessor.cpp" compile="1"
             resource="0" file="Source/motion/MotionProcessor.cpp"/>
       <FILE id="MotionMotionProcessorh" name="MotionProcessor.h" compile="0"
@@ -474,6 +478,10 @@
               resource="0" file="Source/motion/import/LuaSliderBakes.h"/>
         <FILE id="MotimportRasterBeamBuilderh" name="RasterBeamBuilder.h" compile="0"
               resource="0" file="Source/motion/import/RasterBeamBuilder.h"/>
+        <FILE id="MotimportRasterDecodercpp" name="RasterDecoder.cpp" compile="1"
+              resource="0" file="Source/motion/import/RasterDecoder.cpp"/>
+        <FILE id="MotimportRasterDecoderh" name="RasterDecoder.h" compile="0"
+              resource="0" file="Source/motion/import/RasterDecoder.h"/>
         <FILE id="MotimportRasterSourcePreparerh" name="RasterSourcePreparer.h"
               compile="0" resource="0" file="Source/motion/import/RasterSourcePreparer.h"/>
         <FILE id="MotimportSourceDecodingcpp" name="SourceDecoding.cpp" compile="1"
@@ -482,6 +490,10 @@
               resource="0" file="Source/motion/import/SourceDecoding.h"/>
         <FILE id="MotimportVideoSourcePreparerh" name="VideoSourcePreparer.h"
               compile="0" resource="0" file="Source/motion/import/VideoSourcePreparer.h"/>
+        <GROUP id="MotimportThirdParty" name="third_party">
+          <FILE id="MotimportStbImageh" name="stb_image.h" compile="0" resource="0"
+                file="Source/motion/import/third_party/stb/stb_image.h"/>
+        </GROUP>
       </GROUP>
       <GROUP id="MotionSrcLive" name="live">
         <FILE id="MotliveBlenderCaptureh" name="BlenderCapture.h" compile="0"

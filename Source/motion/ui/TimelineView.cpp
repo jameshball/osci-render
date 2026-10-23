@@ -272,7 +272,7 @@ void MotionTimelineView::toggleLanesForSelection() {
 }
 
 void MotionTimelineView::setTool(Tool next) {
-    cancelGesture();
+    cancelClipGesture();
     tool = next;
     updateToolButtons();
     repaint();
@@ -337,6 +337,7 @@ void MotionTimelineView::refreshTracks() {
             header->onMenu = [this](motion::Id id) { showTrackMenu(id); };
             // A track or group name selects it, to show its effects.
             header->onSelect = [this](motion::Id id, juce::ModifierKeys mods) { pickTrack(id, mods); };
+            header->isPicked = [this](motion::Id id) { return selectedTracks.contains(id) || (selectedTracks.empty() && selected == id); };
             header->onCollapse = [this](motion::Id id) {
                 if (collapsedGroups.contains(id)) { collapsedGroups.erase(id); } else { collapsedGroups.insert(id); }
                 refreshTracks();
@@ -355,7 +356,7 @@ void MotionTimelineView::refreshTracks() {
             headers.push_back(std::move(header));
             found = headers.end() - 1;
         }
-        const auto lanes = group ? false : !trackLanes(project, track).empty();
+        const auto lanes = !group && hasLanes(track);
         (*found)->update(track, group, collapsedGroups.contains(track.id), lanes, expandedTracks.contains(track.id));
     };
     if (!project.effects.empty()) {
@@ -539,6 +540,8 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     for (int visible = sliding ? 0 : firstVisibleRow(); visible < static_cast<int>(rows.size()); ++visible) {
         if (rowY(visible) - reach >= getHeight()) { break; }
         if (dragging && visible >= trackDrag->first && visible < trackDrag->last) { continue; }
+        // Only rows in the repainted region: during playback, the playhead's strip.
+        if (!g.clipRegionIntersects({0, rowY(visible) + shiftOf(visible), getWidth(), heightOf(static_cast<std::size_t>(visible))})) { continue; }
         juce::Graphics::ScopedSaveState shifted(g);
         g.addTransform(juce::AffineTransform::translation(0.0f, static_cast<float>(shiftOf(visible))));
         paintRow(g, visible);
@@ -561,13 +564,14 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         g.setFont(motion::style::caption());
         g.drawText("Overlaps", area.reduced(8, 0), juce::Justification::centredLeft, true);
     }
-    // While an effect is dragged, every clip that can take it is outlined.
+    // While an effect is dragged, every clip shown that can take it is outlined.
     if (effectDragActive) {
         juce::Graphics::ScopedSaveState outlines(g);
         g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
         g.setColour(motion::style::accent().withAlpha(.35f));
-        for (int index = 0; index < static_cast<int>(tracks.size()); ++index) {
-            if (tracks[static_cast<std::size_t>(index)].kind != motion::TrackKind::visual) { continue; }
+        for (int visible = firstVisibleRow(); visible < static_cast<int>(rows.size()) && rowY(visible) < getHeight(); ++visible) {
+            const auto index = rows[static_cast<std::size_t>(visible)].track;
+            if (rows[static_cast<std::size_t>(visible)].isLane() || index < 0 || tracks[static_cast<std::size_t>(index)].kind != motion::TrackKind::visual) { continue; }
             for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) { g.drawRoundedRectangle(clipBounds(clip, index).toFloat().reduced(1.5f), motion::style::radiusControl, 1.0f); }
         }
     }
@@ -672,7 +676,7 @@ void MotionTimelineView::paint(juce::Graphics& g) {
 void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     grabKeyboardFocus();
     ensureTrackRows();
-    cancelGesture();
+    cancelClipGesture();
     // The middle button grabs the view anywhere, as it moves the Scene's.
     if (event.mods.isMiddleButtonDown()) {
         gesture = Pan {event.getPosition(), scrollTime, scrollY};
@@ -832,48 +836,95 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     }
 }
 
+void MotionTimelineView::setHover(motion::Id clip, motion::Id beam, int pointer) {
+    if (clip == hoveredClip && beam == beamHover) {
+        if (beam == 0 || pointer == beamPointer) { return; }
+        // Along the same edge only its readout moves, within a readout's
+        // width of the pointer.
+        const auto band = juce::Rectangle<int>(std::min(pointer, beamPointer) - 240, 0, std::abs(pointer - beamPointer) + 480, getHeight());
+        repaint(hoverBounds(beam).getIntersection(band));
+        beamPointer = pointer;
+        return;
+    }
+    for (const auto id : {hoveredClip, beamHover, clip, beam}) {
+        if (id != 0) { repaint(hoverBounds(id)); }
+    }
+    hoveredClip = clip;
+    beamHover = beam;
+    beamPointer = pointer;
+}
+
+juce::Rectangle<int> MotionTimelineView::hoverBounds(motion::Id id) const {
+    const auto& tracks = processor.document.project().tracks;
+    std::optional<juce::Rectangle<float>> body;
+    const auto row = headerRow(id);
+    if (row >= 0 && rows[static_cast<std::size_t>(row)].group()) {
+        body = juce::Rectangle<int>(namesWidth, rowY(row) + shiftOf(row), getWidth() - namesWidth, heightOf(static_cast<std::size_t>(row))).toFloat();
+    }
+    for (int index = 0; !body.has_value() && index < static_cast<int>(tracks.size()); ++index) {
+        for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) {
+            if (clip.id == id) { body = clipBounds(clip, index).toFloat(); break; }
+        }
+    }
+    if (!body.has_value()) { return {}; }
+    // The readout sits above the share's edge or below it, and may be wider
+    // than a short clip.
+    return body->withRight(std::max(body->getRight(), body->getX() + 240.0f)).expanded(2.0f, 26.0f).getSmallestIntegerContainer();
+}
+
 void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
     if (onNamesEdge(event)) {
+        setHover(0, 0, event.x);
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
         return;
     }
     const auto overAdd = addCameraBounds().contains(event.getPosition());
     if (overAdd != addHover) { addHover = overAdd; repaint(addCameraBounds()); }
     if (overAdd) {
+        setHover(0, 0, event.x);
         setMouseCursor(juce::MouseCursor::PointingHandCursor);
         setTooltip("Add a camera at the playhead");
         return;
     }
     const auto bar = barAt(event.getPosition());
-    if (bar != hoveredBar) { hoveredBar = bar; repaint(); }
+    if (bar != hoveredBar) {
+        hoveredBar = bar;
+        repaint(horizontalBar().expanded(2));
+        repaint(verticalBar().expanded(2));
+    }
     if (bar != 0) {
+        setHover(0, 0, event.x);
         const auto thumb = horizontalThumb();
         setMouseCursor(bar == 1 && (std::abs(event.x - thumb.getX()) <= 5 || std::abs(event.x - thumb.getRight()) <= 5) ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
         setTooltip(bar == 1 ? "Drag either end to zoom" : juce::String());
         return;
     }
     const auto edgeRow = rowEdgeAt(event.getPosition());
-    if (edgeRow != hoveredEdge) { hoveredEdge = edgeRow; repaint(); }
+    if (edgeRow != hoveredEdge) {
+        // The accent line along the row's foot, where it was and where it is.
+        for (const auto row : {hoveredEdge, edgeRow}) {
+            if (row >= 0 && row < static_cast<int>(rows.size())) { repaint(0, rowY(row) + heightOf(static_cast<std::size_t>(row)) - 3, getWidth(), 4); }
+        }
+        hoveredEdge = edgeRow;
+    }
     const auto loop = loopBounds();
     if (!loop.isEmpty() && event.y >= loopTop - 4 && event.y < loopTop + loopHeight && event.x >= loop.getX() - 5 && event.x <= loop.getRight() + 5) {
+        setHover(0, 0, event.x);
         const auto edge = std::abs(event.x - loop.getX()) <= 5 || std::abs(event.x - loop.getRight()) <= 5;
         setMouseCursor(edge ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor);
         setTooltip("Double-click to switch looping on or off");
         return;
     }
     if (edgeRow >= 0) {
+        setHover(0, 0, event.x);
         setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
         setTooltip("Double-click for the default height; Alt+wheel resizes every track");
         return;
     }
+    // A share's edge belongs to the clip (or group row) under the pointer.
     const auto beamTarget = beamEdgeAt(event.getPosition());
-    const auto beamId = beamTarget.has_value() ? beamTarget->id : 0;
-    if (beamId != beamHover || (beamId != 0 && event.x != beamPointer)) {
-        beamHover = beamId;
-        beamPointer = event.x;
-        repaint();
-    }
     if (beamTarget.has_value()) {
+        setHover(beamTarget->id, beamTarget->id, event.x);
         setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
         setTooltip("Beam: drag up to give this object more of the beam's time; " + motion::style::shortcutText("Cmd-click") + " adds a key");
         return;
@@ -887,8 +938,7 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
         tip = juce::String(clip->name) + "\n" + grid.positionLabel(timing.start) + " - " + grid.positionLabel(timing.end()) + "  (" + grid.durationLabel(timing.start, timing.end()) + ")";
     }
     if (getTooltip() != tip) { setTooltip(tip); }
-    const auto hovered = clip != nullptr ? clip->id : event.x >= namesWidth ? groupAtY(event.y) : 0;
-    if (hovered != hoveredClip) { hoveredClip = hovered; repaint(); }
+    setHover(clip != nullptr ? clip->id : event.x >= namesWidth ? groupAtY(event.y) : 0, 0, event.x);
     const auto inBand = inCameraBand(event.y) && event.x >= namesWidth;
     const auto* hoveredCut = inBand ? cutAt(event.getPosition()) : nullptr;
     const auto* hoveredMarker = markerAt(event.getPosition());
@@ -917,9 +967,8 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
 void MotionTimelineView::mouseExit(const juce::MouseEvent&) {
     if (hoveredBar != 0) { hoveredBar = 0; repaint(); }
     if (hoveredEdge >= 0) { hoveredEdge = -1; repaint(); }
-    if (hoveredClip != 0) { hoveredClip = 0; repaint(); }
-    if (beamHover != 0) { beamHover = 0; repaint(); }
-    if (addHover) { addHover = false; repaint(); }
+    setHover(0, 0, beamPointer);
+    if (addHover) { addHover = false; repaint(addCameraBounds()); }
 }
 
 std::vector<double> MotionTimelineView::editPoints() const {
@@ -1003,8 +1052,11 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
     if (keyMarquee != nullptr) {
         keyMarquee->area = juce::Rectangle<int>(keyMarquee->start, event.getPosition());
         selectedKeys = keyMarquee->base;
+        KeySet chosen(selectedKeys);
         for (auto& key : keysInside(keyMarquee->area)) {
-            if (!isKeySelected(key.owner, key.property, key.time)) { selectedKeys.push_back(std::move(key)); }
+            if (chosen.contains(key.owner, key.property, key.time)) { continue; }
+            chosen.add(key);
+            selectedKeys.push_back(std::move(key));
         }
         repaint();
         return;
@@ -1013,171 +1065,8 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         seek(event.x, event.mods);
         return;
     }
-    if (!gestureIsCurrent()) {
-        return;
-    }
-    auto* markerDrag = active<MarkerDrag>();
-    if (markerDrag != nullptr) {
-        const auto id = markerDrag->marker;
-        auto updated = edit.start();
-        const auto delta = (event.x - markerDrag->downX) / pixelsPerSecond;
-        const auto time = delta == 0 ? markerDrag->originalTime : std::clamp(snapEdge(markerDrag->originalTime + delta, event.mods, edit.start(), {}, nullptr, id), 0.0, updated.duration);
-        if (std::any_of(updated.markers.begin(), updated.markers.end(), [id, time](const auto& marker) { return marker.id != id && motion::sameTime(marker.time, time); })) { return; }
-        for (auto& marker : updated.markers) { if (marker.id == id) { marker.time = time; } }
-        std::sort(updated.markers.begin(), updated.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
-        edit.show(std::move(updated), time != markerDrag->originalTime);
-        repaint();
-        return;
-    }
-    auto& drag = std::get<ClipDrag>(gesture);
-    const auto& before = edit.start();
-    // Shows the drag's edit, made from the start.
-    const auto show = [&](motion::Project updated, bool changed) {
-        drag.changed = changed;
-        edit.show(std::move(updated), changed);
-        repaint();
-    };
-    auto candidate = drag.original;
-    const auto timing = drag.original.timing(before.tempo());
-    auto edited = timing;
-    auto delta = (event.x - drag.downX) / pixelsPerSecond;
-    if (delta != 0.0 && !event.mods.isAltDown()) {
-        std::set<motion::Id> excluded(selectedClips.begin(), selectedClips.end());
-        excluded.insert(drag.original.id);
-        if (drag.mode == Mode::slip) {
-            const auto anchor = timing.offset / timing.rate;
-            delta = before.timeGrid().snap(anchor + delta) - anchor;
-        } else if (drag.mode == Mode::move) {
-            // Either edge of a moving clip can catch a magnet.
-            const auto startTarget = magnet(timing.start + delta, before, excluded);
-            const auto endTarget = magnet(timing.end() + delta, before, excluded);
-            const auto startDistance = startTarget.has_value() ? std::abs(*startTarget - (timing.start + delta)) : 1.0e300;
-            const auto endDistance = endTarget.has_value() ? std::abs(*endTarget - (timing.end() + delta)) : 1.0e300;
-            if (startTarget.has_value() && startDistance <= endDistance) {
-                delta = *startTarget - timing.start;
-                snapGuide = startTarget;
-            } else if (endTarget.has_value()) {
-                delta = *endTarget - timing.end();
-                snapGuide = endTarget;
-            } else {
-                delta = before.timeGrid().snap(timing.start + delta) - timing.start;
-                snapGuide.reset();
-            }
-        } else {
-            const auto anchor = drag.mode == Mode::right || drag.mode == Mode::stretch || drag.mode == Mode::rippleRight ? timing.end() : timing.start;
-            delta = snapEdge(anchor + delta, event.mods, before, excluded) - anchor;
-        }
-    } else {
-        snapGuide.reset();
-    }
-    if (drag.mode == Mode::rippleLeft || drag.mode == Mode::rippleRight) {
-        auto updated = before;
-        if (!motion::rippleTrim(updated.tracks.change(drag.originalRow), drag.original.id, drag.mode == Mode::rippleLeft, delta, updated.tempo())) { return; }
-        for (const auto& item : updated.tracks[drag.originalRow].clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
-        show(std::move(updated), delta != 0);
-        return;
-    }
-    if (drag.mode == Mode::move && selectedClips.size() > 1) {
-        auto updated = before;
-        double earliest = timing.start;
-        for (const auto& track : updated.tracks) {
-            for (const auto& item : track.clips) {
-                if (selectedClips.contains(item.id)) { earliest = std::min(earliest, item.timing(updated.tempo()).start); }
-            }
-        }
-        delta = std::max(delta, -earliest);
-        const auto row = trackAtY(event.y);
-        const auto rows = row >= 0 ? row - drag.originalRow : 0;
-        if (rows != 0) {
-            const auto sourceY = trackY(drag.originalRow);
-            const auto visibleDelta = trackY(row) - sourceY;
-            for (int index = 0; index < static_cast<int>(updated.tracks.size()); ++index) {
-                const auto& track = updated.tracks[index];
-                if (!std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& item) { return selectedClips.contains(item.id); })) { continue; }
-                const auto y = trackY(index);
-                if (y < rulerHeight || trackAtY(y + visibleDelta) != index + rows) { return; }
-            }
-        }
-        if (!motion::moveClips(updated.tracks, {selectedClips.begin(), selectedClips.end()}, delta, rows, updated.tempo())) { return; }
-        for (const auto& track : updated.tracks) {
-            for (const auto& item : track.clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
-        }
-        show(std::move(updated), delta != 0 || rows != 0);
-        return;
-    }
-    // A clip's timing with the drag applied to the edge (or contents) held.
-    const auto dragged = [&](const auto& from) {
-        auto to = from;
-        if (drag.mode == Mode::move) {
-            to.moveTo(std::max(0.0, from.start + delta));
-        } else if (drag.mode == Mode::left) {
-            to.setStart(std::max(0.0, from.start + delta));
-            to.offset = from.localTime(to.start);
-        } else if (drag.mode == Mode::right) {
-            to.setEnd(to.end() + delta);
-        } else if (drag.mode == Mode::slip) {
-            to.offset += delta * from.rate;
-        } else {
-            to.setEnd(to.end() + delta);
-            to.rate *= from.duration() / to.duration();
-        }
-        return to;
-    };
-    if (drag.mode != Mode::move && selectedClips.size() > 1 && selectedClips.contains(drag.original.id)) {
-        // Every selected clip on an unlocked track by the same time, as the
-        // one held: all their start or end edges, contents or speeds.
-        auto updated = before;
-        std::vector<std::pair<int, motion::Clip>> edits;
-        for (int index = 0; index < static_cast<int>(updated.tracks.size()); ++index) {
-            const auto& track = updated.tracks[index];
-            if (track.locked) { continue; }
-            for (const auto& item : track.clips) {
-                if (!selectedClips.contains(item.id)) { continue; }
-                auto clip = item;
-                if (delta != 0.0 && !clip.setTiming(dragged(item.timing(updated.tempo())), updated.tempo())) { return; }
-                edits.emplace_back(index, std::move(clip));
-            }
-        }
-        for (const auto& [index, clip] : edits) {
-            std::erase_if(updated.tracks.change(index).clips, [id = clip.id](const auto& item) { return item.id == id; });
-        }
-        for (const auto& [index, clip] : edits) {
-            if (!updated.tracks.change(index).insert(clip, updated.tempo())) {
-                // Where one would overlap another shows in red; all stay put.
-                blocked = clipBounds(clip, index);
-                repaint();
-                return;
-            }
-            updated.duration = std::max(updated.duration, clip.timing(updated.tempo()).end());
-        }
-        blocked.reset();
-        show(std::move(updated), delta != 0.0);
-        return;
-    }
-    if (delta != 0.0) {
-        edited = dragged(timing);
-        if (!candidate.setTiming(edited, before.tempo())) { return; }
-    }
-    const auto target = drag.mode == Mode::move
-        ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : drag.originalRow) : drag.originalRow;
-    if (before.tracks[target].locked || before.tracks[target].kind != before.tracks[drag.originalRow].kind) { return; }
-    const bool candidateChanged = candidate.start != drag.original.start || candidate.duration != drag.original.duration
-        || candidate.offset != drag.original.offset || candidate.rate != drag.original.rate || target != drag.originalRow;
-    if (!candidateChanged) {
-        if (drag.changed) { show(before, false); }
-        return;
-    }
-    auto updated = before;
-    std::erase_if(updated.tracks.change(drag.originalRow).clips, [&](const auto& clip) { return clip.id == drag.original.id; });
-    if (updated.tracks.change(target).insert(candidate, updated.tempo())) {
-        updated.duration = std::max(updated.duration, candidate.timing(updated.tempo()).end());
-        blocked.reset();
-        show(std::move(updated), true);
-    } else {
-        // Where the clip would land shows in red; it stays at the last free spot.
-        blocked = clipBounds(candidate, target);
-        repaint();
-    }
+    if (active<MarkerDrag>() != nullptr) { dragMarker(event); return; }
+    if (active<ClipDrag>() != nullptr) { dragClips(event); }
 }
 
 void MotionTimelineView::mouseUp(const juce::MouseEvent&) {
@@ -1201,43 +1090,11 @@ void MotionTimelineView::mouseUp(const juce::MouseEvent&) {
     }
     if (active<KeyMarquee>() != nullptr || active<ClipMarquee>() != nullptr) { gesture = {}; repaint(); return; }
     if (active<Scrub>() != nullptr) { gesture = {}; return; }
-    commitDrag();
-}
-
-void MotionTimelineView::commitDrag() {
-    const auto* cutDrag = active<CutDrag>();
-    const auto* keyDrag = active<KeyDrag>();
-    if (active<BeamDrag>() != nullptr || active<CameraKeyDrag>() != nullptr || cutDrag != nullptr || keyDrag != nullptr) {
-        const auto label = active<BeamDrag>() != nullptr ? juce::String("Change Beam") : active<CameraKeyDrag>() != nullptr ? juce::String("Move camera key")
-            : cutDrag != nullptr ? juce::String(cutDrag->mode == CutDrag::Mode::move ? "Move camera cut" : "Trim camera cut") : juce::String(keyDrag->keys.size() > 1 ? "Move keys" : "Move key");
-        edit.commit(label);
-        gesture = {};
-        repaint();
-        return;
-    }
-    if (active<LoopDrag>() != nullptr) {
-        {
-            const motion::Document::ViewChange view(processor.document);
-            edit.commit("Move loop");
-        }
-        gesture = {};
-        return;
-    }
-    if (!gestureIsCurrent()) {
-        return;
-    }
-    const auto* clipDrag = active<ClipDrag>();
-    const auto marker = clipDrag == nullptr;
-    const auto mode = marker ? Mode::move : clipDrag->mode;
-    const auto several = selectedClips.size() > 1 && mode != Mode::rippleLeft && mode != Mode::rippleRight;
-    const juce::String action = mode == Mode::move ? "Move clip" : mode == Mode::slip ? "Slip clip" : mode == Mode::stretch ? "Stretch clip" : (mode == Mode::rippleLeft || mode == Mode::rippleRight) ? "Ripple trim clip" : "Trim clip";
-    const auto label = marker ? juce::String("Move marker") : action + (several ? "s" : "");
-    gesture = {};
-    edit.commit(label);
+    endDocumentDrag(true);
 }
 
 void MotionTimelineView::mouseDoubleClick(const juce::MouseEvent& event) {
-    cancelGesture();
+    cancelClipGesture();
     const auto edge = rowEdgeAt(event.getPosition());
     if (edge >= 0) {
         // Double-click a row's bottom edge: back to the default height.
@@ -1285,7 +1142,7 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
     // Space, Cmd+D and the rest are the editor's commands, whichever panel
     // has focus: only what is the timeline's own is handled here.
     const auto escape = key == juce::KeyPress::escapeKey;
-    if (escape && cancelDrag()) { return true; }
+    if (escape && endDocumentDrag(false)) { return true; }
     // A marquee given up leaves the keys selected as they were.
     const auto* keyMarquee = active<KeyMarquee>();
     if (escape && keyMarquee != nullptr) {
@@ -1333,13 +1190,13 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
         if (!selectedClips.empty()) { return nudgeSelectedClips(frames); }
     }
     if (escape && clipGesture()) {
-        cancelGesture();
+        cancelClipGesture();
         return true;
     }
     if (!key.getModifiers().isCommandDown() && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown() && !key.getModifiers().isShiftDown()) {
         const auto character = juce::CharacterFunctions::toLowerCase(key.getTextCharacter());
         if (character == 'm' && onEditMarker) {
-            cancelGesture();
+            cancelClipGesture();
             onEditMarker(0, std::clamp(processor.position.load(), 0.0, processor.document.project().duration));
             return true;
         }
@@ -1354,7 +1211,7 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
     }
     if ((key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey)
         && !key.getModifiers().isCommandDown() && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown()) {
-        cancelGesture();
+        cancelClipGesture();
         if (selectedMarker != 0) {
             report(processor.document.removeMarker(selectedMarker));
             selectedMarker = 0;
@@ -1373,43 +1230,60 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
     return false;
 }
 
-bool MotionTimelineView::gestureIsCurrent() {
-    if (active<ClipDrag>() == nullptr && active<MarkerDrag>() == nullptr) {
-        return false;
-    }
-    if (edit.stale()) {
-        gesture = {};
-        edit.reset();
-        repaint();
-        return false;
-    }
-    return true;
-}
-
-void MotionTimelineView::cancelGesture() {
-    if (gestureIsCurrent()) {
-        gesture = {};
-        edit.cancel();
+void MotionTimelineView::cancelClipGesture() {
+    if (active<ClipDrag>() != nullptr || active<MarkerDrag>() != nullptr) {
+        endDocumentDrag(false);
     } else if (active<Scrub>() != nullptr) {
         gesture = {};
     }
     repaint();
 }
 
-bool MotionTimelineView::cancelDrag() {
-    const auto* keyDrag = active<KeyDrag>();
-    const auto* cameraKeyDrag = active<CameraKeyDrag>();
-    if (keyDrag == nullptr && cameraKeyDrag == nullptr && active<BeamDrag>() == nullptr && active<LoopDrag>() == nullptr && active<CutDrag>() == nullptr) { return false; }
-    // Putting the start back (only when the drag changed it and nothing else
-    // has since) moves the revision on.
-    const auto revision = processor.document.revision();
-    edit.cancel();
-    if (processor.document.revision() != revision) {
-        // The selection goes back with what was dragged.
-        if (keyDrag != nullptr) { selectedKeys = keyDrag->keys; }
-        if (cameraKeyDrag != nullptr) { selectedCameraKey = std::make_pair(cameraKeyDrag->camera, cameraKeyDrag->from); }
+juce::String MotionTimelineView::dragLabel() const {
+    return std::visit([this](const auto& drag) -> juce::String {
+        using Drag = std::decay_t<decltype(drag)>;
+        if constexpr (std::is_same_v<Drag, ClipDrag>) {
+            const auto ripple = drag.mode == Mode::rippleLeft || drag.mode == Mode::rippleRight;
+            const juce::String action = drag.mode == Mode::move ? "Move clip" : drag.mode == Mode::slip ? "Slip clip" : drag.mode == Mode::stretch ? "Stretch clip" : ripple ? "Ripple trim clip" : "Trim clip";
+            // A ripple trim takes one clip; the others take every selected clip.
+            return action + (selectedClips.size() > 1 && !ripple ? "s" : "");
+        } else if constexpr (std::is_same_v<Drag, MarkerDrag>) {
+            return "Move marker";
+        } else if constexpr (std::is_same_v<Drag, KeyDrag>) {
+            return drag.keys.size() > 1 ? "Move keys" : "Move key";
+        } else if constexpr (std::is_same_v<Drag, BeamDrag>) {
+            return "Change Beam";
+        } else if constexpr (std::is_same_v<Drag, LoopDrag>) {
+            return "Move loop";
+        } else if constexpr (std::is_same_v<Drag, CutDrag>) {
+            return drag.mode == CutDrag::Mode::move ? "Move camera cut" : "Trim camera cut";
+        } else if constexpr (std::is_same_v<Drag, CameraKeyDrag>) {
+            return "Move camera key";
+        } else {
+            return {};
+        }
+    }, gesture);
+}
+
+bool MotionTimelineView::endDocumentDrag(bool commit) {
+    const auto label = dragLabel();
+    if (label.isEmpty()) { return false; }
+    const auto ended = std::exchange(gesture, {});
+    {
+        // The loop is view state: moving it (or putting it back) prepares
+        // nothing again.
+        std::optional<motion::Document::ViewChange> view;
+        if (std::holds_alternative<LoopDrag>(ended)) { view.emplace(processor.document); }
+        if (commit) {
+            edit.commit(label);
+        } else if (edit.cancel()) {
+            // The selection goes back with what was dragged.
+            const auto* keyDrag = std::get_if<KeyDrag>(&ended);
+            const auto* cameraKeyDrag = std::get_if<CameraKeyDrag>(&ended);
+            if (keyDrag != nullptr) { selectedKeys = keyDrag->keys; }
+            if (cameraKeyDrag != nullptr) { selectedCameraKey = std::make_pair(cameraKeyDrag->camera, cameraKeyDrag->from); }
+        }
     }
-    gesture = {};
     repaint();
     return true;
 }
@@ -1427,23 +1301,6 @@ void MotionTimelineView::selectClip(motion::Id id) {
     selectedClips.clear();
     if (isClip(id)) { selectedClips.insert(id); }
     notifySelection(id);
-}
-
-const motion::Clip* MotionTimelineView::clipAt(juce::Point<int> position, int& row) const {
-    if (position.x < namesWidth || position.y < rulerHeight) {
-        return nullptr;
-    }
-    row = trackAtY(position.y);
-    const auto& tracks = processor.document.project().tracks;
-    if (row < 0 || row >= static_cast<int>(tracks.size())) {
-        return nullptr;
-    }
-    for (const auto& clip : tracks[row].clips) {
-        if (clipBounds(clip, row).contains(position)) {
-            return &clip;
-        }
-    }
-    return nullptr;
 }
 
 int MotionTimelineView::boundedPixel(double value) {
@@ -1472,6 +1329,8 @@ std::optional<double> MotionTimelineView::magnet(double time, const motion::Proj
     if (includePlayhead) {
         consider(processor.position.load());
     }
+    // The keys being dragged, looked up rather than scanned per key.
+    const auto moving = movingKeys != nullptr ? KeySet(*movingKeys) : KeySet();
     for (const auto& marker : project.markers) {
         if (marker.id != excludedMarker) {
             consider(marker.time);
@@ -1506,10 +1365,7 @@ std::optional<double> MotionTimelineView::magnet(double time, const motion::Proj
             if (timing.rate == 0) { continue; }
             for (const auto& [name, curve] : clip.properties) {
                 for (const auto& key : curve.keyframes()) {
-                    const bool moving = movingKeys != nullptr && std::any_of(movingKeys->begin(), movingKeys->end(), [&](const auto& item) {
-                        return item.owner == clip.id && item.property == name && motion::sameTime(item.time, key.time);
-                    });
-                    if (!moving) { consider(timing.projectTime(key.time)); }
+                    if (!moving.contains(clip.id, name, key.time)) { consider(timing.projectTime(key.time)); }
                 }
             }
         }
@@ -1539,7 +1395,7 @@ void MotionTimelineView::seek(int x, juce::ModifierKeys modifiers) {
 }
 
 void MotionTimelineView::showCompositionEffects() {
-    cancelGesture();
+    cancelClipGesture();
     selectClip(0);
     if (onShowCompositionEffects) { onShowCompositionEffects(); }
 }

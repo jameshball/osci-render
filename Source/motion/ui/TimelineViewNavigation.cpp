@@ -20,7 +20,7 @@ void MotionTimelineView::animateView(double zoom, double scroll) {
 }
 
 void MotionTimelineView::revealTime(double seconds) {
-    cancelGesture();
+    cancelClipGesture();
     if (!std::isfinite(seconds) || seconds < 0) { return; }
     // A zoom or Fit gliding on would undo the reveal.
     viewAnimation.stopTimer();
@@ -291,5 +291,15 @@ void MotionTimelineView::followPlayhead(double time, bool playing) {
     if (!follow.update(playing, visible) || !followEnabled || clipGesture() || getWidth() <= namesWidth) { return; }
     scrollTime = std::max(0.0, time - 16 / pixelsPerSecond);
     fitRowsToBar();
+    repaint();
+}
+
+void MotionTimelineView::fitProject() {
+    cancelClipGesture();
+    const auto end = contentEnd();
+    const auto duration = std::isfinite(end) ? std::max(0.001, end) : 1.0;
+    scrollY = 0;
+    animateView(std::clamp(std::max(1, getWidth() - namesWidth - 20) / duration, 0.000001, 500.0), 0.0);
+    resized();
     repaint();
 }

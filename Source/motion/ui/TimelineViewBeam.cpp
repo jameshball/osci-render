@@ -18,18 +18,26 @@ const MotionTimelineView::BeamCache* MotionTimelineView::ensureBeamShares() cons
         if (values.empty()) { values.assign(static_cast<std::size_t>(columns), 0.0f); }
         values[static_cast<std::size_t>(column)] += static_cast<float>(fraction);
     };
+    // A group's share is everything it holds: each clip's groups, found once.
+    std::unordered_map<motion::Id, std::vector<motion::Id>> ancestors;
+    const auto groupsOf = [&](motion::Id clip) -> const std::vector<motion::Id>& {
+        auto found = ancestors.find(clip);
+        if (found != ancestors.end()) { return found->second; }
+        std::vector<motion::Id> chain;
+        const auto* track = motion::findClipTrack(project, clip);
+        auto group = track != nullptr ? track->group : motion::Id(0);
+        for (std::size_t depth = 0; group != 0 && depth < motion::maximumGroupDepth; ++depth) {
+            chain.push_back(group);
+            const auto* parent = motion::findGroup(project, group);
+            group = parent != nullptr ? parent->parent : 0;
+        }
+        return ancestors.emplace(clip, std::move(chain)).first->second;
+    };
     for (int column = 0; column < columns; ++column) {
         const auto time = scrollTime + column * beamStep / pixelsPerSecond;
         for (const auto& share : beamShares.at(*composition, time, live.get())) {
             add(share.clip, column, share.fraction);
-            // A group's share is everything it holds.
-            const auto* track = motion::findClipTrack(project, share.clip);
-            auto group = track != nullptr ? track->group : motion::Id(0);
-            for (std::size_t depth = 0; group != 0 && depth < motion::maximumGroupDepth; ++depth) {
-                add(group, column, share.fraction);
-                const auto* found = motion::findGroup(project, group);
-                group = found != nullptr ? found->parent : 0;
-            }
+            for (const auto group : groupsOf(share.clip)) { add(group, column, share.fraction); }
         }
     }
     beamCache = std::move(cache);
@@ -60,27 +68,26 @@ juce::Rectangle<float> MotionTimelineView::beamArea(const motion::Clip& clip, in
 }
 
 std::optional<juce::Rectangle<float>> MotionTimelineView::groupBeamArea(motion::Id group) const {
-    const auto found = std::find_if(rows.begin(), rows.end(), [group](const auto& row) { return row.id == group && row.group(); });
-    if (found == rows.end()) { return std::nullopt; }
-    const auto index = static_cast<int>(found - rows.begin());
+    const auto index = headerRow(group);
+    if (index < 0 || !rows[static_cast<std::size_t>(index)].group()) { return std::nullopt; }
     const auto y = static_cast<float>(rowY(index) + shiftOf(index));
     const auto height = static_cast<float>(heightOf(static_cast<std::size_t>(index)) - bandGap);
     return juce::Rectangle<float>(static_cast<float>(namesWidth), y, static_cast<float>(getWidth() - namesWidth), height).reduced(0, 4);
 }
 
-void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::Rectangle<float> area, juce::Rectangle<float> body, float opacity) const {
+bool MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::Rectangle<float> area, juce::Rectangle<float> body, float opacity) const {
     const auto* beamDrag = active<BeamDrag>();
     const auto lit = beamHover == id || (beamDrag != nullptr && beamDrag->id == id);
     const auto chosen = id == selected || selectedClips.contains(id);
     // At rest a clip is a plain bar: its share shows under the pointer or on
     // the selection, and a badge by its name flags a Beam other than 1x.
-    if (!lit && !chosen && hoveredClip != id) { return; }
+    if (!lit && !chosen && hoveredClip != id) { return false; }
     const auto* cache = ensureBeamShares();
-    if (cache == nullptr) { return; }
+    if (cache == nullptr) { return false; }
     const auto left = std::max(area.getX(), static_cast<float>(namesWidth)), right = std::min(area.getRight(), static_cast<float>(getWidth()));
-    if (right - left < 2 || area.getHeight() < 6) { return; }
+    if (right - left < 2 || area.getHeight() < 6) { return false; }
     const auto found = cache->shares.find(id);
-    if (found == cache->shares.end()) { return; }
+    if (found == cache->shares.end()) { return false; }
     const auto share = [&](float x) { return interpolatedShare(found->second, x - static_cast<float>(cache->left)); };
     juce::Path fill, edge;
     fill.startNewSubPath(left, area.getBottom());
@@ -112,7 +119,7 @@ void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::
         // they light up to be dragged.
         g.setColour(juce::Colours::white.withAlpha((lit ? .13f : .075f) * opacity));
         g.fillPath(fill);
-        if (!lit && !chosen) { return; }
+        if (!lit && !chosen) { return true; }
         const auto ink = lit ? motion::style::accent().withAlpha(opacity) : juce::Colours::white.withAlpha(.5f * opacity);
         g.setColour(ink);
         g.strokePath(edge, juce::PathStrokeType(lit ? 1.5f : 1.0f));
@@ -129,7 +136,7 @@ void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::
             g.setColour(ink);
             g.fillPath(keys);
         }
-        if (!lit) { return; }
+        if (!lit) { return true; }
     }
     // What the edge means, where the pointer is.
     const auto x = std::clamp(static_cast<float>(beamPointer), left, right);
@@ -145,6 +152,7 @@ void MotionTimelineView::paintBeamShare(juce::Graphics& g, motion::Id id, juce::
     auto pill = juce::Rectangle<float>(width, 16).withCentre({x, 0}).withY(above ? y - 22 : y + 6);
     pill = pill.withX(std::clamp(pill.getX(), left, std::max(left, right - width)));
     beamLabel = std::make_pair(pill, text);
+    return true;
 }
 
 void MotionTimelineView::paintBeamLabel(juce::Graphics& g) const {

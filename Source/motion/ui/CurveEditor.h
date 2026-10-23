@@ -184,6 +184,23 @@ private:
     // and corners turn on their keys.
     template <typename Evaluate>
     juce::Path curvePath(double from, double to, float perPixel, const std::vector<double>& keys, Evaluate&& evaluate) const;
+    // curvePath for the curve `name` ("result" for what plays), kept while the
+    // document, the view and the curves shown stay as they are: repainting
+    // the playhead's strip or the ghost key strokes it again unsampled.
+    template <typename Evaluate>
+    juce::Path cachedPath(const std::string& name, double from, double to, float perPixel, const std::vector<double>& keys, Evaluate&& evaluate);
+    using PathView = std::tuple<std::uint64_t, std::uint64_t, motion::Id, std::string, double, double, double, double, int, int>;
+    std::optional<PathView> pathView;
+    std::map<std::tuple<std::string, double, double, float>, juce::Path> paths;
+    // A value as the readouts show it, to a tenth of the value ticks.
+    juce::String valueText(double value) const;
+    // Where a readout beside `anchor` goes.
+    juce::Rectangle<float> readoutBounds(juce::Point<float> anchor, const juce::String& text) const;
+    // The ghost key on a hovered curve, where a double-click would add one,
+    // and its readout; none unless the pointer is on the curve.
+    std::optional<std::pair<juce::Point<float>, juce::String>> ghostKey() const;
+    // What the ghost key and its readout cover.
+    std::optional<juce::Rectangle<int>> ghostBounds() const;
     // What the pointer is over, for hover feedback and the cursor.
     struct Hover {
         std::optional<KeyRef> key;

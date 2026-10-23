@@ -15,9 +15,11 @@ public:
     void begin() {
         before = document.project();
         revision = document.revision();
-        changed = false;
+        edited = false;
     }
     bool active() const { return before.has_value(); }
+    // Whether the preview shows an edit that ending the gesture would record.
+    bool changed() const { return active() && edited; }
     // Something else changed the document mid-gesture.
     bool stale() const { return active() && document.revision() != revision; }
     const Project& start() const { return *before; }
@@ -36,28 +38,31 @@ public:
         if (!active()) { return; }
         document.preview(std::move(updated));
         revision = document.revision();
-        changed = differs;
+        edited = differs;
     }
     // True when the gesture became an undo step.
     bool commit(const juce::String& label) {
-        const auto record = active() && changed && !stale();
+        const auto record = changed() && !stale();
         if (record) { document.commit(label, std::move(*before)); }
         reset();
         return record;
     }
-    void cancel() {
-        if (active() && changed && !stale()) { document.preview(std::move(*before)); }
+    // True when the start was put back.
+    bool cancel() {
+        const auto revert = changed() && !stale();
+        if (revert) { document.preview(std::move(*before)); }
         reset();
+        return revert;
     }
     void reset() {
         before.reset();
-        changed = false;
+        edited = false;
     }
 
 private:
     Document& document;
     std::optional<Project> before;
     std::uint64_t revision = 0;
-    bool changed = false;
+    bool edited = false;
 };
 }

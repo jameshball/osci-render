@@ -125,11 +125,7 @@ void MotionEditor::setUpScene() {
     };
     timeline.beamComposition = [this] { return composition.preparedComposition(); };
     composition.onEffectMoved = [this](motion::Id effect, motion::Id owner, bool copy) { moveEffectTo(effect, owner, copy); };
-    composition.onEffectMovePreview = [this](motion::Id effect, std::optional<motion::Id> owner) {
-        auto project = processor.document.project();
-        const auto moved = owner.has_value() && motion::moveEffect(project, effect, *owner, juce::ModifierKeys::getCurrentModifiers().isAltDown(), PreviewId::effect);
-        previewProject(moved ? &project : nullptr);
-    };
+    composition.onEffectMovePreview = [this](motion::Id effect, std::optional<motion::Id> owner) { previewEffectMove(effect, owner); };
     timeline.onEffectMoved = [this](motion::Id effect, motion::Id owner, bool copy) { moveEffectTo(effect, owner, copy); };
     composition.onPropertyEdited = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false, true); };
     composition.isSelected = [this](motion::Id id) { return timeline.selectedClipIds().contains(id); };
@@ -168,7 +164,8 @@ void MotionEditor::setUpScope() {
     });
     scopeTools.canvas.onClick = [this] {
         auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize());
-        const auto apply = popoverEdit(panel.get());
+        // The canvas size depends on nothing else, so other edits meanwhile don't stop it.
+        const auto apply = popoverEdit(panel.get(), {}, Requires::sameProject);
         panel->onApply = [apply](VisualiserRenderSize size) {
             apply([size](motion::Document& document) {
                 // The frame is the project's: an edit, saved and undone with it.
@@ -563,7 +560,8 @@ void MotionEditor::setUpTimeline() {
     timeline.onError = [this](const juce::String& message) { statusBar.show(message); };
     timeline.chosenSource = [this] { return assetLibrary.chosen(); };
     timeline.onHint = [this](const juce::String& message) { statusBar.show(message, MotionStatusBar::Kind::notice); };
-    timeline.onPreview = [this](const motion::Project* project) { previewProject(project); };
+    timeline.onEffectPreview = [this](const std::string& type, std::optional<motion::Id> owner) { previewEffect(type, owner); };
+    timeline.onEffectMovePreview = [this](motion::Id effect, std::optional<motion::Id> owner) { previewEffectMove(effect, owner); };
 }
 
 void MotionEditor::setUpGraph() {

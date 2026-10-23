@@ -1,90 +1,8 @@
 #include "TimelineView.h"
 #include "MenuIcons.h"
-#include "../model/LightPresets.h"
 
-// Menus for clips, groups and tracks, and what they do: grouping, locking,
-// muting and soloing, and dragging tracks and groups into place.
-
-void MotionTimelineView::showClipMenu(motion::Id id) {
-    juce::PopupMenu menu;
-    const auto many = selectedClips.size() > 1;
-    motion::Id asset = 0, definition = 0;
-    bool locked = false;
-    const auto* clip = motion::findClip(processor.document.project(), id);
-    if (clip != nullptr) {
-        asset = clip->asset;
-        definition = clip->composition;
-        locked = motion::findClipTrack(processor.document.project(), id)->locked;
-    }
-    // The editor's own commands, so the menu and shortcuts agree.
-    const std::array<std::pair<const char*, const char*>, 4> edits {{{"Cut", "Cmd+X"}, {"Copy", "Cmd+C"}, {"Paste", "Cmd+V"}, {"Split at playhead", "Cmd+K"}}};
-    for (int index = 0; index < static_cast<int>(edits.size()); ++index) {
-        const auto pasting = index == 2;
-        const auto enabled = (index == 1 || !locked) && (!pasting || (canPaste && canPaste()));
-        menu.addItem(motion::style::menuItem(edits[static_cast<std::size_t>(index)].first, 20 + index, edits[static_cast<std::size_t>(index)].second).setEnabled(enabled));
-    }
-    menu.addItem(motion::style::menuItem(many ? "Duplicate clips" : "Duplicate clip", 1, "Cmd+D").setEnabled(!locked));
-    menu.addSeparator();
-    menu.addItem(2, "Edit clip timing");
-    menu.addItem(motion::style::menuItem(many ? "Loop selected clips" : "Loop this clip", 9, "Shift+L"));
-    if (asset != 0) { menu.addItem(10, "Show in Sources"); }
-    menu.addSeparator();
-    menu.addItem(motion::style::menuItem(many ? "Delete clips" : "Delete clip", 7, "Delete").setEnabled(!locked));
-    menu.addItem(motion::style::menuItem(many ? "Ripple delete clips" : "Ripple delete clip", 8, "Shift+Delete").setEnabled(!locked));
-    const auto references = processor.document.assetUses(asset);
-    if (definition == 0) { menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1); }
-    // A light's presets: ways it moves on its own.
-    const auto* generator = motion::generatorFor(processor.document.project(), id);
-    if (generator != nullptr && generator->category == motion::GeneratorCategory::light) {
-        const auto hasPreset = motion::hasLightPreset(processor.document.project(), id);
-        juce::PopupMenu presets;
-        for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) {
-            const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
-            presets.addItem(40 + static_cast<int>(index), juce::String(definition.name.data(), definition.name.size()), !locked);
-        }
-        presets.addSeparator();
-        presets.addItem(39, "No preset", !locked && hasPreset);
-        menu.addSeparator();
-        menu.addSubMenu("Light preset", presets);
-    }
-    menu.addSeparator();
-    menu.addItem(motion::style::menuItem("Make composition", 4, "Cmd+Shift+C").setEnabled(!locked && !selectedClips.empty()));
-    if (definition != 0) { menu.addItem(5, "Open composition"); menu.addItem(6, "Make composition unique", !locked); }
-    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
-        if (result >= 39 && result < 40 + static_cast<int>(motion::lightPresets.size())) {
-            applyLightPreset(id, result == 39 ? std::nullopt : std::optional(motion::lightPresets[static_cast<std::size_t>(result - 40)]));
-        } else if (result >= 20 && result < 24 && onCommand) {
-            const std::array<const char*, 4> names {"Cut", "Copy", "Paste", "Split at playhead"};
-            onCommand(names[static_cast<std::size_t>(result - 20)]);
-        } else if (result == 1) {
-            duplicateClip(id);
-        } else if (result == 2 && onTimingRequested) {
-            onTimingRequested(id);
-        } else if (result == 3 && onMakeUnique) {
-            onMakeUnique(id);
-        } else if (result == 4) {
-            createCompositionFromSelection();
-        } else if (result == 5 && onEnterComposition) {
-            onEnterComposition(id);
-        } else if (result == 7 || result == 8) {
-            deleteSelectedClips(result == 8);
-        } else if (result == 9 && onLoopSelection) {
-            onLoopSelection();
-        } else if (result == 10 && onRevealSource) {
-            const auto* shown = motion::findClip(processor.document.project(), id);
-            if (shown != nullptr) { onRevealSource(shown->asset); }
-        } else if (result == 6) {
-            motion::Id definitionId = 0;
-            report(processor.document.makeCompositionUnique(id, definitionId));
-            refreshTracks();
-        }
-    });
-}
-
-void MotionTimelineView::applyLightPreset(motion::Id id, std::optional<motion::LightPreset> preset) {
-    motion::editLightPreset(processor.document, id, preset);
-    refreshTracks();
-}
+// Menus for groups and tracks, and what they do: grouping, locking, muting
+// and soloing, and dragging tracks and groups into place.
 
 void MotionTimelineView::createGroup(motion::Id trackId, motion::Id parent) {
     motion::Group group;
@@ -114,7 +32,7 @@ void MotionTimelineView::showGroupMenu(motion::Id id) {
     menu.addItem(4, "Delete group and its tracks");
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
         if (motion::findGroup(processor.document.project(), id) == nullptr) { return; }
-        cancelGesture();
+        cancelClipGesture();
         if (result == 1) { selectClip(id); return; }
         if (result == 3) { createGroup(0, id); return; }
         if (result == 2) {
@@ -181,7 +99,7 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Delete track", 3, "Delete"));
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, groups](int result) {
-        cancelGesture();
+        cancelClipGesture();
         const auto& current = processor.document.project().tracks;
         const auto track = std::find_if(current.begin(), current.end(), [id](const auto& item) { return item.id == id; });
         if (track == current.end()) { return; }
@@ -218,7 +136,7 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
 }
 
 void MotionTimelineView::toggleLock(motion::Id id) {
-    cancelGesture();
+    cancelClipGesture();
     const auto* current = processor.document.project().tracks.findById(id);
     processor.document.edit(current != nullptr && current->locked ? "Unlock track" : "Lock track", [id](motion::Project& project) {
         auto* track = project.tracks.changeById(id);
@@ -227,7 +145,7 @@ void MotionTimelineView::toggleLock(motion::Id id) {
 }
 
 void MotionTimelineView::toggleTrack(motion::Id id, bool solo) {
-    cancelGesture();
+    cancelClipGesture();
     // Named for what it does: "Mute track", "Unsolo group".
     const auto& project = processor.document.project();
     const auto* group = motion::findGroup(project, id);
@@ -247,7 +165,7 @@ void MotionTimelineView::toggleTrack(motion::Id id, bool solo) {
 }
 
 void MotionTimelineView::placeTrack(motion::Id id, int boundary, motion::Id group) {
-    cancelGesture();
+    cancelClipGesture();
     const auto& project = processor.document.project();
     if (group != 0 && motion::findGroup(project, group) == nullptr) { return; }
     const auto& tracks = project.tracks;
@@ -270,7 +188,7 @@ void MotionTimelineView::placeTrack(motion::Id id, int boundary, motion::Id grou
 // Moves a group, and every track it holds as one block, before the track at
 // `boundary`, into `parent`.
 void MotionTimelineView::placeGroup(motion::Id id, int boundary, motion::Id parent) {
-    cancelGesture();
+    cancelClipGesture();
     const auto& project = processor.document.project();
     const auto* group = motion::findGroup(project, id);
     if (group == nullptr || (parent != 0 && motion::findGroup(project, parent) == nullptr) || motion::groupHolds(project, id, parent)) { return; }
@@ -325,7 +243,7 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
         if (finished) { return; }
         const auto first = headerRow(id);
         if (first < 0) { return; }
-        cancelGesture();
+        cancelClipGesture();
         const auto& head = rows[static_cast<std::size_t>(first)];
         // A track lifts with its lanes; a group with everything under it.
         auto last = first + 1;
@@ -461,35 +379,6 @@ void MotionTimelineView::stepRows() {
     repaint();
 }
 
-motion::Id MotionTimelineView::effectOwnerAt(juce::Point<int> position) const {
-    if (position.y < rulerHeight) { return 0; }
-    int row = 0;
-    const auto* clip = clipAt(position, row);
-    const auto& tracks = processor.document.project().tracks;
-    if (position.x < namesWidth) { row = trackAtY(position.y); }
-    const auto group = groupAtY(position.y);
-    if (group != 0) { return group; }
-    if (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[static_cast<std::size_t>(row)].kind != motion::TrackKind::visual || (clip == nullptr && position.x >= namesWidth)) { return 0; }
-    const auto owner = clip != nullptr ? clip->id : tracks[static_cast<std::size_t>(row)].id;
-    const auto* effects = motion::findEffectOwner(processor.document.project(), owner);
-    return effects != nullptr && effects->size() < motion::maximumEffectsPerOwner ? owner : 0;
-}
-
-void MotionTimelineView::insertEffect(const std::string& type, juce::Point<int> position) {
-    const auto* definition = motion::effectDefinition(type);
-    const auto owner = effectOwnerAt(position);
-    if (definition == nullptr || owner == 0) { return; }
-    int row = 0;
-    const auto* clip = position.x >= namesWidth ? clipAt(position, row) : nullptr;
-    if (clip != nullptr) { selectClip(clip->id); }
-    const auto effect = motion::makeEffect(processor.document.newId(), *definition);
-    processor.document.edit("Add " + juce::String(definition->name), [owner, effect](motion::Project& project) {
-        auto* destination = motion::findEffectOwner(project, owner);
-        if (destination != nullptr) { destination->push_back(effect); }
-    });
-    if (onEffectAdded) { onEffectAdded(owner, effect.id); }
-}
-
 void MotionTimelineView::showSpaceMenu() {
     juce::PopupMenu menu;
     menu.addItem(motion::style::menuItem("Paste", 1, "Cmd+V").setEnabled(canPaste && canPaste()));
@@ -497,35 +386,11 @@ void MotionTimelineView::showSpaceMenu() {
     menu.addItem(3, "Add camera here");
     const auto time = std::clamp(timeAt(getMouseXYRelative().x), 0.0, processor.document.project().duration);
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, time](int result) {
-        cancelGesture();
+        cancelClipGesture();
         if (result == 1 && onCommand) { onCommand("Paste"); }
         if (result == 2) { addTrack.triggerClick(); }
         if (result == 3 && onAddCamera) {
             onAddCamera(time);
         }
     });
-}
-
-void MotionTimelineView::fitProject() {
-    cancelGesture();
-    const auto end = contentEnd();
-    const auto duration = std::isfinite(end) ? std::max(0.001, end) : 1.0;
-    scrollY = 0;
-    animateView(std::clamp(std::max(1, getWidth() - namesWidth - 20) / duration, 0.000001, 500.0), 0.0);
-    resized();
-    repaint();
-}
-
-void MotionTimelineView::createCompositionFromSelection() {
-    if (selectedClips.empty()) {
-        if (onError) { onError("Select clips to make a composition of them."); }
-        return;
-    }
-    motion::Id instance = 0;
-    auto& document = processor.document;
-    const auto name = "Composition " + juce::String(document.mainProject().definitions.size() + 1);
-    const auto created = document.createComposition({selectedClips.begin(), selectedClips.end()}, name, instance);
-    if (!report(created)) { return; }
-    selectClip(instance);
-    refreshTracks();
 }

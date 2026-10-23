@@ -1,98 +1,10 @@
 #include "MotionEditor.h"
+#include "OutputChannels.h"
 #include "ui/BeamOverload.h"
 #include "ui/MenuIcons.h"
 #include "ui/StartScreen.h"
 #include "../components/AboutComponent.h"
 #include <cstdlib>
-
-namespace {
-// Message-thread transaction: the player is detached before changing bus
-// layouts or restarting hardware. Unavailable channel counts are rejected
-// without touching the running configuration. Every input bus is disabled:
-// osci-motion only produces audio.
-juce::Result configureOutputOnlyChannels(juce::StandalonePluginHolder& holder, int requestedChannels) {
-    if (!juce::MessageManager::getInstance()->isThisTheMessageThread()) {
-        return juce::Result::fail("Output channels must be configured on the message thread.");
-    }
-    auto* device = holder.deviceManager.getCurrentAudioDevice();
-    if (holder.processor == nullptr || device == nullptr) {
-        return juce::Result::fail("No audio processor or output device is available.");
-    }
-    if (requestedChannels <= 0 || device->getOutputChannelNames().size() < requestedChannels) {
-        return juce::Result::fail("The current audio device does not expose " + juce::String(requestedChannels) + " output channels.");
-    }
-    const auto previousLayout = holder.processor->getBusesLayout();
-    const auto previousSetup = holder.deviceManager.getAudioDeviceSetup();
-    const auto previousOutputs = device->getActiveOutputChannels();
-    auto layout = previousLayout;
-    if (layout.outputBuses.isEmpty()) {
-        return juce::Result::fail("The processor has no output bus.");
-    }
-    for (auto& input : layout.inputBuses) {
-        input = juce::AudioChannelSet::disabled();
-    }
-    for (auto& output : layout.outputBuses) {
-        output = juce::AudioChannelSet::disabled();
-    }
-    layout.outputBuses.set(0, requestedChannels == 2 ? juce::AudioChannelSet::stereo() : juce::AudioChannelSet::discreteChannels(requestedChannels));
-    if (!holder.processor->checkBusesLayoutSupported(layout)) {
-        return juce::Result::fail("The processor does not support the requested output layout.");
-    }
-    auto setup = previousSetup;
-    setup.useDefaultOutputChannels = false;
-    // Preserve the user's physical channel mapping when it already fits.
-    setup.outputChannels = device->getActiveOutputChannels();
-    if (setup.outputChannels.countNumberOfSetBits() != requestedChannels) {
-        setup.outputChannels.clear();
-        setup.outputChannels.setRange(0, requestedChannels, true);
-    }
-    if (previousLayout == layout && previousOutputs.countNumberOfSetBits() == requestedChannels) {
-        return juce::Result::ok();
-    }
-    holder.stopPlaying();
-    const auto rollback = [&](juce::String reason) {
-        holder.stopPlaying();
-        const auto restoredLayout = holder.processor->setBusesLayout(previousLayout);
-        const auto restoreError = holder.deviceManager.setAudioDeviceSetup(previousSetup, true);
-        holder.startPlaying();
-        const auto* restoredDevice = holder.deviceManager.getCurrentAudioDevice();
-        const auto restored = restoredDevice != nullptr
-            && restoredDevice->getActiveOutputChannels() == previousOutputs
-            && holder.processor->getBusesLayout() == previousLayout;
-        if (!restoredLayout || restoreError.isNotEmpty() || !restored) {
-            reason += " Restoring the previous audio configuration also failed";
-            if (restoreError.isNotEmpty()) {
-                reason += ": " + restoreError;
-            }
-            reason += ". Check Audio Settings.";
-        }
-        return juce::Result::fail(reason);
-    };
-    if (!holder.processor->setBusesLayout(layout)) {
-        return rollback("The processor could not apply the requested output layout.");
-    }
-    const auto error = holder.deviceManager.setAudioDeviceSetup(setup, true);
-    if (error.isNotEmpty()) {
-        return rollback("The audio device could not enable the requested outputs: " + error);
-    }
-    const auto matches = [&] {
-        const auto* currentDevice = holder.deviceManager.getCurrentAudioDevice();
-        return currentDevice != nullptr
-            && currentDevice->getActiveOutputChannels().countNumberOfSetBits() == requestedChannels
-            && holder.processor->getTotalNumOutputChannels() == requestedChannels
-            && holder.processor->getTotalNumInputChannels() == 0;
-    };
-    if (!matches()) {
-        return rollback("The audio device or processor did not activate the requested channel count.");
-    }
-    holder.startPlaying();
-    // AudioProcessorPlayer may negotiate a layout when it reattaches.
-    if (!matches()) {
-        return rollback("Playback could not retain the requested output layout.");
-    }
-    return juce::Result::ok();
-}
-}
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraRig(ownerProcessor), clipTimingPanel(ownerProcessor), effectStack(ownerProcessor), routingPanel(ownerProcessor), modulatorLibrary(ownerProcessor), propertyInspector(ownerProcessor) {
@@ -501,7 +413,8 @@ void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::R
     motion::style::styleFields(*panel);
     // A window of its own where the Scope's OpenGL view would cover it.
     const auto available = placement == Placement::below ? getLocalBounds().withTop(anchor.getBottom()) : placement == Placement::left ? getLocalBounds().withRight(anchor.getX()) : getLocalBounds();
-    auto& box = osci::launchCallOut(std::move(content), *this, anchor, available);
+    // In the editor itself, as everything else it shows.
+    auto& box = osci::launchCallOut(std::move(content), *this, anchor, available, this);
     box.setArrowSize(9.0f);
     popover = &box;
     // Escape in a field closes the popover, as it does anywhere else in it.
@@ -526,18 +439,20 @@ void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::R
 }
 
 // A popover's Apply edits after the native event has returned, and only the
-// project state the popover opened on; otherwise it just closes. A failed
-// edit shows its error in the panel (which stays open) or the status bar.
-std::function<void(MotionEditor::PopoverEdit)> MotionEditor::popoverEdit(juce::Component* panel, std::function<void(const juce::String&)> showError) {
+// project state the popover opened on (or, as `requirement` allows, the same
+// project); otherwise it just closes. A failed edit shows its error in the
+// panel (which stays open) or the status bar.
+std::function<void(MotionEditor::PopoverEdit)> MotionEditor::popoverEdit(juce::Component* panel, std::function<void(const juce::String&)> showError, Requires requirement) {
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<juce::Component> popover(panel);
     const auto generation = processor.document.generation();
     const auto revision = processor.document.revision();
-    return [owner, popover, generation, revision, showError](PopoverEdit edit) {
-        juce::MessageManager::callAsync([owner, popover, generation, revision, showError, edit] {
+    return [owner, popover, generation, revision, showError, requirement](PopoverEdit edit) {
+        juce::MessageManager::callAsync([owner, popover, generation, revision, showError, requirement, edit] {
             if (owner == nullptr || popover == nullptr) { return; }
             auto& document = owner->processor.document;
-            if (document.generation() == generation && document.revision() == revision) {
+            const auto unchanged = document.generation() == generation && (requirement == Requires::sameProject || document.revision() == revision);
+            if (unchanged) {
                 const auto result = edit(document);
                 if (result.failed() && showError) {
                     showError(result.getErrorMessage());
@@ -813,7 +728,7 @@ void MotionEditor::refreshFromDocument() {
     for (const auto& task : pendingImports) {
         if (task->generation != processor.document.generation()) { task->cancelled.store(true); }
     }
-    assetLibrary.refresh();
+    assetLibrary.refreshIfChanged();
     refreshTiming();
     timeline.refreshTracks();
     curveEditor.refresh();
@@ -948,6 +863,12 @@ void MotionEditor::previewEffect(const std::string& type, std::optional<motion::
     auto* effects = owner.has_value() && definition != nullptr ? motion::findEffectOwner(project, *owner) : nullptr;
     if (effects != nullptr) { effects->push_back(motion::makeEffect(PreviewId::effect, *definition)); }
     previewProject(effects != nullptr ? &project : nullptr);
+}
+
+void MotionEditor::previewEffectMove(motion::Id effect, std::optional<motion::Id> owner) {
+    auto project = processor.document.project();
+    const auto moved = owner.has_value() && motion::moveEffect(project, effect, *owner, juce::ModifierKeys::getCurrentModifiers().isAltDown(), PreviewId::effect);
+    previewProject(moved ? &project : nullptr);
 }
 
 void MotionEditor::previewProject(const motion::Project* project) {
@@ -1309,7 +1230,7 @@ bool MotionEditor::restoreRouting() {
     routing = motion::fitRouting(routing, device.outputs);
     auto* holder = juce::StandalonePluginHolder::getInstance();
     if (routing.channels() > 2) {
-        const auto opened = holder != nullptr ? configureOutputOnlyChannels(*holder, routing.channels()) : juce::Result::fail({});
+        const auto opened = holder != nullptr ? motion::configureOutputOnlyChannels(*holder, routing.channels()) : juce::Result::fail({});
         if (opened.failed()) { routing = motion::fitRouting(routing, 2); }
     }
     processor.setRouting(routing);
@@ -1322,7 +1243,7 @@ juce::Result MotionEditor::applyRouting(motion::OutputRouting routing) {
     // More than a pair opens the outputs it needs; a pair is always open.
     if (routing.channels() > 2) {
         auto* holder = juce::StandalonePluginHolder::getInstance();
-        const auto opened = holder != nullptr ? configureOutputOnlyChannels(*holder, routing.channels()) : juce::Result::fail("The beam on more than two outputs needs the standalone app's audio device.");
+        const auto opened = holder != nullptr ? motion::configureOutputOnlyChannels(*holder, routing.channels()) : juce::Result::fail("The beam on more than two outputs needs the standalone app's audio device.");
         if (opened.failed()) { return opened; }
     }
     processor.setRouting(routing);

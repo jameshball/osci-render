@@ -61,6 +61,7 @@ void MotionAssetLibrary::setImportStatus(const juce::String& message) {
 }
 
 void MotionAssetLibrary::refresh() {
+    builtFrom = shownInputs();
     const auto selectedId = assetId(list.getSelectedRow());
     // With nothing to search, no search field: the list stays blank under Add source.
     const auto searchable = !document.project().assets.empty() || !document.mainProject().definitions.empty();
@@ -274,7 +275,7 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
         if (kind.isNotEmpty() && !kind.equalsIgnoreCase(asset.name)) { detail.add(kind); }
         // A model kept at its file's size says so (its settings say how
         // much fitting it would scale it).
-        if (modelRow(row) && asset.originalSize) { detail.add("unscaled"); }
+        if (asset.originalSize && modelRow(row)) { detail.add("unscaled"); }
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
             detail.add(juce::String(asset.source->duration(), 1) + " s");

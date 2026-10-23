@@ -63,7 +63,11 @@ public:
     void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor, Placement placement = Placement::best);
     static void dismissPopover(juce::Component* content);
     using PopoverEdit = std::function<juce::Result(motion::Document&)>;
-    std::function<void(PopoverEdit)> popoverEdit(juce::Component* panel, std::function<void(const juce::String&)> showError = {});
+    // What an Apply needs unchanged since the popover opened: the whole
+    // project state, or (for an edit that depends on nothing else) only
+    // that it is the same project.
+    enum class Requires { sameState, sameProject };
+    std::function<void(PopoverEdit)> popoverEdit(juce::Component* panel, std::function<void(const juce::String&)> showError = {}, Requires requirement = Requires::sameState);
 
 
 private:
@@ -187,7 +191,10 @@ private:
     motion::Id toolCamera() const;
     void refreshCameraTools();
     void addCamera(double time);
+    // An effect dragged over `owner` plays there: a new one of `type` at the
+    // end of its stack, or the card `effect` moved (copied, with Alt) there.
     void previewEffect(const std::string& type, std::optional<motion::Id> owner);
+    void previewEffectMove(motion::Id effect, std::optional<motion::Id> owner);
     // The Scene and the output show `project`, a preview; nullptr: the
     // document again.
     void previewProject(const motion::Project* project);
@@ -471,7 +478,7 @@ private:
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
-    // The tempo as Composition settings write it: "120 BPM", or "121.35 BPM".
+    // The project tempo, as motion::style::bpm writes it: "120 BPM", "121.35 BPM"; double-click to type one.
     juce::Label tempoValue;
     // Tap tempo: taps preview the tempo; it commits once tapping pauses.
     juce::TextButton tapButton {"Tap"};

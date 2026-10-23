@@ -84,21 +84,9 @@ public:
 
     std::function<void(const juce::String&)> onError;
     std::function<void()> onHeightChanged;
-    static constexpr std::array<double, 8> rates {24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120};
     // The rates a project can be drawn at, from what audio runs at to four
     // times 192 kHz.
     static constexpr std::array<double, 8> sampleRates {44100, 48000, 88200, 96000, 176400, 192000, 384000, 768000};
-    // The beam's frequencies: Auto, then 1 to 8 cycles a frame.
-    static std::vector<juce::String> beamChoices(double frameRate) {
-        std::vector<juce::String> choices;
-        choices.push_back("Auto" + motion::style::dot() + motion::style::hertz(motion::beamCycleRate(frameRate)));
-        for (int cycles = 1; cycles <= motion::Project::mostBeamCycles; ++cycles) {
-            const auto times = cycles == 1 ? juce::String("once a frame") : cycles == 2 ? juce::String("twice a frame") : juce::String(cycles) + " times a frame";
-            const auto rate = motion::beamCycleRate(frameRate, cycles);
-            choices.push_back(motion::style::hertz(rate) + motion::style::dot() + times + (rate < 45 ? " (flickers)" : ""));
-        }
-        return choices;
-    }
     // Where the beam's frequency is set, for the status bar's rates to lead to.
     juce::Component& beamField() { return beam; }
 
@@ -176,6 +164,19 @@ public:
     }
 
 private:
+    // The frame rates offered, in the frame rate list's order.
+    static constexpr std::array<double, 8> rates {24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120};
+    // The beam's frequencies: Auto, then 1 to 8 cycles a frame.
+    static std::vector<juce::String> beamChoices(double frameRate) {
+        std::vector<juce::String> choices;
+        choices.push_back("Auto" + motion::style::dot() + motion::style::hertz(motion::beamCycleRate(frameRate)));
+        for (int cycles = 1; cycles <= motion::Project::mostBeamCycles; ++cycles) {
+            const auto times = cycles == 1 ? juce::String("once a frame") : cycles == 2 ? juce::String("twice a frame") : juce::String(cycles) + " times a frame";
+            const auto rate = motion::beamCycleRate(frameRate, cycles);
+            choices.push_back(motion::style::hertz(rate) + motion::style::dot() + times + (rate < 45 ? " (flickers)" : ""));
+        }
+        return choices;
+    }
     // As Properties opens a section: a rule after the rows above, then the
     // heading clear of it, then the rows a gap below.
     static constexpr int aboutGap = motion::style::padding + motion::style::gap, ruleGap = 10;

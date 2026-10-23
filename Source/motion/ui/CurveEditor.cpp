@@ -21,6 +21,8 @@ MotionCurveEditor::MotionCurveEditor(MotionProcessor& processor) : processor(pro
 void MotionCurveEditor::setHiddenCurves(std::set<std::string> curves) {
     if (curves == hiddenCurves) { return; }
     hiddenCurves = std::move(curves);
+    // The key times the curves are sampled at change with the curves shown.
+    pathView.reset();
     // Keys of a curve hidden are no longer selected: Delete, drags and the
     // Key panel act only on what shows.
     const auto before = companions.size();
@@ -137,6 +139,15 @@ juce::Path MotionCurveEditor::curvePath(double from, double to, float perPixel, 
     return path;
 }
 
+template <typename Evaluate>
+juce::Path MotionCurveEditor::cachedPath(const std::string& name, double from, double to, float perPixel, const std::vector<double>& keys, Evaluate&& evaluate) {
+    if (!pathView.has_value()) { return curvePath(from, to, perPixel, keys, evaluate); }
+    const auto key = std::make_tuple(name, from, to, perPixel);
+    auto found = paths.find(key);
+    if (found == paths.end()) { found = paths.emplace(key, curvePath(from, to, perPixel, keys, evaluate)).first; }
+    return found->second;
+}
+
 void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, std::optional<double> minorStep) {
     const auto area = plot();
     const auto grid = processor.document.project().timeGrid();
@@ -182,7 +193,7 @@ void MotionCurveEditor::paintRuler(juce::Graphics& g, double step, std::optional
 
 // A readout beside a key, above it or below when there is no room: the
 // muted label (a time, "Influence") before "|", then the value.
-void MotionCurveEditor::paintReadout(juce::Graphics& g, juce::Point<float> anchor, const juce::String& text) {
+juce::Rectangle<float> MotionCurveEditor::readoutBounds(juce::Point<float> anchor, const juce::String& text) const {
     const auto label = text.upToFirstOccurrenceOf("|", false, false), value = text.fromFirstOccurrenceOf("|", false, false);
     const auto labelWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), label);
     const auto valueWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), value);
@@ -190,6 +201,13 @@ void MotionCurveEditor::paintReadout(juce::Graphics& g, juce::Point<float> ancho
     chip.setCentre(anchor.x, anchor.y - 21.0f);
     if (chip.getY() < plot().getY()) { chip.setY(anchor.y + 11.0f); }
     chip.setX(std::clamp(chip.getX(), plot().getX(), std::max(plot().getX(), plot().getRight() - chip.getWidth())));
+    return chip;
+}
+
+void MotionCurveEditor::paintReadout(juce::Graphics& g, juce::Point<float> anchor, const juce::String& text) {
+    const auto label = text.upToFirstOccurrenceOf("|", false, false), value = text.fromFirstOccurrenceOf("|", false, false);
+    const auto labelWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), label);
+    const auto chip = readoutBounds(anchor, text);
     motion::style::fillFloatingPanel(g, chip, osci::Colours::surfaceRaised());
     g.setFont(motion::style::caption());
     auto row = chip.reduced(9.0f, 0.0f);
@@ -218,6 +236,13 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     }
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(0, 0, getWidth(), bandHeight);
+    // Sampled paths are kept between paints unless a drag previews its own.
+    const auto& document = processor.document;
+    const auto view = PathView {document.generation(), document.revision(), targetId, propertyName, viewStart, viewEnd, low, high, getWidth(), getHeight()};
+    if (drag.has_value() || pathView != view) {
+        paths.clear();
+        pathView = drag.has_value() ? std::nullopt : std::optional<PathView>(view);
+    }
     const auto& curve = *displayed(*clip, propertyName);
     // Routed modulators and links count as modulation too: the Result
     // curve shows what the property actually does.
@@ -245,20 +270,22 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         }
     }
     paintRuler(g, step, minorStep);
+    // The group's other axes, once for the whole paint.
+    const auto siblingCurves = siblings(*clip);
     // Every key time of the group, where sampling must land exactly.
     std::vector<double> keyTimes;
     for (const auto& name : groupNames(*clip)) {
         for (const auto& key : displayed(*clip, name)->keyframes()) { keyTimes.push_back(clip->projectTime(key.time)); }
     }
     // Faded where the clip never plays, full strength where it does.
-    const auto strokeAcrossStage = [&](const auto& evaluate, juce::Colour colour, float width, float outside, float perPixel) {
+    const auto strokeAcrossStage = [&](const std::string& name, const auto& evaluate, juce::Colour colour, float width, float outside, float perPixel) {
         const juce::PathStrokeType stroke(width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
         g.setColour(colour.withMultipliedAlpha(outside));
-        if (viewStart < clipStart) { g.strokePath(curvePath(viewStart, std::min(clipStart, viewEnd), perPixel, keyTimes, evaluate), stroke); }
-        if (viewEnd > clipEnd) { g.strokePath(curvePath(std::max(clipEnd, viewStart), viewEnd, perPixel, keyTimes, evaluate), stroke); }
+        if (viewStart < clipStart) { g.strokePath(cachedPath(name, viewStart, std::min(clipStart, viewEnd), perPixel, keyTimes, evaluate), stroke); }
+        if (viewEnd > clipEnd) { g.strokePath(cachedPath(name, std::max(clipEnd, viewStart), viewEnd, perPixel, keyTimes, evaluate), stroke); }
         const auto from = std::max(viewStart, clipStart), to = std::min(viewEnd, clipEnd);
         g.setColour(colour);
-        if (to > from) { g.strokePath(curvePath(from, to, perPixel, keyTimes, evaluate), stroke); }
+        if (to > from) { g.strokePath(cachedPath(name, from, to, perPixel, keyTimes, evaluate), stroke); }
     };
     const auto baseOf = [&clip](const motion::Curve& source) { return [&clip, &source](double time) { return source.evaluateBase(clip->localTime(time)); }; };
     g.saveState();
@@ -276,7 +303,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         // weight. It goes first so it never tints the other curves.
         const auto from = std::max(viewStart, clipStart), to = std::min(viewEnd, clipEnd);
         if (to > from) {
-            auto fill = modulated ? curvePath(from, to, 1.0f, keyTimes, result) : curvePath(from, to, 1.0f, keyTimes, baseOf(curve));
+            auto fill = modulated ? cachedPath("result", from, to, 1.0f, keyTimes, result) : cachedPath(propertyName, from, to, 1.0f, keyTimes, baseOf(curve));
             // The fade follows the curve, from its highest point on screen to a
             // little under its lowest, so a curve above the view leaves only a
             // hint at the top edge rather than tinting the whole plot.
@@ -294,12 +321,13 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     // Channels shown from the list, faint and not editable.
     for (const auto& [name, colour] : contextCurves) {
         const auto* other = clip->curve(name);
-        if (other == nullptr || name == propertyName || isSibling(*clip, name)) { continue; }
-        strokeAcrossStage(baseOf(*other), colour.withAlpha(.32f), 1.0f, .45f, 0.5f);
+        const auto sibling = std::any_of(siblingCurves.begin(), siblingCurves.end(), [&name](const auto& entry) { return entry.first == name; });
+        if (other == nullptr || name == propertyName || sibling) { continue; }
+        strokeAcrossStage(name, baseOf(*other), colour.withAlpha(.32f), 1.0f, .45f, 0.5f);
     }
     // Sibling axes are editable too, in their axis colour under the edited curve.
-    for (const auto& [name, colour] : siblings(*clip)) {
-        strokeAcrossStage(baseOf(*displayed(*clip, name)), colour.withAlpha(.6f), 1.5f, .4f, 1.0f);
+    for (const auto& [name, colour] : siblingCurves) {
+        strokeAcrossStage(name, baseOf(*displayed(*clip, name)), colour.withAlpha(.6f), 1.5f, .4f, 1.0f);
     }
     const auto emphasis = hover.curve && !drag.has_value() ? .6f : 0.0f;
     const auto linked = storedCurve->link.has_value();
@@ -307,18 +335,18 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         // A link replaces the keys: they are drawn dashed, as ignored.
         juce::Path dashed;
         const float dashes[] {5.0f, 4.0f};
-        juce::PathStrokeType(1.5f).createDashedStroke(dashed, curvePath(viewStart, viewEnd, 1.0f, keyTimes, baseOf(curve)), dashes, 2);
+        juce::PathStrokeType(1.5f).createDashedStroke(dashed, cachedPath(propertyName, viewStart, viewEnd, 1.0f, keyTimes, baseOf(curve)), dashes, 2);
         g.setColour(colour.withAlpha(.4f));
         g.fillPath(dashed);
-        strokeAcrossStage(result, motion::style::result(), 2.0f, .4f, 2.0f);
+        strokeAcrossStage("result", result, motion::style::result(), 2.0f, .4f, 2.0f);
     } else if (modulated) {
         // The keys are what you edit; the Result is what plays.
-        strokeAcrossStage(baseOf(curve), colour.withAlpha(.55f), 1.5f + emphasis, .5f, 2.0f);
-        strokeAcrossStage(result, motion::style::result(), 2.0f, .4f, 2.0f);
+        strokeAcrossStage(propertyName, baseOf(curve), colour.withAlpha(.55f), 1.5f + emphasis, .5f, 2.0f);
+        strokeAcrossStage("result", result, motion::style::result(), 2.0f, .4f, 2.0f);
     } else {
-        strokeAcrossStage(baseOf(curve), colour, 2.0f + emphasis, .35f, 2.0f);
+        strokeAcrossStage(propertyName, baseOf(curve), colour, 2.0f + emphasis, .35f, 2.0f);
     }
-    for (const auto& [name, siblingColour] : siblings(*clip)) {
+    for (const auto& [name, siblingColour] : siblingCurves) {
         const auto* other = displayed(*clip, name);
         for (const auto& key : other->keyframes()) {
             motion::style::drawKey(g, keyPoint(*clip, key), 4.0f, key, siblingColour, isSelected(name, key.time), hover.key == KeyRef {name, key.time}, osci::Colours::veryDark());
@@ -408,10 +436,6 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     }
     // What the pointer is on, or what is being dragged: its time and value.
     {
-        const auto valueText = [this](double value) {
-            const auto tick = valueStep(high - low, std::max(3, juce::roundToInt(plot().getHeight() / 30)));
-            return juce::String(value, std::clamp(static_cast<int>(-std::floor(std::log10(tick))) + 1, 0, 6));
-        };
         const auto describe = [&](const std::string& name, double time) -> std::optional<std::pair<juce::Point<float>, juce::String>> {
             const auto* owner = displayed(*clip, name);
             const auto* key = owner != nullptr ? owner->findKey(time) : nullptr;
@@ -430,19 +454,38 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         } else if (!drag.has_value() && hover.key.has_value()) {
             readout = describe(hover.key->property, hover.key->time);
         } else if (!drag.has_value() && hover.curve) {
-            // A ghost key where a double-click would add one (snapped the same
-            // way), with the curve's value there.
-            const auto time = snappedTime(*clip, projectTime(pointer.x), juce::ModifierKeys::currentModifiers);
-            const auto value = curve.evaluateBase(clip->localTime(time));
-            const juce::Point<float> ghost(timeX(time), valueY(value));
-            g.setColour(osci::Colours::veryDark());
-            g.fillEllipse(juce::Rectangle<float>(9.0f, 9.0f).withCentre(ghost));
-            g.setColour(colour);
-            g.drawEllipse(juce::Rectangle<float>(7.0f, 7.0f).withCentre(ghost), 1.5f);
-            readout = std::make_pair(ghost, juce::String(grid.positionLabel(time)) + "|" + valueText(value));
+            readout = ghostKey();
+            if (readout.has_value()) {
+                g.setColour(osci::Colours::veryDark());
+                g.fillEllipse(juce::Rectangle<float>(9.0f, 9.0f).withCentre(readout->first));
+                g.setColour(colour);
+                g.drawEllipse(juce::Rectangle<float>(7.0f, 7.0f).withCentre(readout->first), 1.5f);
+            }
         }
         if (readout.has_value() && area.expanded(4).contains(readout->first)) { paintReadout(g, readout->first, readout->second); }
     }
+}
+
+juce::String MotionCurveEditor::valueText(double value) const {
+    const auto tick = valueStep(high - low, std::max(3, juce::roundToInt(plot().getHeight() / 30)));
+    return juce::String(value, std::clamp(static_cast<int>(-std::floor(std::log10(tick))) + 1, 0, 6));
+}
+
+std::optional<std::pair<juce::Point<float>, juce::String>> MotionCurveEditor::ghostKey() const {
+    if (drag.has_value() || !hover.curve) { return std::nullopt; }
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    const auto* curve = findCurve(clip, propertyName);
+    if (curve == nullptr) { return std::nullopt; }
+    // Snapped as a double-click there would be, with the curve's value.
+    const auto time = snappedTime(*clip, projectTime(pointer.x), juce::ModifierKeys::currentModifiers);
+    const auto value = curve->evaluateBase(clip->localTime(time));
+    return std::make_pair(juce::Point<float>(timeX(time), valueY(value)), juce::String(processor.document.project().timeGrid().positionLabel(time)) + "|" + valueText(value));
+}
+
+std::optional<juce::Rectangle<int>> MotionCurveEditor::ghostBounds() const {
+    const auto ghost = ghostKey();
+    if (!ghost.has_value()) { return std::nullopt; }
+    return juce::Rectangle<float>(9.0f, 9.0f).withCentre(ghost->first).getUnion(readoutBounds(ghost->first, ghost->second)).getSmallestIntegerContainer().expanded(3);
 }
 
 void MotionCurveEditor::resized() {
@@ -509,10 +552,18 @@ void MotionCurveEditor::setHover(Hover next) {
 }
 
 void MotionCurveEditor::mouseMove(const juce::MouseEvent& event) {
+    const auto before = ghostBounds();
     pointer = event.position;
-    setHover(hoverAt(event.position));
-    // The ghost key follows the pointer along a hovered curve.
-    if (hover.curve) { repaint(); }
+    const auto next = hoverAt(event.position);
+    if (next != hover) {
+        setHover(next);
+        return;
+    }
+    // The ghost key follows the pointer along a hovered curve: only it and
+    // its readout repaint, where they were and where they are.
+    for (const auto& area : {before, ghostBounds()}) {
+        if (area.has_value()) { repaint(*area); }
+    }
 }
 
 void MotionCurveEditor::mouseExit(const juce::MouseEvent&) {

@@ -29,6 +29,11 @@ public:
     void setImportStatus(const juce::String& message);
 
     void refresh();
+    // As refresh, when what the list shows has changed since it was built:
+    // most edits (and a drag's every step) leave it alone.
+    void refreshIfChanged() {
+        if (builtFrom != shownInputs()) { refresh(); }
+    }
 
     void selectAsset(motion::Id id);
     // Selected, scrolled to and marked: "Show in Sources".
@@ -113,6 +118,17 @@ private:
     motion::Document& document;
     std::vector<std::shared_ptr<const motion::Asset>> assets;
     std::vector<std::shared_ptr<const motion::CompositionDefinition>> definitions;
+    // What the list is built from: the scope's sources, the project's
+    // compositions, and the scope they are offered to. Held, so a new source
+    // can never take a removed one's address.
+    struct Inputs {
+        std::vector<std::shared_ptr<const motion::Asset>> assets;
+        std::vector<std::shared_ptr<const motion::CompositionDefinition>> definitions;
+        motion::Id scope = 0;
+        bool operator==(const Inputs&) const = default;
+    };
+    Inputs shownInputs() const { return {document.project().assets, document.mainProject().definitions, document.editingComposition()}; }
+    std::optional<Inputs> builtFrom;
     juce::ListBox list;
     osci::ListBoxScrollFades fades {list};
     juce::TextEditor search, rename;

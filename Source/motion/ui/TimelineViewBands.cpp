@@ -336,6 +336,23 @@ void MotionTimelineView::selectMarker(motion::Id id) {
     selectedMarker = id;
 }
 
+void MotionTimelineView::dragMarker(const juce::MouseEvent& event) {
+    // One the document changed under ends.
+    if (edit.stale()) { gesture = {}; edit.reset(); repaint(); return; }
+    const auto& drag = std::get<MarkerDrag>(gesture);
+    const auto id = drag.marker;
+    auto updated = edit.start();
+    const auto delta = (event.x - drag.downX) / pixelsPerSecond;
+    const auto time = delta == 0 ? drag.originalTime : std::clamp(snapEdge(drag.originalTime + delta, event.mods, edit.start(), {}, nullptr, id), 0.0, updated.duration);
+    if (std::any_of(updated.markers.begin(), updated.markers.end(), [id, time](const auto& marker) { return marker.id != id && motion::sameTime(marker.time, time); })) { return; }
+    for (auto& marker : updated.markers) {
+        if (marker.id == id) { marker.time = time; }
+    }
+    std::sort(updated.markers.begin(), updated.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
+    edit.show(std::move(updated), time != drag.originalTime);
+    repaint();
+}
+
 void MotionTimelineView::jumpMarker(bool forward) {
     const auto now = processor.position.load();
     const motion::Marker* target = nullptr;

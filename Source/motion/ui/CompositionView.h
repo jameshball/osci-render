@@ -334,6 +334,15 @@ private:
         std::function<void()> tick;
         void timerCallback() override { if (tick) { tick(); } }
     } cameraSync;
+    // A drag's steps can come faster than frames, and each would build the
+    // Scene again: while a mouse button is held, a project arriving within a
+    // frame of the last build waits for that frame, and only the newest is
+    // built then.
+    static constexpr double framePeriod = 1000.0 / 60;
+    std::optional<motion::Project> waiting;
+    double preparedAt = 0;
+    Sync preparation;
+    void prepare(const motion::Project& project);
     // Zero throughout: no roll at any key or between them.
     static bool level(const motion::Curve& curve);
     double cameraTime() const { return processor.document.project().frameTime(processor.position.load()); }

@@ -20,6 +20,9 @@ namespace {
 // The example projects that ship with osci-motion, as resources.
 std::vector<juce::String> exampleProjects() { return motion::ui::examples::resources(".osci-motion"); }
 constexpr int firstExampleId = 1200;
+// Open recent: one for each recent project, and one to clear the list.
+constexpr int firstRecentId = 1100;
+constexpr int clearRecentId = 1099;
 // One for each output mode.
 constexpr int firstExportAudioId = 1020;
 }
@@ -28,12 +31,12 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
     menu.addItem(motion::style::menuItem("New project", 1001, "Cmd+N"));
     menu.addItem(motion::style::menuItem("Open project...", 1002, "Cmd+O"));
     juce::PopupMenu recent;
-    const int added = processor.createRecentProjectsPopupMenuItems(recent, 1100, true, true);
+    const int added = processor.createRecentProjectsPopupMenuItems(recent, firstRecentId, true, true);
     if (added == 0) {
-        recent.addItem(1100, "No recent projects", false);
+        recent.addItem(firstRecentId, "No recent projects", false);
     }
     recent.addSeparator();
-    recent.addItem(1099, "Clear recent projects", added > 0);
+    recent.addItem(clearRecentId, "Clear recent projects", added > 0);
     menu.addSubMenu("Open recent", recent);
     // Each opens as a new project, to look into or start from.
     juce::PopupMenu examples;
@@ -71,7 +74,7 @@ void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
 }
 
 bool MotionEditor::fileMenuItemSelected(int id) {
-    if (menus.handleRecentProjectMenuItem(id, processor, *this, 1100, 1099)) { return true; }
+    if (menus.handleRecentProjectMenuItem(id, processor, *this, firstRecentId, clearRecentId)) { return true; }
     const auto examples = exampleProjects();
     if (id >= firstExampleId && id < firstExampleId + static_cast<int>(examples.size())) {
         openExample(examples[static_cast<std::size_t>(id - firstExampleId)]);

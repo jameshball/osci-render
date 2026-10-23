@@ -7,6 +7,13 @@ MotionCompositionView::MotionCompositionView(MotionProcessor& processor) : proce
     setName("Composition preview");
     setWantsKeyboardFocus(true);
     cameraSync.tick = [this] { syncCamera(); };
+    preparation.tick = [this] {
+        preparation.stopTimer();
+        if (waiting.has_value()) {
+            const auto project = std::move(*waiting);
+            prepare(project);
+        }
+    };
     partCount.setFont(motion::style::body());
     partCount.setColour(juce::Label::textColourId, osci::Colours::text());
     partCount.setJustificationType(juce::Justification::centred);
@@ -28,6 +35,7 @@ MotionCompositionView::MotionCompositionView(MotionProcessor& processor) : proce
 
 MotionCompositionView::~MotionCompositionView() {
     cameraSync.stopTimer();
+    preparation.stopTimer();
     stopTimer();
     cancelGesture();
     if (navigating) { releaseCursor(); }
@@ -166,6 +174,19 @@ void MotionCompositionView::setViewPreset(ViewPreset preset) {
 }
 
 void MotionCompositionView::preview(const motion::Project& project) {
+    const auto since = juce::Time::getMillisecondCounterHiRes() - preparedAt;
+    const auto dragging = juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown();
+    if (prepared != nullptr && dragging && since < framePeriod) {
+        waiting = project;
+        if (!preparation.isTimerRunning()) { preparation.startTimer(std::max(1, juce::roundToInt(framePeriod - since))); }
+        return;
+    }
+    prepare(project);
+}
+
+void MotionCompositionView::prepare(const motion::Project& project) {
+    preparation.stopTimer();
+    waiting.reset();
     pathDirty = true;
     prepared = std::make_unique<motion::PreparedComposition>(project, 48000, nullptr, motion::CompositionPurpose::editorGeometry);
     shownProject = std::make_shared<const motion::Project>(project);
@@ -177,6 +198,9 @@ void MotionCompositionView::preview(const motion::Project& project) {
     }
     prunePicked();
     repaint();
+    // From when the build is done, so a slow build leaves the frame after it
+    // for everything else.
+    preparedAt = juce::Time::getMillisecondCounterHiRes();
     if (onPrepared) { onPrepared(); }
 }
 

@@ -91,10 +91,9 @@ static double movedKeyTime(const motion::ClipTiming& timing, double time, double
 bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<KeyRef>& keys, double delta) {
     if (keysLocked(project, keys)) { return false; }
     bool collided = false;
-    std::vector<motion::Id> owners;
-    for (const auto& key : keys) {
-        if (std::find(owners.begin(), owners.end(), key.owner) == owners.end()) { owners.push_back(key.owner); }
-    }
+    const KeySet chosen(keys);
+    std::set<motion::Id> owners;
+    for (const auto& key : keys) { owners.insert(key.owner); }
     for (const auto owner : owners) {
         auto target = ownerOf(project, owner);
         if (!target.has_value() || target->properties == nullptr) { continue; }
@@ -102,15 +101,13 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
         for (auto& [name, curve] : *target->properties) {
             std::vector<motion::Keyframe> moving;
             for (const auto& key : curve.keyframes()) {
-                const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.owner == owner && item.property == name && motion::sameTime(item.time, key.time); });
-                if (chosen) { moving.push_back(key); }
+                if (chosen.contains(owner, name, key.time)) { moving.push_back(key); }
             }
             if (moving.empty()) { continue; }
             for (const auto& key : moving) { curve.removeKey(key.time); }
             for (auto key : moving) {
                 key.time = movedKeyTime(timing, key.time, delta);
-                const auto& remaining = curve.keyframes();
-                if (std::any_of(remaining.begin(), remaining.end(), [&](const auto& other) { return motion::sameTime(other.time, key.time); })) {
+                if (curve.hasKeyAt(key.time)) {
                     collided = true;
                     continue;
                 }

@@ -127,7 +127,11 @@ public:
         }
         travel = event.mods.isLeftButtonDown() ? 0 : -1;
         // Anywhere on the header but its buttons selects the track or group.
-        if (onSelect) { onSelect(id, event.mods); }
+        // A plain press on one already picked keeps the pick while it may be
+        // dragged; let go without dragging, it picks this one alone.
+        const auto plain = !event.mods.isCommandDown() && !event.mods.isShiftDown();
+        selectOnRelease = travel == 0 && plain && isPicked && isPicked(id);
+        if (!selectOnRelease && onSelect) { onSelect(id, event.mods); }
     }
     // Dragging the header, by its name or the space around it, moves the
     // track, or a group with all it holds: the timeline lifts it and slides
@@ -142,6 +146,8 @@ public:
     }
     void mouseUp(const juce::MouseEvent& event) override {
         travel = -1;
+        const auto select = std::exchange(selectOnRelease, false) && !carried;
+        if (select && onSelect) { onSelect(id, {}); }
         if (!carried) { return; }
         carry(false);
         if (onReorder) { onReorder(id, event.getScreenPosition(), true); }
@@ -155,10 +161,12 @@ public:
     std::function<void(motion::Id)> onMute, onSolo, onMenu, onCollapse, onLanes, onLock;
     // Cmd adds or removes the track from a selection; Shift takes a run.
     std::function<void(motion::Id, juce::ModifierKeys)> onSelect;
+    // Whether the track or group is picked already.
+    std::function<bool(motion::Id)> isPicked;
     // The header's drag, in screen coordinates; `finished` on release.
     std::function<void(motion::Id, juce::Point<int>, bool finished)> onReorder;
 private:
-    bool isGroup = false, isComposition = false, carried = false;
+    bool isGroup = false, isComposition = false, carried = false, selectOnRelease = false;
     juce::Rectangle<float> folderArea;
     // How far the pointer has moved since a left press; -1 with none.
     int travel = -1;

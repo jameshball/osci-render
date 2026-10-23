@@ -38,48 +38,72 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
     g.drawText(row.label, indent + 12, y, namesWidth - indent - 18, height - bandGap, juce::Justification::centredLeft);
     juce::Graphics::ScopedSaveState scope(g);
     g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
+    // Only the columns being repainted (during playback, the playhead's strip).
+    const auto repainted = g.getClipBounds();
+    if (repainted.isEmpty()) { return; }
+    const auto view = LaneRangeView {processor.document.generation(), processor.document.scopeGeneration(), processor.document.revision(), scrollTime, pixelsPerSecond, namesWidth, getWidth()};
+    if (laneRangeView != view) {
+        laneRangeView = view;
+        laneRanges.clear();
+    }
+    // This lane's selected keys, looked up rather than scanned per key.
+    std::vector<KeyRef> laneSelection;
+    std::copy_if(selectedKeys.begin(), selectedKeys.end(), std::back_inserter(laneSelection), [&row](const auto& key) { return key.property == row.property; });
+    const KeySet chosen(laneSelection);
     const auto centre = y + height * .5f;
     for (const auto owner : row.owners) {
         const auto target = motion::findPropertyTarget(project, owner);
         const auto* curve = target.has_value() ? target->curve(row.property) : nullptr;
         const auto timing = target.has_value() ? target->clock() : motion::ClipTiming();
         if (curve == nullptr || !curve->animated() || timing.rate == 0) { continue; }
+        const auto left = timeX(timing.start), right = timeX(timing.end());
+        // Keys at its ends reach a few pixels past them.
+        if (right + 6 < repainted.getX() || left - 6 > repainted.getRight()) { continue; }
         const auto* clip = laneClip(project, owner);
         const auto* track = clip != nullptr ? motion::findClipTrack(project, clip->id) : nullptr;
         // Tinted as what holds it: its clip, the composition's slate, or (a track's own effect) neutral.
         const auto composition = std::any_of(project.effects.begin(), project.effects.end(), [owner](const auto& effect) { return effect.id == owner; });
         const auto tint = clip != nullptr && track != nullptr ? clipColour(*clip, *track) : composition ? motion::style::compositionClip() : osci::Colours::textMuted();
-        const auto left = timeX(timing.start), right = timeX(timing.end());
         g.setColour(tint.withAlpha(.18f));
         g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
         const auto& keys = curve->keyframes();
         // A faint value curve normalised to the lane shows each move's shape.
         if (keys.size() > 1) {
             const auto first = std::max(left, namesWidth), last = std::min(right, getWidth());
-            double low = std::numeric_limits<double>::max(), high = std::numeric_limits<double>::lowest();
-            for (const auto& key : keys) { low = std::min(low, key.value); high = std::max(high, key.value); }
             const auto localAt = [&](int x) { return timing.localTime(timeAt(x)); };
-            for (int x = first; x < last; x += 3) {
-                const auto value = curve->evaluateBase(localAt(x));
-                low = std::min(low, value);
-                high = std::max(high, value);
+            // Normalised over all it shows, wherever the repaint is.
+            auto range = laneRanges.find({row.lane, owner});
+            if (range == laneRanges.end()) {
+                double low = std::numeric_limits<double>::max(), high = std::numeric_limits<double>::lowest();
+                for (const auto& key : keys) { low = std::min(low, key.value); high = std::max(high, key.value); }
+                for (int x = first; x < last; x += 3) {
+                    const auto value = curve->evaluateBase(localAt(x));
+                    low = std::min(low, value);
+                    high = std::max(high, value);
+                }
+                range = laneRanges.emplace(std::make_pair(row.lane, owner), std::make_pair(low, high)).first;
             }
-            if (high > low && last > first) {
+            const auto low = range->second.first, high = range->second.second;
+            // Sampled every 2 px from `first`, as a full paint does, so a
+            // repainted strip meets the curve either side of it.
+            const auto from = std::max(first, first + (repainted.getX() - 2 - first) / 2 * 2);
+            const auto to = std::min(last, repainted.getRight() + 2);
+            if (high > low && to > from) {
                 juce::Path shape;
                 const auto yOf = [&](double value) { return static_cast<float>(y + height - 4 - (value - low) / (high - low) * (height - 8)); };
-                shape.startNewSubPath(static_cast<float>(first), yOf(curve->evaluateBase(localAt(first))));
-                for (int x = first + 2; x < last; x += 2) { shape.lineTo(static_cast<float>(x), yOf(curve->evaluateBase(localAt(x)))); }
+                shape.startNewSubPath(static_cast<float>(from), yOf(curve->evaluateBase(localAt(from))));
+                for (int x = from + 2; x < to; x += 2) { shape.lineTo(static_cast<float>(x), yOf(curve->evaluateBase(localAt(x)))); }
                 g.setColour(colour.withAlpha(.4f));
                 g.strokePath(shape, juce::PathStrokeType(1.0f));
             }
         }
         // Key shape encodes its outgoing interpolation, as in the Graph.
         const auto behind = osci::Colours::surfaceSunken().interpolatedWith(tint, .18f);
-        for (std::size_t k = 0; k < keys.size(); ++k) {
-            const auto time = timing.projectTime(keys[k].time);
+        for (const auto& key : keys) {
             // A key at the very start stays clear of the name column.
-            const auto x = std::max(static_cast<float>(timeX(time)), static_cast<float>(namesWidth) + 4.5f);
-            motion::style::drawKey(g, {x, centre}, 4.5f, keys[k], colour, isKeySelected(owner, row.property, keys[k].time), false, behind);
+            const auto x = std::max(static_cast<float>(timeX(timing.projectTime(key.time))), static_cast<float>(namesWidth) + 4.5f);
+            if (x + 6 < static_cast<float>(repainted.getX()) || x - 6 > static_cast<float>(repainted.getRight())) { continue; }
+            motion::style::drawKey(g, {x, centre}, 4.5f, key, colour, chosen.contains(owner, row.property, key.time), false, behind);
         }
     }
 }
@@ -224,13 +248,23 @@ void MotionTimelineView::ensureTrackRows() const {
         if (std::none_of(project.cameraCuts.begin(), project.cameraCuts.end(), [this](const auto& cut) { return cut.id == selectedCut; })) { selectedCut = 0; }
         if (selectedCameraKey.has_value() && std::none_of(project.cameras.begin(), project.cameras.end(), [this](const auto& camera) { return camera.id == selectedCameraKey->first; })) { selectedCameraKey.reset(); }
         rebuildRows();
-        std::erase_if(selectedClips, [this](auto id) { return !isClip(id); });
+        if (!selectedClips.empty()) {
+            std::unordered_set<motion::Id> clips;
+            for (const auto& track : project.tracks) {
+                for (const auto& clip : track.clips) { clips.insert(clip.id); }
+            }
+            std::erase_if(selectedClips, [&clips](auto id) { return !clips.contains(id); });
+        }
         std::erase_if(selectedTracks, [&project](auto id) {
             return motion::findGroup(project, id) == nullptr && project.tracks.findById(id) == nullptr;
         });
-        // A key stays selected while its owner (a clip or an effect) still has it.
-        std::erase_if(selectedKeys, [&project](const KeyRef& key) {
-            const auto* curve = motion::findPropertyCurve(project, key.owner, key.property);
+        // A key stays selected while its owner (a clip or an effect) still
+        // has it; each owner is looked up once.
+        std::unordered_map<motion::Id, std::optional<motion::PropertyTarget>> owners;
+        std::erase_if(selectedKeys, [&project, &owners](const KeyRef& key) {
+            auto found = owners.find(key.owner);
+            if (found == owners.end()) { found = owners.emplace(key.owner, motion::findPropertyTarget(project, key.owner)).first; }
+            const auto* curve = found->second.has_value() ? found->second->curve(key.property) : nullptr;
             return curve == nullptr || curve->findKey(key.time) == nullptr;
         });
         layoutRevision = revision;
@@ -262,12 +296,10 @@ void MotionTimelineView::addEffectLanes(std::vector<Row>& lanes, const std::vect
     }
 }
 
-std::vector<MotionTimelineView::Row> MotionTimelineView::trackLanes(const motion::Project& project, const motion::Track& track) {
-    std::vector<Row> lanes;
-    std::vector<motion::PropertySpec> specs;
-    const auto base = track.kind == motion::TrackKind::audio ? std::span<const motion::PropertySpec>(motion::audioPropertySpecs) : motion::objectPropertySpecs;
-    specs.assign(base.begin(), base.end());
-    if (track.kind == motion::TrackKind::visual) {
+const std::vector<motion::PropertySpec>& MotionTimelineView::laneSpecs(motion::TrackKind kind) {
+    static const auto audio = std::vector<motion::PropertySpec>(motion::audioPropertySpecs.begin(), motion::audioPropertySpecs.end());
+    static const auto visual = [] {
+        std::vector<motion::PropertySpec> specs(motion::objectPropertySpecs.begin(), motion::objectPropertySpecs.end());
         specs.insert(specs.end(), motion::luaSliderSpecs.begin(), motion::luaSliderSpecs.end());
         specs.insert(specs.end(), motion::fractalPropertySpecs.begin(), motion::fractalPropertySpecs.end());
         // Every generator's parameters, each name once.
@@ -276,8 +308,32 @@ std::vector<MotionTimelineView::Row> MotionTimelineView::trackLanes(const motion
                 if (motion::findPropertySpec(specs, spec.id) == nullptr) { specs.push_back(spec); }
             }
         }
+        return specs;
+    }();
+    return kind == motion::TrackKind::audio ? audio : visual;
+}
+
+bool MotionTimelineView::hasLanes(const motion::Track& track) {
+    const auto& specs = laneSpecs(track.kind);
+    const auto keyed = [](const motion::EffectInstance& effect) {
+        const auto* definition = motion::effectDefinition(effect.type);
+        return definition != nullptr && std::any_of(definition->parameters.begin(), definition->parameters.end(), [&effect](const auto& parameter) {
+            const auto found = effect.properties.find(parameter.id);
+            return found != effect.properties.end() && found->second.animated();
+        });
+    };
+    for (const auto& clip : track.clips) {
+        for (const auto& [name, curve] : clip.properties) {
+            if (curve.animated() && motion::findPropertySpec(specs, name) != nullptr) { return true; }
+        }
+        if (std::any_of(clip.effects.begin(), clip.effects.end(), keyed)) { return true; }
     }
-    for (const auto& spec : specs) {
+    return std::any_of(track.effects.begin(), track.effects.end(), keyed);
+}
+
+std::vector<MotionTimelineView::Row> MotionTimelineView::trackLanes(const motion::Project& project, const motion::Track& track) {
+    std::vector<Row> lanes;
+    for (const auto& spec : laneSpecs(track.kind)) {
         const std::string id(spec.id);
         // Shown while a clip keys it; every clip with it can take a key there.
         Row lane;
@@ -319,6 +375,7 @@ std::vector<MotionTimelineView::Row> MotionTimelineView::compositionLanes(const 
 void MotionTimelineView::rebuildRows() const {
     const auto& project = processor.document.project();
     rows.clear();
+    headerRows.clear();
     std::erase_if(expandedTracks, [&](auto id) { return id != compositionRow && project.tracks.findById(id) == nullptr; });
     const auto addLanes = [&](const motion::TrackRow& base, std::vector<Row> lanes) {
         for (auto& lane : lanes) {
@@ -340,6 +397,12 @@ void MotionTimelineView::rebuildRows() const {
         rows.push_back(row);
         if (base.track < 0 || !expandedTracks.contains(base.id)) { continue; }
         addLanes(base, trackLanes(project, project.tracks[static_cast<std::size_t>(base.track)]));
+    }
+    trackRows.assign(project.tracks.size(), -1);
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        if (rows[row].isLane()) { continue; }
+        headerRows.emplace(rows[row].id, static_cast<int>(row));
+        if (rows[row].track >= 0 && rows[row].track < static_cast<int>(trackRows.size())) { trackRows[static_cast<std::size_t>(rows[row].track)] = static_cast<int>(row); }
     }
     layoutRows();
 }
@@ -392,19 +455,14 @@ const MotionTimelineView::Row* MotionTimelineView::laneAtY(int y) const {
 
 int MotionTimelineView::trackY(int track) const {
     ensureTrackRows();
-    const auto found = std::find_if(rows.begin(), rows.end(), [track](const auto& row) { return row.track == track && !row.isLane(); });
-    return found == rows.end() ? -defaultTrackHeight : rowY(static_cast<int>(found - rows.begin()));
+    const auto row = track >= 0 && track < static_cast<int>(trackRows.size()) ? trackRows[static_cast<std::size_t>(track)] : -1;
+    return row < 0 ? -defaultTrackHeight : rowY(row);
 }
 
 int MotionTimelineView::rowY(int row) const {
     if (row < 0) { return rulerHeight - scrollY; }
     const auto top = row < static_cast<int>(rowTops.size()) ? rowTops[static_cast<std::size_t>(row)] : contentHeight + (row - static_cast<int>(rowTops.size())) * defaultTrackHeight;
     return rulerHeight - scrollY + top;
-}
-
-juce::Rectangle<int> MotionTimelineView::clipBounds(const motion::Clip& clip, int row) const {
-    const auto timing = clip.timing(processor.document.project().tempo());
-    return { timeX(timing.start), trackY(row), std::max(2, boundedPixel(timing.duration() * pixelsPerSecond)), trackHeight(row) };
 }
 
 // The composition's effects as one bar across all of it, as an adjustment

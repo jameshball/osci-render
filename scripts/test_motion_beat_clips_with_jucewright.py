@@ -85,7 +85,7 @@ try:
     tempo(60)
     command("wait-for-locator", "--text", "Couldn't change the tempo")
     step("overlap explanation", "screenshot", "--file", session.artifact_dir / "tempo-conflict.png")
-    command("wait-for-locator", "--name", "240.0", "--class", "juce::Label", "--exact")
+    command("wait-for-locator", "--name", "240 BPM", "--class", "juce::Label", "--exact")
     step("select musical clip", "click", "--class", "MotionTimelineView", "--position", "324,77")
     step("seek musical midpoint", "click", "--class", "MotionTimelineView", "--position", "324,12")
     step("split musical clip", "press", "command + k", "--class", "MotionTimelineView")

@@ -6,12 +6,16 @@
 #include "../model/SourceParts.h"
 #include "../../parser/FileFormatRegistry.h"
 #include "../live/TextureSource.h"
+#include <string_view>
 
 namespace motion::ui {
+// A source's file as it is held, read in place: rows paint often, and a model
+// or SVG file can run to megabytes.
+inline std::string_view fileText(const Asset& asset) { return {static_cast<const char*>(asset.data.getData()), asset.data.getSize()}; }
 // An SVG drawn in osci-motion's drawing editor, which edits it again.
-inline bool isDrawing(const Asset& asset) { return asset.extension.equalsIgnoreCase(".svg") && drawing::isDrawing(asset.data.toString()); }
+inline bool isDrawing(const Asset& asset) { return asset.extension.equalsIgnoreCase(".svg") && fileText(asset).find(drawing::marker) != std::string_view::npos; }
 // A 3D object as imported, not parts split from one (which keep their place).
-inline bool isModel(const Asset& asset) { return asset.extension.equalsIgnoreCase(".obj") && !parts::isLineSet(asset.data.toString()); }
+inline bool isModel(const Asset& asset) { return asset.extension.equalsIgnoreCase(".obj") && !fileText(asset).starts_with(parts::lineSetMarker); }
 // What kind of source an asset is, as the library and Properties both name it.
 inline juce::String sourceKind(const Asset& asset) {
     const auto extension = asset.extension.toLowerCase();

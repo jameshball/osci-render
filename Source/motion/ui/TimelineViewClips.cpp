@@ -1,7 +1,31 @@
 #include "TimelineView.h"
+#include "../model/LightPresets.h"
 
-// Clips: how they paint, and what dragging sources and effects onto the
-// tracks, deleting and duplicating do.
+// Clips: where they sit, how they paint and are dragged, their menu, and
+// what dragging sources and effects onto the tracks, deleting and
+// duplicating do.
+
+const motion::Clip* MotionTimelineView::clipAt(juce::Point<int> position, int& row) const {
+    if (position.x < namesWidth || position.y < rulerHeight) {
+        return nullptr;
+    }
+    row = trackAtY(position.y);
+    const auto& tracks = processor.document.project().tracks;
+    if (row < 0 || row >= static_cast<int>(tracks.size())) {
+        return nullptr;
+    }
+    for (const auto& clip : tracks[row].clips) {
+        if (clipBounds(clip, row).contains(position)) {
+            return &clip;
+        }
+    }
+    return nullptr;
+}
+
+juce::Rectangle<int> MotionTimelineView::clipBounds(const motion::Clip& clip, int row) const {
+    const auto timing = clip.timing(processor.document.project().tempo());
+    return { timeX(timing.start), trackY(row), std::max(2, boundedPixel(timing.duration() * pixelsPerSecond)), trackHeight(row) };
+}
 
 void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
     if (!dropPosition.has_value()) { return; }
@@ -91,24 +115,13 @@ void MotionTimelineView::previewEffect(motion::Id owner) {
     if (owner == previewedOwner && processor.document.revision() == previewedRevision) { return; }
     previewedOwner = owner;
     previewedRevision = processor.document.revision();
-    if (!onPreview) { return; }
-    // A moved card plays where it would land.
-    if (dropInstance != 0 && owner != 0) {
-        auto project = processor.document.project();
-        const auto moved = motion::moveEffect(project, dropInstance, owner, juce::ModifierKeys::getCurrentModifiers().isAltDown(), std::numeric_limits<motion::Id>::max());
-        onPreview(moved ? &project : nullptr);
-        return;
+    const auto target = owner != 0 ? std::optional<motion::Id>(owner) : std::nullopt;
+    // A moved card plays where it would land; a new effect, at the end of the owner's stack.
+    if (dropInstance != 0) {
+        if (onEffectMovePreview) { onEffectMovePreview(dropInstance, target); }
+    } else if (onEffectPreview) {
+        onEffectPreview(dropEffect, target);
     }
-    const auto* definition = motion::effectDefinition(dropEffect);
-    if (owner == 0 || definition == nullptr) {
-        onPreview(nullptr);
-        return;
-    }
-    auto project = processor.document.project();
-    auto* effects = motion::findEffectOwner(project, owner);
-    if (effects == nullptr) { onPreview(nullptr); return; }
-    effects->push_back(motion::makeEffect(std::numeric_limits<motion::Id>::max(), *definition));
-    onPreview(&project);
 }
 
 void MotionTimelineView::setEffectDragActive(bool active) {
@@ -176,6 +189,189 @@ bool MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
     return true;
 }
 
+motion::Id MotionTimelineView::effectOwnerAt(juce::Point<int> position) const {
+    if (position.y < rulerHeight) { return 0; }
+    int row = 0;
+    const auto* clip = clipAt(position, row);
+    const auto& tracks = processor.document.project().tracks;
+    if (position.x < namesWidth) { row = trackAtY(position.y); }
+    const auto group = groupAtY(position.y);
+    if (group != 0) { return group; }
+    if (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[static_cast<std::size_t>(row)].kind != motion::TrackKind::visual || (clip == nullptr && position.x >= namesWidth)) { return 0; }
+    const auto owner = clip != nullptr ? clip->id : tracks[static_cast<std::size_t>(row)].id;
+    const auto* effects = motion::findEffectOwner(processor.document.project(), owner);
+    return effects != nullptr && effects->size() < motion::maximumEffectsPerOwner ? owner : 0;
+}
+
+void MotionTimelineView::insertEffect(const std::string& type, juce::Point<int> position) {
+    const auto* definition = motion::effectDefinition(type);
+    const auto owner = effectOwnerAt(position);
+    if (definition == nullptr || owner == 0) { return; }
+    int row = 0;
+    const auto* clip = position.x >= namesWidth ? clipAt(position, row) : nullptr;
+    if (clip != nullptr) { selectClip(clip->id); }
+    const auto effect = motion::makeEffect(processor.document.newId(), *definition);
+    processor.document.edit("Add " + juce::String(definition->name), [owner, effect](motion::Project& project) {
+        auto* destination = motion::findEffectOwner(project, owner);
+        if (destination != nullptr) { destination->push_back(effect); }
+    });
+    if (onEffectAdded) { onEffectAdded(owner, effect.id); }
+}
+
+void MotionTimelineView::dragClips(const juce::MouseEvent& event) {
+    // One the document changed under ends.
+    if (edit.stale()) { gesture = {}; edit.reset(); repaint(); return; }
+    const auto& drag = std::get<ClipDrag>(gesture);
+    const auto& before = edit.start();
+    // Shows the drag's edit, made from the start.
+    const auto show = [this](motion::Project updated, bool changed) {
+        edit.show(std::move(updated), changed);
+        repaint();
+    };
+    auto candidate = drag.original;
+    const auto timing = drag.original.timing(before.tempo());
+    auto edited = timing;
+    auto delta = (event.x - drag.downX) / pixelsPerSecond;
+    if (delta != 0.0 && !event.mods.isAltDown()) {
+        std::set<motion::Id> excluded(selectedClips.begin(), selectedClips.end());
+        excluded.insert(drag.original.id);
+        if (drag.mode == Mode::slip) {
+            const auto anchor = timing.offset / timing.rate;
+            delta = before.timeGrid().snap(anchor + delta) - anchor;
+        } else if (drag.mode == Mode::move) {
+            // Either edge of a moving clip can catch a magnet.
+            const auto startTarget = magnet(timing.start + delta, before, excluded);
+            const auto endTarget = magnet(timing.end() + delta, before, excluded);
+            const auto startDistance = startTarget.has_value() ? std::abs(*startTarget - (timing.start + delta)) : 1.0e300;
+            const auto endDistance = endTarget.has_value() ? std::abs(*endTarget - (timing.end() + delta)) : 1.0e300;
+            if (startTarget.has_value() && startDistance <= endDistance) {
+                delta = *startTarget - timing.start;
+                snapGuide = startTarget;
+            } else if (endTarget.has_value()) {
+                delta = *endTarget - timing.end();
+                snapGuide = endTarget;
+            } else {
+                delta = before.timeGrid().snap(timing.start + delta) - timing.start;
+                snapGuide.reset();
+            }
+        } else {
+            const auto anchor = drag.mode == Mode::right || drag.mode == Mode::stretch || drag.mode == Mode::rippleRight ? timing.end() : timing.start;
+            delta = snapEdge(anchor + delta, event.mods, before, excluded) - anchor;
+        }
+    } else {
+        snapGuide.reset();
+    }
+    if (drag.mode == Mode::rippleLeft || drag.mode == Mode::rippleRight) {
+        auto updated = before;
+        if (!motion::rippleTrim(updated.tracks.change(drag.originalRow), drag.original.id, drag.mode == Mode::rippleLeft, delta, updated.tempo())) { return; }
+        for (const auto& item : updated.tracks[drag.originalRow].clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
+        show(std::move(updated), delta != 0);
+        return;
+    }
+    if (drag.mode == Mode::move && selectedClips.size() > 1) {
+        auto updated = before;
+        double earliest = timing.start;
+        for (const auto& track : updated.tracks) {
+            for (const auto& item : track.clips) {
+                if (selectedClips.contains(item.id)) { earliest = std::min(earliest, item.timing(updated.tempo()).start); }
+            }
+        }
+        delta = std::max(delta, -earliest);
+        const auto row = trackAtY(event.y);
+        const auto tracksDown = row >= 0 ? row - drag.originalRow : 0;
+        if (tracksDown != 0) {
+            const auto sourceY = trackY(drag.originalRow);
+            const auto visibleDelta = trackY(row) - sourceY;
+            for (int index = 0; index < static_cast<int>(updated.tracks.size()); ++index) {
+                const auto& track = updated.tracks[index];
+                if (!std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& item) { return selectedClips.contains(item.id); })) { continue; }
+                const auto y = trackY(index);
+                if (y < rulerHeight || trackAtY(y + visibleDelta) != index + tracksDown) { return; }
+            }
+        }
+        if (!motion::moveClips(updated.tracks, {selectedClips.begin(), selectedClips.end()}, delta, tracksDown, updated.tempo())) { return; }
+        for (const auto& track : updated.tracks) {
+            for (const auto& item : track.clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
+        }
+        show(std::move(updated), delta != 0 || tracksDown != 0);
+        return;
+    }
+    // A clip's timing with the drag applied to the edge (or contents) held.
+    const auto dragged = [&](const auto& from) {
+        auto to = from;
+        if (drag.mode == Mode::move) {
+            to.moveTo(std::max(0.0, from.start + delta));
+        } else if (drag.mode == Mode::left) {
+            to.setStart(std::max(0.0, from.start + delta));
+            to.offset = from.localTime(to.start);
+        } else if (drag.mode == Mode::right) {
+            to.setEnd(to.end() + delta);
+        } else if (drag.mode == Mode::slip) {
+            to.offset += delta * from.rate;
+        } else {
+            to.setEnd(to.end() + delta);
+            to.rate *= from.duration() / to.duration();
+        }
+        return to;
+    };
+    if (drag.mode != Mode::move && selectedClips.size() > 1 && selectedClips.contains(drag.original.id)) {
+        // Every selected clip on an unlocked track by the same time, as the
+        // one held: all their start or end edges, contents or speeds.
+        auto updated = before;
+        std::vector<std::pair<int, motion::Clip>> edits;
+        for (int index = 0; index < static_cast<int>(updated.tracks.size()); ++index) {
+            const auto& track = updated.tracks[index];
+            if (track.locked) { continue; }
+            for (const auto& item : track.clips) {
+                if (!selectedClips.contains(item.id)) { continue; }
+                auto clip = item;
+                if (delta != 0.0 && !clip.setTiming(dragged(item.timing(updated.tempo())), updated.tempo())) { return; }
+                edits.emplace_back(index, std::move(clip));
+            }
+        }
+        for (const auto& [index, clip] : edits) {
+            std::erase_if(updated.tracks.change(index).clips, [id = clip.id](const auto& item) { return item.id == id; });
+        }
+        for (const auto& [index, clip] : edits) {
+            if (!updated.tracks.change(index).insert(clip, updated.tempo())) {
+                // Where one would overlap another shows in red; all stay put.
+                blocked = clipBounds(clip, index);
+                repaint();
+                return;
+            }
+            updated.duration = std::max(updated.duration, clip.timing(updated.tempo()).end());
+        }
+        blocked.reset();
+        show(std::move(updated), delta != 0.0);
+        return;
+    }
+    if (delta != 0.0) {
+        edited = dragged(timing);
+        if (!candidate.setTiming(edited, before.tempo())) { return; }
+    }
+    const auto target = drag.mode == Mode::move
+        ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : drag.originalRow) : drag.originalRow;
+    if (before.tracks[target].locked || before.tracks[target].kind != before.tracks[drag.originalRow].kind) { return; }
+    const bool candidateChanged = candidate.start != drag.original.start || candidate.duration != drag.original.duration
+        || candidate.offset != drag.original.offset || candidate.rate != drag.original.rate || target != drag.originalRow;
+    if (!candidateChanged) {
+        // Back where it began: the start is shown once.
+        if (edit.changed()) { show(before, false); }
+        return;
+    }
+    auto updated = before;
+    std::erase_if(updated.tracks.change(drag.originalRow).clips, [&](const auto& clip) { return clip.id == drag.original.id; });
+    if (updated.tracks.change(target).insert(candidate, updated.tempo())) {
+        updated.duration = std::max(updated.duration, candidate.timing(updated.tempo()).end());
+        blocked.reset();
+        show(std::move(updated), true);
+    } else {
+        // Where the clip would land shows in red; it stays at the last free spot.
+        blocked = clipBounds(candidate, target);
+        repaint();
+    }
+}
+
 std::optional<juce::Colour> MotionTimelineView::labelColour(const motion::Track& track) {
     if (track.label <= 0 || track.label >= static_cast<int>(motion::style::trackLabels().size())) { return std::nullopt; }
     return juce::Colour(motion::style::trackLabels()[static_cast<std::size_t>(track.label)].argb);
@@ -234,7 +430,7 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
         g.fillRoundedRectangle(bounds.getX() + 3, bounds.getY() + 6, 2, bounds.getHeight() - 12, 1);
         g.fillRoundedRectangle(bounds.getRight() - 5, bounds.getY() + 6, 2, bounds.getHeight() - 12, 1);
     }
-    if (!audio) { paintBeamShare(g, clip.id, beamArea(clip, index), bounds, opacity); }
+    const auto shareShown = !audio && paintBeamShare(g, clip.id, beamArea(clip, index), bounds, opacity);
     // Every clip's name sits in the same band at its top, clear of the key
     // ticks along its foot and the waveform below, so names line up along a
     // row.
@@ -305,6 +501,13 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
         const auto font = g.getCurrentFont();
         const auto textWidth = juce::TextLayout::getStringWidth(font, label);
         const auto fill = (hovered ? base.brighter(.1f) : base).withAlpha(opacity);
+        // Over a beam share the name sits on the clip's own colour, so the
+        // share's fill, edge and keys never run through it.
+        if (shareShown) {
+            const auto chipWidth = std::min(textWidth + 6, labelBounds.getWidth() + 3);
+            g.setColour(fill);
+            g.fillRoundedRectangle(labelBounds.withX(labelBounds.getX() - 3).withWidth(chipWidth).withSizeKeepingCentre(chipWidth, font.getHeight() + 2), 3);
+        }
         // A muted track's names stay legible (3:1 or better) while its fills dim.
         g.setColour(juce::Colours::white.withAlpha((active ? 1.0f : .88f) * std::max(opacity, .6f)));
         g.drawText(label, labelBounds.withWidth(std::max(labelBounds.getWidth(), 2000.0f)), juce::Justification::centredLeft, false);
@@ -322,7 +525,7 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
 }
 
 void MotionTimelineView::deleteSelectedClips(bool ripple) {
-    cancelGesture();
+    cancelClipGesture();
     const auto result = processor.document.removeClips({selectedClips.begin(), selectedClips.end()}, ripple);
     if (!report(result)) { return; }
     selectClip(0);
@@ -330,7 +533,7 @@ void MotionTimelineView::deleteSelectedClips(bool ripple) {
 }
 
 void MotionTimelineView::duplicateClip(motion::Id id) {
-    cancelGesture();
+    cancelClipGesture();
     std::vector<motion::Id> duplicates;
     const auto sources = selectedClips.contains(id) ? std::vector<motion::Id>(selectedClips.begin(), selectedClips.end()) : std::vector<motion::Id>{id};
     const auto result = processor.document.duplicateClips(sources, duplicates);
@@ -341,4 +544,99 @@ void MotionTimelineView::duplicateClip(motion::Id id) {
     revealSelection();
     const auto* clip = motion::findClip(processor.document.project(), duplicate);
     if (clip != nullptr) { revealTime(clip->timing(processor.document.project().tempo()).start); }
+}
+
+void MotionTimelineView::showClipMenu(motion::Id id) {
+    juce::PopupMenu menu;
+    const auto many = selectedClips.size() > 1;
+    motion::Id asset = 0, definition = 0;
+    bool locked = false;
+    const auto* clip = motion::findClip(processor.document.project(), id);
+    if (clip != nullptr) {
+        asset = clip->asset;
+        definition = clip->composition;
+        locked = motion::findClipTrack(processor.document.project(), id)->locked;
+    }
+    // The editor's own commands, so the menu and shortcuts agree.
+    const std::array<std::pair<const char*, const char*>, 4> edits {{{"Cut", "Cmd+X"}, {"Copy", "Cmd+C"}, {"Paste", "Cmd+V"}, {"Split at playhead", "Cmd+K"}}};
+    for (int index = 0; index < static_cast<int>(edits.size()); ++index) {
+        const auto pasting = index == 2;
+        const auto enabled = (index == 1 || !locked) && (!pasting || (canPaste && canPaste()));
+        menu.addItem(motion::style::menuItem(edits[static_cast<std::size_t>(index)].first, 20 + index, edits[static_cast<std::size_t>(index)].second).setEnabled(enabled));
+    }
+    menu.addItem(motion::style::menuItem(many ? "Duplicate clips" : "Duplicate clip", 1, "Cmd+D").setEnabled(!locked));
+    menu.addSeparator();
+    menu.addItem(2, "Edit clip timing");
+    menu.addItem(motion::style::menuItem(many ? "Loop selected clips" : "Loop this clip", 9, "Shift+L"));
+    if (asset != 0) { menu.addItem(10, "Show in Sources"); }
+    menu.addSeparator();
+    menu.addItem(motion::style::menuItem(many ? "Delete clips" : "Delete clip", 7, "Delete").setEnabled(!locked));
+    menu.addItem(motion::style::menuItem(many ? "Ripple delete clips" : "Ripple delete clip", 8, "Shift+Delete").setEnabled(!locked));
+    const auto references = processor.document.assetUses(asset);
+    if (definition == 0) { menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1); }
+    // A light's presets: ways it moves on its own.
+    const auto* generator = motion::generatorFor(processor.document.project(), id);
+    if (generator != nullptr && generator->category == motion::GeneratorCategory::light) {
+        const auto hasPreset = motion::hasLightPreset(processor.document.project(), id);
+        juce::PopupMenu presets;
+        for (std::size_t index = 0; index < motion::lightPresets.size(); ++index) {
+            const auto& definition = motion::lightPresetDefinition(motion::lightPresets[index]);
+            presets.addItem(40 + static_cast<int>(index), juce::String(definition.name.data(), definition.name.size()), !locked);
+        }
+        presets.addSeparator();
+        presets.addItem(39, "No preset", !locked && hasPreset);
+        menu.addSeparator();
+        menu.addSubMenu("Light preset", presets);
+    }
+    menu.addSeparator();
+    menu.addItem(motion::style::menuItem("Make composition", 4, "Cmd+Shift+C").setEnabled(!locked && !selectedClips.empty()));
+    if (definition != 0) { menu.addItem(5, "Open composition"); menu.addItem(6, "Make composition unique", !locked); }
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
+        if (result >= 39 && result < 40 + static_cast<int>(motion::lightPresets.size())) {
+            applyLightPreset(id, result == 39 ? std::nullopt : std::optional(motion::lightPresets[static_cast<std::size_t>(result - 40)]));
+        } else if (result >= 20 && result < 24 && onCommand) {
+            const std::array<const char*, 4> names {"Cut", "Copy", "Paste", "Split at playhead"};
+            onCommand(names[static_cast<std::size_t>(result - 20)]);
+        } else if (result == 1) {
+            duplicateClip(id);
+        } else if (result == 2 && onTimingRequested) {
+            onTimingRequested(id);
+        } else if (result == 3 && onMakeUnique) {
+            onMakeUnique(id);
+        } else if (result == 4) {
+            createCompositionFromSelection();
+        } else if (result == 5 && onEnterComposition) {
+            onEnterComposition(id);
+        } else if (result == 7 || result == 8) {
+            deleteSelectedClips(result == 8);
+        } else if (result == 9 && onLoopSelection) {
+            onLoopSelection();
+        } else if (result == 10 && onRevealSource) {
+            const auto* shown = motion::findClip(processor.document.project(), id);
+            if (shown != nullptr) { onRevealSource(shown->asset); }
+        } else if (result == 6) {
+            motion::Id definitionId = 0;
+            report(processor.document.makeCompositionUnique(id, definitionId));
+            refreshTracks();
+        }
+    });
+}
+
+void MotionTimelineView::applyLightPreset(motion::Id id, std::optional<motion::LightPreset> preset) {
+    motion::editLightPreset(processor.document, id, preset);
+    refreshTracks();
+}
+
+void MotionTimelineView::createCompositionFromSelection() {
+    if (selectedClips.empty()) {
+        if (onError) { onError("Select clips to make a composition of them."); }
+        return;
+    }
+    motion::Id instance = 0;
+    auto& document = processor.document;
+    const auto name = "Composition " + juce::String(document.mainProject().definitions.size() + 1);
+    const auto created = document.createComposition({selectedClips.begin(), selectedClips.end()}, name, instance);
+    if (!report(created)) { return; }
+    selectClip(instance);
+    refreshTracks();
 }

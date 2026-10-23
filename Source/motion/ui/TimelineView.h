@@ -11,6 +11,8 @@
 #include <variant>
 #include <limits>
 #include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include "../model/CompositionGraph.h"
 #include "../model/PropertySchema.h"
 #include "../model/KeyEasing.h"
@@ -39,6 +41,25 @@ class MotionTimelineView : public juce::Component, public juce::DragAndDropTarge
         motion::Id owner = 0; // Whose key: a clip, an effect, or another owner of keys.
         std::string property;
         double time = 0; // Content-local key time.
+    };
+    // Keys looked up by owner and property, then by time, so checking a
+    // selection of thousands costs a search rather than a scan.
+    class KeySet {
+    public:
+        KeySet() = default;
+        explicit KeySet(const std::vector<KeyRef>& keys) {
+            for (const auto& key : keys) { add(key); }
+        }
+        void add(const KeyRef& key) { times[{key.owner, key.property}].insert(key.time); }
+        bool contains(motion::Id owner, const std::string& property, double time) const {
+            const auto found = times.find({owner, property});
+            if (found == times.end()) { return false; }
+            const auto next = found->second.lower_bound(time);
+            if (next != found->second.end() && motion::sameTime(*next, time)) { return true; }
+            return next != found->second.begin() && motion::sameTime(*std::prev(next), time);
+        }
+    private:
+        std::map<std::pair<motion::Id, std::string>, std::set<double>> times;
     };
 public:
     explicit MotionTimelineView(MotionProcessor& ownerProcessor);
@@ -122,7 +143,8 @@ public:
     void itemDragExit(const SourceDetails&) override;
     // An effect dragged over a clip, track or group is heard and seen before
     // it is dropped.
-    std::function<void(const motion::Project*)> onPreview;
+    std::function<void(const std::string&, std::optional<motion::Id>)> onEffectPreview;
+    std::function<void(motion::Id, std::optional<motion::Id>)> onEffectMovePreview;
     // An effect card dropped on a clip or track moves its effect (Alt copies it).
     std::function<void(motion::Id, motion::Id, bool)> onEffectMoved;
     void setEffectDragActive(bool active);
@@ -321,7 +343,8 @@ private:
     // Shares rise on a square-root scale, so one of many still shows and can
     // be grabbed: a quarter of the beam fills half the height.
     static float beamY(juce::Rectangle<float> area, float share) { return area.getBottom() - std::sqrt(std::clamp(share, 0.0f, 1.0f)) * area.getHeight(); }
-    void paintBeamShare(juce::Graphics& g, motion::Id id, juce::Rectangle<float> area, juce::Rectangle<float> body, float opacity) const;
+    // True when it drew the share (only for the hovered, lit or chosen).
+    bool paintBeamShare(juce::Graphics& g, motion::Id id, juce::Rectangle<float> area, juce::Rectangle<float> body, float opacity) const;
     void paintBeamLabel(juce::Graphics& g) const;
     // The clip or group whose share edge is under the point, if any.
     struct BeamTarget { motion::Id id; juce::Rectangle<float> area; };
@@ -333,12 +356,27 @@ private:
     void beamDragged(const juce::MouseEvent& event);
     motion::Id beamHover = 0;
     int beamPointer = 0;
+    // Sets the hovered clip (or group) and beam edge, repainting only what
+    // they light: the old and new ones and their readouts.
+    void setHover(motion::Id clip, motion::Id beam, int pointer);
+    // A clip's or group row's bounds, with room for the beam readout above
+    // or below it; empty when it is gone.
+    juce::Rectangle<int> hoverBounds(motion::Id id) const;
     void paintLane(juce::Graphics& g, const Row& row, int y, int height) const;
+    // Each lane owner's value range over the visible time, kept while the
+    // document and view stay as they are, so a repainted strip (the
+    // playhead's) samples only its own columns.
+    using LaneRangeView = std::tuple<std::uint64_t, std::uint64_t, std::uint64_t, double, double, int, int>;
+    mutable std::optional<LaneRangeView> laneRangeView;
+    mutable std::map<std::pair<std::string, motion::Id>, std::pair<double, double>> laneRanges;
     // The clip a lane's owner is, or is an effect of; none for the composition's effects.
     static const motion::Clip* laneClip(const motion::Project& project, motion::Id owner);
     bool isKeySelected(motion::Id owner, const std::string& property, double time) const {
         return std::any_of(selectedKeys.begin(), selectedKeys.end(), [&](const auto& key) { return key.owner == owner && key.property == property && motion::sameTime(key.time, time); });
     }
+    // Moves the clips a ClipDrag holds, as the pointer goes.
+    void dragClips(const juce::MouseEvent& event);
+    void dragMarker(const juce::MouseEvent& event);
     // Keys whose diamond lies under a point in a lane row.
     std::optional<KeyRef> keyAt(juce::Point<int> point) const;
     std::vector<KeyRef> keysInside(juce::Rectangle<int> area) const;
@@ -518,17 +556,16 @@ private:
     // Right-clicking empty track space offers what people look for first.
     void showSpaceMenu();
 
-    // Whether a clip or marker drag is under way on the document it began
-    // from; one the document changed under ends.
-    bool gestureIsCurrent();
-    // Ends a scrub, or a clip or marker drag and puts back what it changed.
-    void cancelGesture();
-    // Letting go of a document drag records it as one undo step, named for
-    // what it did.
-    void commitDrag();
-    // Escape during a key, beam, loop, cut or camera key drag puts back what
-    // it changed; false when none is under way.
-    bool cancelDrag();
+    // Ends a scrub, or a clip or marker drag and puts back what it changed;
+    // the other drags carry on (see endDocumentDrag).
+    void cancelClipGesture();
+    // The undo step the document drag under way records, named for what it
+    // did; empty when no document drag is under way.
+    juce::String dragLabel() const;
+    // Ends the document drag under way (a clip, marker, key, beam, loop, cut
+    // or camera key): letting go records it as one undo step, Escape puts
+    // back what it changed. False when none is under way.
+    bool endDocumentDrag(bool commit);
 
     bool isClip(motion::Id id) const { return motion::findClip(processor.document.project(), id) != nullptr; }
     bool notifyingSelection = false;
@@ -550,6 +587,11 @@ private:
     static void addEffectLanes(std::vector<Row>& lanes, const std::vector<const motion::EffectInstance*>& effects);
     // The composition's effects' animated parameters.
     static std::vector<Row> compositionLanes(const motion::Project& project);
+    // Whether a track has any key lanes to show (trackLanes' rows, unbuilt).
+    static bool hasLanes(const motion::Track& track);
+    // The properties a track's lanes can show, in schema order: every kind's
+    // object properties, or an audio track's.
+    static const std::vector<motion::PropertySpec>& laneSpecs(motion::TrackKind kind);
     void rebuildRows() const;
     // Row heights: lanes are fixed; tracks use their own height or the
     // default; groups use the default.
@@ -558,8 +600,8 @@ private:
     int trackHeight(int track) const;
     // The row of a track's or group's header (not a lane), or -1.
     int headerRow(motion::Id id) const {
-        const auto found = std::find_if(rows.begin(), rows.end(), [id](const auto& row) { return row.id == id && !row.isLane(); });
-        return found == rows.end() ? -1 : static_cast<int>(found - rows.begin());
+        const auto found = headerRows.find(id);
+        return found == headerRows.end() ? -1 : found->second;
     }
     void layoutRows() const;
     // Rows end above the horizontal scroll bar's strip, while it is shown.
@@ -630,6 +672,10 @@ private:
     mutable int scrollY = 0;
     mutable int rulerHeight = 26;
     mutable std::vector<Row> rows;
+    // Rebuilt with the rows: each header's row by id, and each track's by
+    // its index in the project (-1 while hidden in a folded group).
+    mutable std::unordered_map<motion::Id, int> headerRows;
+    mutable std::vector<int> trackRows;
     mutable std::vector<int> rowTops;
     mutable int contentHeight = 0;
     mutable std::set<motion::Id> expandedTracks;
@@ -651,9 +697,6 @@ private:
         int originalRow = 0;
         Mode mode = Mode::move;
         int downX = 0;
-        // Whether the preview shows the clips moved: back where they began,
-        // the start is shown once.
-        bool changed = false;
     };
     struct MarkerDrag {
         motion::Id marker = 0;
@@ -694,7 +737,7 @@ private:
     std::variant<std::monostate, ClipDrag, KeyDrag, BeamDrag, LoopDrag, BarDrag, HeightDrag, CutDrag, CameraKeyDrag, TrackDrag, MarkerDrag, Scrub, NamesResize, Pan, KeyMarquee, ClipMarquee> gesture;
     template <typename T> T* active() { return std::get_if<T>(&gesture); }
     template <typename T> const T* active() const { return std::get_if<T>(&gesture); }
-    // A clip or marker drag, or a scrub: what cancelGesture() ends.
+    // A clip or marker drag, or a scrub: what cancelClipGesture() ends.
     bool clipGesture() const { return active<ClipDrag>() != nullptr || active<MarkerDrag>() != nullptr || active<Scrub>() != nullptr; }
     // The clip, or group row, under the pointer: its beam share shows.
     motion::Id hoveredClip = 0;
