@@ -1,6 +1,7 @@
 #pragma once
 
 #include <osci_render_core/osci_render_core.h>
+#include "FrameTiming.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -216,10 +217,7 @@ public:
     std::uint64_t serial() const { return identity; }
 
 private:
-    const std::uint64_t identity = [] {
-        static std::atomic<std::uint64_t> next {1};
-        return next.fetch_add(1, std::memory_order_relaxed);
-    }();
+    const std::uint64_t identity = nextSerial();
     Mesh meshFaces;
     std::vector<std::array<std::int32_t, 2>> facesOfShapes;
     bool fading = false, turning = false;

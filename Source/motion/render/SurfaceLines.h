@@ -1035,10 +1035,4 @@ inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::v
     }
     return followed;
 }
-inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, const Normals& smooth, Vec3 eye, double crease = .7) {
-    return outline(corners, faces, smooth, Topology::of(corners, faces), eye, crease);
-}
-inline std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Vec3 eye, double crease = .7) {
-    return outline(corners, faces, normalsOf(corners, faces, crease), eye, crease);
-}
 }

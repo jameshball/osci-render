@@ -2,7 +2,7 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/ScopeBeam.h"
-#include "../Source/visualiser/OfflineVisualiserParameters.h"
+#include "../Source/motion/render/OfflineVisualiserParameters.h"
 
 class MotionScopeBeamTest : public juce::UnitTest {
 public:

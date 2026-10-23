@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -10,6 +11,13 @@
 #include <vector>
 
 namespace motion {
+// A number no other drawing or point frames has had while the program runs:
+// what a bake's fingerprints know one by (an address can be reused).
+inline std::uint64_t nextSerial() {
+    static std::atomic<std::uint64_t> next {1};
+    return next.fetch_add(1, std::memory_order_relaxed);
+}
+
 // A source's time looped into [0, length): negative times wrap into its end.
 inline double wrapTime(double seconds, double length) {
     const auto wrapped = std::fmod(seconds, length);

@@ -463,8 +463,8 @@ public:
         beginTest("A bake takes over hatching only from a bake of the same beam frequency");
         {
             motion::hidden::Bake before(nullptr, 10, 1, {}), same(nullptr, 10, 1, {}), faster(nullptr, 10, 1, {});
-            for (auto* bake : {&before, &same, &faster}) { bake->hatches = true; }
-            faster.beamRate = before.beamRate * 4;
+            for (auto* bake : {&before, &same, &faster}) { bake->settings.hatches = true; }
+            faster.settings.beamRate = before.settings.beamRate * 4;
             before.publish(0, std::make_shared<const motion::hidden::Frame>(), 7);
             same.inherit(before);
             faster.inherit(before);

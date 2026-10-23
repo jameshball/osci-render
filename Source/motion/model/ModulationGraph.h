@@ -82,32 +82,6 @@ bool linkCreatesCycle(const CompositionType& composition, Id target, const std::
     return true;
 }
 
-// Structural checks shared by loading and editing. Identity uniqueness across
-// the project is checked by the loader's identity set.
-template <typename CompositionType>
-std::string validateModulation(const CompositionType& composition) {
-    std::set<Id> modulators;
-    for (const auto& modulator : composition.modulators) {
-        if (!modulator.valid() || !modulators.insert(modulator.id).second) { return "Invalid or duplicate modulator settings."; }
-    }
-    const DrivableProperties drivable(composition);
-    for (const auto& route : composition.routes) {
-        if (!route.valid() || !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property)) {
-            return "A modulation route references a missing modulator or property.";
-        }
-    }
-    std::string error;
-    forEachPropertyMap(composition, [&](Id owner, const auto& properties) {
-        for (const auto& [name, curve] : properties) {
-            if (!error.empty() || !curve.link.has_value()) { continue; }
-            if (!drivable.contains(owner, name)) { error = "Audio clip gain and pan cannot be linked."; continue; }
-            if (!hasPropertyCurve(composition, curve.link->source, curve.link->property)) { error = "A property link references a missing property."; continue; }
-            if (linkCreatesCycle(composition, owner, name, *curve.link)) { error = "Property links must not form a cycle."; }
-        }
-    });
-    return error;
-}
-
 // After cloning property owners (old id -> new id), gives each clone the
 // routes of its original and points links between cloned owners at the
 // clones, so a copy behaves like its original rather than following it.
@@ -135,31 +109,48 @@ void cloneDrivers(CompositionType& composition, const std::map<Id, Id>& owners, 
     });
 }
 
-// Drops routes, links and camera targets/parents whose
-// referents were deleted, so removing a clip never leaves the composition
-// unloadable.
-template <typename CompositionType>
-void pruneReferences(CompositionType& composition) {
+// Hears of nothing pruneReferences drops.
+struct NoDrop {
+    void operator()(const char*, const std::string&) const {}
+};
+
+// Drops routes from a modulator or to a property that's missing, links to a
+// property that's missing, from one that can't be driven, or that would go
+// round in a loop, and camera targets/parents that are missing, so removing
+// a clip never leaves the composition unloadable. Loading and editing share
+// it; `dropped(what, name)` hears of each (the loader notes them).
+template <typename CompositionType, typename Dropped = NoDrop>
+void pruneReferences(CompositionType& composition, Dropped&& dropped = {}) {
     std::set<Id> modulators;
     for (const auto& modulator : composition.modulators) { modulators.insert(modulator.id); }
     const DrivableProperties drivable(composition);
     std::erase_if(composition.routes, [&](const auto& route) {
-        return !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property);
+        const auto missing = !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property);
+        if (missing) { dropped("Modulation of something that's missing", route.property); }
+        return missing;
     });
     std::vector<std::pair<Id, std::string>> broken;
     // Read-only walk: a mutable one would copy every shared track.
     forEachPropertyMap(std::as_const(composition), [&](Id owner, const auto& properties) {
         for (const auto& [name, curve] : properties) {
-            if (curve.link.has_value() && !hasPropertyCurve(composition, curve.link->source, curve.link->property)) { broken.emplace_back(owner, name); }
+            if (!curve.link.has_value()) { continue; }
+            if (!drivable.contains(owner, name) || !hasPropertyCurve(composition, curve.link->source, curve.link->property) || linkCreatesCycle(composition, owner, name, *curve.link)) { broken.emplace_back(owner, name); }
         }
     });
     for (const auto& [owner, name] : broken) {
+        dropped("Property link to something missing, or in a loop", name);
         auto* curve = findPropertyCurve(composition, owner, name);
         if (curve != nullptr) { curve->link.reset(); }
     }
     for (auto& camera : composition.cameras) {
-        if (camera.parent != 0 && findGroup(composition, camera.parent) == nullptr) { camera.parent = 0; }
-        if (camera.target != 0 && findGroup(composition, camera.target) == nullptr && !hasVisualClip(composition, camera.target)) { camera.target = 0; }
+        if (camera.parent != 0 && findGroup(composition, camera.parent) == nullptr) {
+            dropped("Camera carried by a group that's missing", camera.name);
+            camera.parent = 0;
+        }
+        if (camera.target != 0 && findGroup(composition, camera.target) == nullptr && !hasVisualClip(composition, camera.target)) {
+            dropped("Camera aimed at something that's missing", camera.name);
+            camera.target = 0;
+        }
     }
 }
 }

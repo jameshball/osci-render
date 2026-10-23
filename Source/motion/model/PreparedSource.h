@@ -1,11 +1,13 @@
 #pragma once
 
+#include "AssetKinds.h"
 #include "PreparedDrawing.h"
 #include "PreparedPointFrames.h"
 #include "FrameTiming.h"
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 namespace motion {
@@ -122,17 +124,46 @@ private:
 
 // The frames a clip's own source samples its content with, from its start to
 // `contentEnd`: one a frame at `frameRate`, or for content longer than
-// `maximum` frames (at least 2), `maximum` spread over it, so they reach its
+// maximumSourceFrames frames, that many spread over it, so they reach its
 // end rather than loop back to its start.
 struct ContentFrames {
     double rate;
     std::size_t count;
 };
-inline ContentFrames contentFrames(double contentEnd, double frameRate, std::size_t maximum) {
+inline ContentFrames contentFrames(double contentEnd, double frameRate) {
+    constexpr auto maximum = maximumSourceFrames;
     const auto base = std::isfinite(frameRate) && frameRate > 0 ? frameRate : 60.0;
     const auto span = std::isfinite(contentEnd) && contentEnd > 0 ? contentEnd : 0.0;
     // The last frame falls on the content's end, inside the frames' duration.
     if (span * base >= static_cast<double>(maximum)) { return {static_cast<double>(maximum - 1) / span, maximum}; }
     return {base, static_cast<std::size_t>(std::floor(span * base)) + 1};
+}
+
+// A clip's source sampled a frame per frame of its content (contentFrames):
+// `valueAt(seconds)` is what draws it then and `drawingOf(value)` its
+// drawing, or null if it can't be drawn (and then there is no source).
+// Frames whose values match share a drawing, and a clip whose value never
+// changes has a single frame.
+template <typename ValueAt, typename DrawingOf>
+std::shared_ptr<const PreparedSource> sampledSource(double contentEnd, double frameRate, ValueAt&& valueAt, DrawingOf&& drawingOf) {
+    const auto [rate, count] = contentFrames(contentEnd, frameRate);
+    std::vector<std::shared_ptr<const PreparedDrawing>> frames;
+    frames.reserve(count);
+    std::decay_t<decltype(valueAt(0.0))> previous {};
+    bool varies = false;
+    for (std::size_t frame = 0; frame < count; ++frame) {
+        auto value = valueAt(static_cast<double>(frame) / rate);
+        if (frame > 0 && value == previous) {
+            frames.push_back(frames.back());
+            continue;
+        }
+        auto drawing = drawingOf(value);
+        if (drawing == nullptr) { return nullptr; }
+        varies = varies || frame > 0;
+        frames.push_back(std::move(drawing));
+        previous = std::move(value);
+    }
+    if (!varies) { frames.resize(1); }
+    return std::make_shared<PreparedSource>(std::move(frames), rate);
 }
 }

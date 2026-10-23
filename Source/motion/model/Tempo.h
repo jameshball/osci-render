@@ -89,7 +89,6 @@ public:
         const auto average = (lastBeat - firstBeat) * 60 / span;
         return std::isfinite(average) && average > 0 ? average : bpmAtBeat(firstBeat);
     }
-    // The same map at another initial tempo, change beats and tempos intact.
 
 private:
     // Seconds from `from` to `beat` inside a ramp that starts at `start` BPM

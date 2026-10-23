@@ -5,6 +5,7 @@
 #include "PreparedEffects.h"
 #include <functional>
 #include <map>
+#include <span>
 #include <tuple>
 
 namespace motion {
@@ -19,10 +20,19 @@ public:
     void drive(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, std::string_view property) {
         drive(curve, scope, scopeClock, owner, property, 0);
     }
+    // Each property's curve as `properties` hold it (its default otherwise),
+    // driven.
+    void driveAll(std::span<Curve> curves, const PropertyMap& properties, std::span<const PropertySpec> specs, const Composition& scope, const ClipTiming& scopeClock, Id owner) {
+        for (std::size_t index = 0; index < curves.size() && index < specs.size(); ++index) {
+            curves[index] = curveOrDefault(properties, specs[index]);
+            drive(curves[index], scope, scopeClock, owner, specs[index].id);
+        }
+    }
     // The Scope's picture: the main composition's routes and links, on
     // project-time curves the composition scope cannot look up itself.
-    void driveBeam(Curve& curve, const Project& project, const ClipTiming& projectClock, std::string_view property) {
-        attach(curve, project, projectClock, project.beam.id, ClipTiming(0.0, project.duration), property, 0);
+    void driveBeam(Curve& curve, const Project& project, std::string_view property) {
+        const ClipTiming projectClock(0.0, project.duration);
+        attach(curve, project, projectClock, project.beam.id, projectClock, property, 0);
     }
     void driveEffects(std::vector<PreparedEffect>& prepared, const std::vector<EffectInstance>& effects, const Composition& scope, const ClipTiming& scopeClock) {
         for (std::size_t index = 0; index < prepared.size() && index < effects.size(); ++index) {

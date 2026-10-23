@@ -17,6 +17,11 @@ void check(bool condition, const std::string& message) {
     }
 }
 
+// A mesh's outline seen from `eye`, with the normals and topology it has.
+std::vector<Piece> outline(const std::vector<Vec3>& corners, const std::vector<Face>& faces, Vec3 eye, double crease = .7) {
+    return motion::hidden::surface::outline(corners, faces, normalsOf(corners, faces, crease), Topology::of(corners, faces), eye, crease);
+}
+
 // A ball as the sphere generator makes one: parallels and meridians.
 void ball(double radius, int rings, int segments, std::vector<Vec3>& corners, std::vector<Face>& faces) {
     const auto pi = 3.14159265358979323846;

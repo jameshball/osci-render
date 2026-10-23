@@ -169,10 +169,7 @@ private:
         return darkPrefix[offset + stride] != darkPrefix[offset + start]
             || darkPrefix[offset + end - stride] != darkPrefix[offset];
     }
-    const std::uint64_t identity = [] {
-        static std::atomic<std::uint64_t> next {1};
-        return next.fetch_add(1, std::memory_order_relaxed);
-    }();
+    const std::uint64_t identity = nextSerial();
     const double rate;
     const std::size_t frames, stride;
     const bool explicitColour;

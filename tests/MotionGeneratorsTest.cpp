@@ -87,7 +87,7 @@ public:
             expectEquals(shapesAt(119.99), 18, "nine to the end");
             const auto shortSource = motion::generator::clipSource(star, 2, 60, pointsAt);
             expect(shortSource->frameRate() == 60 && shortSource->frameCount() == 1, "a short still clip is as it was: one frame");
-            const auto frames = motion::contentFrames(2, 60, 3600);
+            const auto frames = motion::contentFrames(2, 60);
             expect(frames.rate == 60 && frames.count == 121, "a short clip has a frame a frame of its content");
 
             // A Lua clip's sliders, baked over two minutes, likewise.

@@ -72,13 +72,18 @@ public:
     // shows of it, for the bake's workers.
     const std::shared_ptr<const Project> project;
     const Reach reach;
-    // What it bakes: lines a camera hides, light from lights, reflections,
-    // surfaces drawn other than by their edges, hatching, or any of them.
-    bool hides = true, lights = false, reflects = false, restyles = false, hatches = false;
-    // The beam's cycles a second, which size the hatching drawn in one.
-    double beamRate = 60;
-    // How the Scope draws, which shapes how lines are cut.
-    ScopeProfile scope;
+    // How it bakes: a bake takes frames over only from one baked the same way.
+    struct Settings {
+        // What it bakes: lines a camera hides, light from lights, reflections,
+        // surfaces drawn other than by their edges, hatching, or any of them.
+        bool hides = true, lights = false, reflects = false, restyles = false, hatches = false;
+        // The beam's cycles a second, which size the hatching drawn in one.
+        double beamRate = 60;
+        // How the Scope draws, which shapes how lines are cut.
+        ScopeProfile scope;
+        bool operator==(const Settings&) const = default;
+    };
+    Settings settings;
 
     double frameRate() const { return rate; }
     std::size_t frameCount() const { return count; }
@@ -147,9 +152,7 @@ public:
     // whose fingerprint matches one of them is that frame. Only from a bake
     // of the same settings, which no fingerprint holds.
     void inherit(const Bake& previous) {
-        if (previous.rate != rate || previous.samples != samples || !(previous.reach == reach) || previous.hides != hides || previous.lights != lights
-            || previous.reflects != reflects || previous.restyles != restyles || previous.hatches != hatches
-            || (hatches && previous.beamRate != beamRate) || !(previous.scope == scope)) {
+        if (previous.rate != rate || previous.samples != samples || !(previous.reach == reach) || !(previous.settings == settings)) {
             return;
         }
         for (std::size_t index = 0; index < previous.count; ++index) {

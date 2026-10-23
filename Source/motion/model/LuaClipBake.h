@@ -81,12 +81,10 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
         writeCurveKey(key, curve);
     }
     const auto writeClip = [&](Id id) {
-        for (const auto& track : composition.tracks) {
-            for (const auto& other : track.clips) {
-                if (other.id != id) { continue; }
-                const auto placed = other.timing(tempo);
-                for (const auto value : {placed.start, placed.end(), placed.offset, placed.rate}) { key.writeDouble(value); }
-            }
+        const auto* other = findClip(composition, id);
+        if (other != nullptr) {
+            const auto placed = other->timing(tempo);
+            for (const auto value : {placed.start, placed.end(), placed.offset, placed.rate}) { key.writeDouble(value); }
         }
     };
     // Routes on (owner, property), then its link, following link sources as

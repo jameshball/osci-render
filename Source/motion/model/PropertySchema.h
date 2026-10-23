@@ -8,7 +8,8 @@
 #include <string_view>
 
 namespace motion {
-inline std::span<const PropertySpec> propertySpecs(const PropertyTarget& target) {
+template <typename Map>
+std::span<const PropertySpec> propertySpecs(const BasicPropertyTarget<Map>& target) {
     if (target.beam) { return beamPropertySpecs; }
     if (target.camera) { return cameraPropertySpecs; }
     if (target.isAudio) { return audioPropertySpecs; }
@@ -47,21 +48,22 @@ inline PropertySpec effectPropertySpec(const EffectParameterDefinition& paramete
     return {parameter.id, parameter.name, "Effect", "", parameter.min, parameter.max, parameter.defaultValue, span / 200.0, parameter.decimals >= 0 ? parameter.decimals : span >= 10 ? 1 : 2, parameter.unit};
 }
 
+// The asset a clip draws: null when the clip, or its asset, is missing, or
+// it draws none (an instance of a composition). Only for projects that hold
+// assets; `findClip`, `findAsset` and `generatorOf` come with their assets.
+template <typename ProjectType>
+auto clipAsset(const ProjectType& project, Id clip) {
+    const auto* found = findClip(project, clip);
+    return found != nullptr && found->asset != 0 ? findAsset(project.assets, found->asset) : nullptr;
+}
+
 // What generates a clip, when the target is a generator's clip. Only
-// projects that hold assets have generators; `generatorOf` comes with their
-// assets.
+// projects that hold assets have generators.
 template <typename ProjectType>
 const GeneratorDefinition* generatorFor(const ProjectType& project, Id target) {
     if constexpr (requires { project.assets; }) {
-        for (const auto& track : project.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != target || clip.asset == 0) { continue; }
-                for (const auto& asset : project.assets) {
-                    if (asset != nullptr && asset->id == clip.asset) { return generatorOf(*asset); }
-                }
-                return nullptr;
-            }
-        }
+        const auto asset = clipAsset(project, target);
+        return asset != nullptr ? generatorOf(*asset) : nullptr;
     }
     return nullptr;
 }
@@ -71,37 +73,21 @@ const GeneratorDefinition* generatorFor(const ProjectType& project, Id target) {
 template <typename ProjectType>
 bool drawsLive(const ProjectType& project, Id target) {
     if constexpr (requires { project.assets; }) {
-        for (const auto& track : project.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != target || clip.asset == 0) { continue; }
-                for (const auto& asset : project.assets) {
-                    if (asset != nullptr && asset->id == clip.asset) { return asset->liveIdentity != nullptr; }
-                }
-                return false;
-            }
-        }
+        const auto asset = clipAsset(project, target);
+        return asset != nullptr && asset->liveIdentity != nullptr;
     }
     return false;
 }
 
 // Whether a clip's source, other than a generator's (see hasProperty), has a
 // surface: faces (a mesh, or a filled shape) for lines to be laid on and to
-// reflect with. A source not made yet, or a composition, may have.
+// reflect with. A source not made yet, or a composition, may have; a live
+// source draws what arrives as it is, so has none.
 template <typename ProjectType>
 bool hasSurface(const ProjectType& project, Id target) {
     if constexpr (requires { project.assets; }) {
-        for (const auto& track : project.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != target || clip.asset == 0) { continue; }
-                for (const auto& asset : project.assets) {
-                    if (asset == nullptr || asset->id != clip.asset) { continue; }
-                    // A live source draws what arrives as it is: no surfaces.
-                    if (asset->liveIdentity != nullptr) { return false; }
-                    return generatorOf(*asset) != nullptr || asset->source == nullptr || asset->source->hasFaces();
-                }
-                return true;
-            }
-        }
+        const auto asset = clipAsset(project, target);
+        return asset == nullptr || (asset->liveIdentity == nullptr && (generatorOf(*asset) != nullptr || asset->source == nullptr || asset->source->hasFaces()));
     }
     return true;
 }
@@ -142,9 +128,7 @@ Curve* ensurePropertyCurve(ProjectType& project, Id id, std::string_view propert
     if (!target.has_value() || target->properties == nullptr) { return nullptr; }
     auto* curve = target->curve(property);
     if (curve != nullptr || target->isEffect) { return curve; }
-    const auto specs = target->beam ? std::span<const PropertySpec>(beamPropertySpecs) : target->camera ? std::span<const PropertySpec>(cameraPropertySpecs)
-        : target->isAudio ? std::span<const PropertySpec>(audioPropertySpecs) : std::span<const PropertySpec>(objectPropertySpecs);
-    auto* spec = findPropertySpec(specs, property);
+    auto* spec = findPropertySpec(propertySpecs(*target), property);
     if (spec == nullptr) { spec = generatorSpec(project, id, property); }
     if (spec == nullptr) { return nullptr; }
     return &target->properties->emplace(std::string(property), Curve(spec->defaultValue)).first->second;

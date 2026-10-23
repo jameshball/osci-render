@@ -343,39 +343,6 @@ void repairGroups(CompositionType& project, LoadNotes& notes) {
     }
 }
 
-// Routes from a modulator or to a property that's missing are left out, and
-// links to a property that's missing, or that would go round in a loop.
-template <typename CompositionType>
-void repairModulation(CompositionType& project, LoadNotes& notes) {
-    std::set<Id> modulators;
-    for (const auto& modulator : project.modulators) { modulators.insert(modulator.id); }
-    {
-        const DrivableProperties drivable(project);
-        std::erase_if(project.routes, [&](const ModulationRoute& route) {
-            const auto missing = !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property);
-            if (missing) { notes.note("Modulation of something that's missing", juce::String(route.property)); }
-            return missing;
-        });
-    }
-    std::vector<std::pair<Id, std::string>> broken;
-    {
-        const DrivableProperties drivable(project);
-        forEachPropertyMap(project, [&](Id owner, const PropertyMap& properties) {
-            for (const auto& [name, curve] : properties) {
-                if (!curve.link.has_value()) { continue; }
-                if (!drivable.contains(owner, name) || !hasPropertyCurve(project, curve.link->source, curve.link->property) || linkCreatesCycle(project, owner, name, *curve.link)) { broken.emplace_back(owner, name); }
-            }
-        });
-    }
-    for (const auto& [owner, name] : broken) {
-        notes.note("Property link to something missing, or in a loop", juce::String(name));
-        forEachPropertyMap(project, [&](Id each, auto& properties) {
-            const auto found = properties.find(name);
-            if (each == owner && found != properties.end()) { found->second.link.reset(); }
-        });
-    }
-}
-
 // A clip property's curve brought inside its range, keys and all.
 void clampCurve(Curve& curve, const PropertySpec& spec) {
     curve.base = spec.clamp(curve.base);
@@ -602,14 +569,6 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         camera.id = *identity;
         camera.target = readId(*item, "target").value_or(0);
         camera.parent = readId(*item, "parent").value_or(0);
-        if (camera.parent != 0 && findGroup(project, camera.parent) == nullptr) {
-            notes.note("Camera carried by a group that's missing", juce::String(camera.name));
-            camera.parent = 0;
-        }
-        if (camera.target != 0 && findGroup(project, camera.target) == nullptr && !hasVisualClip(project, camera.target)) {
-            notes.note("Camera aimed at something that's missing", juce::String(camera.name));
-            camera.target = 0;
-        }
         loadKnownProperties(*item, camera.properties, "Camera", notes);
         if (!camera.valid()) {
             notes.note("Camera transform or field of view that isn't valid, reset", juce::String(camera.name));
@@ -694,7 +653,9 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         }
         project.routes.push_back(std::move(route));
     }
-    repairModulation(project, notes);
+    // Routes, links and camera targets/parents to something that's missing
+    // are left out, as are links that can't be driven or go round in a loop.
+    pruneReferences(project, [&](const char* what, const std::string& detail) { notes.note(what, juce::String(detail)); });
     // Only a slider bake matching its clip's sliders and what drives them is
     // kept; a stale one is dropped and the editor bakes again.
     const auto stale = [&](const Clip& clip) {
