@@ -192,6 +192,9 @@ public:
         return std::all_of(keys.begin(), keys.end(), [](const Keyframe& key) { return key.valid(); });
     }
     bool animated() const { return !keys.empty(); }
+    // Whether it holds one value throughout: no keys, and no link or
+    // modulators to move it.
+    bool steady() const { return keys.empty() && !linked() && (drivers == nullptr || drivers->routes.empty()); }
     // Every key gone, the value held as it was at `time`.
     void clearKeys(double time) {
         if (keys.empty()) { return; }

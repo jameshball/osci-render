@@ -87,10 +87,13 @@ struct PreparedBeam {
 inline hidden::Reach squareScope() { return hidden::Reach::ofCanvas(1, 1, VisualiserGeometry::signalGain); }
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = squareScope()) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate, project.beamCycles)), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), effects(prepareEffects(project.effects)) {
+    // `sharedLoudness`: the project's soundtrack loudness, already built (a
+    // bake's, for its workers), so it is not built again.
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = squareScope(), std::shared_ptr<const SoundtrackEnvelope> sharedLoudness = nullptr) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate, project.beamCycles)), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), loudness(std::move(sharedLoudness)), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         // Editor geometry is rebuilt during drags; loudness modulation only
-        // matters to the signal, so the envelope is built there alone.
+        // matters to the signal (and what bakes it), so the envelope is built
+        // there alone.
         PreparedDrivers drivers([this, cancel, purpose]() -> std::shared_ptr<const SoundtrackEnvelope> {
             return purpose != CompositionPurpose::editorGeometry ? loudnessEnvelope(cancel) : nullptr;
         });
@@ -147,6 +150,11 @@ struct PreparedComposition {
         }
         std::sort(cameraCuts.begin(), cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
         const auto definitions = definitionsById(project);
+        // A noise's flow, summed over the times its layer plays; the editor's
+        // shapes never draw noise.
+        const auto flowOver = [&](const Curve& flow, double from, double to) {
+            return purpose != CompositionPurpose::editorGeometry ? NoiseFlow(flow, from, to) : NoiseFlow();
+        };
         const auto prepareStage = [&](const CompositionStage& stage, bool root, const Composition& scope) {
             const auto& clip = *stage.clip;
             const auto& timing = stage.clipClock;
@@ -156,6 +164,7 @@ struct PreparedComposition {
             item.scopeClock = stage.scopeClock;
             drivers.driveAll(item.curves, clip.properties, objectPropertySpecs, scope, stage.scopeClock, clip.id);
             item.spatial = prepareSpatial(clip.spatialPath, clip.quaternionRotation, item.curves);
+            item.flow = flowOver(item.curves[noiseFlowIndex], item.localTime(item.start), item.localTime(item.end));
             item.effects = prepareEffects(clip.effects);
             drivers.driveEffects(item.effects, clip.effects, scope, stage.scopeClock);
             item.trackEffects = prepareEffects(stage.track->effects);
@@ -171,6 +180,7 @@ struct PreparedComposition {
                 item.groups.emplace_back(*group);
                 auto& prepared = item.groups.back();
                 for (std::size_t i = 0; i < objectPropertySpecs.size(); ++i) { drivers.drive(prepared.curves[i], scope, stage.scopeClock, group->id, objectPropertySpecs[i].id); }
+                prepared.flow = flowOver(prepared.curves[noiseFlowIndex], item.scopeTime(item.start), item.scopeTime(item.end));
                 drivers.driveEffects(prepared.effects, group->effects, scope, stage.scopeClock);
                 groupId = group->parent;
             }
@@ -194,6 +204,8 @@ struct PreparedComposition {
             item.rootTrack = stages.front().track->id;
             item.liveIdentity = asset->liveIdentity;
             item.source = clip.luaBake != nullptr && clip.luaBake->source != nullptr ? clip.luaBake->source : asset->source;
+            // Content whose values hold still is drawn once.
+            const auto contentEnd = leaf.clipClock.localTime(leaf.clipClock.end());
             // A generator is drawn from this clip's own values of its
             // parameters, keyed, modulated and linked like any property.
             const auto* generator = generatorOf(*asset);
@@ -202,7 +214,8 @@ struct PreparedComposition {
                 parameters.resize(generator->parameters.size());
                 drivers.driveAll(parameters, clip.properties, generator->parameters, scopeOf(stages, stages.size() - 1), leaf.scopeClock, clip.id);
                 std::vector<double> values(parameters.size());
-                item.source = generator::clipSource(*generator, leaf.clipClock.localTime(leaf.clipClock.end()), project.frameRate, [&](double seconds) {
+                const auto steady = std::all_of(parameters.begin(), parameters.end(), [](const Curve& curve) { return curve.steady(); });
+                item.source = generator::clipSource(*generator, steady ? 0.0 : contentEnd, project.frameRate, [&](double seconds) {
                     for (std::size_t index = 0; index < parameters.size(); ++index) { values[index] = parameters[index].evaluate(seconds); }
                     return values;
                 });
@@ -214,7 +227,7 @@ struct PreparedComposition {
                 const auto stored = clip.properties.find("fractal.depth");
                 auto depth = stored != clip.properties.end() ? stored->second : Curve(asset->fractalDepth);
                 drivers.drive(depth, scope, leaf.scopeClock, clip.id, "fractal.depth");
-                const auto drawn = fractal::clipSource(asset->data.toString(), leaf.clipClock.localTime(leaf.clipClock.end()), project.frameRate, [&](double seconds) { return depth.evaluate(seconds); });
+                const auto drawn = fractal::clipSource(asset->data.toString(), depth.steady() ? 0.0 : contentEnd, project.frameRate, [&](double seconds) { return depth.evaluate(seconds); });
                 if (drawn != nullptr) { item.source = drawn; }
             }
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
@@ -251,6 +264,7 @@ struct PreparedComposition {
             hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration, reach, sampleRate);
             // The beam's rate only sizes hatching: without it, any rate bakes the same.
             hiddenLines->settings = {.hides = hides, .lights = !lights.empty(), .reflects = reflective, .restyles = restyled, .hatches = hatches, .beamRate = hatches ? beamRate : 0.0, .scope = project.scope};
+            hiddenLines->loudness = loudness;
         }
     }
 
@@ -395,8 +409,7 @@ struct PreparedComposition {
     // The eye the frame is seen from, in the scene: the active camera's, or
     // without cameras the fixed framing's, four units in front of the
     // middle looking back at it.
-    using Viewpoint = PreparedCamera::Frame;
-    std::optional<Viewpoint> viewpoint(double time) const { return frameAt(time); }
+    std::optional<PreparedCamera::Frame> viewpoint(double time) const { return frameAt(time); }
     // A world point in the active camera's eye space (x right, y up, z along
     // its view), or the fixed framing's without cameras, as projectVisible
     // sees it before dividing by depth.

@@ -315,17 +315,23 @@ public:
             motion::Curve flow;
             flow.setKey({0, 1, motion::Interpolation::linear});
             flow.setKey({2, 0, motion::Interpolation::linear});
-            expectWithinAbsoluteError(motion::TransformPose::flowedBy(flow, 2), 1.0, 1.0e-9);
-            expectWithinAbsoluteError(motion::TransformPose::flowedBy(flow, 3), 1.0, 1.0e-9);
+            const motion::NoiseFlow flowed(flow, 0, 3);
+            expectWithinAbsoluteError(flowed.at(flow, 2), 1.0, 1.0e-9);
+            expectWithinAbsoluteError(flowed.at(flow, 3), 1.0, 1.0e-9);
             double previous = 0;
             bool forward = true;
             for (int step = 1; step <= 30; ++step) {
-                const auto flowed = motion::TransformPose::flowedBy(flow, step * .1);
-                forward = forward && flowed >= previous;
-                previous = flowed;
+                const auto turns = flowed.at(flow, step * .1);
+                forward = forward && turns >= previous;
+                previous = turns;
             }
             expect(forward, "slowing, it still only goes forward");
-            expectWithinAbsoluteError(motion::TransformPose::flowedBy(motion::Curve(.5), 4), 2.0, 1.0e-12);
+            expectWithinAbsoluteError(motion::NoiseFlow().at(motion::Curve(.5), 4), 2.0, 1.0e-12);
+            // Summed ahead or found afresh, it has flowed as far.
+            expectEquals(motion::NoiseFlow().at(flow, 1.37), flowed.at(flow, 1.37));
+            expectEquals(motion::NoiseFlow(flow, -1, 10).at(flow, 1.37), flowed.at(flow, 1.37));
+            expectWithinAbsoluteError(flowed.at(flow, 1), .75, 1.0e-9);
+            expectWithinAbsoluteError(flowed.at(flow, -1), -1.0, 1.0e-9);
         }
     }
 

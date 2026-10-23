@@ -129,14 +129,27 @@ public:
         static DrawingCache cache;
         return cache;
     }
-    // Blends are made at this many steps a depth.
+    // Blends are made at up to this many steps a depth.
     static constexpr double steps = 240;
-    static double settle(double depth) { return std::round(std::clamp(depth, 0.0, 15.0) * steps) / steps; }
+    // A depth as a blend is made of it: fewer steps between deep levels, so
+    // the blends across one fit a quarter of the budget. A depth keyed across
+    // a level then keeps its blends from one preparation to the next (the
+    // same drawings, which bakes know as the same) rather than evicting them
+    // while they are still being sampled.
+    double settle(const juce::String& source, double depth) {
+        depth = std::isfinite(depth) ? std::clamp(depth, 0.0, 15.0) : 0.0;
+        const auto whole = std::floor(depth);
+        if (depth == whole) { return depth; }
+        const auto deeper = at(source, whole + 1);
+        const auto fit = deeper != nullptr ? static_cast<double>(budget / 4) / static_cast<double>(std::max<std::size_t>(deeper->bytes(), 1)) : steps;
+        const auto levelSteps = std::clamp(std::floor(fit), 4.0, steps);
+        return std::round(depth * levelSteps) / levelSteps;
+    }
 
     // The source at `depth`; past the deepest it can be drawn (too many
     // segments), the deepest. Null if it can't be drawn at all.
     std::shared_ptr<const PreparedDrawing> at(const juce::String& source, double depth) {
-        depth = settle(depth);
+        depth = settle(source, depth);
         const auto key = std::make_pair(source.hashCode64(), depth);
         const auto found = blends.find(key);
         if (found != nullptr) { return found; }
@@ -170,7 +183,8 @@ private:
         return made;
     }
 
-    DrawingLru<Key, std::map> blends {64 * 1024 * 1024};
+    static constexpr std::size_t budget = 64 * 1024 * 1024;
+    DrawingLru<Key, std::map> blends {budget};
     juce::SpinLock depthsGuard;
     std::map<std::pair<juce::int64, int>, std::shared_ptr<const Segments>> depths;
 };
@@ -180,6 +194,7 @@ private:
 // same depth share a drawing.
 template <typename DepthAt>
 std::shared_ptr<const PreparedSource> clipSource(const juce::String& source, double contentEnd, double frameRate, DepthAt&& depthAt) {
-    return sampledSource(contentEnd, frameRate, [&](double seconds) { return DrawingCache::settle(depthAt(seconds)); }, [&](double depth) { return DrawingCache::shared().at(source, depth); });
+    auto& cache = DrawingCache::shared();
+    return sampledSource(contentEnd, frameRate, [&](double seconds) { return cache.settle(source, depthAt(seconds)); }, [&](double depth) { return cache.at(source, depth); });
 }
 }

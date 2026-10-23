@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Modulation.h"
 #include "../model/PreparedDrawing.h"
 #include "../model/ScopeProfile.h"
 #include "HiddenLineDepth.h"
@@ -84,6 +85,10 @@ public:
         bool operator==(const Settings&) const = default;
     };
     Settings settings;
+    // The soundtrack's loudness as the composition that made the bake built
+    // it (null when it built none), which its workers' compositions share
+    // rather than each build again.
+    std::shared_ptr<const SoundtrackEnvelope> loudness;
 
     double frameRate() const { return rate; }
     std::size_t frameCount() const { return count; }

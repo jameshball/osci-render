@@ -105,7 +105,7 @@ private:
         };
         std::unique_ptr<PreparedComposition> composition;
         try {
-            composition = std::make_unique<PreparedComposition>(*bake.project, sampleRate, &cancel, CompositionPurpose::culling, bake.reach);
+            composition = std::make_unique<PreparedComposition>(*bake.project, sampleRate, &cancel, CompositionPurpose::culling, bake.reach, bake.loudness);
         } catch (...) {
             if (!cancel.load()) { giveUp(next()); }
             return;

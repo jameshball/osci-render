@@ -114,6 +114,10 @@ public:
             clip.duration = 2;
             const auto shortPlan = motion::luaSliderPlan(*lua, clip, project);
             expect(shortPlan.has_value() && shortPlan->settings.frameRate == 60 && shortPlan->settings.duration == 5, "a short clip bakes as it did");
+            // Content ending part way through a frame bakes that frame too.
+            clip.duration = 6 + .375 / 60;
+            const auto partPlan = motion::luaSliderPlan(*lua, clip, project);
+            expect(partPlan.has_value() && static_cast<double>(partPlan->settings.frameCount()) / partPlan->settings.frameRate >= clip.duration, "its last part of a frame is baked, not looped back to its start");
         }
 
         beginTest("A modulator drives a generator's parameter");

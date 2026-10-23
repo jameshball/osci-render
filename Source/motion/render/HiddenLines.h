@@ -260,7 +260,7 @@ struct Workspace {
 // it nothing is hidden (it shows every line, as an editor does); lights
 // light as ever, and mirrors show what they would to it, over `reach`.
 struct OtherEye {
-    PreparedComposition::Viewpoint eye;
+    PreparedCamera::Frame eye;
     Reach reach;
 };
 

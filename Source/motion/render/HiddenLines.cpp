@@ -240,7 +240,7 @@ private:
     void restyleSurfaces() {
         auto& styled = workspace.styled;
         styled.resize(std::max(styled.size(), items.size()));
-        viewpoint = other != nullptr ? std::optional(other->eye) : composition.viewpoint(time);
+        viewpoint = other != nullptr ? std::optional(other->eye) : view;
         eyeAt = viewpoint.has_value() ? std::optional(viewpoint->position) : std::nullopt;
         for (std::size_t surface = 0; restyling && surface < items.size(); ++surface) {
             auto& item = items[surface];
@@ -998,7 +998,7 @@ private:
     std::ptrdiff_t surfaces = 0;
     // Where the frame is seen from, in the scene, and whether any surface
     // draws its outline.
-    std::optional<PreparedComposition::Viewpoint> viewpoint;
+    std::optional<PreparedCamera::Frame> viewpoint;
     std::optional<Vec3> eyeAt;
     bool outlining = false;
     // Whether what stands between two points is found along the line

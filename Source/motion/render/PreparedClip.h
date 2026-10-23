@@ -27,9 +27,10 @@ inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool qua
 // camera sees it, and patterns over it (in Pattern order: spiral, noise,
 // slices, rings), each as a brightness 0..1, and how many
 // lines across a pattern draws, and how far round its loop the noise has
-// morphed (turns). Groups dim its edges, add their outline and patterns, and
-// move its noise on by theirs.
+// morphed (turns; 0 while it draws no noise). Groups dim its edges, add
+// their outline and patterns, and move its noise on by theirs.
 struct LineStyle {
+    static constexpr std::size_t noisePattern = specIndex(objectPropertySpecs, "noise") - patternsIndex;
     double edges = 1, outline = 0;
     std::array<double, patternCount> patterns {};
     double detail = objectPropertySpecs[fillDetailIndex].defaultValue;
@@ -39,7 +40,60 @@ struct LineStyle {
         edges *= outer.edges;
         outline = std::max(outline, outer.outline);
         for (std::size_t pattern = 0; pattern < patternCount; ++pattern) { patterns[pattern] = std::max(patterns[pattern], outer.patterns[pattern]); }
-        noiseTurn += outer.noiseTurn;
+    }
+};
+
+// The turns a noise's flow (turns a second) has carried it by a time: the
+// area under the flow from 0, so a flow eased down slows the noise rather
+// than running it back. Exact for a steady flow; otherwise Simpson's rule
+// over cells of a fixed step, split at its keys, finely enough to follow a
+// modulator driving it. The cells are summed once over the times a layer
+// plays, so a frame looks its turn up rather than adding it all up again.
+class NoiseFlow {
+public:
+    NoiseFlow() = default;
+    // Sums the cells from 0 to cover `from` to `to`, in the flow's own time.
+    NoiseFlow(const Curve& flow, double from, double to) {
+        if (flow.steady() || !std::isfinite(from) || !std::isfinite(to)) { return; }
+        const auto low = std::min({0.0, from, to}), high = std::max({0.0, from, to});
+        const auto driven = flow.linked() || (flow.drivers != nullptr && !flow.drivers->routes.empty());
+        rate = std::min(driven ? 60.0 : 8.0, maximumCells / std::max(high - low, 1.0));
+        first = std::floor(low * rate);
+        areas.assign(static_cast<std::size_t>(std::floor(high * rate) + 2 - first), 0.0);
+        // From 0 outward either way, so an area is the same whatever the span.
+        const auto zero = static_cast<std::size_t>(-first);
+        for (auto cell = zero; cell + 1 < areas.size(); ++cell) { areas[cell + 1] = areas[cell] + across(flow, edge(cell), edge(cell + 1)); }
+        for (auto cell = zero; cell > 0; --cell) { areas[cell - 1] = areas[cell] - across(flow, edge(cell - 1), edge(cell)); }
+    }
+    // The turns by `time`; past the cells summed, summed afresh.
+    double at(const Curve& flow, double time) const {
+        if (flow.steady() || !std::isfinite(time)) { return flow.evaluate(0) * time; }
+        const auto cell = std::floor(time * rate) - first;
+        if (!(cell >= 0 && cell < static_cast<double>(areas.size()))) { return NoiseFlow(flow, time, time).at(flow, time); }
+        const auto index = static_cast<std::size_t>(cell);
+        return areas[index] + across(flow, edge(index), time);
+    }
+
+private:
+    static constexpr double maximumCells = 1 << 18;
+    double rate = 8, first = 0;
+    // The area at each cell's start, from 0; cells are 1 / rate long.
+    std::vector<double> areas;
+
+    double edge(std::size_t index) const { return (first + static_cast<double>(index)) / rate; }
+    // Simpson's rule over part of a cell, either side of any key in it.
+    static double across(const Curve& flow, double from, double to) {
+        const auto& keys = flow.keyframes();
+        auto key = std::upper_bound(keys.begin(), keys.end(), from, [](double time, const Keyframe& value) { return time < value.time; });
+        double area = 0;
+        for (; key != keys.end() && key->time < to; ++key) {
+            area += simpson(flow, from, key->time);
+            from = key->time;
+        }
+        return area + simpson(flow, from, to);
+    }
+    static double simpson(const Curve& flow, double from, double to) {
+        return (to - from) / 6 * (flow.evaluate(from) + 4 * flow.evaluate((from + to) / 2) + flow.evaluate(to));
     }
 };
 
@@ -127,47 +181,27 @@ struct TransformPose {
     }
     // How far round its loop the noise is at a time: its phase, and as many
     // turns as its flow has taken it by then.
-    static double noiseTurnAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
-        const auto turn = curves[noisePhaseIndex].evaluate(time) / 360 + flowedBy(curves[noiseFlowIndex], time);
+    static double noiseTurnAt(const std::array<Curve, objectPropertySpecs.size()>& curves, const NoiseFlow& flow, double time) {
+        const auto turn = curves[noisePhaseIndex].evaluate(time) / 360 + flow.at(curves[noiseFlowIndex], time);
         return std::isfinite(turn) ? turn : 0.0;
-    }
-    // The turns a flow (turns a second) has carried the noise by `time`: the
-    // area under it from 0, so a flow eased down slows the noise rather than
-    // running it back. Exact for a steady flow; otherwise Simpson's rule
-    // between its keys, finely enough to follow a modulator driving it.
-    static double flowedBy(const Curve& flow, double time) {
-        const auto driven = flow.drivers != nullptr && (flow.linked() || !flow.drivers->routes.empty());
-        if (!flow.animated() && !driven) { return flow.evaluate(0) * time; }
-        std::vector<double> stops {std::min(0.0, time), std::max(0.0, time)};
-        for (const auto& key : flow.keyframes()) {
-            if (key.time > stops[0] && key.time < stops[1]) { stops.push_back(key.time); }
-        }
-        std::sort(stops.begin(), stops.end());
-        double area = 0;
-        for (std::size_t index = 1; index < stops.size(); ++index) {
-            const auto from = stops[index - 1], to = stops[index];
-            const auto pairs = std::clamp(static_cast<int>(std::ceil((to - from) * (driven ? 60.0 : 8.0))), 8, 2048);
-            const auto step = (to - from) / (2 * pairs);
-            auto sum = flow.evaluate(from) + flow.evaluate(to);
-            for (int sample = 1; sample < 2 * pairs; ++sample) { sum += flow.evaluate(from + sample * step) * (sample % 2 == 1 ? 4 : 2); }
-            area += sum * step / 3;
-        }
-        return time < 0 ? -area : area;
     }
     // A Lines property, 0..1.
     static double linesAmount(const std::array<Curve, objectPropertySpecs.size()>& curves, std::size_t index, double time) {
         return fractionAt(curves[index], time, objectPropertySpecs[index].defaultValue / 100);
     }
-    // How a clip or group's own Lines properties draw its surfaces.
+    // How a clip or group's own Lines properties dim its edges, outline it
+    // and lay patterns on it (its detail and noise's turn are found apart).
     static LineStyle linesAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
         LineStyle style;
         style.edges = linesAmount(curves, edgesIndex, time);
         style.outline = linesAmount(curves, outlineIndex, time);
         for (std::size_t pattern = 0; pattern < patternCount; ++pattern) { style.patterns[pattern] = linesAmount(curves, patternsIndex + pattern, time); }
-        const auto detail = curves[fillDetailIndex].evaluate(time);
-        style.detail = std::isfinite(detail) ? objectPropertySpecs[fillDetailIndex].clamp(std::round(detail)) : objectPropertySpecs[fillDetailIndex].defaultValue;
-        style.noiseTurn = noiseTurnAt(curves, time);
         return style;
+    }
+    // How many lines across its patterns draw: a whole number in range.
+    static double detailAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
+        const auto detail = curves[fillDetailIndex].evaluate(time);
+        return std::isfinite(detail) ? objectPropertySpecs[fillDetailIndex].clamp(std::round(detail)) : objectPropertySpecs[fillDetailIndex].defaultValue;
     }
     static double beamAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
         const auto value = curves[beamIndex].evaluate(time);
@@ -222,6 +256,7 @@ struct PreparedGroup {
     std::array<Curve, objectPropertySpecs.size()> curves;
     std::vector<PreparedEffect> effects;
     std::shared_ptr<const PreparedSpatial> spatial;
+    NoiseFlow flow; // its noise's, over the times it plays
 
     explicit PreparedGroup(const Group& group) : id(group.id), effects(prepareEffects(group.effects)) {
         for (std::size_t index = 0; index < objectPropertySpecs.size(); ++index) {
@@ -251,6 +286,7 @@ struct PreparedClipStage {
     std::vector<PreparedGroup> groups;
     std::shared_ptr<const PreparedSpatial> spatial;
     std::optional<ClipTiming> scopeClock;
+    NoiseFlow flow; // its noise's, over the times it plays
     TimeCache<TransformPose> poses;
 
     double scopeTime(double time) const { return scopeClock.has_value() ? scopeClock->localTime(time) : time; }
@@ -261,6 +297,12 @@ struct PreparedClipStage {
     void eachStageLayer(double time, Visit&& visit) const {
         visit(curves, localTime(time));
         for (const auto& group : groups) { visit(group.curves, scopeTime(time)); }
+    }
+    // Adds its own noise's turn, then each group's holding it, in the order
+    // eachStageLayer visits them.
+    void addNoiseTurns(double time, double& turn) const {
+        turn += TransformPose::noiseTurnAt(curves, flow, localTime(time));
+        for (const auto& group : groups) { turn += TransformPose::noiseTurnAt(group.curves, group.flow, scopeTime(time)); }
     }
     osci::Point processStage(osci::Point point, double time) const {
         const auto local = localTime(time);
@@ -322,17 +364,16 @@ struct PreparedClip : PreparedClipStage {
         return std::isfinite(value) ? value : 1.0;
     }
     // How its surfaces draw themselves, with its groups' and nested
-    // placements' (see LineStyle). The detail is always its own.
+    // placements' (see LineStyle). The detail is always its own; the noise's
+    // turn is found only while it draws noise.
     LineStyle lines(double time) const {
-        auto style = TransformPose::linesAt(curves, localTime(time));
-        bool own = true;
-        eachLayer(time, [&](const auto& layer, double at) {
-            if (own) {
-                own = false;
-                return;
-            }
-            style.include(TransformPose::linesAt(layer, at));
-        });
+        LineStyle style;
+        style.detail = TransformPose::detailAt(curves, localTime(time));
+        eachLayer(time, [&](const auto& layer, double at) { style.include(TransformPose::linesAt(layer, at)); });
+        if (style.patterns[LineStyle::noisePattern] > 0) {
+            addNoiseTurns(time, style.noiseTurn);
+            for (const auto& ancestor : ancestors) { ancestor.addNoiseTurns(time, style.noiseTurn); }
+        }
         return style;
     }
     bool mayRestyle() const {

@@ -70,8 +70,10 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
         // Half a frame short of the budget, so frameCount() rounds up to it.
         plan.settings.duration = (budget - 0.5) / plan.settings.frameRate;
     } else {
-        plan.settings.duration = std::max(wanted, 1.0 / plan.settings.frameRate);
-        plan.settings.duration = std::floor(plan.settings.duration * plan.settings.frameRate) / plan.settings.frameRate;
+        // Whole frames, rounded up so the last part of a frame reaches the
+        // content's end rather than looping back to its start.
+        const auto frames = std::max(1.0, std::ceil(wanted * plan.settings.frameRate - 1.0e-9));
+        plan.settings.duration = frames / plan.settings.frameRate;
     }
     juce::MemoryOutputStream key;
     key.writeString(asset.bakeKey);

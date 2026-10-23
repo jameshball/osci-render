@@ -147,7 +147,7 @@ template <typename Place, typename NormalsOf, typename Cancelled>
 class Reflector {
 public:
     Reflector(const PreparedComposition& composition, double time, const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world, Place& place, NormalsOf& normalsOf,
-        const std::vector<LightView>& lights, bool lit, const PreparedComposition::Viewpoint& view, Reach reach, const DepthBuffer* depth, const SceneRays& rays, LaidSurfaces& laid, Cancelled& cancelled)
+        const std::vector<LightView>& lights, bool lit, const PreparedCamera::Frame& view, Reach reach, const DepthBuffer* depth, const SceneRays& rays, LaidSurfaces& laid, Cancelled& cancelled)
         : composition(composition), time(time), items(items), world(world), place(place), normalsOf(normalsOf), lights(lights), lit(lit), eye {view.position, view.right, view.up, view.forward},
           projection {view.focalLength}, reach(reach), depth(depth), rays(rays), laid(laid), cancelled(cancelled) {}
 
@@ -588,7 +588,7 @@ private:
 template <typename Place, typename NormalsOf, typename Cancelled>
 std::optional<std::vector<Frame::Entry>> reflect(const PreparedComposition& composition, double time, const std::vector<SceneItem>& items,
     const std::vector<std::vector<std::optional<Vec3>>>& world, Place&& place, NormalsOf&& normalsOf, const std::vector<LightView>& lights, bool lit,
-    const PreparedComposition::Viewpoint& view, Reach reach, const DepthBuffer* depth, const SceneRays& rays, LaidSurfaces& laid, Cancelled&& cancelled) {
+    const PreparedCamera::Frame& view, Reach reach, const DepthBuffer* depth, const SceneRays& rays, LaidSurfaces& laid, Cancelled&& cancelled) {
     return Reflector<std::remove_reference_t<Place>, std::remove_reference_t<NormalsOf>, std::remove_reference_t<Cancelled>>(composition, time, items, world, place, normalsOf, lights, lit, view, reach, depth, rays, laid, cancelled).run();
 }
 }
