@@ -29,18 +29,23 @@ inline osci::Point kaleidoscope(osci::Point input, int copy, double segments, do
     const osci::Point upper(std::sin(0.5 * size), -std::cos(0.5 * size), 0);
     const osci::Point lower(upper.x, -upper.y, 0);
     osci::Point clipped;
+    // What falls outside the wedge on its far side is folded to the middle,
+    // where every segment meets: drawn dark there, or the beam would rest
+    // on one bright spot.
+    auto light = 1.0;
     if (size < std::numbers::pi) {
         clipped = clipToPlane(clipToPlane(output, upper), lower);
         if (clipped.x < 0) {
             clipped.x = 0;
             clipped.y = 0;
+            light = 1 - clip;
         }
     } else {
         clipped = clipToPlane(output, output.y > 0 ? upper : lower);
     }
     output = (1 - clip) * output + clip * clipped;
     output.rotate(0, 0, (copy / segments + turn) * twoPi);
-    return output.withColour(input.r, input.g, input.b);
+    return output.withColour(static_cast<float>(input.r * light), static_cast<float>(input.g * light), static_cast<float>(input.b * light));
 }
 
 // Copy `copy` of `count` (osci-render's Duplicator): smaller by `spread`

@@ -118,16 +118,15 @@ void MotionEditor::registerCommands() {
         }
     });
     // Ripple delete closes the gap too, as Shift+Delete does in other editors.
-    addCommand(editMenu, "Ripple delete", juce::KeyPress(juce::KeyPress::deleteKey, juce::ModifierKeys::shiftModifier, 0), "Shift+Delete", [this] {
+    const auto rippleDelete = [this] {
         if (graphShown() || !timeline.hasSelectedClips()) {
             statusBar.show("Select clips to delete and close the gap after them.", MotionStatusBar::Kind::notice);
             return;
         }
         timeline.rippleDeleteSelection();
-    });
-    addCommand(keyOnly, "Ripple delete", juce::KeyPress(juce::KeyPress::backspaceKey, juce::ModifierKeys::shiftModifier, 0), {}, [this] {
-        if (!graphShown() && timeline.hasSelectedClips()) { timeline.rippleDeleteSelection(); }
-    });
+    };
+    addCommand(editMenu, "Ripple delete", juce::KeyPress(juce::KeyPress::deleteKey, juce::ModifierKeys::shiftModifier, 0), "Shift+Delete", rippleDelete);
+    addCommand(keyOnly, "Ripple delete", juce::KeyPress(juce::KeyPress::backspaceKey, juce::ModifierKeys::shiftModifier, 0), {}, rippleDelete);
     // Cut, Copy and Delete act on what the shown editor has selected: the
     // Graph's keys, or the timeline's keys or clips. Paste needs a copy.
     const auto anySelection = [this] { return graphShown() ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
@@ -392,7 +391,14 @@ void MotionEditor::sceneMenuChosen(int result) {
 }
 
 void MotionEditor::togglePlayback() {
-    processor.playing.store(!processor.playing.load());
+    const auto pausing = processor.playing.load();
+    processor.playing.store(!pausing);
+    // Backwards by Shift+Space was for that playing only.
+    if (pausing && reversingOnce) {
+        reversingOnce = false;
+        processor.playbackSpeed.store(std::abs(processor.playbackSpeed.load()));
+        speedButton.setSpeed(processor.playbackSpeed.load());
+    }
 }
 
 void MotionEditor::seekAndReveal(double time) {

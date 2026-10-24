@@ -221,7 +221,8 @@ inline std::optional<Match> approximateIn(const juce::String& query, const juce:
         if (token.length() >= 3) {
             // The whole word, or its start as long as the query (so a typo
             // in a word not yet typed out still finds it).
-            auto distance = detail::editDistance(query, token, limit);
+            const auto whole = detail::editDistance(query, token, limit);
+            auto distance = whole;
             for (const auto length : {n - 1, n, n + 1}) {
                 if (length >= 3 && length < token.length()) {
                     distance = std::min(distance, detail::editDistance(query, token.substring(0, length), limit));
@@ -229,7 +230,9 @@ inline std::optional<Match> approximateIn(const juce::String& query, const juce:
             }
             if (distance <= limit) {
                 Match match;
-                match.score = 10 * n - 24 * distance;
+                // A miss of a whole word ("glwo", Glow) beats one of a word's
+                // start ("glwo", global).
+                match.score = 10 * n - 24 * distance + (whole == distance ? 8 : 0);
                 for (int index = start; index < start + std::min(n, token.length()); ++index) {
                     match.positions.push_back(index);
                 }

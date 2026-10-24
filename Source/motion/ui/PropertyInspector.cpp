@@ -1123,7 +1123,8 @@ void MotionPropertyInspector::showKeyMenu(Row& row, bool atPointer) {
     if (!found.has_value()) { return; }
     std::vector<std::string> properties;
     std::vector<std::pair<std::string, double>> defaults;
-    bool animated = false, changed = false;
+    bool animated = false, changed = false, driven = false;
+    const auto routed = routedProperties();
     for (auto& field : row.fields) {
         properties.emplace_back(field->spec.id);
         // The field's own default: a fractal's depth is its source's.
@@ -1131,11 +1132,17 @@ void MotionPropertyInspector::showKeyMenu(Row& row, bool atPointer) {
         const auto* curve = found->curve(properties.back());
         animated = animated || (curve != nullptr && curve->animated());
         changed = changed || (curve != nullptr && (curve->animated() || std::abs(curve->base - field->spec.defaultValue) > 1.0e-9));
+        driven = driven || isDriven(*found, routed, properties.back());
     }
     const auto what = row.group.toLowerCase();
     juce::PopupMenu menu;
     menu.addItem(2, "Reset " + what, changed && !found->locked);
     menu.addItem(1, "Remove " + what + " keyframes", animated && !found->locked);
+    // Reset keeps what drives it: said, so a value still moving isn't a surprise.
+    if (driven) {
+        menu.addSeparator();
+        menu.addItem(3, "Modulation stays (remove it in the Graph)", false);
+    }
     const juce::Component::SafePointer<MotionPropertyInspector> owner(this);
     auto options = juce::PopupMenu::Options().withTargetComponent(&row.key);
     if (atPointer) { options = options.withMousePosition(); }

@@ -114,8 +114,8 @@ inline juce::StringArray menuKeywords(const juce::String& title) {
         {"Show Graph", {"graph editor", "curve editor", "curves", "f-curve"}},
         {"Show timeline", {"dope sheet", "sequencer"}},
         {"Select all", {"everything"}},
-        {"Delete", {"delete clip", "delete track", "delete key", "remove"}},
-        {"Ripple delete", {"close gap", "close the gap", "delete and close gap", "lift", "ripple"}},
+        {"Delete", {"delete clip", "delete track", "delete key", "remove", "lift"}},
+        {"Ripple delete", {"close gap", "close the gap", "delete and close gap", "extract", "ripple"}},
         {"Ungroup", {"dissolve group", "release", "flatten", "ungroup tracks"}},
         {"Duplicate", {"duplicate clip", "copy clip"}},
     };
@@ -210,7 +210,7 @@ inline juce::StringArray scopeKeywords(const juce::String& label) {
         {"Persistence", {"trails", "trail", "phosphor", "decay", "afterimage", "longer trails", "motion blur"}},
         {"Afterglow", {"trails", "glow tail", "decay"}},
         {"Glow", {"bloom", "halo", "brighter"}},
-        {"Hue", {"colour", "color", "tint", "beam colour", "background colour", "background color"}},
+        {"Hue", {"colour", "color", "tint", "beam colour"}},
         {"Saturation", {"colour", "vivid", "grey", "washed out"}},
         // The screen's glow behind the beam, in the Hue's colour: the nearest
         // thing to a background colour.

@@ -183,6 +183,8 @@ public:
             expectEquals(first(index, "position"), juce::String("Position"), "A word start beats one inside composition");
             expectEquals(first(index, "how do i make it glow"), juce::String("Glow"), "The filler of a sentence is ignored");
             expectEquals(first(index, "glwo"), juce::String("Glow"), "A near miss, once nothing matches as typed");
+            index.entries.insert(index.entries.begin(), entry("Show global settings file", Kind::help, "Help"));
+            expectEquals(first(index, "glwo"), juce::String("Glow"), "a miss of a whole word beats a miss of a word's start");
             const auto some = index.search("glow zzzz");
             expect(some.note.isNotEmpty() && !some.results.empty() && some.results.front().entry->title == "Glow", "Some of the words, said so");
             expect(index.search("glow").note.isEmpty());

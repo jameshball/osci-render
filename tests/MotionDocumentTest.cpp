@@ -662,15 +662,15 @@ public:
                 places.insert(juce::roundToInt(made.processPoint(osci::Point(0, 0, 0, 1, 1, 1), 0).x * 100));
             }
             expect(places.size() > 1, "the copies are in different places");
-            // Keyed from 1 to 3 copies: all 3 are prepared, the later ones drawn only once counted.
-            duplicator.properties["copies"] = motion::Curve(1);
-            duplicator.properties["copies"].setKeyValue(0, 1);
-            duplicator.properties["copies"].setKeyValue(1, 3);
+            // Keyed from 2 to 4 copies: all 4 are prepared, the later ones drawn only once counted.
+            duplicator.properties["copies"] = motion::Curve(2);
+            duplicator.properties["copies"].setKeyValue(0, 2);
+            duplicator.properties["copies"].setKeyValue(1, 4);
             clip.effects = {duplicator};
             motion::PreparedComposition keyed(copied);
-            expectEquals(static_cast<int>(keyed.clips.size()), 3);
-            expect(keyed.clips[0].visible(0) && !keyed.clips[2].visible(0), "a copy past the count at a time doesn't draw");
-            expect(keyed.clips[2].visible(.99), "it draws once the count reaches it");
+            expectEquals(static_cast<int>(keyed.clips.size()), 4);
+            expect(keyed.clips[0].visible(0) && !keyed.clips[3].visible(0), "a copy past the count at a time doesn't draw");
+            expect(keyed.clips[3].visible(.99), "it draws once the count reaches it");
             // At no strength only the first draws.
             duplicator.properties["strength"] = motion::Curve(0);
             duplicator.properties["copies"] = motion::Curve(4);

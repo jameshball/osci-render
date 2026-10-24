@@ -54,9 +54,9 @@ inline const std::vector<EffectDefinition>& effectCatalog() {
         { EffectKind::spiralCrush, "spiralCrush", "Spiral crush", {{"strength", "Strength", 1, 0, 1}, {"density", "Density", 13, 3, 30}, {"spiralTwist", "Twist", 0.6, -1, 1}, {"zoom", "Zoom", 0, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
         // Segments of a circle, each the shape turned to stand on its
         // radius (every other mirrored), kept within its own wedge.
-        { EffectKind::kaleidoscope, "kaleidoscope", "Kaleidoscope", {{"strength", "Strength", 1, 0, 1}, {"segments", "Segments", 6, 1, 12, 0}, {"mirror", "Mirror", 1, 0, 1}, {"spread", "Spread", 0.4, 0, 1}, {"clip", "Clip", 1, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
+        { EffectKind::kaleidoscope, "kaleidoscope", "Kaleidoscope", {{"strength", "Strength", 1, 0, 1}, {"segments", "Segments", 6, 1, 12, 0}, {"mirror", "Flip alternate", 1, 0, 1}, {"spread", "Spread", 0.4, 0, 1}, {"clip", "Crop to wedge", 1, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
         // Copies around a circle, each smaller and pushed out towards it.
-        { EffectKind::duplicator, "duplicator", "Duplicator", {{"strength", "Strength", 1, 0, 1}, {"copies", "Copies", 3, 1, 12, 0}, {"spread", "Spread", 0.4, 0, 1}, {"turn", "Rotation", 0, 0, 1}} }
+        { EffectKind::duplicator, "duplicator", "Duplicator", {{"strength", "Strength", 1, 0, 1}, {"copies", "Copies", 3, 2, 12, 0}, {"spread", "Spread", 0.4, 0, 1}, {"turn", "Rotation", 0, 0, 1}} }
     };
     return catalog;
 }

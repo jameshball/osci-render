@@ -511,7 +511,7 @@ private:
     bool hasSound;
     juce::Rectangle<int> strip;
     juce::Label soundCaption {"Sound caption", "Sound"}, beamCaption {"Beam caption", "Beam"}, onCaption {"On caption", "on"}, wiringCaption {"Wiring caption", "Wiring"}, note;
-    motion::ui::Chip flipX {"Flip X"}, flipY {"Flip Y"}, swapXY {"Swap X and Y"};
+    motion::ui::Chip flipX {"Flip X"}, flipY {"Flip Y"}, swapXY {"Swap XY"};
     juce::ComboBox sound, form, place;
     juce::TextButton settings;
 };

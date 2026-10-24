@@ -672,7 +672,7 @@ void MotionEditor::addMenuEntries(const juce::PopupMenu& menu, const juce::Strin
         entry.family = familyIn(where, entry.title);
         // An example is found by name, below what the app itself does.
         if (entry.family == "example") {
-            entry.relevance -= 40;
+            entry.relevance -= 70;
             entry.keywords.add("example");
         }
         entry.shortcut = item.shortcutKeyDescription;

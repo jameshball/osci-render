@@ -16,7 +16,9 @@ public:
         setWantsKeyboardFocus(false);
     }
     void setQuery(const juce::String& query) {
-        setButtonText(juce::String::fromUTF8("Search everything for \xe2\x80\x9c") + query + juce::String::fromUTF8("\xe2\x80\x9d"));
+        // Short, to fit a narrow library with the words in full.
+        setButtonText(juce::String::fromUTF8("Search all for \xe2\x80\x9c") + query + juce::String::fromUTF8("\xe2\x80\x9d"));
+        setTooltip(juce::String::fromUTF8("Search everything osci-motion does for \xe2\x80\x9c") + query + juce::String::fromUTF8("\xe2\x80\x9d (Return)"));
     }
     // As wide as its glass and words, within `room`.
     int idealWidth(int room) const { return std::min(room, juce::roundToInt(juce::TextLayout::getStringWidth(style::body(), getButtonText())) + 40); }

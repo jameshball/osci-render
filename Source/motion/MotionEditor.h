@@ -260,7 +260,7 @@ private:
     void showNewTextEditor();
     void updateNewText();
     motion::Id newTextAsset = 0, newTextTrack = 0;
-    bool newTextOpen = false;
+    bool newTextOpen = false, newTextHeld = false;
     // A script being written plays on the Scope a moment after each change:
     // baked as it stands, off the message thread, the newest only.
     void previewLua();
@@ -525,6 +525,8 @@ private:
     // Reverse: the speed's sign, kept as the speed changes.
     void setReverse(bool backwards);
     void playBackwards();
+    // Playing backwards by Shift+Space, once: pausing turns it forwards again.
+    bool reversingOnce = false;
     static constexpr int reverseMenuId = 100;
     void refreshSpeed();
     void showInComposition(std::function<juce::Component&()> part);

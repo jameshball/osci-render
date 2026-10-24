@@ -675,7 +675,9 @@ void MotionEditor::timerCallback() {
         statusBar.updateTask(exportState->cancelled.load() ? juce::String("Cancelling the export...") : exportTask + motion::style::dot() + juce::String(juce::roundToInt(exportState->progress.load() * 100)) + "%");
     }
     const auto playing = processor.playing.load();
-    playButton.setIcon(playing ? motion::icons::Icon::pause : motion::icons::Icon::play);
+    // Play points the way it will play.
+    const auto backwards = processor.playbackSpeed.load() < 0;
+    playButton.setIcon(playing ? motion::icons::Icon::pause : backwards ? motion::icons::Icon::playReverse : motion::icons::Icon::play);
     {
         const auto& project = processor.document.project();
         loopButton.setToggleState(project.looping && project.hasLoop(), juce::dontSendNotification);
@@ -698,7 +700,6 @@ void MotionEditor::timerCallback() {
     const auto slowTick = ++ticks % 10 == 0;
     const auto moved = position != lastPaintedPosition || playing;
     lastPaintedPosition = position;
-    const auto backwards = processor.playbackSpeed.load() < 0;
     timeline.followPlayhead(position, playing, backwards);
     timeline.updateBake();
     if (curveEditor.isVisible() && timeline.layout().follow) { curveEditor.followPlayhead(position, playing, backwards); }
@@ -1257,7 +1258,8 @@ void MotionEditor::keepOutputPlayable() {
         routingDevice = device->getName();
         const auto previous = processor.getRouting();
         if (!restoreRouting()) {
-            const motion::OutputRouting plain {device->getOutputChannelNames().size() >= 2 ? 0 : motion::OutputRouting::off, motion::OutputMode::soundtrack, 0};
+            // The scope's wiring stays: it is the scope's, whatever the interface.
+            const motion::OutputRouting plain {device->getOutputChannelNames().size() >= 2 ? 0 : motion::OutputRouting::off, motion::OutputMode::soundtrack, 0, previous.wiring};
             processor.setRouting(plain);
             outputButton.setRouting(plain);
         }
@@ -1370,7 +1372,6 @@ void MotionEditor::showSpeedMenu(juce::Component& anchor) {
     juce::PopupMenu::Item reverse("Reverse");
     reverse.itemID = reverseMenuId;
     reverse.isTicked = backwards;
-    reverse.shortcutKeyDescription = motion::style::shortcutText("Shift+Space");
     menu.addItem(reverse);
     menu.setLookAndFeel(&motionLookAndFeel);
     const juce::Component::SafePointer<MotionEditor> owner(this);
@@ -1396,19 +1397,26 @@ void MotionEditor::changeSpeed(int steps) {
 }
 
 void MotionEditor::setReverse(bool backwards) {
+    reversingOnce = false;
     const auto current = processor.playbackSpeed.load();
     processor.playbackSpeed.store(std::copysign(std::abs(current), backwards ? -1.0 : 1.0));
     refreshSpeed();
+    statusBar.show(backwards ? juce::String("Reverse on: playback runs backwards until you turn Reverse off in the speed menu.") : juce::String("Reverse off: playback runs forwards."), MotionStatusBar::Kind::notice);
 }
 
-// Plays backwards from where it is; again, pauses.
+// Plays backwards from where it is, this once (the speed menu's Reverse
+// stays as it was); again, or Space, pauses and turns it forwards again.
 void MotionEditor::playBackwards() {
     const auto backwards = processor.playbackSpeed.load() < 0;
     if (processor.playing.load() && backwards) {
         togglePlayback();
         return;
     }
-    if (!backwards) { setReverse(true); }
+    if (!backwards) {
+        processor.playbackSpeed.store(-std::abs(processor.playbackSpeed.load()));
+        reversingOnce = true;
+        speedButton.setSpeed(processor.playbackSpeed.load());
+    }
     if (!processor.playing.load()) { togglePlayback(); }
 }
 
@@ -1419,12 +1427,10 @@ void MotionEditor::refreshSpeed() {
     juce::String said;
     if (speed == 1.0) {
         said = "Back to normal speed.";
-    } else if (speed == -1.0) {
-        said = "Playing in reverse: Reverse in the speed menu (or Shift+Space) plays forwards again.";
-    } else {
-        said = (speed < 0 ? "Reverse at " + text.substring(1) : "Speed " + text) + ": < and > change it; exports always play forwards at normal speed.";
+    } else if (std::abs(speed) != 1.0) {
+        said = "Speed " + text + ": < and > change it; exports always play forwards at normal speed.";
     }
-    statusBar.show(said, MotionStatusBar::Kind::notice);
+    if (said.isNotEmpty()) { statusBar.show(said, MotionStatusBar::Kind::notice); }
     repaint();
 }
 

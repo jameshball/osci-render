@@ -87,6 +87,7 @@ public:
         // The words start on the page's inset, like the type bar above.
         text.setIndents(0, 4);
         text.setText(initial, false);
+        if (creating) { text.setTextToShowWhenEmpty("Type your text", osci::Colours::textMuted()); }
         text.onTextChange = [this] { changed(); };
         addAndMakeVisible(text);
         status.setName("Text status");
@@ -153,7 +154,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".txt", creating ? "New text" : "Editing", error.isNotEmpty());
+        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, creating && text.getText().trim().isEmpty() ? juce::String() : sourceName + ".txt", creating ? "New text" : "Editing", error.isNotEmpty());
         // The type bar and the foot are bands of the panel's surface.
         for (const auto& band : {bar, footer}) {
             g.setColour(osci::Colours::surface());
@@ -169,9 +170,15 @@ public:
     bool keyPressed(const juce::KeyPress& key) override {
         const auto command = key.getModifiers().isCommandDown();
         if (command && key.getKeyCode() == juce::KeyPress::returnKey) { finish(); return true; }
-        // Escape leaves an untouched text; edits need Cancel, so typing is never lost.
+        // Escape leaves an untouched text; edits need Cancel, so typing is never
+        // lost. A new text is in the project already: Escape finishes it, as
+        // leaving a text box does elsewhere.
         if (key == juce::KeyPress::escapeKey) {
-            if (text.getText() == original && settings == originalSettings && onCancel) { onCancel(); }
+            if (creating && text.getText().trim().isNotEmpty()) {
+                finish();
+            } else if (text.getText() == original && settings == originalSettings && onCancel) {
+                onCancel();
+            }
             return true;
         }
         // Other shortcuts would act on the timeline behind the editor.

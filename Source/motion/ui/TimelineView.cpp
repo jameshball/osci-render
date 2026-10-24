@@ -123,10 +123,20 @@ void MotionTimelineView::ungroupSelected() {
         if (onError) { onError("Select a group to ungroup: click its name."); }
         return;
     }
+    // What the groups held directly, to be picked once they are free.
+    std::set<motion::Id> freed;
+    const auto& before = processor.document.project();
+    for (const auto& track : before.tracks) {
+        if (std::find(groups.begin(), groups.end(), track.group) != groups.end()) { freed.insert(track.id); }
+    }
+    for (const auto& group : before.groups) {
+        if (std::find(groups.begin(), groups.end(), group.parent) != groups.end()) { freed.insert(group.id); }
+    }
     juce::String lost;
     if (!report(processor.document.ungroup(groups, lost))) { return; }
     for (const auto id : groups) { collapsedGroups.erase(id); }
-    selectedTracks.clear();
+    // Picked, as they were before grouping: Cmd+G groups them again.
+    selectedTracks = freed;
     refreshTracks();
     if (lost.isNotEmpty() && onNotice) { onNotice(lost + " Undo to keep them."); }
 }

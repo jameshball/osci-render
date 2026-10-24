@@ -225,16 +225,26 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         // Reset, from the diamond's menu or a right-click on the row.
         const auto defaultValue = parameter.defaultValue;
         const auto name = juce::String(parameter.name).toLowerCase();
+        // As a property's row has it: Reset (when there is anything to
+        // reset) and removing its keyframes.
         const auto menu = [this, property, defaultValue, name, raw = row.get()](bool atPointer) {
+            const motion::Curve* curve = nullptr;
+            const auto* effect = motion::findEffect(stack.processor.document.project(), id);
+            if (effect != nullptr) {
+                const auto found = effect->properties.find(std::string(property));
+                if (found != effect->properties.end()) { curve = &found->second; }
+            }
+            const auto animated = curve != nullptr && curve->animated();
+            const auto changed = curve != nullptr && (animated || std::abs(curve->base - defaultValue) > 1.0e-9);
             juce::PopupMenu items;
-            items.addItem(1, "Reset " + name);
+            items.addItem(1, "Reset " + name, changed);
+            items.addItem(2, "Remove " + name + " keyframes", animated);
             auto options = juce::PopupMenu::Options().withTargetComponent(&raw->key);
             if (atPointer) { options = options.withMousePosition(); }
             motion::ui::showDocumentMenu(items, raw->key, stack.processor.document, options, [this, property, defaultValue, name](int result) {
-                if (result == 1) {
-                    const auto reset = stack.processor.document.resetProperties(id, {{std::string(property), defaultValue}}, name);
-                    if (reset.failed()) { update(); }
-                }
+                auto& document = stack.processor.document;
+                if (result == 1) { document.resetProperties(id, {{std::string(property), defaultValue}}, name); }
+                if (result == 2) { document.removeKeyframes(id, {std::string(property)}, stack.processor.position.load(), name); }
             });
         };
         row->key.onPopupMenu = [menu] { menu(false); };

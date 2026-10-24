@@ -8,7 +8,7 @@
 // drawn at the named sizes (style::iconLarge and smaller), on whole pixels.
 // One button draws them all, so toolbars match.
 namespace motion::icons {
-enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, settings, openInNew, fullscreen, fullscreenExit, cast, autoKey, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search, solidView, link, effects };
+enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, rectangle, ellipse, lock, trash, undo, redo, settings, openInNew, fullscreen, fullscreenExit, cast, autoKey, bold, italic, alignLeft, alignCentre, alignRight, close, parts, box, lasso, connected, anchor, centre, folder, newProject, keyboard, search, solidView, link, effects, playReverse };
 
 inline const juce::Path& path(Icon icon) {
     static const auto paths = [] {
@@ -80,6 +80,8 @@ inline const juce::Path& path(Icon icon) {
         // the corners alone).
         add(Icon::frame, "M3 5v4h2V5h4V3H5c-1.1 0-2 .9-2 2zm2 10H3v4c0 1.1.9 2 2 2h4v-2H5v-4zm14 4h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4zm0-16h-4v2h4v4h2V5c0-1.1-.9-2-2-2zM9 8h6c.55 0 1 .45 1 1v6c0 .55-.45 1-1 1H9c-.55 0-1-.45-1-1V9c0-.55.45-1 1-1zm1 2v4h4v-4h-4z");
         add(Icon::play, "M8 5v14l11-7z");
+        // Play, pointing back: while the transport plays in reverse.
+        add(Icon::playReverse, "M16 5v14L5 12z");
         add(Icon::pause, "M6 19h4V5H6v14zm8-14v14h4V5h-4z");
         add(Icon::start, "M6 6h2v12H6zm3.5 6l8.5 6V6z");
         add(Icon::end, "M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z");

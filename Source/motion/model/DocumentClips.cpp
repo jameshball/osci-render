@@ -340,7 +340,7 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
         }
     }
     if (found != requested.size()) { return juce::Result::fail("A selected clip no longer exists."); }
-    edit(ripple ? "Ripple delete clips" : (found == 1 ? "Delete clip" : "Delete clips"),
+    edit(ripple ? (found == 1 ? "Ripple delete clip" : "Ripple delete clips") : (found == 1 ? "Delete clip" : "Delete clips"),
         [candidate = std::move(candidate)](Project& value) { value = candidate; });
     return juce::Result::ok();
 }

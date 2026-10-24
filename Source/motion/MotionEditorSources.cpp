@@ -1130,6 +1130,7 @@ void MotionEditor::showNewTextEditor() {
     newTextAsset = 0;
     newTextTrack = 0;
     newTextOpen = true;
+    newTextHeld = false;
     // Centred, as a title most often is.
     motion::TextSettings settings;
     settings.alignment = 1;
@@ -1170,10 +1171,25 @@ void MotionEditor::updateNewText() {
         return;
     }
     const auto text = editor->currentText();
+    auto& document = processor.document;
+    const juce::String held = "new text";
+    // Every letter gone: the text goes too, in the same step (the next
+    // letter brings it back).
+    if (text.trim().isEmpty() && newTextAsset != 0) {
+        const auto asset = newTextAsset, track = newTextTrack;
+        document.editCoalesced("Add text", held, [asset, track](motion::Project& project) {
+            std::erase_if(project.assets, [asset](const auto& each) { return each != nullptr && each->id == asset; });
+            project.tracks.eraseIf([track](const motion::Track& each) { return each.id == track; });
+        });
+        newTextAsset = 0;
+        newTextTrack = 0;
+        assetLibrary.refresh();
+        editor->repaint();
+        return;
+    }
     if (text.trim().isEmpty() || text.length() > 16384) {
         return;
     }
-    auto& document = processor.document;
     const auto stem = nameForText(text);
     editor->setSourceName(stem);
     // Its name, unique among the other sources.
@@ -1195,7 +1211,6 @@ void MotionEditor::updateNewText() {
     if (motion::decodeAsset(*asset).failed()) {
         return;
     }
-    const juce::String held = "new text";
     // Undone while typing: it starts again.
     const auto& assets = document.project().assets;
     if (newTextAsset != 0 && std::none_of(assets.begin(), assets.end(), [this](const auto& each) { return each != nullptr && each->id == newTextAsset; })) {
@@ -1208,8 +1223,12 @@ void MotionEditor::updateNewText() {
         motion::Track track;
         track.id = document.newId();
         track.name = stem.toStdString();
+        clip.name = stem.toStdString();
         track.insert(clip, document.project().tempo());
-        document.beginHeld(held);
+        if (!newTextHeld) {
+            document.beginHeld(held);
+            newTextHeld = true;
+        }
         document.editCoalesced("Add text", held, [&](motion::Project& project) {
             project.assets.push_back(asset);
             project.tracks.push_back(track);
@@ -1238,7 +1257,7 @@ void MotionEditor::updateNewText() {
             auto* track = project.tracks.changeById(newTextTrack);
             track->name = stem.toStdString();
             for (auto& clip : track->clips) {
-                clip.name = name.toStdString();
+                clip.name = stem.toStdString();
             }
         }
     });

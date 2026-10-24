@@ -85,10 +85,10 @@ public:
     };
     void setState(const State& next) {
         if (next == state) { return; }
-        const auto playingChanged = next.playing != state.playing;
+        const auto playingChanged = next.playing != state.playing || (next.speed < 0) != (state.speed < 0);
         state = next;
         if (playingChanged) {
-            play.setIcon(state.playing ? motion::icons::Icon::pause : motion::icons::Icon::play);
+            play.setIcon(state.playing ? motion::icons::Icon::pause : state.speed < 0 ? motion::icons::Icon::playReverse : motion::icons::Icon::play);
             play.setTooltip(state.playing ? "Pause (Space)" : "Play (Space)");
         }
         speed.setSpeed(state.speed);
