@@ -652,6 +652,14 @@
         <FILE id="MotrenderTrianglePointsh" name="TrianglePoints.h" compile="0"
               resource="0" file="Source/motion/render/TrianglePoints.h"/>
       </GROUP>
+      <GROUP id="MotionSrcSearch" name="search">
+        <FILE id="MotsearchFuzzyMatchh" name="FuzzyMatch.h" compile="0" resource="0"
+              file="Source/motion/search/FuzzyMatch.h"/>
+        <FILE id="MotsearchSearchIndexh" name="SearchIndex.h" compile="0"
+              resource="0" file="Source/motion/search/SearchIndex.h"/>
+        <FILE id="MotsearchSynonymsh" name="Synonyms.h" compile="0" resource="0"
+              file="Source/motion/search/Synonyms.h"/>
+      </GROUP>
       <GROUP id="MotionSrcUi" name="ui">
         <FILE id="MotuiAssetLibrarycpp" name="AssetLibrary.cpp" compile="1"
               resource="0" file="Source/motion/ui/AssetLibrary.cpp"/>
