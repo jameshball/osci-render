@@ -390,6 +390,23 @@ public:
             expect(!finished && pieces < 1024, "a cancelled face stops being diced (" + juce::String(static_cast<int>(pieces)) + " pieces)");
         }
 
+        beginTest("A bend that folds a face across the view again and again is cut within a budget");
+        {
+            // A fine ripple, as a camera close to a rippled surface sees it:
+            // every fold throws the face across the whole view, so halving
+            // alone would go on to its deepest (minutes, and gigabytes).
+            const auto folded = [](const osci::Point& point) -> std::optional<motion::hidden::Screen> {
+                const auto x = point.x + 2 * std::sin(500 * point.y);
+                return motion::hidden::Screen {x / point.z, point.y / point.z, 1.0 / point.z};
+            };
+            const auto corner = [&](float x, float y) { const osci::Point point(x, y, 1); return motion::hidden::DiceCorner {point, folded(point)}; };
+            motion::hidden::Dicer dicer;
+            dicer.begin({});
+            std::size_t pieces = 0;
+            const auto finished = dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), folded, [&](const auto&, const auto&, const auto&, bool) { ++pieces; });
+            expect(finished && pieces > 0 && pieces <= 2 * motion::hidden::Dicer::budget, "a folded face is cut into a bounded number of pieces (" + juce::String(static_cast<juce::int64>(pieces)) + ")");
+        }
+
         beginTest("A bake reuses a frame for a time that depends on just the same");
         {
             // A still cube: every frame is the first, shared. Turning it, none is.

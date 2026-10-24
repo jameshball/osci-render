@@ -120,7 +120,7 @@ template <typename Place, typename Whole, typename Cancelled>
 bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world, Place&& place, const Eye& eye, const Projection& projection,
     Reach reach, DepthBuffer& depth, Dicer& dicer, Whole&& whole, Cancelled&& cancelled, bool solidOnly = false) {
     depth.cover(reach);
-    dicer.setReach(reach);
+    dicer.begin(reach);
     const auto seen = [&](const std::optional<Vec3>& point) -> std::optional<Vec3> {
         if (!point.has_value()) { return std::nullopt; }
         return eye.see(*point);

@@ -34,8 +34,18 @@ public:
     // pixels, and in depth, as a share of the room a depth test leaves.
     static constexpr double flatTolerance = .125, depthTolerance = DepthBuffer::depthPush / 4;
 
-    // What the Scope shows: a piece wholly past it is dropped.
-    void setReach(Reach value) { reach = value; }
+    // How many pieces one pass over a frame's surfaces may cut, some eight
+    // to each cell of the depth buffer. Close to the eye a bend can throw a
+    // face across the whole view again with every fold, so halving would
+    // go on to its deepest; past this, pieces are drawn as they are.
+    static constexpr std::size_t budget = std::size_t {1} << 19;
+
+    // A pass over a frame's surfaces, showing what the Scope shows: a piece
+    // wholly past it is dropped.
+    void begin(Reach value) {
+        reach = value;
+        spent = 0;
+    }
 
     // `bend` places a source point on screen; `emit` takes each piece, and
     // whether it is whole (rather than cut where it comes into view). A face
@@ -121,7 +131,7 @@ private:
                 clipToView(p, q, r, bend, emit);
             }
         };
-        if (longest <= limit || depthLeft <= 0) {
+        if (longest <= limit || depthLeft <= 0 || ++spent > budget) {
             asItIs();
             return;
         }
@@ -285,6 +295,7 @@ private:
 
     MidpointCache<DiceCorner> midpoints;
     bool stopped = false;
+    std::size_t spent = 0;
     std::vector<DiceCorner> points;
     Reach reach;
 };
