@@ -24,11 +24,10 @@ inline bool isSeparator(juce::juce_wchar c) {
 // Extra for matching the text's character at `index`: most at the start of
 // the text or of a word, some at a capital inside a word or a digit after a
 // letter.
-inline int boundaryBonus(const juce::String& text, int index) {
+inline int boundaryBonus(juce::juce_wchar previous, juce::juce_wchar current, int index) {
     if (index == 0) {
         return 10;
     }
-    const auto previous = text[index - 1], current = text[index];
     if (isSeparator(previous)) {
         return 9;
     }
@@ -39,6 +38,9 @@ inline int boundaryBonus(const juce::String& text, int index) {
         return 4;
     }
     return 0;
+}
+inline int boundaryBonus(const juce::String& text, int index) {
+    return boundaryBonus(index > 0 ? text[index - 1] : 0, text[index], index);
 }
 
 // Whether `word` (lower case) appears in `lower` in order, letter by letter.
@@ -55,40 +57,37 @@ inline bool isSubsequence(const juce::String& word, const juce::String& lower) {
 }
 
 // The Damerau-Levenshtein distance between `a` and `b`, or more than
-// `limit` when it is over it.
+// `limit` when it is over it. Three rows, reused between calls.
 inline int editDistance(const juce::String& a, const juce::String& b, int limit) {
     const auto n = a.length(), m = b.length();
     if (std::abs(n - m) > limit) {
         return limit + 1;
     }
-    std::vector<std::vector<int>> d(static_cast<size_t>(n + 1), std::vector<int>(static_cast<size_t>(m + 1)));
-    for (int i = 0; i <= n; ++i) {
-        d[static_cast<size_t>(i)][0] = i;
-    }
+    thread_local std::vector<int> rows;
+    rows.assign(static_cast<size_t>(3 * (m + 1)), 0);
+    const auto at = [m](int i, int j) { return static_cast<size_t>((i % 3) * (m + 1) + j); };
     for (int j = 0; j <= m; ++j) {
-        d[0][static_cast<size_t>(j)] = j;
+        rows[at(0, j)] = j;
     }
     for (int i = 1; i <= n; ++i) {
+        rows[at(i, 0)] = i;
         for (int j = 1; j <= m; ++j) {
             const auto cost = a[i - 1] == b[j - 1] ? 0 : 1;
-            auto best = std::min({d[static_cast<size_t>(i - 1)][static_cast<size_t>(j)] + 1, d[static_cast<size_t>(i)][static_cast<size_t>(j - 1)] + 1, d[static_cast<size_t>(i - 1)][static_cast<size_t>(j - 1)] + cost});
+            auto best = std::min({rows[at(i - 1, j)] + 1, rows[at(i, j - 1)] + 1, rows[at(i - 1, j - 1)] + cost});
             if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1]) {
-                best = std::min(best, d[static_cast<size_t>(i - 2)][static_cast<size_t>(j - 2)] + 1);
+                best = std::min(best, rows[at(i - 2, j - 2)] + 1);
             }
-            d[static_cast<size_t>(i)][static_cast<size_t>(j)] = best;
+            rows[at(i, j)] = best;
         }
     }
-    return d[static_cast<size_t>(n)][static_cast<size_t>(m)];
+    return rows[at(n, m)];
 }
 }
 
-// The best fuzzy match of `word` in `text`, or none when its letters aren't
-// all there in order. Case is ignored.
-inline std::optional<Match> fuzzy(const juce::String& word, const juce::String& text) {
-    const auto query = word.toLowerCase();
-    const auto shown = text.substring(0, 160);
-    const auto lower = shown.toLowerCase();
-    const auto n = query.length(), m = lower.length();
+// The best fuzzy match of `query` (lower case) in `shown`, whose lower case
+// is `lower`, or none when its letters aren't all there in order.
+inline std::optional<Match> fuzzyIn(const juce::String& query, const juce::String& shown, const juce::String& lower) {
+    const auto n = query.length(), m = std::min(lower.length(), 160);
     if (n == 0) {
         return Match {};
     }
@@ -100,11 +99,44 @@ inline std::optional<Match> fuzzy(const juce::String& word, const juce::String& 
     // more to open than to widen.
     constexpr int matchScore = 16, runBonus = 4, gapOpen = 3, gapWiden = 1, none = INT_MIN / 4;
     const auto cell = [m](int i, int j) { return static_cast<size_t>(i * m + j); };
-    std::vector<int> best(static_cast<size_t>(n * m), none), from(static_cast<size_t>(n * m), -1);
+    // The letters as an array (a String's are found by walking it), and what
+    // landing on each is worth.
+    thread_local std::vector<juce::juce_wchar> letters, typed;
+    thread_local std::vector<int> best, from, bonus, carried;
+    letters.assign(static_cast<size_t>(m), 0);
+    bonus.assign(static_cast<size_t>(m), 0);
+    {
+        auto lowered = lower.getCharPointer();
+        for (int j = 0; j < m; ++j) {
+            letters[static_cast<size_t>(j)] = lowered.getAndAdvance();
+        }
+        auto original = shown.getCharPointer();
+        juce::juce_wchar previous = 0;
+        for (int j = 0; j < m && !original.isEmpty(); ++j) {
+            const auto current = original.getAndAdvance();
+            bonus[static_cast<size_t>(j)] = detail::boundaryBonus(previous, current, j);
+            previous = current;
+        }
+    }
+    typed.assign(static_cast<size_t>(n), 0);
+    {
+        auto pointer = query.getCharPointer();
+        for (int i = 0; i < n; ++i) {
+            typed[static_cast<size_t>(i)] = pointer.getAndAdvance();
+        }
+    }
+    best.assign(static_cast<size_t>(n * m), none);
+    from.assign(static_cast<size_t>(n * m), -1);
+    // A letter in a run earns the bonus its run began with, as fzf has it,
+    // so "loop" in Loop playback stays together rather than jumping to the
+    // p of playback.
+    carried.assign(static_cast<size_t>(n * m), 0);
     for (int j = 0; j < m; ++j) {
-        if (lower[j] == query[0]) {
-            // Letters skipped before the first match cost a little each.
-            best[cell(0, j)] = matchScore + detail::boundaryBonus(shown, j) - std::min(j, 12);
+        if (letters[static_cast<size_t>(j)] == typed[0]) {
+            // Letters skipped before the first match cost a little each; where
+            // the first letter lands counts double, as fzf has it.
+            best[cell(0, j)] = matchScore + 2 * bonus[static_cast<size_t>(j)] - std::min(j, 12);
+            carried[cell(0, j)] = bonus[static_cast<size_t>(j)];
         }
     }
     for (int i = 1; i < n; ++i) {
@@ -122,16 +154,20 @@ inline std::optional<Match> fuzzy(const juce::String& word, const juce::String& 
                     gapped = widened;
                 }
             }
-            if (lower[j] != query[i]) {
+            if (letters[static_cast<size_t>(j)] != typed[static_cast<size_t>(i)]) {
                 continue;
             }
-            const auto adjacent = best[cell(i - 1, j - 1)] == none ? none : best[cell(i - 1, j - 1)] + runBonus;
-            const auto previous = std::max(adjacent, gapped);
-            if (previous == none) {
+            const auto here = bonus[static_cast<size_t>(j)];
+            const auto runOn = std::max(here, carried[cell(i - 1, j - 1)]);
+            const auto adjacent = best[cell(i - 1, j - 1)] == none ? none : best[cell(i - 1, j - 1)] + runBonus + runOn;
+            const auto jumped = gapped == none ? none : gapped + here;
+            if (adjacent == none && jumped == none) {
                 continue;
             }
-            best[cell(i, j)] = previous + matchScore + detail::boundaryBonus(shown, j);
-            from[cell(i, j)] = adjacent >= gapped ? j - 1 : gappedFrom;
+            const auto together = adjacent >= jumped;
+            best[cell(i, j)] = (together ? adjacent : jumped) + matchScore;
+            from[cell(i, j)] = together ? j - 1 : gappedFrom;
+            carried[cell(i, j)] = together ? runOn : here;
         }
     }
     int end = -1;
@@ -157,17 +193,21 @@ inline std::optional<Match> fuzzy(const juce::String& word, const juce::String& 
     return match;
 }
 
+// The best fuzzy match of `word` in `text`, or none when its letters aren't
+// all there in order. Case is ignored.
+inline std::optional<Match> fuzzy(const juce::String& word, const juce::String& text) {
+    return fuzzyIn(word.toLowerCase(), text, text.toLowerCase());
+}
+
 // A near miss of `word` against the words of `text`: one letter wrong,
-// missing, extra or swapped (two for longer words), against a whole word or
+// missing, extra or swapped (two for words of nine letters or more), against a whole word or
 // its start. Used only when `fuzzy` finds nothing, and scored below it.
-inline std::optional<Match> approximate(const juce::String& word, const juce::String& text) {
-    const auto query = word.toLowerCase();
+inline std::optional<Match> approximateIn(const juce::String& query, const juce::String& lower) {
     const auto n = query.length();
     if (n < 4) {
         return std::nullopt;
     }
-    const auto limit = n >= 7 ? 2 : 1;
-    const auto lower = text.toLowerCase();
+    const auto limit = n >= 9 ? 2 : 1;
     std::optional<Match> found;
     for (int start = 0; start < lower.length();) {
         while (start < lower.length() && detail::isSeparator(lower[start])) {
@@ -201,5 +241,9 @@ inline std::optional<Match> approximate(const juce::String& word, const juce::St
         start = end;
     }
     return found;
+}
+
+inline std::optional<Match> approximate(const juce::String& word, const juce::String& text) {
+    return approximateIn(word.toLowerCase(), text.toLowerCase());
 }
 }
