@@ -646,6 +646,50 @@ public:
             expect(std::isfinite(point.r) && std::isfinite(point.g) && std::isfinite(point.b));
         }
 
+        beginTest("Kaleidoscope and Duplicator draw a clip once a copy, as many as they make then, wherever they are put");
+        {
+            auto copied = document.project();
+            auto& clip = copied.tracks.change(0).clips[0];
+            clip.properties = motion::defaultProperties(motion::objectPropertySpecs);
+            auto duplicator = motion::makeEffect(700, *motion::effectDefinition("duplicator"));
+            duplicator.properties["copies"] = motion::Curve(4);
+            clip.effects = {duplicator};
+            motion::PreparedComposition four(copied);
+            expectEquals(static_cast<int>(four.clips.size()), 4);
+            std::set<int> places;
+            for (const auto& made : four.clips) {
+                expect(made.visible(0), "each copy draws");
+                places.insert(juce::roundToInt(made.processPoint(osci::Point(0, 0, 0, 1, 1, 1), 0).x * 100));
+            }
+            expect(places.size() > 1, "the copies are in different places");
+            // Keyed from 1 to 3 copies: all 3 are prepared, the later ones drawn only once counted.
+            duplicator.properties["copies"] = motion::Curve(1);
+            duplicator.properties["copies"].setKeyValue(0, 1);
+            duplicator.properties["copies"].setKeyValue(1, 3);
+            clip.effects = {duplicator};
+            motion::PreparedComposition keyed(copied);
+            expectEquals(static_cast<int>(keyed.clips.size()), 3);
+            expect(keyed.clips[0].visible(0) && !keyed.clips[2].visible(0), "a copy past the count at a time doesn't draw");
+            expect(keyed.clips[2].visible(.99), "it draws once the count reaches it");
+            // At no strength only the first draws.
+            duplicator.properties["strength"] = motion::Curve(0);
+            duplicator.properties["copies"] = motion::Curve(4);
+            clip.effects = {duplicator};
+            motion::PreparedComposition off(copied);
+            expect(off.clips[0].visible(0) && !off.clips[1].visible(0));
+            // On the composition, every clip is copied; with two, their copies multiply.
+            clip.effects = {};
+            auto kaleidoscope = motion::makeEffect(701, *motion::effectDefinition("kaleidoscope"));
+            kaleidoscope.properties["segments"] = motion::Curve(6);
+            copied.effects = {kaleidoscope};
+            duplicator.properties["strength"] = motion::Curve(1);
+            duplicator.properties["copies"] = motion::Curve(2);
+            clip.effects = {duplicator};
+            motion::PreparedComposition both(copied);
+            expectEquals(static_cast<int>(both.clips.size()), 12);
+            expect(!both.hasCompositionEffects(), "the composition's effects go with each clip");
+        }
+
         beginTest("A damaged project opens with what can be used, and says what was left out");
         auto invalid = std::make_unique<juce::XmlElement>(xml);
         invalid->setAttribute("duration", -1);

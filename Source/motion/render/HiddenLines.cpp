@@ -86,7 +86,7 @@ private:
             const auto* drawing = clip.source->drawingAt(sourceFrame);
             const auto* points = clip.source->pointFrames();
             if (drawing == nullptr && points == nullptr) { continue; }
-            const auto bent = bends(clip) || std::any_of(clip.ancestors.begin(), clip.ancestors.end(), [](const auto& stage) { return bends(stage); });
+            const auto bent = bends(clip) || std::any_of(clip.ancestors.begin(), clip.ancestors.end(), [](const auto& stage) { return bends(stage); }) || bends(clip.rootEffects);
             items.push_back({index, &clip, clip.source, drawing, points, sourceFrame, bent, clip.reflects(time)});
             items.back().solid = clip.solid(time);
             items.back().response = clip.lit(time);

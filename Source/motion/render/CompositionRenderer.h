@@ -92,6 +92,13 @@ struct PreparedComposition {
         });
         const ClipTiming mainClock(0, project.duration);
         drivers.driveEffects(effects, project.effects, project, mainClock);
+        // An effect on the composition that makes copies makes them of every
+        // clip: all its effects go with each clip, in order, to be copied.
+        std::vector<PreparedEffect> carried;
+        if (std::any_of(effects.begin(), effects.end(), [](const PreparedEffect& effect) { return effect.makesCopies(); })) {
+            carried = std::move(effects);
+            effects.clear();
+        }
         const auto chainFor = [&](Id id, bool groupsOnly) {
             PreparedChain chain;
             Id groupId = 0;
@@ -241,7 +248,35 @@ struct PreparedComposition {
                 return;
             }
             item.light = generator != nullptr && generator->category == GeneratorCategory::light;
-            clips.push_back(std::move(item));
+            item.rootEffects = carried;
+            // One clip for each copy the effects on it make together, the
+            // first (copy 0 of each) first: a clip with none is one.
+            std::vector<int> counts;
+            item.eachEffect([&](const PreparedEffect& effect) {
+                if (effect.makesCopies()) { counts.push_back(effect.mostCopies()); }
+            });
+            int total = 1;
+            for (auto& count : counts) {
+                count = std::max(1, std::min(count, maximumCopiesOfClip / total));
+                total *= count;
+            }
+            if (total <= 1) {
+                clips.push_back(std::move(item));
+                return;
+            }
+            for (int copy = 0; copy < total; ++copy) {
+                auto made = item;
+                made.hasCopies = true;
+                auto remaining = copy;
+                std::size_t which = 0;
+                made.eachEffect([&](PreparedEffect& effect) {
+                    if (!effect.makesCopies()) { return; }
+                    effect.copy = remaining % counts[which];
+                    remaining /= counts[which];
+                    ++which;
+                });
+                clips.push_back(std::move(made));
+            }
         }, cancel);
         if (!expanded) { preparationError = expanded.error; }
         if (preparationError.isNotEmpty()) {

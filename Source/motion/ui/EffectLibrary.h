@@ -121,7 +121,7 @@ private:
                 const auto found = instance.properties.find(property);
                 if (found != instance.properties.end()) { found->second = motion::Curve(value); }
             }
-            const auto effects = motion::prepareEffects({instance});
+            auto effects = motion::prepareEffects({instance});
             // Colour effects show in the stroke.
             const auto key = motion::style::key();
             osci::Point sample(0, 0, 0);
@@ -140,8 +140,20 @@ private:
             const auto moves = kind == Kind::skew;
             const auto rows = kind == Kind::ripple;
             const auto rings = kind == Kind::polygon || kind == Kind::spiralCrush || kind == Kind::bitCrush;
+            // Copies show best of a small shape whose turns and mirrorings
+            // read: an F, each copy drawn.
+            const auto copies = motion::makesCopies(kind) ? effects.front().mostCopies() : 1;
             std::vector<std::vector<osci::Point>> lines;
-            if (rings) {
+            if (copies > 1) {
+                const std::array<std::array<float, 4>, 3> strokes {{{-.15f, -.5f, -.15f, .5f}, {-.15f, .5f, .3f, .5f}, {-.15f, .05f, .18f, .05f}}};
+                for (const auto& stroke : strokes) {
+                    auto& points = lines.emplace_back();
+                    for (int step = 0; step <= 8; ++step) {
+                        const auto t = static_cast<float>(step) / 8;
+                        points.emplace_back(stroke[0] + (stroke[2] - stroke[0]) * t, stroke[1] + (stroke[3] - stroke[1]) * t, 0);
+                    }
+                }
+            } else if (rings) {
                 for (const auto radius : {.22f, .44f, .66f}) {
                     auto& ring = lines.emplace_back();
                     for (int step = 0; step <= 96; ++step) {
@@ -163,15 +175,18 @@ private:
                     }
                 }
             }
-            for (const auto& line : lines) {
-                for (std::size_t index = 0; index < line.size(); ++index) {
-                    auto point = motion::applyEffects(effects, line[index], .5);
-                    if (rows) { point.y += point.z * .8f; }
-                    point.x = std::clamp(point.x, -.95f, .95f);
-                    point.y = std::clamp(point.y, -.95f, .95f);
-                    if (index == 0) { thumbnail.startNewSubPath(point.x, point.y); } else { thumbnail.lineTo(point.x, point.y); }
-                    if (!moves) { continue; }
-                    if (index == 0) { before.startNewSubPath(line[index].x, line[index].y); } else { before.lineTo(line[index].x, line[index].y); }
+            for (int copy = 0; copy < copies; ++copy) {
+                effects.front().copy = copy;
+                for (const auto& line : lines) {
+                    for (std::size_t index = 0; index < line.size(); ++index) {
+                        auto point = motion::applyEffects(effects, line[index], .5);
+                        if (rows) { point.y += point.z * .8f; }
+                        point.x = std::clamp(point.x, -.95f, .95f);
+                        point.y = std::clamp(point.y, -.95f, .95f);
+                        if (index == 0) { thumbnail.startNewSubPath(point.x, point.y); } else { thumbnail.lineTo(point.x, point.y); }
+                        if (!moves) { continue; }
+                        if (index == 0) { before.startNewSubPath(line[index].x, line[index].y); } else { before.lineTo(line[index].x, line[index].y); }
+                    }
                 }
             }
         }

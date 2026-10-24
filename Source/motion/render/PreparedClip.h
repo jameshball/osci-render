@@ -323,8 +323,39 @@ struct PreparedClip : PreparedClipStage {
     Id rootTrack = 0; // the main timeline track this clip plays on
     // A light, pictured in the Scene: the beam never draws it.
     bool light = false;
+    // One of the copies an effect makes, which draws while the count does.
+    bool hasCopies = false;
+
+    // The composition's own effects, carried here (after its nested
+    // placements') when one of them makes copies, so each copy is a clip.
+    std::vector<PreparedEffect> rootEffects;
 
     Id editorId() const { return ancestors.empty() ? id : ancestors.back().id; }
+    // Every effect that shapes it, wherever it was put: its own, its track's,
+    // its groups', its nested placements', and the composition's carried here.
+    template <typename Visit>
+    void eachEffect(Visit&& visit) {
+        const auto stage = [&](PreparedClipStage& layer) {
+            for (auto& effect : layer.effects) { visit(effect); }
+            for (auto& effect : layer.trackEffects) { visit(effect); }
+            for (auto& group : layer.groups) {
+                for (auto& effect : group.effects) { visit(effect); }
+            }
+            for (auto& effect : layer.compositionEffects) { visit(effect); }
+        };
+        stage(*this);
+        for (auto& ancestor : ancestors) { stage(ancestor); }
+        for (auto& effect : rootEffects) { visit(effect); }
+    }
+    template <typename Visit>
+    void eachEffect(Visit&& visit) const { const_cast<PreparedClip*>(this)->eachEffect([&](const PreparedEffect& effect) { visit(effect); }); }
+    // Whether this copy draws at a time (every effect's copy within the count
+    // it makes then).
+    bool copyShows(double time) const {
+        bool shows = true;
+        eachEffect([&](const PreparedEffect& effect) { shows = shows && effect.shows(time); });
+        return shows;
+    }
     bool active(double time) const { return time >= start && time < end; }
     // Visits every layer of curves that shapes it, each at its own time: its
     // own first, then its groups', then its nested placements' and theirs.
@@ -337,7 +368,7 @@ struct PreparedClip : PreparedClipStage {
     // Whether the beam draws it at all: opacity dims a clip through its
     // colour, and only a fully transparent one gives up its beam time.
     bool visible(double time) const {
-        bool shown = true;
+        bool shown = !hasCopies || copyShows(time);
         eachLayer(time, [&](const auto& layer, double at) { shown = shown && TransformPose::opacityAt(layer, at) > 0 && TransformPose::beamAt(layer, at) > 0; });
         return shown;
     }
@@ -418,7 +449,7 @@ struct PreparedClip : PreparedClipStage {
     osci::Point processPoint(osci::Point point, double time) const {
         point = processStage(point, time);
         for (const auto& ancestor : ancestors) { point = ancestor.processStage(point, time); }
-        return point;
+        return applyEffects(rootEffects, point, time);
     }
 };
 }

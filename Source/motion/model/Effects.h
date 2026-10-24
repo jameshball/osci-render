@@ -23,7 +23,16 @@ struct EffectParameterDefinition {
 // What an effect does to each point; prepared effects switch on it.
 // Moving, turning and sizing are an object's own transform, perspective a
 // camera's and a wobble a modulator's, so none is an effect.
-enum class EffectKind { skew, swirl, bulge, ripple, vortex, colour, bitCrush, twist, polygon, spiralCrush };
+// Kaleidoscope and Duplicator draw what they are on more than once: copies,
+// each placed differently (new kinds go at the end, as baked frames are
+// fingerprinted by them).
+enum class EffectKind { skew, swirl, bulge, ripple, vortex, colour, bitCrush, twist, polygon, spiralCrush, kaleidoscope, duplicator };
+
+inline bool makesCopies(EffectKind kind) { return kind == EffectKind::kaleidoscope || kind == EffectKind::duplicator; }
+
+// The most copies one of them makes (a parameter's top), and the most of one
+// clip all of them make together.
+inline constexpr int maximumCopies = 12, maximumCopiesOfClip = 48;
 
 struct EffectDefinition {
     EffectKind kind;
@@ -42,7 +51,12 @@ inline const std::vector<EffectDefinition>& effectCatalog() {
         { EffectKind::bitCrush, "bitCrush", "Bit crush", {{"strength", "Strength", 1, 0, 1}, {"crush", "Crush", 0.7, 0, 1}} },
         { EffectKind::twist, "twist", "Twist", {{"strength", "Strength", 1, 0, 1}, {"twist", "Twist", 0.5, -1, 1}} },
         { EffectKind::polygon, "polygon", "Polygon", {{"strength", "Strength", 1, 0, 1}, {"sides", "Sides", 5, 2, 12}, {"stripes", "Stripe size", 0.5, 0, 1}, {"turn", "Rotation", 0, 0, 1}, {"stripePhase", "Stripe phase", 0, 0, 1}} },
-        { EffectKind::spiralCrush, "spiralCrush", "Spiral crush", {{"strength", "Strength", 1, 0, 1}, {"density", "Density", 13, 3, 30}, {"spiralTwist", "Twist", 0.6, -1, 1}, {"zoom", "Zoom", 0, 0, 1}, {"turn", "Rotation", 0, 0, 1}} }
+        { EffectKind::spiralCrush, "spiralCrush", "Spiral crush", {{"strength", "Strength", 1, 0, 1}, {"density", "Density", 13, 3, 30}, {"spiralTwist", "Twist", 0.6, -1, 1}, {"zoom", "Zoom", 0, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
+        // Segments of a circle, each the shape turned to stand on its
+        // radius (every other mirrored), kept within its own wedge.
+        { EffectKind::kaleidoscope, "kaleidoscope", "Kaleidoscope", {{"strength", "Strength", 1, 0, 1}, {"segments", "Segments", 6, 1, 12, 0}, {"mirror", "Mirror", 1, 0, 1}, {"spread", "Spread", 0.4, 0, 1}, {"clip", "Clip", 1, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
+        // Copies around a circle, each smaller and pushed out towards it.
+        { EffectKind::duplicator, "duplicator", "Duplicator", {{"strength", "Strength", 1, 0, 1}, {"copies", "Copies", 3, 1, 12, 0}, {"spread", "Spread", 0.4, 0, 1}, {"turn", "Rotation", 0, 0, 1}} }
     };
     return catalog;
 }

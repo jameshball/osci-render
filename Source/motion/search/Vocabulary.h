@@ -229,6 +229,8 @@ inline juce::StringArray effectAliases(const juce::String& id) {
         {"polygon", {"polygonizer"}},
         {"bitCrush", {"bitcrush", "lo-fi", "pixelate"}},
         {"spiralCrush", {"spiral bit crush"}},
+        {"kaleidoscope", {"symmetry", "mandala", "radial", "segments", "mirror copies"}},
+        {"duplicator", {"copies", "clone", "repeat", "array", "radial array", "duplicate shape"}},
         {"colour", {"hue shift", "tint"}},
         {"ripple", {"distort", "water"}},
         {"swirl", {"distort", "twirl"}},

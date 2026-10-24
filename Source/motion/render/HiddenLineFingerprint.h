@@ -57,6 +57,7 @@ public:
             add(drawing != nullptr ? static_cast<double>(drawing->serial()) : -2.0 - static_cast<double>(frame), points != nullptr ? static_cast<double>(points->serial()) : 0.0);
             addStage(clip, time);
             for (const auto& ancestor : clip.ancestors) { addStage(ancestor, time); }
+            addEffects(clip.rootEffects, time);
         }
     }
     bool operator==(const Fingerprint& other) const { return values == other.values; }
@@ -87,7 +88,7 @@ private:
             const auto parameters = effect.parametersAt(time);
             add(parameters.active ? 1.0 : 0.0);
             if (!parameters.active) { continue; }
-            add(static_cast<double>(effect.kind));
+            add(static_cast<double>(effect.kind), static_cast<double>(effect.copy));
             for (std::size_t index = 0; index < effect.count; ++index) { add(parameters.values[index]); }
         }
     }

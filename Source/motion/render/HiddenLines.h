@@ -27,6 +27,8 @@ inline bool bends(const PreparedEffect& effect) {
     switch (effect.kind) {
         case EffectKind::colour:
         case EffectKind::skew:
+        // Each copy is the shape made smaller and moved.
+        case EffectKind::duplicator:
             return false;
         default:
             return true;
