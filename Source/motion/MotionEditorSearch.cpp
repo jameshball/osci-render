@@ -401,7 +401,7 @@ void MotionEditor::refreshSearch() {
         // Goals, which only typing their words would find otherwise.
         Group goals {"Try", {}};
         for (const auto& result : browse) {
-            if (result.entry->id.startsWith("goal:") && !shown.contains(result.entry) && result.unavailable.isEmpty()) {
+            if (result.entry->id.startsWith("goal:") && !shown.contains(result.entry) && result.unavailable.isEmpty() && goals.results.size() < 6) {
                 goals.results.push_back(result);
                 shown.insert(result.entry);
             }
@@ -729,7 +729,7 @@ void MotionEditor::buildSearchIndex() {
     // beside the list anyway.
     const auto clipSelected = target.has_value() && !target->isGroup && !target->camera && !target->beam && motion::findClip(project, selection) != nullptr;
     if (clipSelected) {
-        suggestedSearchIds = {"menu:Clip/Split at playhead", "menu:Clip/Duplicate", "menu:Clip/Key/Position", "goal:spin", "goal:fade", "track:Rename", "menu:Clip/Show key lanes"};
+        suggestedSearchIds = {"menu:Clip/Split at playhead", "menu:Clip/Duplicate", "menu:Clip/Key/Position", "goal:fade-in", "goal:spin", "track:Rename", "menu:Clip/Show key lanes"};
     } else if (selectionIsCamera()) {
         suggestedSearchIds.insert(0, "goal:shake");
         suggestedSearchIds.insert(1, "menu:Scene/Look through camera");
@@ -1412,36 +1412,115 @@ void MotionEditor::indexGoals() {
     };
     const auto& project = processor.document.project();
     const auto target = motion::findPropertyTarget(project, selection);
-    const auto visual = target.has_value() && !target->isGroup && !target->camera && !target->beam;
-    // Goals lead the rows they go to.
-    const auto needsClip = [visual](Entry entry) {
-        entry.relevance = 15;
-        if (!visual) {
-            entry.unavailable = [] { return juce::String("Select a clip first"); };
+    const auto visual = target.has_value() && !target->isGroup && !target->camera && !target->beam && !target->isAudio && !target->isEffect;
+    const auto hasSoundtrack = std::any_of(project.tracks.begin(), project.tracks.end(), [](const auto& track) { return track.kind == motion::TrackKind::audio && !track.clips.empty(); });
+    auto& entries = searchIndex.entries;
+    // Goals lead the rows they go to; one for a clip waits, greyed, for one.
+    const auto goal = [&](juce::String id, juce::String title, juce::String path, juce::StringArray words, std::function<void()> run, juce::String needs = {}) {
+        Entry entry {.id = "goal:" + id, .title = title, .kind = Kind::action, .path = "How to" + (path.isEmpty() ? juce::String() : separator + path), .keywords = words, .run = std::move(run), .relevance = 15};
+        if (needs.isNotEmpty()) {
+            entry.unavailable = [needs] { return needs; };
         }
-        return entry;
+        entries.push_back(std::move(entry));
+    };
+    const auto clipNeeded = visual ? juce::String() : juce::String("Select a clip first");
+    const auto noted = [](MotionEditor& editor, const juce::String& text) {
+        const juce::Component::SafePointer<MotionEditor> safe(&editor);
+        editor.sayAfterSearch(text, "Undo", [safe] {
+            if (safe != nullptr) {
+                safe->processor.getUndoManager().undo();
+            }
+        });
+    };
+
+    // Keyed goals: keys at the clip's start or end, as one undo step, the
+    // property shown in the Graph. `at` is in project seconds from the start
+    // (or, below 0, back from the end); `value` is the property's own value
+    // there now times `scale`, plus `offset`.
+    struct GoalKey {
+        std::string property;
+        double at;
+        double scale, offset;
+    };
+    const auto keyed = [acting, noted](juce::String name, juce::String done, std::function<std::vector<GoalKey>(double length)> keys) {
+        return acting([name, done, keys, noted](MotionEditor& editor) {
+            auto& document = editor.processor.document;
+            const auto id = editor.selection;
+            const auto found = motion::findPropertyTarget(document.project(), id);
+            if (!found.has_value() || found->locked) {
+                editor.sayAfterSearch(found.has_value() ? "Unlock its track first" : "Select a clip first");
+                return;
+            }
+            // A beat, or a third of a short clip.
+            const auto beat = 60.0 / std::max(1.0, document.project().tempo().bpmAt(found->start));
+            const auto length = std::min(beat, found->duration / 3);
+            // Each key's time in the clip, and its value: the property's own
+            // value there now, scaled and offset.
+            struct Placed {
+                std::string property;
+                double local, value;
+            };
+            std::vector<Placed> placed;
+            const auto planned = keys(length);
+            for (const auto& key : planned) {
+                const auto time = key.at >= 0 ? found->start + key.at : found->end() + key.at;
+                const auto local = found->localTime(std::clamp(time, found->start, found->end()));
+                const auto* curve = found->curve(key.property);
+                const auto spec = motion::specFor(document.project(), id, key.property);
+                const auto now = curve != nullptr ? curve->evaluateBase(local) : spec.has_value() ? spec->defaultValue : 0.0;
+                placed.push_back({key.property, local, now * key.scale + key.offset});
+            }
+            const auto changed = !placed.empty() && document.tryEdit(name, [&](motion::Project& updated) {
+                for (const auto& key : placed) {
+                    auto* curve = motion::ensurePropertyCurve(updated, id, key.property);
+                    if (curve == nullptr) {
+                        return false;
+                    }
+                    curve->setKeyValue(key.local, key.value);
+                }
+                return true;
+            });
+            if (!changed) {
+                editor.sayAfterSearch("Couldn't key that here");
+                return;
+            }
+            editor.modulate(id, planned.front().property, editor.selectionIsCamera());
+            noted(editor, done);
+        });
+    };
+    // The value of a property where a key lands, as it will end: the same
+    // time's value now (scale 1) or nothing (scale 0).
+    const auto fade = [](double from, double to, std::string property, double length, bool atEnd) {
+        const auto start = atEnd ? -length : 0.0, end = atEnd ? -1.0e-6 : length;
+        return std::vector<GoalKey> {{property, start, from, 0}, {property, end, to, 0}};
     };
     using Waveform = motion::ModulationWaveform;
+    using Mode = motion::ModulationMode;
     struct Drive {
         std::string property;
         double amount;
-        motion::ModulationMode mode;
+        Mode mode;
     };
-    // Adds a modulator driving `drives` of `id`, as one undo step; shows the
-    // first in the Graph and says what it did, with Undo.
-    const auto drive = [acting](juce::String name, motion::Modulation shape, std::vector<Drive> drives, juce::String done) {
-        return acting([name, shape, drives, done](MotionEditor& editor) {
+    // Modulated goals: a modulator (named for the goal, numbered after the
+    // first) driving `drives`, as one undo step, its curve in the Graph.
+    const auto drive = [acting, noted](juce::String name, motion::Modulation shape, std::vector<Drive> drives, juce::String done, bool camera) {
+        return acting([name, shape, drives, done, camera, noted](MotionEditor& editor) {
             const auto id = editor.selection;
             auto& document = editor.processor.document;
             for (const auto& each : drives) {
                 if (!motion::drivableProperty(document.project(), id, each.property)) {
-                    editor.sayAfterSearch("This can't be driven by a modulator");
+                    editor.sayAfterSearch(camera ? "Select a camera first" : "Select a clip first");
                     return;
                 }
             }
             motion::Modulator modulator;
             modulator.id = document.newId();
-            modulator.name = name.toStdString();
+            const auto& existing = document.project().modulators;
+            auto unique = name;
+            for (int number = 2; std::any_of(existing.begin(), existing.end(), [&unique](const auto& item) { return juce::String(item.name) == unique; }); ++number) {
+                unique = name + " " + juce::String(number);
+            }
+            modulator.name = unique.toStdString();
             modulator.shape = shape;
             std::vector<motion::ModulationRoute> routes;
             for (const auto& each : drives) {
@@ -1453,53 +1532,169 @@ void MotionEditor::indexGoals() {
             });
             editor.modulatorLibrary.refresh();
             editor.modulate(id, drives.front().property, editor.selectionIsCamera());
-            const juce::Component::SafePointer<MotionEditor> safe(&editor);
-            editor.sayAfterSearch(done + ": its modulator is in Modulators, and its curve in the Graph", "Undo", [safe] {
-                if (safe != nullptr) {
-                    safe->processor.getUndoManager().undo();
-                }
-            });
+            noted(editor, done + ": its modulator is in Modulators, its curve in the Graph");
         });
     };
-    motion::Modulation spin;
-    spin.waveform = Waveform::saw;
-    spin.tempoSync = true;
-    spin.beatsPerCycle = 4;
-    motion::Modulation pulse;
-    pulse.waveform = Waveform::soundtrack;
-    motion::Modulation shake;
-    shake.waveform = Waveform::noiseSmooth;
-    shake.rateHz = 4;
-    const auto add = motion::ModulationMode::add, multiply = motion::ModulationMode::multiply;
-    auto& entries = searchIndex.entries;
-    entries.push_back(needsClip({.id = "goal:spin", .title = "Make it spin", .kind = Kind::action, .path = "How to", .keywords = {"spin", "rotate forever", "keep turning", "revolve", "spinning"},
-        .run = drive("Spin", spin, {{"rotation.z", 180, add}}, "Spins once every 4 beats")}));
-    {
-        auto pulsing = needsClip({.id = "goal:pulse", .title = "Pulse to the music", .kind = Kind::action, .path = "How to", .keywords = {"pulse", "beat", "audio reactive", "react to music", "bounce to the beat", "sidechain"},
-            .run = drive("Pulse", pulse, {{"scale.x", .3, multiply}, {"scale.y", .3, multiply}}, "Grows with the soundtrack's loudness")});
-        const auto hasSoundtrack = std::any_of(project.tracks.begin(), project.tracks.end(), [](const auto& track) { return track.kind == motion::TrackKind::audio && !track.clips.empty(); });
-        if (visual && !hasSoundtrack) {
-            pulsing.unavailable = [] { return juce::String("Add a soundtrack first"); };
-        }
-        entries.push_back(std::move(pulsing));
+    const auto synced = [](Waveform waveform, double beats) {
+        motion::Modulation shape;
+        shape.waveform = waveform;
+        shape.tempoSync = true;
+        shape.beatsPerCycle = beats;
+        return shape;
+    };
+    motion::Modulation loudness;
+    loudness.waveform = Waveform::soundtrack;
+    motion::Modulation jitter;
+    jitter.waveform = Waveform::noiseSmooth;
+    jitter.rateHz = 4;
+
+    // Entrances and exits, keyed at the clip's ends.
+    goal("fade-in", "Fade in", "Entrance", {"fade in", "fade up", "appear", "fading in", "dissolve in"},
+        keyed("Fade in", "Fades in over its first beat", [fade](double length) { return fade(0, 1, "opacity", length, false); }), clipNeeded);
+    goal("fade-out", "Fade out", "Exit", {"fade out", "fade away", "disappear", "fading out", "dissolve out"},
+        keyed("Fade out", "Fades out over its last beat", [fade](double length) { return fade(1, 0, "opacity", length, true); }), clipNeeded);
+    goal("pop-in", "Pop in", "Entrance", {"pop", "pop up", "bounce in", "scale in", "spring"},
+        keyed("Pop in", "Pops in over its first beat", [](double length) {
+            std::vector<GoalKey> keys;
+            for (const auto* axis : {"scale.x", "scale.y", "scale.z"}) {
+                keys.push_back({axis, 0, 0, 0});
+                keys.push_back({axis, length * .7, 1.12, 0});
+                keys.push_back({axis, length, 1, 0});
+            }
+            return keys;
+        }), clipNeeded);
+    goal("grow-in", "Grow in", "Entrance", {"grow", "scale up", "zoom in", "expand"},
+        keyed("Grow in", "Grows in over its first beat", [](double length) {
+            std::vector<GoalKey> keys;
+            for (const auto* axis : {"scale.x", "scale.y", "scale.z"}) {
+                keys.push_back({axis, 0, 0, 0});
+                keys.push_back({axis, length, 1, 0});
+            }
+            return keys;
+        }), clipNeeded);
+    goal("shrink-away", "Shrink away", "Exit", {"shrink", "scale down", "zoom out", "vanish"},
+        keyed("Shrink away", "Shrinks away over its last beat", [](double length) {
+            std::vector<GoalKey> keys;
+            for (const auto* axis : {"scale.x", "scale.y", "scale.z"}) {
+                keys.push_back({axis, -length, 1, 0});
+                keys.push_back({axis, -1.0e-6, 0, 0});
+            }
+            return keys;
+        }), clipNeeded);
+    for (const auto& [side, property, offset] : std::initializer_list<std::tuple<const char*, const char*, double>> {
+             {"left", "position.x", -2.2}, {"right", "position.x", 2.2}, {"top", "position.y", 2.2}, {"bottom", "position.y", -2.2}}) {
+        const juce::String from(side);
+        goal("slide-" + from, "Slide in from the " + from, "Entrance", {"slide", "slide in", "fly in", "swipe in", "enter from " + from},
+            keyed("Slide in", "Slides in from the " + from + " over its first beat", [property = std::string(property), offset](double length) {
+                return std::vector<GoalKey> {{property, 0, 1, offset}, {property, length, 1, 0}};
+            }), clipNeeded);
+        entries.back().family = "slide in";
     }
-    // Fading is keys, set by hand: shown where, and how.
-    entries.push_back(needsClip({.id = "goal:fade", .title = "Fade it in or out", .kind = Kind::action, .path = "How to", .keywords = {"fade in", "fade out", "appear", "disappear", "dissolve", "fading"},
-        .run = acting([](MotionEditor& editor) {
-            editor.revealForSearch("opacity", "opacity");
-            editor.sayAfterSearch("Click Opacity's diamond to key it, move the playhead, then change it: 0% to 100% fades in");
-        })}));
-    entries.push_back(needsClip({.id = "goal:path", .title = "Move it along a path", .kind = Kind::action, .path = "How to", .keywords = {"motion path", "travel", "animate position", "move over time"},
-        .run = acting([](MotionEditor& editor) {
+
+    // Movement that keeps going, from a modulator.
+    goal("spin", "Make it spin", "Movement", {"spin", "rotate forever", "keep turning", "revolve", "spinning"},
+        drive("Spin", synced(Waveform::saw, 4), {{"rotation.z", 180, Mode::add}}, "Spins once every 4 beats", false), clipNeeded);
+    goal("spin-3d", "Spin in 3D", "Movement", {"turntable", "spin around", "rotate in 3d", "revolve"},
+        drive("Spin in 3D", synced(Waveform::saw, 8), {{"rotation.y", 180, Mode::add}}, "Turns round once every 8 beats", false), clipNeeded);
+    goal("swing", "Swing back and forth", "Movement", {"swing", "sway", "rock", "pendulum", "wobble"},
+        drive("Swing", synced(Waveform::sine, 4), {{"rotation.z", 15, Mode::add}}, "Swings 15° each way every 4 beats", false), clipNeeded);
+    goal("bob", "Bob up and down", "Movement", {"bob", "float", "hover", "bounce", "up and down"},
+        drive("Bob", synced(Waveform::sine, 2), {{"position.y", .08, Mode::add}}, "Bobs up and down every 2 beats", false), clipNeeded);
+    goal("breathe", "Breathe", "Movement", {"breathe", "breathing", "throb", "grow and shrink"},
+        drive("Breathe", synced(Waveform::sine, 4), {{"scale.x", .08, Mode::multiply}, {"scale.y", .08, Mode::multiply}}, "Breathes in and out every 4 beats", false), clipNeeded);
+    goal("flash", "Flash on the beat", "Music", {"flash", "strobe", "blink", "flicker on the beat", "beat flash"},
+        drive("Flash", synced(Waveform::square, 1), {{"opacity", 1, Mode::multiply}}, "Flashes on every beat", false), clipNeeded);
+    goal("pulse-beat", "Pulse on the beat", "Music", {"pulse", "beat", "throb", "pump", "on the beat"},
+        drive("Beat pulse", synced(Waveform::sine, 1), {{"scale.x", .1, Mode::multiply}, {"scale.y", .1, Mode::multiply}}, "Pulses with every beat", false), clipNeeded);
+    goal("pulse", "Pulse to the music", "Music", {"audio reactive", "react to music", "bounce to the music", "sidechain", "loudness"},
+        drive("Pulse", loudness, {{"scale.x", .3, Mode::multiply}, {"scale.y", .3, Mode::multiply}}, "Grows with the soundtrack's loudness", false),
+        !visual ? clipNeeded : !hasSoundtrack ? juce::String("Add a soundtrack first") : juce::String());
+    // A colour cycle needs a Colour effect to turn: both go in, one step.
+    goal("colour-cycle", "Colour cycle", "Look", {"rainbow", "cycle colours", "hue cycle", "colour shift", "color cycle"},
+        acting([noted](MotionEditor& editor) {
+            const auto id = editor.selection;
+            auto& document = editor.processor.document;
+            const auto* definition = motion::effectDefinition("colour");
+            if (definition == nullptr || motion::findClip(document.project(), id) == nullptr) {
+                editor.sayAfterSearch("Select a clip first");
+                return;
+            }
+            auto effect = motion::makeEffect(document.newId(), *definition);
+            motion::Modulator modulator;
+            modulator.id = document.newId();
+            modulator.name = "Colour cycle";
+            modulator.shape.waveform = Waveform::saw;
+            modulator.shape.tempoSync = true;
+            modulator.shape.beatsPerCycle = 8;
+            const motion::ModulationRoute route {document.newId(), modulator.id, effect.id, "hue", 180, Mode::add};
+            const auto made = document.tryEdit("Colour cycle", [&](motion::Project& updated) {
+                auto* clip = motion::changeClip(updated, id);
+                if (clip == nullptr) {
+                    return false;
+                }
+                clip->effects.push_back(effect);
+                updated.modulators.push_back(modulator);
+                updated.routes.push_back(route);
+                return true;
+            });
+            if (!made) {
+                editor.sayAfterSearch("Couldn't add a Colour effect there");
+                return;
+            }
+            editor.modulatorLibrary.refresh();
+            editor.modulate(effect.id, "hue", false);
+            noted(editor, "Cycles through every hue each 8 beats, with a Colour effect");
+        }),
+        clipNeeded);
+
+    // The camera's.
+    {
+        auto shake = drive("Shake", jitter, {{"rotation.x", .8, Mode::add}, {"rotation.y", .8, Mode::add}}, "Shakes the camera", true);
+        goal("shake", "Shake the camera", "Camera", {"camera shake", "shake", "handheld", "jitter"}, std::move(shake),
+            selectionIsCamera() ? juce::String() : juce::String("Select a camera first (the Cameras row)"));
+    }
+
+    // Guides for what is set by hand.
+    goal("path", "Move it along a path", "Movement", {"motion path", "travel", "animate position", "move over time"},
+        acting([](MotionEditor& editor) {
             editor.revealForSearch("position.x", "position");
             editor.sayAfterSearch("Key Position at two times or more; Show motion path draws the way it goes in the Scene");
-        })}));
-    {
-        Entry shaking {.id = "goal:shake", .title = "Shake the camera", .kind = Kind::action, .path = "How to", .keywords = {"camera shake", "shake", "handheld", "jitter", "wobble"},
-            .run = drive("Shake", shake, {{"rotation.x", .8, add}, {"rotation.y", .8, add}}, "Shakes the camera"), .relevance = 15};
-        if (!selectionIsCamera()) {
-            shaking.unavailable = [] { return juce::String("Select a camera first (the Cameras row)"); };
-        }
-        entries.push_back(std::move(shaking));
+        }),
+        clipNeeded);
+
+    // Format, export and the scope itself.
+    for (const auto& [name, words, width, height] : std::initializer_list<std::tuple<const char*, juce::StringArray, int, int>> {
+             {"vertical", {"portrait", "9:16", "reels", "tiktok", "shorts", "phone"}, 1080, 1920},
+             {"square", {"1:1", "instagram post"}, 1024, 1024},
+             {"landscape", {"16:9", "widescreen", "youtube", "horizontal"}, 1920, 1080}}) {
+        const juce::String shape(name);
+        const auto size = juce::String(width) + juce::String::fromUTF8(" \xc3\x97 ") + juce::String(height);
+        const auto& settings = project.exportSettings;
+        goal("canvas-" + shape, "Make it " + shape, "Format", words,
+            acting([noted, width, height, shape, size](MotionEditor& editor) {
+                editor.processor.document.edit("Make it " + shape, [width, height](motion::Project& updated) {
+                    updated.exportSettings.width = width;
+                    updated.exportSettings.height = height;
+                });
+                noted(editor, "The canvas is " + shape + ": " + size);
+            }),
+            settings.width == width && settings.height == height ? "It's " + shape + " already (" + size + ")" : juce::String());
+        entries.back().family = "canvas goal";
     }
+    goal("instagram", "Export for Instagram", "Format", {"instagram", "reels", "tiktok", "social", "phone video", "vertical video"},
+        acting([](MotionEditor& editor) {
+            const auto& settings = editor.processor.document.mainProject().exportSettings;
+            if (settings.width != 1080 || settings.height != 1920) {
+                editor.processor.document.edit("Make it vertical", [](motion::Project& updated) {
+                    updated.exportSettings.width = 1080;
+                    updated.exportSettings.height = 1920;
+                });
+            }
+            editor.exportVideo();
+        }));
+    goal("oscilloscope", "Set up my oscilloscope", "Scope", {"connect scope", "oscilloscope", "hardware", "real scope", "xy mode", "wiring", "audio interface"},
+        acting([](MotionEditor& editor) {
+            editor.showOutputPanel();
+            editor.sayAfterSearch("Set Beam to XY, then connect X to the scope's horizontal input and Y to its vertical one, with the scope in XY mode");
+        }));
 }
