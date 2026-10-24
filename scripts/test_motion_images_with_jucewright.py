@@ -37,7 +37,7 @@ def nodes(value):
 
 
 def wait_undo(label):
-    command("wait-for-locator", "--name", "Undo " + label, "--role", "label", "--exact")
+    session.wait_for_undo(label, 10.0)
 
 
 def combo_value(name):

@@ -71,7 +71,7 @@ try:
     command("wait-for-locator", "--name", "Bake duration", "--exact")
     step("short source cache", "set-value", "--name", "Bake duration", "--exact", "1")
     step("bake initial source", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
-    command("wait-for-locator", "--name", "Undo Import source", "--role", "label", "--exact")
+    session.wait_for_undo("Import source")
     step("duplicate shared source", "press", "command + d", "--class", "MotionTimelineView")
     before = saved_asset()
     assert len(saved_clips()) == 2
@@ -86,7 +86,7 @@ try:
     step("correct retained source", "fill", "--name", "Lua Code Editor", "--role", "editableText", "--exact", revised)
     step("source editor screenshot", "screenshot", "--file", session.artifact_dir / "lua-editor.png")
     step("bake corrected source", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
-    command("wait-for-locator", "--name", "Undo Edit Lua source", "--role", "label", "--exact")
+    session.wait_for_undo("Edit Lua source")
     after = saved_asset()
     clips = saved_clips()
     assert after != before and len(clips) == 2 and clips[0].get("asset") == clips[1].get("asset")

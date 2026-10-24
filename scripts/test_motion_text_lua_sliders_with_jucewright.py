@@ -29,7 +29,7 @@ def step(label, *args):
 
 
 def wait_undo(label):
-    command("wait-for-locator", "--name", "Undo " + label, "--role", "label", "--exact", "--timeout-ms", 60000)
+    session.wait_for_undo(label, 60.0)
 
 
 def nodes(value):

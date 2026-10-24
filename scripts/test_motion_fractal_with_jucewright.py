@@ -44,7 +44,7 @@ def fractal_depth():
 
 
 def wait_undo(label):
-    command("wait-for-locator", "--name", "Undo " + label, "--role", "label", "--exact", "--timeout-ms", "30000")
+    session.wait_for_undo(label, 30.0)
 
 
 source = session.root_dir / "Resources" / "fractal" / "koch_snowflake.lsystem"

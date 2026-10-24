@@ -87,11 +87,14 @@ try:
     command("wait-for-locator", "--name", "Colour picker", "--exact")
     step("picker", "screenshot", "--file", session.artifact_dir / "colour-picker.png", "--scale", 2)
     x, y, w, h = box(find(lambda n: n.get("componentName") == "Colour picker"))
+    # The picker is a popover in a window of its own: its bounds, and the
+    # drags, are in that window's coordinates.
+    picker_window = next(w["id"] for w in json.loads(command("windows"))["windows"] if w["id"] != "root")
     # Hue strip: blue (two thirds along). Square: full saturation and brightness.
     strip_y = y + 10 + 136 + 10 + 6
-    step("pick hue", "drag-xy", x + 10 + 100, strip_y, x + 10 + round(200 * 2 / 3), strip_y, "--steps", 8)
+    step("pick hue", "drag-xy", x + 10 + 100, strip_y, x + 10 + round(200 * 2 / 3), strip_y, "--steps", 8, "--target", picker_window)
     session.wait_for_undo("Change colour")
-    step("pick saturation", "drag-xy", x + 10 + 100, y + 10 + 68, x + 10 + 199, y + 11, "--steps", 8)
+    step("pick saturation", "drag-xy", x + 10 + 100, y + 10 + 68, x + 10 + 199, y + 11, "--steps", 8, "--target", picker_window)
     step("picked", "screenshot", "--file", session.artifact_dir / "colour-picked.png", "--scale", 2)
     red, green, blue = saved_colour()
     assert blue > 0.95 and red < 0.1 and green < 0.1, (red, green, blue)

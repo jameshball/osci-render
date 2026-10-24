@@ -28,7 +28,7 @@ def step(label, *args):
 
 
 def wait_undo(text):
-    command("wait-for-locator", "--name", "Undo " + text, "--role", "label", "--exact", "--timeout-ms", 20000)
+    session.wait_for_undo(text, 20.0)
 
 
 def encoded(data):

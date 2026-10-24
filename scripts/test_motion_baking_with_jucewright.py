@@ -45,7 +45,7 @@ def duration(value):
 
 
 def wait_undo(label):
-    command("wait-for-locator", "--name", "Undo " + label, "--role", "label", "--exact")
+    session.wait_for_undo(label, 10.0)
 
 
 fixture = session.artifact_dir / "Orbit.lua"

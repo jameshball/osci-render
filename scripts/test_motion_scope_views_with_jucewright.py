@@ -107,7 +107,7 @@ try:
     step("reopen unused menu", "click", "--name", "Composition 1", "--role", "listItem", "--exact", "--position", "6,12", "--button", "right")
     step("request confirmed cleanup", "click", "--name", "Remove unused composition", "--role", "menuItem", "--exact")
     step("confirm cleanup", "click", "--name", "Remove", "--class", "juce::TextButton", "--exact")
-    command("wait-for-locator", "--name", "Undo Remove unused composition", "--exact")
+    session.wait_for_undo("Remove unused composition")
     step("save cleanup", "press", "command + s", "--class", "MotionEditor")
     cleaned = read_project(seed)
     assert not cleaned.findall("./composition/definition") and len(cleaned.findall("./composition/asset")) == 1

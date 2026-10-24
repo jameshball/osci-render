@@ -137,7 +137,7 @@ try:
     session.wait_for_undo("Change Intensity")
     step("open scope presets", "click", "--name", "Scope presets", "--exact")
     step("choose laser timing", "click", "--name", "Laser (slow galvo)", "--role", "menuItem", "--exact")
-    command("wait-for-locator", "--name", "Undo Apply laser (slow galvo) preset", "--role", "label", "--exact")
+    session.wait_for_undo("Apply laser (slow galvo) preset")
     step("set scope dwell", "set-value", scope_field("dwell")["ref"], "80")
     save("save beam settings")
     state = saved()
@@ -148,19 +148,19 @@ try:
     # An XY-only scope: saved with the project, its dark waits put aside, and
     # kept through a timing preset; then back to brightness.
     step("set the scope to XY only", "click", "--name", "Scope XY only", "--exact")
-    command("wait-for-locator", "--name", "Undo Set the scope to XY only", "--role", "label", "--exact")
+    session.wait_for_undo("Set the scope to XY only")
     if scope_field("dwell").get("enabled") is not False:
         raise RuntimeError("With no brightness input, dwell means nothing: " + str(scope_field("dwell")))
     step("XY-only scope options", "screenshot", "--file", session.artifact_dir / "xy-only.png", "--scale", "2")
     step("open scope presets again", "click", "--name", "Scope presets", "--exact")
     step("choose analog timing", "click", "--name", "Analog scope", "--role", "menuItem", "--exact")
-    command("wait-for-locator", "--name", "Undo Apply analog scope preset", "--role", "label", "--exact")
+    session.wait_for_undo("Apply analog scope preset")
     save("save XY-only scope")
     if saved().find("composition").get("scopeXYOnly") not in ("1", "true"):
         raise RuntimeError("XY only is saved, and a timing preset keeps it")
     step("undo the analog timing", "click", "--name", "Undo", "--exact")
     step("give the scope brightness again", "click", "--name", "Scope XY only", "--exact")
-    command("wait-for-locator", "--name", "Undo Give the scope brightness", "--role", "label", "--exact")
+    session.wait_for_undo("Give the scope brightness")
     save("save scope with brightness")
     if saved().find("composition").get("scopeXYOnly") is not None or saved_scope() != [80, 400, 150]:
         raise RuntimeError("Back to brightness, the laser timing as it was: " + str(saved_scope()))
