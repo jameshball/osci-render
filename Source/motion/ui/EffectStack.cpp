@@ -222,6 +222,23 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->modulate.onClick = [this, property] { if (stack.onModulate) { stack.onModulate(id, property); } };
         row->previous.onClick = [this, property] { jump(property, false); };
         row->next.onClick = [this, property] { jump(property, true); };
+        // Reset, from the diamond's menu or a right-click on the row.
+        const auto defaultValue = parameter.defaultValue;
+        const auto name = juce::String(parameter.name).toLowerCase();
+        const auto menu = [this, property, defaultValue, name, raw = row.get()](bool atPointer) {
+            juce::PopupMenu items;
+            items.addItem(1, "Reset " + name);
+            auto options = juce::PopupMenu::Options().withTargetComponent(&raw->key);
+            if (atPointer) { options = options.withMousePosition(); }
+            motion::ui::showDocumentMenu(items, raw->key, stack.processor.document, options, [this, property, defaultValue, name](int result) {
+                if (result == 1) {
+                    const auto reset = stack.processor.document.resetProperties(id, {{std::string(property), defaultValue}}, name);
+                    if (reset.failed()) { update(); }
+                }
+            });
+        };
+        row->key.onPopupMenu = [menu] { menu(false); };
+        row->onContextMenu = [menu] { menu(true); };
         row->addAndMakeVisible(row->field);
         addAndMakeVisible(*row);
         rows.push_back(std::move(row));

@@ -29,6 +29,7 @@ void MotionTimelineView::showGroupMenu(motion::Id id) {
     menu.addItem(2, "Add track to group");
     menu.addItem(3, "Add nested group");
     menu.addSeparator();
+    menu.addItem(motion::style::menuItem("Ungroup", 5, "Cmd+Shift+G"));
     menu.addItem(4, "Delete group and its tracks");
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
         if (motion::findGroup(processor.document.project(), id) == nullptr) { return; }
@@ -44,6 +45,11 @@ void MotionTimelineView::showGroupMenu(motion::Id id) {
         } else if (result == 4) {
             deleteTracks({id});
             return;
+        } else if (result == 5) {
+            juce::String lost;
+            if (!report(processor.document.ungroup({id}, lost))) { return; }
+            collapsedGroups.erase(id);
+            if (lost.isNotEmpty() && onNotice) { onNotice(lost + " Undo to keep them."); }
         }
         refreshTracks();
     });

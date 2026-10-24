@@ -1449,6 +1449,68 @@ private:
             expect(motion::findGroup(document.project(), outermost) == nullptr, "a grouping is one undo step");
         }
 
+        beginTest("Ungrouping moves what a group held up a level, playing as it did, its effects on each, in one undo step");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            motion::Project tracks;
+            for (motion::Id id = 1; id <= 3; ++id) {
+                motion::Track track;
+                track.id = id;
+                track.name = "Track " + std::to_string(id);
+                tracks.tracks.push_back(track);
+            }
+            document.reset(tracks);
+            motion::Id inner = 0, outer = 0;
+            expect(document.groupTracks({1, 2}, inner).wasOk());
+            expect(document.groupTracks({inner, 3}, outer).wasOk());
+            document.edit("Style group", [inner](motion::Project& project) {
+                auto* group = motion::findGroup(project, inner);
+                group->muted = true;
+                group->effects.push_back(motion::makeEffect(900, *motion::effectDefinition("swirl")));
+            });
+            juce::String lost;
+            expect(document.ungroup({inner}, lost).wasOk());
+            const auto& project = document.project();
+            expect(motion::findGroup(project, inner) == nullptr, "the group is gone");
+            expect(project.tracks[0].group == outer && project.tracks[1].group == outer, "its tracks are in its parent");
+            expect(project.tracks[0].muted && project.tracks[1].muted, "a muted group's tracks stay quiet");
+            expect(project.tracks[0].effects.size() == 1 && project.tracks[1].effects.size() == 1 && project.tracks[0].effects[0].id != project.tracks[1].effects[0].id,
+                "each keeps the group's effect, as one of its own");
+            expect(lost.isEmpty(), "an untouched transform loses nothing");
+            expect(undo.undo() && motion::findGroup(document.project(), inner) != nullptr, "ungrouping is one undo step");
+            // A group moved or faded says what no longer applies.
+            document.edit("Move group", [inner](motion::Project& project) { motion::findGroup(project, inner)->properties["opacity"].base = .5; });
+            expect(document.ungroup({inner}, lost).wasOk() && lost.isNotEmpty());
+            expect(document.ungroup({}, lost).failed() && document.ungroup({12345}, lost).failed(), "nothing to ungroup");
+        }
+
+        beginTest("Reset puts properties back to their defaults, keys gone, as one step; a locked track's stay");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            motion::Project project;
+            motion::Track track;
+            track.id = 1;
+            motion::Clip clip;
+            clip.id = 2;
+            clip.properties = motion::defaultProperties(motion::objectPropertySpecs);
+            clip.properties["position.x"].base = 3;
+            clip.properties["opacity"].setKeyValue(0, .2);
+            clip.properties["opacity"].setKeyValue(1, .8);
+            track.clips.push_back(clip);
+            project.tracks.push_back(track);
+            document.reset(project);
+            expect(document.resetProperties(2, {{"position.x", 0.0}, {"opacity", 1.0}}, "position").wasOk());
+            const auto* reset = motion::findClip(document.project(), 2);
+            expect(reset->properties.at("position.x").base == 0.0);
+            expect(!reset->properties.at("opacity").animated() && reset->properties.at("opacity").base == 1.0, "keys go with a reset");
+            expect(undo.getUndoDescription() == "Reset position");
+            expect(document.resetProperties(2, {{"position.x", 0.0}}, "position").failed(), "nothing to reset at the default");
+            document.edit("Lock", [](motion::Project& edited) { edited.tracks.change(0).locked = true; });
+            expect(document.resetProperties(2, {{"position.x", 5.0}}, "position").failed(), "a locked track's clip stays");
+        }
+
         beginTest("Group persistence and undo preserve nested values, IDs and shared assets");
         juce::UndoManager undo;
         motion::Document document(undo);

@@ -289,6 +289,11 @@ public:
     // A new group holding `ids` (tracks or groups), where they sat when they
     // shared a parent; `made` is its id.
     juce::Result groupTracks(const std::vector<Id>& ids, Id& made);
+    // Dissolves groups: what each held moves up to its parent, keeping how it
+    // plays (muted, soloed) and the group's effects (copied onto each, with
+    // their modulation). Its transform and look can't move onto tracks:
+    // `lost` says so when they were in use.
+    juce::Result ungroup(const std::vector<Id>& groups, juce::String& lost);
     juce::Result duplicateClips(const std::vector<Id>& sourceIds, std::vector<Id>& duplicateIds);
     // Clipboard contents are value copies, so pasting survives source deletion.
     struct CopiedClip { Id track = 0; TrackKind kind = TrackKind::visual; std::string trackName; Clip clip; };
@@ -391,6 +396,9 @@ public:
     // A property's animation gone in one step: its keys, each property held at
     // its value at `projectTime`. `what` names it for undo ("position").
     juce::Result removeKeyframes(Id target, const std::vector<std::string>& properties, double projectTime, const juce::String& what);
+    // Puts properties back to their defaults (each property with its default),
+    // keys gone; links and modulators stay, as the Graph holds those.
+    juce::Result resetProperties(Id target, const std::vector<std::pair<std::string, double>>& defaults, const juce::String& what);
     // Shows a gesture in progress without an undo step; commit() then records
     // it from where it began.
     void preview(Project project);

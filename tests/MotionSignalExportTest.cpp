@@ -41,6 +41,31 @@ public:
             expectEquals(past.second, 1);
         }
 
+        beginTest("Backwards, the playhead moves back at the speed, wraps at the loop's start to its end, and at 0 to the end");
+        {
+            const auto run = [](double speed, std::int64_t from, int samples, std::int64_t loopStart, std::int64_t loopEnd, std::int64_t duration) {
+                double carry = 0;
+                auto sample = from;
+                int jumps = 0;
+                for (int i = 0; i < samples; ++i) {
+                    const auto step = motion::advancePlayhead(sample, speed, carry, loopStart, loopEnd, duration);
+                    sample = step.sample;
+                    jumps += step.jumped ? 1 : 0;
+                }
+                return std::pair {sample, jumps};
+            };
+            expectEquals(run(-1.0, 5000, 1000, 0, 0, 100000).first, static_cast<std::int64_t>(4000));
+            expectEquals(run(-2.0, 5000, 1000, 0, 0, 100000).first, static_cast<std::int64_t>(3000));
+            expectEquals(run(-0.25, 5000, 1000, 0, 0, 100000).first, static_cast<std::int64_t>(4750));
+            const auto looped = run(-4.0, 199, 30, 100, 200, 100000);
+            expect(looped.first >= 100 && looped.first < 200 && looped.second == 1, "the loop's start wraps to its end once");
+            const auto start = run(-1.0, 10, 20, 0, 0, 400);
+            expect(start.first > 380 && start.second == 1, "passing 0 goes on from the end");
+            // Started before the loop: back to 0, then the end.
+            const auto before = run(-1.0, 50, 60, 100, 200, 400);
+            expect(before.first > 380 && before.second == 1);
+        }
+
         beginTest("The exporter writes exact-length five-channel floating-point XYRGB samples");
         expect(created.wasOk(), created.getErrorMessage());
         if (created.failed()) {
@@ -279,6 +304,31 @@ public:
             expectEquals(output.getSample(3, 0), -.25f);
             expectEquals(output.getSample(0, 0), .9f);
             expect(!motion::routeBeam(Mode::xyz, beam, output, 3, 3), "no room past the last output");
+        }
+
+        beginTest("A scope wired or mounted differently: X and Y swapped, then either output flipped, the brightness untouched");
+        {
+            using Mode = motion::OutputMode;
+            using Routing = motion::OutputRouting;
+            Routing wired {0, Mode::xyz, 2, {true, false, true}};
+            expect(Routing::unpack(wired.pack()) == wired, "the wiring travels in the routing's word");
+            expect(Routing::unpack(Routing {0, Mode::xy, 2}.pack()).wiring == motion::BeamWiring {}, "a word saved before has none");
+            expect(motion::fitRouting(Routing {0, Mode::xy, 6, {false, true, false}}, 4).wiring.flipY, "fitting a smaller device keeps it");
+            juce::AudioBuffer<float> beam(6, 1);
+            beam.clear();
+            beam.setSample(0, 0, .5f);
+            beam.setSample(1, 0, -.25f);
+            beam.setSample(3, 0, 1.0f);
+            for (const auto& [wiring, x, y] : std::initializer_list<std::tuple<motion::BeamWiring, float, float>> {
+                     {{}, .5f, -.25f}, {{true, false, false}, -.5f, -.25f}, {{false, true, false}, .5f, .25f},
+                     {{false, false, true}, -.25f, .5f}, {{true, false, true}, .25f, .5f}, {{true, true, true}, .25f, -.5f}}) {
+                juce::AudioBuffer<float> output(3, 1);
+                output.clear();
+                expect(motion::routeBeam(Mode::xyz, beam, output, 1, 0, wiring));
+                expectEquals(output.getSample(0, 0), x);
+                expectEquals(output.getSample(1, 0), y);
+                expectEquals(output.getSample(2, 0), 1.0f);
+            }
         }
 
         beginTest("A scope's Z input gets the beam's brightness: its brightest colour, inverted on request");

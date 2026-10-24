@@ -564,6 +564,67 @@ juce::Result Document::groupTracks(const std::vector<Id>& ids, Id& made) {
     return juce::Result::ok();
 }
 
+juce::Result Document::ungroup(const std::vector<Id>& groups, juce::String& lost) {
+    const auto& current = project();
+    std::vector<Id> dissolved;
+    for (const auto id : groups) {
+        if (findGroup(current, id) != nullptr) { dissolved.push_back(id); }
+    }
+    if (dissolved.empty()) { return juce::Result::fail("Select a group to ungroup."); }
+    // Whether a group's own transform or look was doing anything.
+    bool styled = false;
+    for (const auto id : dissolved) {
+        const auto* group = findGroup(current, id);
+        for (const auto& spec : objectPropertySpecs) {
+            const auto curve = curveOrDefault(group->properties, spec);
+            if (curve.animated() || curve.link.has_value() || std::abs(curve.base - spec.defaultValue) > 1.0e-9) { styled = true; }
+        }
+        if (std::any_of(current.routes.begin(), current.routes.end(), [id](const auto& route) { return route.target == id; })) { styled = true; }
+    }
+    lost = styled ? (dissolved.size() > 1 ? "The groups' own transforms and looks no longer apply." : "The group's own transform and look no longer apply.") : juce::String();
+    const auto ungrouped = tryEdit(dissolved.size() > 1 ? "Ungroup " + juce::String(static_cast<int>(dissolved.size())) + " groups" : juce::String("Ungroup"), [&](Project& updated) {
+        for (const auto id : dissolved) {
+            const auto* found = findGroup(updated, id);
+            if (found == nullptr) { continue; }
+            const auto group = *found;
+            // Its tracks and groups, up a level, playing as they did.
+            const auto copyEffects = [&](std::vector<EffectInstance>& effects) {
+                std::map<Id, Id> owners;
+                for (auto effect : group.effects) {
+                    const auto clone = newId();
+                    owners.emplace(effect.id, clone);
+                    effect.id = clone;
+                    effects.push_back(std::move(effect));
+                }
+                cloneDrivers(updated, owners, [this] { return newId(); });
+            };
+            for (std::size_t index = 0; index < updated.tracks.size(); ++index) {
+                if (updated.tracks[index].group != id) { continue; }
+                auto* track = updated.tracks.changeById(updated.tracks[index].id);
+                track->group = group.parent;
+                track->muted = track->muted || group.muted;
+                track->solo = track->solo || group.solo;
+                copyEffects(track->effects);
+            }
+            for (auto& child : updated.groups) {
+                if (child.parent != id || child.id == id) { continue; }
+                child.parent = group.parent;
+                child.muted = child.muted || group.muted;
+                child.solo = child.solo || group.solo;
+                copyEffects(child.effects);
+            }
+            for (auto& camera : updated.cameras) {
+                if (camera.parent == id) { camera.parent = group.parent; }
+                if (camera.target == id) { camera.target = group.parent; }
+            }
+            std::erase_if(updated.groups, [id](const auto& item) { return item.id == id; });
+        }
+        return validGroupHierarchy(updated);
+    });
+    if (!ungrouped) { return juce::Result::fail("Those groups can't be ungrouped."); }
+    return juce::Result::ok();
+}
+
 juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::String name, Id& instanceId) {
     const auto& state = project();
     instanceId = 0;

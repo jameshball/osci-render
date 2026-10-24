@@ -285,6 +285,11 @@ juce::PopupMenu MotionEditor::addSourceMenu() {
     menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder(), [](MotionEditor& editor) { editor.chooseSourceFile(); }));
     menu.addSeparator();
     menu.addItem(item(AddMenuId::drawing, "Draw a shape...", icons::glyph::pencil(), [](MotionEditor& editor) { editor.showDrawingEditor(0); }));
+    {
+        auto typeText = item(AddMenuId::text, "Type text...", icons::glyph::letter(), [](MotionEditor& editor) { editor.showNewTextEditor(); });
+        typeText.shortcutKeyDescription = motion::style::shortcutText("T");
+        menu.addItem(typeText);
+    }
     menu.addItem(item(AddMenuId::newScript, "Write a script...", icons::glyph::braces(), [](MotionEditor& editor) { editor.newScript(); }));
     menu.addSeparator();
     // Sources made from a few numbers, by category, each with its picture.
@@ -564,6 +569,7 @@ void MotionEditor::setUpTimeline() {
         assetLibrary.revealAsset(asset);
     };
     timeline.onError = [this](const juce::String& message) { statusBar.show(message, MotionStatusBar::Kind::warning); };
+    timeline.onNotice = [this](const juce::String& message) { statusBar.show(message, MotionStatusBar::Kind::notice); };
     timeline.chosenSource = [this] { return assetLibrary.chosen(); };
     timeline.onHint = [this](const juce::String& message) { statusBar.show(message, MotionStatusBar::Kind::notice); };
     timeline.onEffectPreview = [this](const std::string& type, std::optional<motion::Id> owner) { previewEffect(type, owner); };

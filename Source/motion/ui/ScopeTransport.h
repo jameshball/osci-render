@@ -11,11 +11,14 @@ class MotionSpeedChip final : public juce::TextButton {
 public:
     MotionSpeedChip() {
         setName("Playback speed");
-        setTooltip("Playback speed (< and > to change it)");
+        setTooltip("Playback speed, and Reverse (< and > change the speed)");
         setSpeed(1.0);
     }
+    // "2×", "½×"; backwards, with a minus: "−1×".
     static juce::String text(double speed) {
-        return (speed == 0.25 ? juce::String::fromUTF8("\xc2\xbc") : speed == 0.5 ? juce::String::fromUTF8("\xc2\xbd") : juce::String(static_cast<int>(speed))) + juce::String::fromUTF8("\xc3\x97");
+        const auto size = std::abs(speed);
+        const auto shown = (size == 0.25 ? juce::String::fromUTF8("\xc2\xbc") : size == 0.5 ? juce::String::fromUTF8("\xc2\xbd") : juce::String(static_cast<int>(size))) + juce::String::fromUTF8("\xc3\x97");
+        return speed < 0 ? juce::String::fromUTF8("\xe2\x88\x92") + shown : shown;
     }
     void setSpeed(double speed) {
         normal = speed == 1.0;

@@ -336,6 +336,23 @@ juce::Result Document::removeKeyframes(Id target, const std::vector<std::string>
     return removed ? juce::Result::ok() : juce::Result::fail("There are no keyframes to remove.");
 }
 
+juce::Result Document::resetProperties(Id target, const std::vector<std::pair<std::string, double>>& defaults, const juce::String& what) {
+    const auto found = findPropertyTarget(project(), target);
+    if (!found.has_value() || found->locked) { return juce::Result::fail("That can't be reset: its track is locked."); }
+    const auto reset = tryEdit("Reset " + what, [&](Project& updated) {
+        bool any = false;
+        for (const auto& [property, value] : defaults) {
+            auto* curve = ensurePropertyCurve(updated, target, property);
+            if (curve == nullptr || (!curve->animated() && std::abs(curve->base - value) <= 1.0e-12)) { continue; }
+            curve->clearKeys(0);
+            curve->base = value;
+            any = true;
+        }
+        return any;
+    });
+    return reset ? juce::Result::ok() : juce::Result::fail("It is already at its default.");
+}
+
 juce::Result Document::setLink(Id target, const std::string& property, std::optional<PropertyLink> link) {
     const auto& current = project();
     const auto* curve = findPropertyCurve(current, target, property);

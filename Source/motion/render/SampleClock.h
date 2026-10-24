@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -43,6 +44,13 @@ inline PlayheadStep advancePlayhead(std::int64_t sample, double speed, double& c
         const auto steps = static_cast<std::int64_t>(carry);
         carry -= static_cast<double>(steps);
         next += steps;
+    }
+    // Backwards, the same the other way: the loop's start goes back to its
+    // end, and the composition's start to its end.
+    if (speed < 0) {
+        if (loopEnd > loopStart && sample >= loopStart && next < loopStart) { return {loopEnd - 1, true}; }
+        if (next < 0) { return {std::max<std::int64_t>(0, duration - 1), true}; }
+        return {next, false};
     }
     if (loopEnd > loopStart && sample < loopEnd && next >= loopEnd) { return {loopStart, true}; }
     if (next >= duration) { return {0, true}; }

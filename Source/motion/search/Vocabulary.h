@@ -30,6 +30,8 @@ inline juce::String reasonFor(const juce::String& title, const juce::String& pat
     static const std::vector<std::pair<juce::StringArray, const char*>> reasons {
         {{"Cut", "Copy"}, "Select clips or keys first"},
         {{"Delete"}, "Select clips, keys, tracks or a camera first"},
+        {{"Ripple delete"}, "Select clips first"},
+        {{"Ungroup"}, "Select a group first"},
         {{"Paste"}, "Copy something first"},
         {{"Split at playhead"}, "Select a clip under the playhead"},
         {{"Duplicate"}, "Select clips first"},
@@ -93,12 +95,14 @@ inline juce::StringArray menuKeywords(const juce::String& title) {
         {"Follow playhead", {"scroll", "auto scroll"}},
         {"Loop playback", {"repeat", "cycle"}},
         {"Play / pause", {"stop", "pause", "start playback", "space"}},
+        {"Play backwards", {"reverse", "rewind", "backwards", "play in reverse", "reverse playback"}},
         {"Keyboard shortcuts...", {"hotkeys", "keys", "cheat sheet"}},
         {"Start screen...", {"welcome", "home", "recent projects"}},
         {"New project", {"blank", "empty"}},
         {"Import source...", {"open file", "load", "svg", "obj", "image", "video", "audio", "add file", "add music", "soundtrack"}},
         {"Draw a shape...", {"pen", "pencil", "freehand", "sketch"}},
         {"Write a script...", {"lua", "code", "program"}},
+        {"Type text...", {"add text", "text", "title", "caption", "lettering", "label", "words", "type", "font", "my name"}},
         {"Add camera from this view", {"new camera", "shot"}},
         {"Pick parts", {"edit mode", "faces", "components"}},
         {"Frame selection", {"zoom to fit", "fit view", "focus view"}},
@@ -111,6 +115,8 @@ inline juce::StringArray menuKeywords(const juce::String& title) {
         {"Show timeline", {"dope sheet", "sequencer"}},
         {"Select all", {"everything"}},
         {"Delete", {"delete clip", "delete track", "delete key", "remove"}},
+        {"Ripple delete", {"close gap", "close the gap", "delete and close gap", "lift", "ripple"}},
+        {"Ungroup", {"dissolve group", "release", "flatten", "ungroup tracks"}},
         {"Duplicate", {"duplicate clip", "copy clip"}},
     };
     if (title.startsWith("Export beam")) {
@@ -204,9 +210,11 @@ inline juce::StringArray scopeKeywords(const juce::String& label) {
         {"Persistence", {"trails", "trail", "phosphor", "decay", "afterimage", "longer trails", "motion blur"}},
         {"Afterglow", {"trails", "glow tail", "decay"}},
         {"Glow", {"bloom", "halo", "brighter"}},
-        {"Hue", {"colour", "color", "tint", "beam colour"}},
+        {"Hue", {"colour", "color", "tint", "beam colour", "background colour", "background color"}},
         {"Saturation", {"colour", "vivid", "grey", "washed out"}},
-        {"Ambient", {"background", "room light", "screen colour"}},
+        // The screen's glow behind the beam, in the Hue's colour: the nearest
+        // thing to a background colour.
+        {"Ambient", {"background", "background colour", "background color", "backdrop", "screen colour", "room light", "screen glow"}},
         {"Smoothing", {"smooth", "smoother lines", "filter"}},
     };
     auto found = detail::lookUp(words, label);

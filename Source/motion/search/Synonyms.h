@@ -102,6 +102,8 @@ inline const std::vector<juce::StringArray>& synonymGroups() {
                  {"gain", "volume", "level", "loudness"},
                  {"distort", "distortion", "warp", "deform"},
                  {"pan", "balance"},
+                 {"background", "backdrop", "backplate"},
+                 {"reverse", "backwards", "rewind", "play backwards"},
                  {"mute", "silence"},
                  {"solo", "isolate"},
                  {"lock", "protect"},

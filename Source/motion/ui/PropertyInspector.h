@@ -212,7 +212,7 @@ public:
 private:
     void toggleKeys(Row& row);
     // Right-clicked, the diamond offers what toggling it doesn't: all its keys gone.
-    void showKeyMenu(Row& row);
+    void showKeyMenu(Row& row, bool atPointer = false);
     void jumpToKey(Row& row, bool forward);
 
     // What a clip shows, named by its source rather than "Object"; a

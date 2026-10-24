@@ -2,6 +2,7 @@
 
 #include "../BeamOutput.h"
 #include "MotionStyle.h"
+#include "Chip.h"
 #include "Sheet.h"
 #include <functional>
 
@@ -47,11 +48,23 @@ inline juce::Colour roleColour(const juce::String& role, bool beam) {
     if (role == "B") { return juce::Colour(0xff7ab4ff); }
     return osci::Colours::text();
 }
-// The routing in a few words: "Sound 1–2 · Beam XY 3–4".
+// The wiring's corrections in a word, so one left on isn't forgotten:
+// "flipped", "swapped", "swapped, flipped"; empty when there are none.
+inline juce::String wiringWord(const BeamWiring& wiring) {
+    juce::StringArray words;
+    if (wiring.swapXY) { words.add("swapped"); }
+    if (wiring.flipX || wiring.flipY) { words.add("flipped"); }
+    return words.joinIntoString(", ");
+}
+
+// The routing in a few words: "Sound 1–2 · Beam XY 3–4 (flipped)".
 inline juce::String summary(const OutputRouting& routing) {
     juce::StringArray parts;
     if (routing.soundOn()) { parts.add("Sound " + range(routing.sound, 2)); }
-    if (routing.beamOn()) { parts.add("Beam " + formName(routing.beam) + " " + range(routing.beamFirst, routing.beamChannels())); }
+    if (routing.beamOn()) {
+        const auto wiring = wiringWord(routing.wiring);
+        parts.add("Beam " + formName(routing.beam) + " " + range(routing.beamFirst, routing.beamChannels()) + (wiring.isEmpty() ? juce::String() : " (" + wiring + ")"));
+    }
     return parts.isEmpty() ? juce::String("Nothing") : parts.joinIntoString(style::dot());
 }
 }
@@ -89,7 +102,7 @@ public:
         int needed = 8 + width("Output") + 8 + 16;
         if (!open || (!routing.soundOn() && !routing.beamOn())) { return needed + width(open ? "Nothing" : "No audio device"); }
         if (routing.soundOn()) { needed += 12 + width("Sound " + range(routing.sound, 2)) + 10; }
-        if (routing.beamOn()) { needed += 12 + width(shortFormName(routing.beam) + " " + range(routing.beamFirst, routing.beamChannels())) + 10; }
+        if (routing.beamOn()) { needed += 12 + width(beamText()) + 10; }
         return needed;
     }
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
@@ -113,7 +126,7 @@ public:
             area.removeFromLeft(8);
         }
         const auto width = [&](const juce::String& text) { return static_cast<int>(std::ceil(juce::TextLayout::getStringWidth(g.getCurrentFont(), text))) + 2; };
-        const auto beamText = shortFormName(routing.beam) + " " + range(routing.beamFirst, routing.beamChannels());
+        const auto beamText = this->beamText();
         auto soundText = "Sound " + range(routing.sound, 2);
         const auto needed = (routing.soundOn() ? 12 + width(soundText) : 0) + (routing.beamOn() ? 12 + width(beamText) : 0) + (routing.soundOn() && routing.beamOn() ? 10 : 0);
         if (needed > area.getWidth()) { soundText = range(routing.sound, 2); }
@@ -142,6 +155,12 @@ public:
     }
 
 private:
+    // The beam's form and outputs, and its wiring if corrected: "XY 3–4, flipped".
+    juce::String beamText() const {
+        using namespace motion::ui::output;
+        const auto wiring = wiringWord(routing.wiring);
+        return shortFormName(routing.beam) + " " + range(routing.beamFirst, routing.beamChannels()) + (wiring.isEmpty() ? juce::String() : ", " + wiring);
+    }
     motion::OutputRouting routing {motion::OutputRouting::off, motion::OutputMode::soundtrack, 0};
     bool open = false, inStatusBar = false;
 };
@@ -160,7 +179,7 @@ public:
     MotionOutputPanel(motion::OutputRouting current, Device device, bool hasSound) : Popover("Output", "Done", "Close output"), routing(current), device(std::move(device)), hasSound(hasSound) {
         detail = this->device.name;
         primary.onClick = [this] { if (onDone) { onDone(); } };
-        for (auto* label : {&soundCaption, &beamCaption, &onCaption}) {
+        for (auto* label : {&soundCaption, &beamCaption, &onCaption, &wiringCaption}) {
             label->setFont(motion::style::body());
             label->setColour(juce::Label::textColourId, osci::Colours::textMuted());
             label->setBorderSize({});
@@ -180,6 +199,20 @@ public:
         settings.setTooltip("Choose the audio interface, and its outputs");
         motion::style::makeQuiet(settings);
         settings.onClick = [this] { if (onAudioSettings) { onAudioSettings(); } };
+        // How this machine's scope is wired or mounted: corrected at the
+        // outputs only, so the Scope and exports show the picture as made.
+        const auto wire = [this](motion::ui::Chip& chip, const char* tip, bool motion::BeamWiring::*flag) {
+            chip.setTooltip(tip);
+            chip.onClick = [this, &chip, flag] {
+                auto next = routing;
+                next.wiring.*flag = chip.getToggleState();
+                apply(next, false);
+            };
+            addAndMakeVisible(chip);
+        };
+        wire(flipX, "Mirror the beam left to right, for a scope whose X input is wired the other way round. The Scope and exports stay as made.", &motion::BeamWiring::flipX);
+        wire(flipY, "Mirror the beam top to bottom, for a scope whose Y input is wired the other way round. The Scope and exports stay as made.", &motion::BeamWiring::flipY);
+        wire(swapXY, "Send the picture's X to the Y output and its Y to the X output, for a scope or laser turned on its side (with a flip, a quarter turn). The Scope and exports stay as made.", &motion::BeamWiring::swapXY);
         sound.onChange = [this] { chooseSound(); };
         form.onChange = [this] { chooseForm(); };
         place.onChange = [this] { choosePlace(); };
@@ -235,6 +268,15 @@ protected:
         form.setBounds(line.removeFromLeft(half));
         onCaption.setBounds(line.removeFromLeft(26).withTrimmedLeft(7));
         place.setBounds(line);
+        area.removeFromTop(rowGap);
+        // The wiring: three toggles, under the beam they correct.
+        line = area.removeFromTop(row);
+        wiringCaption.setBounds(line.removeFromLeft(caption).withTrimmedLeft(dotSpace));
+        const auto third = (line.getWidth() - 2 * 6) / 3;
+        for (auto* chip : {&flipX, &flipY, &swapXY}) {
+            chip->setBounds(line.removeFromLeft(chip == &swapXY ? line.getWidth() : third));
+            line.removeFromLeft(6);
+        }
         area.removeFromTop(10);
         // Without a device there are no outputs to draw.
         strip = device.outputs > 0 ? area.removeFromTop(stripHeight) : juce::Rectangle<int>();
@@ -381,10 +423,15 @@ private:
         }
         place.setEnabled(routing.beamOn());
         onCaption.setAlpha(routing.beamOn() ? 1.0f : .4f);
+        flipX.setToggleState(routing.wiring.flipX, juce::dontSendNotification);
+        flipY.setToggleState(routing.wiring.flipY, juce::dontSendNotification);
+        swapXY.setToggleState(routing.wiring.swapXY, juce::dontSendNotification);
+        for (auto* chip : {&flipX, &flipY, &swapXY}) { chip->setEnabled(routing.beamOn()); }
+        wiringCaption.setAlpha(routing.beamOn() ? 1.0f : .4f);
         note.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         note.setText(error.isNotEmpty() ? error : moved.isNotEmpty() ? moved : explain(), juce::dontSendNotification);
         // Without a device there are no outputs to draw, so no room for them.
-        const auto height = heightFor(2, (device.outputs > 0 ? stripHeight + 4 : 2) + 10 + noteHeight);
+        const auto height = heightFor(3, (device.outputs > 0 ? stripHeight + 4 : 2) + 10 + noteHeight);
         if (getHeight() != height) {
             setSize(widthFor(caption + 260), height);
         } else {
@@ -400,6 +447,7 @@ private:
         if (routing.beam == motion::OutputMode::xyz || routing.beam == motion::OutputMode::xyzInverted || routing.beam == motion::OutputMode::xyrgb) {
             return "Brightness needs a DC-coupled interface: through AC-coupled outputs the beam drifts and its light flickers.";
         }
+        if (routing.beamOn() && routing.wiring.any()) { return "The outputs are corrected for this scope's wiring; the Scope and exports show the picture as made."; }
         if (routing.beamOn()) { return "Connect X to the scope's horizontal input and Y to its vertical one, in XY mode."; }
         return {};
     }
@@ -458,7 +506,8 @@ private:
     Device device;
     bool hasSound;
     juce::Rectangle<int> strip;
-    juce::Label soundCaption {"Sound caption", "Sound"}, beamCaption {"Beam caption", "Beam"}, onCaption {"On caption", "on"}, note;
+    juce::Label soundCaption {"Sound caption", "Sound"}, beamCaption {"Beam caption", "Beam"}, onCaption {"On caption", "on"}, wiringCaption {"Wiring caption", "Wiring"}, note;
+    motion::ui::Chip flipX {"Flip X"}, flipY {"Flip Y"}, swapXY {"Swap X and Y"};
     juce::ComboBox sound, form, place;
     juce::TextButton settings;
 };

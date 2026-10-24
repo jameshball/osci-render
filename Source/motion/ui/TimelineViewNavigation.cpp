@@ -285,11 +285,13 @@ void MotionTimelineView::setDefaultTrackHeight(int height) {
     repaint();
 }
 
-void MotionTimelineView::followPlayhead(double time, bool playing) {
+void MotionTimelineView::followPlayhead(double time, bool playing, bool backwards) {
     const auto x = timeX(time);
     const auto visible = x >= namesWidth && x <= getWidth() - 16;
     if (!follow.update(playing, visible) || !followEnabled || clipGesture() || getWidth() <= namesWidth) { return; }
-    scrollTime = std::max(0.0, time - 16 / pixelsPerSecond);
+    // A page on: the playhead at the side it moves away from.
+    const auto margin = backwards ? getWidth() - namesWidth - 16 : 16;
+    scrollTime = std::max(0.0, time - margin / pixelsPerSecond);
     fitRowsToBar();
     repaint();
 }

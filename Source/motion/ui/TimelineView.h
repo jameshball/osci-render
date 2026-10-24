@@ -111,10 +111,18 @@ public:
 
     bool hasSelectedKeys() const { return !selectedKeys.empty(); }
     bool hasSelectedClips() const { return !selectedClips.empty(); }
+    // Deletes the selected clips and closes the gaps they leave on their tracks.
+    void rippleDeleteSelection() { deleteSelectedClips(true); }
     // Tracks or groups picked by their headers (or the one selected).
     bool hasPickedRows() const { return !pickedTracks().empty(); }
     // Whether Group tracks has tracks to group (see tracksToGroup).
     bool canGroupTracks() const { return !tracksToGroup().empty(); }
+    // The picked or selected groups, which Ungroup dissolves.
+    std::vector<motion::Id> groupsToUngroup() const;
+    bool canUngroup() const { return !groupsToUngroup().empty(); }
+    void ungroupSelected();
+    // Something said about an edit that went through (what Ungroup lost).
+    std::function<void(const juce::String&)> onNotice;
     std::vector<motion::Document::CopiedKey> copiedKeys() const;
     std::vector<motion::Document::CopiedClip> copiedClips() const;
     void deleteSelection();
@@ -196,7 +204,7 @@ public:
     // Page-follows the playhead during playback, like Premiere and Ableton. A
     // manual scroll while playing pauses following until the playhead is back
     // in view (or playback restarts).
-    void followPlayhead(double time, bool playing);
+    void followPlayhead(double time, bool playing, bool backwards = false);
 
     bool keyPressed(const juce::KeyPress& key) override;
     // The layout the editor keeps between sessions.

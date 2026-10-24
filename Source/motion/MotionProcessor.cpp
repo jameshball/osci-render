@@ -70,10 +70,14 @@ MotionProcessor::MotionProcessor()
 double MotionProcessor::shownPosition() const {
     const auto at = position.load();
     const auto advance = positionAdvance.load(std::memory_order_relaxed);
-    if (advance <= 0) { return at; }
+    if (advance == 0) { return at; }
     const auto elapsed = std::clamp((juce::Time::getMillisecondCounterHiRes() - positionStamp.load(std::memory_order_relaxed)) / 1000.0, 0.0, 2 * blockSeconds.load(std::memory_order_relaxed));
     auto time = at + elapsed * advance;
     const auto start = loopStart.load(), end = loopEnd.load();
+    if (advance < 0) {
+        if (looping.load() && end > start && at >= start && time < start) { time = end - (start - time); }
+        return std::max(time, 0.0);
+    }
     if (looping.load() && end > start && at < end && time >= end) { time = start + (time - end); }
     return std::min(time, document.mainProject().duration);
 }
@@ -220,7 +224,8 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
     // At 1x the beam's cycles keep step with the timeline; at another speed
     // they run on by themselves, so the beam keeps its frequency.
     const auto wanted = playbackSpeed.load(std::memory_order_relaxed);
-    const auto speed = std::isfinite(wanted) ? std::clamp(wanted, playbackSpeeds.front(), playbackSpeeds.back()) : 1.0;
+    // Its sign is the way it plays: below 0, backwards.
+    const auto speed = std::isfinite(wanted) && wanted != 0.0 ? std::copysign(std::clamp(std::abs(wanted), playbackSpeeds.front(), playbackSpeeds.back()), wanted) : 1.0;
     const auto atSpeed = speed == 1.0;
     if (speed != previousSpeed) {
         previousSpeed = speed;
@@ -230,7 +235,10 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
     // The beam keeps drawing while stopped (the picture at the playhead);
     // starting or stopping guards the jump.
     const auto running = playing.load();
-    if (running && audioSample >= durationSamples) { audioSample = 0; }
+    // Playing from the end goes on from the start; backwards from the start,
+    // on from the end.
+    if (running && speed > 0 && audioSample >= durationSamples) { audioSample = 0; }
+    if (running && speed < 0 && audioSample <= 0 && durationSamples > 0) { audioSample = durationSamples - 1; }
     if (running != wasPlaying) { transitionGuard.begin(); }
     wasPlaying = running;
     juce::int64 loopStartSample = 0, loopEndSample = 0;
@@ -286,7 +294,7 @@ void MotionProcessor::routeSignalOutput(juce::AudioBuffer<float>& buffer) {
     const auto count = buffer.getNumSamples();
     if (!audible) {
         motion::blankBeam(route.beam, buffer, count, route.beamFirst);
-    } else if (motion::routeBeam(route.beam, signal, buffer, count, route.beamFirst)) {
+    } else if (motion::routeBeam(route.beam, signal, buffer, count, route.beamFirst, route.wiring)) {
         applyVolumeAndThreshold(buffer.getArrayOfWritePointers() + route.beamFirst, count);
     }
 }

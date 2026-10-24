@@ -109,6 +109,28 @@ std::vector<motion::Id> MotionTimelineView::tracksToGroup() const {
     return result;
 }
 
+std::vector<motion::Id> MotionTimelineView::groupsToUngroup() const {
+    std::vector<motion::Id> result;
+    for (const auto id : pickedTracks()) {
+        if (motion::findGroup(processor.document.project(), id) != nullptr) { result.push_back(id); }
+    }
+    return result;
+}
+
+void MotionTimelineView::ungroupSelected() {
+    const auto groups = groupsToUngroup();
+    if (groups.empty()) {
+        if (onError) { onError("Select a group to ungroup: click its name."); }
+        return;
+    }
+    juce::String lost;
+    if (!report(processor.document.ungroup(groups, lost))) { return; }
+    for (const auto id : groups) { collapsedGroups.erase(id); }
+    selectedTracks.clear();
+    refreshTracks();
+    if (lost.isNotEmpty() && onNotice) { onNotice(lost + " Undo to keep them."); }
+}
+
 // The picked rows: tracks, and groups (which go with all they hold).
 std::vector<motion::Id> MotionTimelineView::pickedTracks() const {
     std::vector<motion::Id> result;

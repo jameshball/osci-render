@@ -552,6 +552,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             };
             row->key.onClick = [this, raw] { toggleKeys(*raw); };
             row->key.onPopupMenu = [this, raw] { showKeyMenu(*raw); };
+            row->onContextMenu = [this, raw] { showKeyMenu(*raw, true); };
             if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
                 const bool path = row->group == "Position";
                 row->mode = std::make_unique<motion::ui::Chip>(path ? "Spatial path" : "Quaternion rotation", path ? motion::icons::Icon::path : motion::icons::Icon::rotate);
@@ -1115,23 +1116,33 @@ void MotionPropertyInspector::toggleKeys(Row& row) {
     if (onKeyTimeEdited) { onKeyTimeEdited(); }
 }
 
-void MotionPropertyInspector::showKeyMenu(Row& row) {
+// The row's menu: Reset (to its defaults, keys gone), and removing its
+// keyframes (the value at the playhead kept).
+void MotionPropertyInspector::showKeyMenu(Row& row, bool atPointer) {
     const auto found = motion::findPropertyTarget(processor.document.project(), target);
     if (!found.has_value()) { return; }
     std::vector<std::string> properties;
-    bool animated = false;
+    std::vector<std::pair<std::string, double>> defaults;
+    bool animated = false, changed = false;
     for (auto& field : row.fields) {
         properties.emplace_back(field->spec.id);
+        // The field's own default: a fractal's depth is its source's.
+        defaults.emplace_back(field->spec.id, field->spec.defaultValue);
         const auto* curve = found->curve(properties.back());
         animated = animated || (curve != nullptr && curve->animated());
+        changed = changed || (curve != nullptr && (curve->animated() || std::abs(curve->base - field->spec.defaultValue) > 1.0e-9));
     }
     const auto what = row.group.toLowerCase();
     juce::PopupMenu menu;
+    menu.addItem(2, "Reset " + what, changed && !found->locked);
     menu.addItem(1, "Remove " + what + " keyframes", animated && !found->locked);
     const juce::Component::SafePointer<MotionPropertyInspector> owner(this);
-    motion::ui::showDocumentMenu(menu, row.key, processor.document, juce::PopupMenu::Options().withTargetComponent(&row.key), [owner, id = target, properties, what](int result) {
-        if (owner == nullptr || result != 1) { return; }
-        owner->processor.document.removeKeyframes(id, properties, owner->processor.position.load(), what);
+    auto options = juce::PopupMenu::Options().withTargetComponent(&row.key);
+    if (atPointer) { options = options.withMousePosition(); }
+    motion::ui::showDocumentMenu(menu, row.key, processor.document, options, [owner, id = target, properties, defaults, what](int result) {
+        if (owner == nullptr) { return; }
+        if (result == 1) { owner->processor.document.removeKeyframes(id, properties, owner->processor.position.load(), what); }
+        if (result == 2) { owner->processor.document.resetProperties(id, defaults, what); }
     });
 }
 

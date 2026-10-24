@@ -254,6 +254,13 @@ private:
     SourceRequest textRequest;
     // Typing previews after a short pause rather than on every key.
     double textPreviewDue = 0;
+    // A new text, typed in the Scene: in the project from its first letter,
+    // on a track of its own at the playhead, named for its first line; all
+    // one undo step, which Cancel takes back.
+    void showNewTextEditor();
+    void updateNewText();
+    motion::Id newTextAsset = 0, newTextTrack = 0;
+    bool newTextOpen = false;
     // A script being written plays on the Scope a moment after each change:
     // baked as it stands, off the message thread, the newest only.
     void previewLua();
@@ -515,6 +522,10 @@ private:
     MotionScopeTransport scopeTransport;
     void showSpeedMenu(juce::Component& anchor);
     void changeSpeed(int steps);
+    // Reverse: the speed's sign, kept as the speed changes.
+    void setReverse(bool backwards);
+    void playBackwards();
+    static constexpr int reverseMenuId = 100;
     void refreshSpeed();
     void showInComposition(std::function<juce::Component&()> part);
     // Properties lead: a clip's timing, then a text clip's character animation.
@@ -577,7 +588,7 @@ private:
     void setInterfaceSize(float scale, bool keepWindowSize);
     // The add menu's items, and the first id of each list in it.
     struct AddMenuId {
-        static constexpr int importFile = 1, blenderSource = 2, drawing = 3, newScript = 4;
+        static constexpr int importFile = 1, blenderSource = 2, drawing = 3, newScript = 4, text = 5;
         static constexpr int firstExample = 100, firstGenerator = 1000, firstLightPreset = 2000, firstMirror = 3000, firstTexture = 4000;
     };
     juce::Label timeLabel;

@@ -117,11 +117,23 @@ void MotionEditor::registerCommands() {
             timeline.deleteSelection();
         }
     });
+    // Ripple delete closes the gap too, as Shift+Delete does in other editors.
+    addCommand(editMenu, "Ripple delete", juce::KeyPress(juce::KeyPress::deleteKey, juce::ModifierKeys::shiftModifier, 0), "Shift+Delete", [this] {
+        if (graphShown() || !timeline.hasSelectedClips()) {
+            statusBar.show("Select clips to delete and close the gap after them.", MotionStatusBar::Kind::notice);
+            return;
+        }
+        timeline.rippleDeleteSelection();
+    });
+    addCommand(keyOnly, "Ripple delete", juce::KeyPress(juce::KeyPress::backspaceKey, juce::ModifierKeys::shiftModifier, 0), {}, [this] {
+        if (!graphShown() && timeline.hasSelectedClips()) { timeline.rippleDeleteSelection(); }
+    });
     // Cut, Copy and Delete act on what the shown editor has selected: the
     // Graph's keys, or the timeline's keys or clips. Paste needs a copy.
     const auto anySelection = [this] { return graphShown() ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
     for (const auto* name : {"Cut", "Copy"}) { menus.setMenuItemEnabled(editMenu, name, anySelection); }
     menus.setMenuItemEnabled(editMenu, "Delete", [this, anySelection] { return anySelection() || (!graphShown() && (timeline.hasPickedRows() || selectionIsCamera())); });
+    menus.setMenuItemEnabled(editMenu, "Ripple delete", [this] { return !graphShown() && timeline.hasSelectedClips(); });
     menus.setMenuItemEnabled(editMenu, "Paste", [this] { return !std::holds_alternative<std::monostate>(clipboard); });
     menus.addMenuSeparator(editMenu);
     addCommand(editMenu, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] {
@@ -142,6 +154,7 @@ void MotionEditor::registerCommands() {
         timeline.selectClips(duplicates);
     });
     addCommand(clipMenu, "Group tracks", juce::KeyPress('g', command, 0), "Cmd+G", [this] { timeline.groupSelectedTracks(); });
+    addCommand(clipMenu, "Ungroup", juce::KeyPress('g', command | juce::ModifierKeys::shiftModifier, 0), "Cmd+Shift+G", [this] { timeline.ungroupSelected(); });
     // After Effects' Pre-compose keys; Final Cut's and CapCut's Alt+G works too.
     addCommand(clipMenu, "Make composition", juce::KeyPress('c', command | shift, 0), "Cmd+Shift+C", [this] { timeline.createCompositionFromSelection(); });
     addCommand(keyOnly, "Make composition", juce::KeyPress('g', alt, 0), {}, [this] { timeline.createCompositionFromSelection(); });
@@ -154,6 +167,8 @@ void MotionEditor::registerCommands() {
     addCommand(clipMenu, "Trim end to playhead", juce::KeyPress(']', alt, 0), "Alt+]", [this] { placeClipAtPlayhead(false, true); });
     menus.addMenuSeparator(clipMenu);
     addCommand(clipMenu, "Show key lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
+    // T, as text tools have it elsewhere: a new text, typed in the Scene.
+    addCommand(keyOnly, "Type text", juce::KeyPress('t', 0, 0), "T", [this] { showNewTextEditor(); });
     // Key: each group Properties shows, named in the menu by the group alone.
     const std::array<std::tuple<char, const char*, const char*>, 5> keyed {{{'p', "Position", "Key position"}, {'r', "Rotation", "Key rotation"}, {'s', "Scale", "Key scale"}, {'c', "Colour", "Key colour"}, {'t', "Opacity", "Key opacity"}}};
     menus.beginSubMenu(clipMenu, "Key");
@@ -190,12 +205,14 @@ void MotionEditor::registerCommands() {
     // when their keys are pressed, and show it in the menu first.
     menus.setMenuItemEnabled(clipMenu, "Split at playhead", [this] { return canSplitAtPlayhead(); });
     menus.setMenuItemEnabled(clipMenu, "Group tracks", [this] { return timeline.canGroupTracks(); });
+    menus.setMenuItemEnabled(clipMenu, "Ungroup", [this] { return timeline.canUngroup(); });
     for (const auto* name : {"Duplicate", "Show key lanes"}) { menus.setMenuItemEnabled(clipMenu, name, [this] { return timeline.hasSelectedClips(); }); }
     for (const auto* name : {"Move start to playhead", "Move end to playhead", "Trim start to playhead", "Trim end to playhead"}) {
         menus.setMenuItemEnabled(clipMenu, name, [this] { return clipSelected(); });
     }
 
     addCommand(transportMenu, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { togglePlayback(); });
+    addCommand(transportMenu, "Play backwards", juce::KeyPress(juce::KeyPress::spaceKey, juce::ModifierKeys::shiftModifier, 0), "Shift+Space", [this] { playBackwards(); });
     addCommand(transportMenu, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { seekAndReveal(0); });
     addCommand(transportMenu, "Go to end", juce::KeyPress(juce::KeyPress::endKey), "End", [this] { seekAndReveal(processor.document.project().duration); });
     menus.addMenuSeparator(transportMenu);

@@ -529,7 +529,7 @@ void MotionEditor::displayFrame() {
     lastDisplayFrame = now;
     const auto heard = processor.shownPosition();
     const auto advance = processor.positionAdvance.load(std::memory_order_relaxed);
-    if (advance <= 0 || seconds <= 0 || seconds > .25 || std::abs(heard - shownPlayhead) > .25) {
+    if (advance == 0 || seconds <= 0 || seconds > .25 || std::abs(heard - shownPlayhead) > .25) {
         shownPlayhead = heard;
     } else {
         shownPlayhead += seconds * advance;
@@ -540,7 +540,7 @@ void MotionEditor::displayFrame() {
     if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(shownPlayhead)), juce::dontSendNotification); }
     // What plays moves in the Scene as often as it can be drawn: a heavy
     // Scene gets a frame when its last one is done, leaving time for the rest.
-    if (advance > 0 && now >= sceneDue) {
+    if (advance != 0 && now >= sceneDue) {
         composition.repaint();
         sceneDue = now + composition.paintMilliseconds();
     }
@@ -577,7 +577,13 @@ void MotionEditor::timerCallback() {
         });
     }
     refreshUndo();
-    if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) { previewText(); }
+    if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) {
+        if (newTextOpen) {
+            updateNewText();
+        } else {
+            previewText();
+        }
+    }
     if (luaPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= luaPreviewDue) { previewLua(); }
     processor.showIdleSeek(processor.document.mainProject().duration);
     auto& previewRate = processor.recordingParameters.frameRate;
@@ -692,9 +698,10 @@ void MotionEditor::timerCallback() {
     const auto slowTick = ++ticks % 10 == 0;
     const auto moved = position != lastPaintedPosition || playing;
     lastPaintedPosition = position;
-    timeline.followPlayhead(position, playing);
+    const auto backwards = processor.playbackSpeed.load() < 0;
+    timeline.followPlayhead(position, playing, backwards);
     timeline.updateBake();
-    if (curveEditor.isVisible() && timeline.layout().follow) { curveEditor.followPlayhead(position, playing); }
+    if (curveEditor.isVisible() && timeline.layout().follow) { curveEditor.followPlayhead(position, playing, backwards); }
     if (slowTick) {
         timeline.repaint();
         if (curveEditor.isVisible()) { curveEditor.repaint(); }
@@ -1096,7 +1103,9 @@ bool MotionEditor::keyPressed(const juce::KeyPress& key) {
     const auto code = key.getKeyCode();
     const auto modifiers = key.getModifiers();
     if ((code == juce::KeyPress::deleteKey || code == juce::KeyPress::backspaceKey) && !modifiers.isCommandDown() && !modifiers.isCtrlDown() && !modifiers.isAltDown()) {
-        const auto found = std::find_if(commands.begin(), commands.end(), [](const auto& command) { return command.name == "Delete"; });
+        // With Shift, clips go as Ripple delete takes them: the gap closes.
+        const auto ripple = modifiers.isShiftDown() && !graphShown() && timeline.hasSelectedClips();
+        const auto found = std::find_if(commands.begin(), commands.end(), [ripple](const auto& command) { return command.name == (ripple ? "Ripple delete" : "Delete"); });
         if (found != commands.end()) {
             found->action();
             return true;
@@ -1348,18 +1357,30 @@ juce::Result MotionEditor::applyRouting(motion::OutputRouting routing) {
 
 // Playback speeds in a menu by `anchor`, as a video player's: each a step
 // of < and >.
+// The speeds, then Reverse: the way it plays, kept whatever the speed.
 void MotionEditor::showSpeedMenu(juce::Component& anchor) {
     juce::PopupMenu menu;
     const auto current = processor.playbackSpeed.load();
+    const auto backwards = current < 0;
     for (std::size_t index = 0; index < MotionProcessor::playbackSpeeds.size(); ++index) {
         const auto speed = MotionProcessor::playbackSpeeds[index];
-        menu.addItem(static_cast<int>(index) + 1, MotionSpeedChip::text(speed) + (speed == 1.0 ? juce::String("  Normal") : juce::String()), true, speed == current);
+        menu.addItem(static_cast<int>(index) + 1, MotionSpeedChip::text(speed) + (speed == 1.0 ? juce::String("  Normal") : juce::String()), true, speed == std::abs(current));
     }
+    menu.addSeparator();
+    juce::PopupMenu::Item reverse("Reverse");
+    reverse.itemID = reverseMenuId;
+    reverse.isTicked = backwards;
+    reverse.shortcutKeyDescription = motion::style::shortcutText("Shift+Space");
+    menu.addItem(reverse);
     menu.setLookAndFeel(&motionLookAndFeel);
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&anchor), [owner](int result) {
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&anchor), [owner, current](int result) {
         if (owner == nullptr || result <= 0) { return; }
-        owner->processor.playbackSpeed.store(MotionProcessor::playbackSpeeds[static_cast<std::size_t>(result - 1)]);
+        if (result == reverseMenuId) {
+            owner->setReverse(current > 0);
+            return;
+        }
+        owner->processor.playbackSpeed.store(std::copysign(MotionProcessor::playbackSpeeds[static_cast<std::size_t>(result - 1)], current));
         owner->refreshSpeed();
     });
 }
@@ -1367,17 +1388,43 @@ void MotionEditor::showSpeedMenu(juce::Component& anchor) {
 void MotionEditor::changeSpeed(int steps) {
     const auto& speeds = MotionProcessor::playbackSpeeds;
     const auto current = processor.playbackSpeed.load();
-    auto index = static_cast<int>(std::distance(speeds.begin(), std::min_element(speeds.begin(), speeds.end(), [current](double a, double b) { return std::abs(a - current) < std::abs(b - current); })));
+    const auto size = std::abs(current);
+    auto index = static_cast<int>(std::distance(speeds.begin(), std::min_element(speeds.begin(), speeds.end(), [size](double a, double b) { return std::abs(a - size) < std::abs(b - size); })));
     index = std::clamp(index + steps, 0, static_cast<int>(speeds.size()) - 1);
-    processor.playbackSpeed.store(speeds[static_cast<std::size_t>(index)]);
+    processor.playbackSpeed.store(std::copysign(speeds[static_cast<std::size_t>(index)], current));
     refreshSpeed();
+}
+
+void MotionEditor::setReverse(bool backwards) {
+    const auto current = processor.playbackSpeed.load();
+    processor.playbackSpeed.store(std::copysign(std::abs(current), backwards ? -1.0 : 1.0));
+    refreshSpeed();
+}
+
+// Plays backwards from where it is; again, pauses.
+void MotionEditor::playBackwards() {
+    const auto backwards = processor.playbackSpeed.load() < 0;
+    if (processor.playing.load() && backwards) {
+        togglePlayback();
+        return;
+    }
+    if (!backwards) { setReverse(true); }
+    if (!processor.playing.load()) { togglePlayback(); }
 }
 
 void MotionEditor::refreshSpeed() {
     const auto speed = processor.playbackSpeed.load();
     const auto text = MotionSpeedChip::text(speed);
     speedButton.setSpeed(speed);
-    statusBar.show(speed == 1.0 ? juce::String("Back to normal speed.") : "Speed " + text + ": < and > change it; exports always play at normal speed.", MotionStatusBar::Kind::notice);
+    juce::String said;
+    if (speed == 1.0) {
+        said = "Back to normal speed.";
+    } else if (speed == -1.0) {
+        said = "Playing in reverse: Reverse in the speed menu (or Shift+Space) plays forwards again.";
+    } else {
+        said = (speed < 0 ? "Reverse at " + text.substring(1) : "Speed " + text) + ": < and > change it; exports always play forwards at normal speed.";
+    }
+    statusBar.show(said, MotionStatusBar::Kind::notice);
     repaint();
 }
 

@@ -16,6 +16,8 @@ namespace motion::ui {
 // values never shift: the rows that are keyed or driven stand out.
 class PropertyRow : public juce::Component {
 public:
+    // The row's menu, from a right-click on its name or fields.
+    std::function<void()> onContextMenu;
     PropertyRow() {
         key.restAlpha = .45f;
         // Keys are neutral: filled on a key, outlined off one.
@@ -106,6 +108,10 @@ private:
     // not the row, so wheel events still pass up once to the scroller.
     struct Hover final : juce::MouseListener {
         explicit Hover(PropertyRow& owner) : row(owner) {}
+        // A right-click anywhere on the row (the key has a menu of its own).
+        void mouseDown(const juce::MouseEvent& event) override {
+            if (event.mods.isPopupMenu() && event.eventComponent != &row.key && row.onContextMenu) { row.onContextMenu(); }
+        }
         void mouseEnter(const juce::MouseEvent& event) override {
             row.hoverKey(event, true);
             row.showModulate();

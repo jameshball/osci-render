@@ -42,22 +42,33 @@ inline std::array<float, 5> beamSample(OutputMode mode, float x, float y, float 
     return {x, y, r, g, b};
 }
 
+// How a scope or laser is wired or mounted, corrected at the outputs: X
+// and Y swapped first, then either output's polarity turned over (as
+// osci-render's Swap X/Y and Invert X/Y do). The picture itself, the Scope
+// and exports stay as designed.
+struct BeamWiring {
+    bool flipX = false, flipY = false, swapXY = false;
+    bool any() const { return flipX || flipY || swapXY; }
+    bool operator==(const BeamWiring&) const = default;
+};
+
 // Plays the beam's signal (x, y, z, r, g, b channels) on an output in the
-// mode's channels, from `first` on. False, leaving the output as it was,
-// for audio or when the output has too few channels.
-inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, juce::AudioBuffer<float>& output, int count, int first = 0) {
+// mode's channels, from `first` on, corrected for `wiring`. False, leaving
+// the output as it was, for audio or when the output has too few channels.
+inline bool routeBeam(OutputMode mode, const juce::AudioBuffer<float>& signal, juce::AudioBuffer<float>& output, int count, int first = 0, BeamWiring wiring = {}) {
     const auto channels = beamOutputChannels(mode);
     if (channels == 0 || first < 0 || output.getNumChannels() < first + channels || signal.getNumChannels() < 6) {
         return false;
     }
-    const auto* x = signal.getReadPointer(0);
-    const auto* y = signal.getReadPointer(1);
+    const auto* x = signal.getReadPointer(wiring.swapXY ? 1 : 0);
+    const auto* y = signal.getReadPointer(wiring.swapXY ? 0 : 1);
+    const auto xGain = wiring.flipX ? -1.0f : 1.0f, yGain = wiring.flipY ? -1.0f : 1.0f;
     const auto* r = signal.getReadPointer(3);
     const auto* g = signal.getReadPointer(4);
     const auto* b = signal.getReadPointer(5);
     auto* const* out = output.getArrayOfWritePointers() + first;
     for (int i = 0; i < count; ++i) {
-        const auto sample = beamSample(mode, x[i], y[i], r[i], g[i], b[i]);
+        const auto sample = beamSample(mode, xGain * x[i], yGain * y[i], r[i], g[i], b[i]);
         for (int channel = 0; channel < channels; ++channel) {
             out[channel][i] = sample[static_cast<std::size_t>(channel)];
         }
@@ -96,6 +107,8 @@ struct OutputRouting {
     // The beam's form (soundtrack: no beam), and its first output.
     OutputMode beam = OutputMode::soundtrack;
     int beamFirst = 0;
+    // The beam outputs' corrections for this machine's scope.
+    BeamWiring wiring;
 
     bool soundOn() const { return sound >= 0; }
     bool beamOn() const { return beamOutputChannels(beam) > 0 && beamFirst >= 0; }
@@ -106,12 +119,15 @@ struct OutputRouting {
     bool fits(int outputs) const { return !overlaps() && channels() <= outputs; }
     bool operator==(const OutputRouting&) const = default;
 
-    // One word for the audio thread.
+    // One word for the audio thread: the wiring in its top byte (a word
+    // saved before there was any reads as none).
     std::uint32_t pack() const {
-        return static_cast<std::uint32_t>(sound + 1) | (static_cast<std::uint32_t>(beam) << 8) | (static_cast<std::uint32_t>(beamFirst + 1) << 16);
+        const auto flags = (wiring.flipX ? 1u : 0u) | (wiring.flipY ? 2u : 0u) | (wiring.swapXY ? 4u : 0u);
+        return static_cast<std::uint32_t>(sound + 1) | (static_cast<std::uint32_t>(beam) << 8) | (static_cast<std::uint32_t>(beamFirst + 1) << 16) | (flags << 24);
     }
     static OutputRouting unpack(std::uint32_t word) {
-        return {static_cast<int>(word & 0xff) - 1, static_cast<OutputMode>((word >> 8) & 0xff), static_cast<int>((word >> 16) & 0xff) - 1};
+        const auto flags = word >> 24;
+        return {static_cast<int>(word & 0xff) - 1, static_cast<OutputMode>((word >> 8) & 0xff), static_cast<int>((word >> 16) & 0xff) - 1, {(flags & 1u) != 0, (flags & 2u) != 0, (flags & 4u) != 0}};
     }
 };
 
@@ -123,7 +139,7 @@ inline OutputRouting fitRouting(OutputRouting routing, int outputs) {
     if (routing.fits(outputs)) { return routing; }
     if (routing.soundOn() && routing.sound + 2 > outputs) { routing.sound = outputs >= 2 ? 0 : OutputRouting::off; }
     if (routing.beamOn() && routing.beamChannels() > outputs) { routing.beam = outputs >= 2 ? OutputMode::xy : OutputMode::soundtrack; }
-    if (!routing.beamOn()) { return routing.fits(outputs) ? routing : OutputRouting {outputs >= 2 ? 0 : OutputRouting::off, OutputMode::soundtrack, 0}; }
+    if (!routing.beamOn()) { return routing.fits(outputs) ? routing : OutputRouting {outputs >= 2 ? 0 : OutputRouting::off, OutputMode::soundtrack, 0, routing.wiring}; }
     for (int first = 0; first + routing.beamChannels() <= outputs; ++first) {
         auto moved = routing;
         moved.beamFirst = first;

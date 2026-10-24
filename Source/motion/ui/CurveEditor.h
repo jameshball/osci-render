@@ -31,7 +31,7 @@ public:
     void setContextCurves(std::map<std::string, juce::Colour> curves);
     void setPlayhead(double time) { playheadStrip.moveTo(*this, time, [this](double at) { return playheadX(at); }); }
     // Page-follows the playhead during playback unless the view was just moved.
-    void followPlayhead(double time, bool playing);
+    void followPlayhead(double time, bool playing, bool backwards = false);
 
     struct ViewState {
         motion::Id target = 0;

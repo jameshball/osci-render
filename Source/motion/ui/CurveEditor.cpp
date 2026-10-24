@@ -37,12 +37,13 @@ void MotionCurveEditor::setContextCurves(std::map<std::string, juce::Colour> cur
     repaint();
 }
 
-void MotionCurveEditor::followPlayhead(double time, bool playing) {
+void MotionCurveEditor::followPlayhead(double time, bool playing, bool backwards) {
     const auto inside = time >= viewStart && time <= viewEnd;
     if (follow.update(playing, inside) && !drag.has_value()) {
         const auto span = viewEnd - viewStart;
         userView = true;
-        setView(time - span * 0.02, time + span * 0.98);
+        const auto behind = backwards ? 0.98 : 0.02;
+        setView(time - span * behind, time + span * (1.0 - behind));
         repaint();
     }
 }

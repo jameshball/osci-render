@@ -855,6 +855,11 @@ void MotionEditor::closeSceneEditor() {
     if (sceneEditor == nullptr) { return; }
     // Text and Lua editors are the import queue's settings for their source.
     if (sceneEditorAs<MotionDrawingEditor>() == nullptr) { preparationSettingsOpen = false; }
+    // A new text closed any other way (another project) keeps what it made.
+    if (newTextOpen) {
+        processor.document.endHeld();
+        newTextOpen = false;
+    }
     removeChildComponent(sceneEditor.get());
     sceneEditor.reset();
     assetLibrary.setEditingSource(false);
@@ -1107,6 +1112,137 @@ void MotionEditor::previewText() {
         return;
     }
     previewSource(asset, asset->id, {});
+}
+
+// A name for a text from its words: its first line, short ("Text" for none).
+static juce::String nameForText(const juce::String& text) {
+    auto line = juce::StringArray::fromLines(text.trim())[0].trim().removeCharacters("/\\:*?\"<>|");
+    if (line.length() > 32) {
+        line = line.substring(0, 32).trimEnd() + juce::String::fromUTF8("\xe2\x80\xa6");
+    }
+    return line.isEmpty() ? juce::String("Text") : line;
+}
+
+void MotionEditor::showNewTextEditor() {
+    if (sceneEditorOpen()) {
+        return;
+    }
+    newTextAsset = 0;
+    newTextTrack = 0;
+    newTextOpen = true;
+    // Centred, as a title most often is.
+    motion::TextSettings settings;
+    settings.alignment = 1;
+    auto& editor = openSceneEditor(std::make_unique<MotionTextSourceEditor>(juce::String(), "Text", settings, juce::String(), true));
+    editor.onChanged = [this] { textPreviewDue = juce::Time::getMillisecondCounterHiRes() + 120; };
+    const juce::Component::SafePointer<MotionTextSourceEditor> opened(&editor);
+    editor.onDone = [this, opened](const juce::String&, const motion::TextSettings&) {
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), opened] {
+            if (owner == nullptr || opened == nullptr || owner->sceneEditor.get() != opened.getComponent()) {
+                return;
+            }
+            owner->updateNewText();
+            owner->processor.document.endHeld();
+            owner->newTextOpen = false;
+            owner->closeSceneEditor();
+        });
+    };
+    editor.onCancel = [this, opened] {
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), opened] {
+            if (owner == nullptr || opened == nullptr || owner->sceneEditor.get() != opened.getComponent()) {
+                return;
+            }
+            // Whatever it typed goes, as one step.
+            owner->processor.document.cancelHeld();
+            owner->newTextOpen = false;
+            owner->closeSceneEditor();
+            owner->assetLibrary.refresh();
+        });
+    };
+    resized();
+    editor.focusText();
+}
+
+void MotionEditor::updateNewText() {
+    textPreviewDue = 0;
+    auto* editor = sceneEditorAs<MotionTextSourceEditor>();
+    if (editor == nullptr || !newTextOpen) {
+        return;
+    }
+    const auto text = editor->currentText();
+    if (text.trim().isEmpty() || text.length() > 16384) {
+        return;
+    }
+    auto& document = processor.document;
+    const auto stem = nameForText(text);
+    editor->setSourceName(stem);
+    // Its name, unique among the other sources.
+    const auto taken = [&document, this](const juce::String& candidate) {
+        const auto& assets = document.mainProject().assets;
+        return std::any_of(assets.begin(), assets.end(), [&](const auto& asset) { return asset != nullptr && asset->id != newTextAsset && asset->name == candidate; });
+    };
+    auto name = stem + ".txt";
+    for (int number = 2; taken(name); ++number) {
+        name = stem + " " + juce::String(number) + ".txt";
+    }
+    auto asset = std::make_shared<motion::Asset>();
+    asset->id = newTextAsset != 0 ? newTextAsset : document.newId();
+    asset->name = name;
+    asset->extension = ".txt";
+    asset->data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
+    asset->textSettings = editor->currentSettings();
+    asset->textSettings.animation = motion::TextSettings::Animation::none;
+    if (motion::decodeAsset(*asset).failed()) {
+        return;
+    }
+    const juce::String held = "new text";
+    // Undone while typing: it starts again.
+    const auto& assets = document.project().assets;
+    if (newTextAsset != 0 && std::none_of(assets.begin(), assets.end(), [this](const auto& each) { return each != nullptr && each->id == newTextAsset; })) {
+        newTextAsset = 0;
+        newTextTrack = 0;
+        asset->id = document.newId();
+    }
+    if (newTextAsset == 0) {
+        auto clip = motion::Document::makeClip(document.newId(), *asset, document.project().frameTime(processor.position.load()));
+        motion::Track track;
+        track.id = document.newId();
+        track.name = stem.toStdString();
+        track.insert(clip, document.project().tempo());
+        document.beginHeld(held);
+        document.editCoalesced("Add text", held, [&](motion::Project& project) {
+            project.assets.push_back(asset);
+            project.tracks.push_back(track);
+            project.duration = std::max(project.duration, clip.timing(project.tempo()).end());
+        });
+        newTextAsset = asset->id;
+        newTextTrack = track.id;
+        assetLibrary.refresh();
+        assetLibrary.selectAsset(asset->id);
+        select(clip.id);
+        // Selecting it shows its Properties; the typing carries on here.
+        editor = sceneEditorAs<MotionTextSourceEditor>();
+        if (editor != nullptr) {
+            editor->focusText();
+        }
+        return;
+    }
+    // The words, and the names that follow them.
+    document.editCoalesced("Add text", held, [&](motion::Project& project) {
+        for (auto& each : project.assets) {
+            if (each != nullptr && each->id == asset->id) {
+                each = asset;
+            }
+        }
+        if (project.tracks.findById(newTextTrack) != nullptr) {
+            auto* track = project.tracks.changeById(newTextTrack);
+            track->name = stem.toStdString();
+            for (auto& clip : track->clips) {
+                clip.name = name.toStdString();
+            }
+        }
+    });
+    assetLibrary.refresh();
 }
 
 void MotionEditor::addDrawingSource() {

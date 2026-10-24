@@ -11,16 +11,18 @@
 // clip's Properties.
 class MotionTextSourceEditor final : public juce::Component {
 public:
-    MotionTextSourceEditor(const juce::String& initial, const juce::String& title, motion::TextSettings initialSettings, const juce::String& preparationError)
-        : settings(initialSettings), original(initial), originalSettings(initialSettings) {
+    // `creating`: a new text, in the project from its first letter (as a
+    // drawing is from its first stroke); Done ends the typing.
+    MotionTextSourceEditor(const juce::String& initial, const juce::String& title, motion::TextSettings initialSettings, const juce::String& preparationError, bool creating = false)
+        : settings(initialSettings), original(initial), originalSettings(initialSettings), creating(creating) {
         setName("Text editor");
         setWantsKeyboardFocus(true);
         cancelButton.setButtonText("Cancel");
         cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
-        doneButton.setName("Apply text");
-        doneButton.setTitle("Apply text");
-        doneButton.setButtonText("Apply");
-        doneButton.setTooltip("Apply the text (" + motion::style::shortcutText("Cmd+Return") + ")");
+        doneButton.setName(creating ? "Done" : "Apply text");
+        doneButton.setTitle(creating ? "Done" : "Apply text");
+        doneButton.setButtonText(creating ? "Done" : "Apply");
+        doneButton.setTooltip((creating ? "Finish the text (" : "Apply the text (") + motion::style::shortcutText("Cmd+Return") + ")");
         motion::style::makePrimary(doneButton);
         doneButton.onClick = [this] { finish(); };
         for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
@@ -100,6 +102,12 @@ public:
     std::function<void()> onCancel, onChanged;
     juce::String currentText() const { return text.getText(); }
     const motion::TextSettings& currentSettings() const { return settings; }
+    // The name the header shows (a new text's follows its first line).
+    void setSourceName(const juce::String& name) {
+        if (name == sourceName) { return; }
+        sourceName = name;
+        repaint();
+    }
     void focusText() { text.grabKeyboardFocus(); text.moveCaretToEnd(); }
 
 
@@ -145,7 +153,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".txt", "Editing", error.isNotEmpty());
+        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".txt", creating ? "New text" : "Editing", error.isNotEmpty());
         // The type bar and the foot are bands of the panel's surface.
         for (const auto& band : {bar, footer}) {
             g.setColour(osci::Colours::surface());
@@ -194,7 +202,8 @@ private:
         text.applyFontToAllText(settings.font(28));
         const auto content = text.getText();
         const auto tooLong = content.length() > 16384;
-        doneButton.setEnabled(content.trim().isNotEmpty() && !tooLong && (content != original || settings != originalSettings));
+        // A new text is in the project already: Done keeps whatever is there.
+        doneButton.setEnabled(content.trim().isNotEmpty() && !tooLong && (creating || content != original || settings != originalSettings));
         const auto message = tooLong ? juce::String("Maximum 16,384 characters") : error;
         status.setColour(juce::Label::textColourId, message.isNotEmpty() ? osci::Colours::danger() : osci::Colours::textMuted());
         status.setText(message.isNotEmpty() ? message : juce::String(content.length()) + (content.length() == 1 ? " character" : " characters"), juce::dontSendNotification);
@@ -217,6 +226,7 @@ private:
     motion::TextSettings settings;
     const juce::String original;
     const motion::TextSettings originalSettings;
+    const bool creating;
     juce::String error;
     juce::StringArray families;
     static constexpr int barInset = 2, footerHeight = 26;

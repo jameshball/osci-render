@@ -1200,7 +1200,8 @@ void MotionEditor::indexSettings() {
     entries.push_back({.id = "place:composition", .title = "Composition settings", .kind = Kind::place, .path = "Composition", .keywords = {"project settings", "format", "timing"},
         .run = acting([](MotionEditor& editor) { editor.goToForSearch(0, "the composition", {}); })});
     entries.push_back({.id = "setting:output", .title = "Output", .kind = Kind::setting, .path = "Status bar",
-        .keywords = {"routing", "channels", "device", "sound outputs", "beam outputs", "beam form", "xy mode", "xyz", "xyrgb", "z input", "laser", "speakers", "stereo"},
+        .keywords = {"routing", "channels", "device", "sound outputs", "beam outputs", "beam form", "xy mode", "xyz", "xyrgb", "z input", "laser", "speakers", "stereo",
+                      "flip x", "flip y", "invert", "invert x", "invert y", "swap x and y", "swap channels", "polarity", "upside down", "mirrored", "wiring"},
         .run = acting([](MotionEditor& editor) { editor.showOutputPanel(); })});
     entries.push_back({.id = "setting:tempo", .title = "Tempo", .kind = Kind::setting, .path = "Transport", .keywords = {"bpm", "beats per minute"},
         .run = acting([](MotionEditor& editor) { editor.tempoValue.showEditor(); }), .relevance = 6});
