@@ -149,7 +149,8 @@ public:
         auto words = juce::StringArray::fromTokens(query.toLowerCase().trim(), " \t", "");
         words.removeEmptyStrings();
         static const juce::StringArray filler {"a", "an", "the", "it", "its", "my", "this", "that", "to", "of", "on", "in", "into", "for", "with", "and",
-                                               "how", "do", "does", "i", "me", "can", "could", "please", "want", "make", "change", "is", "be", "get"};
+                                               "how", "do", "does", "i", "me", "can", "could", "please", "want", "make", "change", "is", "be", "get",
+                                               "where", "did", "whole", "thing", "things", "some", "go"};
         juce::StringArray meant;
         for (const auto& word : words) {
             if (!filler.contains(word)) {
@@ -382,8 +383,9 @@ private:
                 // video) than inside one ("star" in Start screen).
                 result.score += detail::isSeparator(title[whole.length()]) ? 40 : 15;
             } else if (count > 1 && prepared[index].keywords.contains(whole)) {
-                // Several words that are one of its keywords ("add music").
-                result.score += 40;
+                // Several words that are one of its keywords ("add music"):
+                // what they mean together outweighs where each word lands.
+                result.score += 120;
             }
             if (allInTitle) {
                 result.score += 20;
@@ -403,8 +405,10 @@ private:
             result.highlights.erase(std::unique(result.highlights.begin(), result.highlights.end()), result.highlights.end());
             results.push_back(std::move(result));
         }
-        // Ties keep the order entries were listed in (the menus' order).
+        // Ties keep the order entries were listed in (the menus' order); what
+        // can run comes before what can't, so Return on the first row acts.
         std::stable_sort(results.begin(), results.end(), [](const Result& a, const Result& b) { return a.score > b.score; });
+        std::stable_partition(results.begin(), results.end(), [](const Result& result) { return result.unavailable.isEmpty(); });
         // A few of each family, the best; the rest are counted.
         std::map<juce::String, int> shown;
         std::erase_if(results, [&](const Result& result) {
@@ -550,9 +554,12 @@ private:
         for (int index = 0; index < lower.keywords.size(); ++index) {
             const auto match = sensible(typed, entry.keywords[index], lower.keywords[index]);
             if (match.has_value()) {
-                // A keyword that is the word itself beats one it only starts.
+                // A keyword that is the word itself beats one it only starts,
+                // and one word of a phrase ("bigger" of "bigger text") counts
+                // for less.
                 const auto exactly = lower.keywords[index] == typed ? 10 : 0;
-                consider(match->score * 8 / 10 + exactly, false, {}, entry.keywords[index]);
+                const auto share = lower.keywords[index].containsChar(' ') ? 6 : 8;
+                consider(match->score * share / 10 + exactly, false, {}, entry.keywords[index]);
             }
             for (const auto& stem : word.stems) {
                 if (startsWord(stem, lower.keywords[index]).has_value()) {
@@ -573,12 +580,15 @@ private:
         }
         // Another word for it counts only as the start of a word, below the
         // word itself; the title isn't marked, as none of it was typed.
+        // Only a whole word of the title or a whole keyword: "turn" (for
+        // spin) isn't the start of "turn off".
         for (const auto& synonym : word.synonyms) {
-            if (startsWord(synonym, lower.title).has_value()) {
+            const auto inTitle = startsWord(synonym, lower.title);
+            if (inTitle.has_value() && wholeWord(*inTitle, lower.title)) {
                 consider(14 * synonym.length() * 6 / 10, false, {}, typed);
             }
             for (const auto& keyword : lower.keywords) {
-                if (startsWord(synonym, keyword).has_value()) {
+                if (keyword == synonym) {
                     consider(14 * synonym.length() * 5 / 10, false, {}, typed);
                 }
             }

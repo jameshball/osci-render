@@ -113,8 +113,19 @@ inline juce::StringArray menuKeywords(const juce::String& title) {
         {"Delete", {"delete clip", "delete track", "delete key", "remove"}},
         {"Duplicate", {"duplicate clip", "copy clip"}},
     };
-    if (title.startsWith("Export beam") || title.startsWith("Export sound")) {
-        return {"wav", "oscilloscope audio", "render audio"};
+    if (title.startsWith("Export beam")) {
+        // The five channels (and their brightness) are what a laser's DAC plays.
+        juce::StringArray words {"wav", "oscilloscope audio", "render audio"};
+        if (title.contains("XYRGB")) {
+            words.addArray({"laser", "ilda", "dac", "rgb laser"});
+        }
+        return words;
+    }
+    if (title.startsWith("Export sound")) {
+        return {"wav", "render audio", "soundtrack", "mixdown"};
+    }
+    if (title.startsWith("Keyframe ")) {
+        return {"add key", "set key", "keyframe", "key it"};
     }
     if (title.startsWith("Interface size")) {
         return {"zoom", "ui scale", "bigger text", "smaller text", "text size"};
@@ -170,7 +181,7 @@ inline juce::StringArray propertyKeywords(const juce::String& group) {
         {"Anchor", {"pivot", "origin", "centre"}},
         {"Colour", {"color", "hue", "tint", "rgb", "red", "green", "blue"}},
         {"Opacity", {"fade", "fade in", "fade out", "transparency", "transparent", "visible", "visibility", "alpha", "see through"}},
-        {"Beam share", {"beam time", "brightness", "weight", "dwell"}},
+        {"Beam share", {"beam time", "brightness", "weight", "dwell", "flicker"}},
         {"Lit by lights", {"lighting", "shading", "shade"}},
         {"Mirror", {"reflect", "reflection", "reflective"}},
         {"Solid", {"hidden lines", "hidden line removal", "occlusion", "filled", "opaque"}},

@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/search/SearchIndex.h"
+#include "../Source/motion/search/Vocabulary.h"
 
 class MotionSearchTest : public juce::UnitTest {
 public:
@@ -264,6 +265,39 @@ public:
             expect(!finds(index, "stop", "Move start to playhead"), "s-to-p: single letters past the third");
             expect(finds(index, "exvid", "Export video..."), "Runs of letters at word starts");
             expect(finds(index, "sap", "Split at playhead"), "Three initials");
+        }
+
+        beginTest("Golden queries, with the app's own words");
+        {
+            using motion::search::Kind;
+            namespace vocabulary = motion::search::vocabulary;
+            motion::search::Index index;
+            const auto add = [&index](juce::String title, Kind kind, juce::StringArray keywords, bool unavailable = false) {
+                index.entries.push_back(entry(title, kind, {}, keywords));
+                if (unavailable) {
+                    index.entries.back().unavailable = [] { return juce::String("Select a clip first"); };
+                }
+            };
+            add("Import source...", Kind::action, vocabulary::menuKeywords("Import source..."));
+            add("Add Audio loudness modulator", Kind::add, vocabulary::modulatorKeywords("Audio loudness"));
+            add("Add Saw modulator", Kind::add, vocabulary::modulatorKeywords("Saw"));
+            add("Rotation", Kind::property, vocabulary::propertyKeywords("Rotation"));
+            add("Mute Road", Kind::action, {"silence", "hide", "disable"});
+            add("Field of view", Kind::property, vocabulary::propertyKeywords("Field of view"));
+            add("Intensity", Kind::setting, vocabulary::scopeKeywords("Intensity"));
+            add("Glow", Kind::setting, vocabulary::scopeKeywords("Glow"));
+            add("Persistence", Kind::setting, vocabulary::scopeKeywords("Persistence"));
+            add("Export beam XYRGB (5 ch)...", Kind::action, vocabulary::menuKeywords("Export beam XYRGB (5 ch)..."));
+            add("Make it spin", Kind::action, {"spin", "rotate forever"}, true);
+            add("Keyframe rotation", Kind::action, vocabulary::menuKeywords("Keyframe rotation"));
+            expectEquals(first(index, "add music"), juce::String("Import source..."), "A phrase that is a keyword wins");
+            expectEquals(first(index, "spin"), juce::String("Rotation"), "What can run comes before what can't");
+            expect(!finds(index, "spin", "Mute Road"), "Turn (for spin) isn't the start of turn off");
+            expect(!finds(index, "spin", "Field of view"), "Nor is angle the end of wide angle");
+            expect(finds(index, "brighter", "Intensity") && finds(index, "brighter", "Glow"));
+            expectEquals(first(index, "longer trails"), juce::String("Persistence"));
+            expectEquals(first(index, "export for my laser"), juce::String("Export beam XYRGB (5 ch)..."));
+            expectEquals(first(index, "add keyframe"), juce::String("Keyframe rotation"));
         }
 
         beginTest("Synonyms expand from a typed start");
