@@ -403,7 +403,7 @@ public:
             motion::hidden::Dicer dicer;
             dicer.begin({});
             std::size_t pieces = 0;
-            const auto finished = dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), folded, [&](const auto&, const auto&, const auto&, bool) { ++pieces; });
+            const auto finished = dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), folded, [&](const auto&, const auto&, const auto&, bool) { ++pieces; }, [] { return false; });
             expect(finished && pieces > 0 && pieces <= 2 * motion::hidden::Dicer::budget, "a folded face is cut into a bounded number of pieces (" + juce::String(static_cast<juce::int64>(pieces)) + ")");
         }
 
