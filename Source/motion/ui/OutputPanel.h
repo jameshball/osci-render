@@ -426,7 +426,11 @@ private:
         flipX.setToggleState(routing.wiring.flipX, juce::dontSendNotification);
         flipY.setToggleState(routing.wiring.flipY, juce::dontSendNotification);
         swapXY.setToggleState(routing.wiring.swapXY, juce::dontSendNotification);
-        for (auto* chip : {&flipX, &flipY, &swapXY}) { chip->setEnabled(routing.beamOn()); }
+        // Dim while there's no beam to correct, as its caption is.
+        for (auto* chip : {&flipX, &flipY, &swapXY}) {
+            chip->setEnabled(routing.beamOn());
+            chip->setAlpha(routing.beamOn() ? 1.0f : .4f);
+        }
         wiringCaption.setAlpha(routing.beamOn() ? 1.0f : .4f);
         note.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         note.setText(error.isNotEmpty() ? error : moved.isNotEmpty() ? moved : explain(), juce::dontSendNotification);
