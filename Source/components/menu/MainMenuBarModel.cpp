@@ -276,7 +276,11 @@ void MainMenuBarModel::setMenuItemEnabled(int topLevelMenuIndex, const juce::Str
     }
 }
 
-void MainMenuBarModel::menuBarActivated(bool isActive) {}
+void MainMenuBarModel::menuBarActivated(bool isActive) {
+    if (onActivated) {
+        onActivated(isActive);
+    }
+}
 
 void MainMenuBarModel::resetMenuItems() {
     topLevelMenuNames.clear();

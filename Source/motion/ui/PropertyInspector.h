@@ -142,6 +142,8 @@ private:
     // away until asked for; shown only when opening it would show some.
     motion::style::Disclosure advanced {"Advanced settings", "Advanced", "Advanced"};
     bool advancedAvailable = false;
+    // Advanced rows not in play now, and what would bring them in.
+    std::map<std::string, juce::String> outOfPlay;
     // A row of those numbers (Mirror is no style, and always shows).
     static bool isAdvanced(const Row& row);
     // Puts the tiles in step with the target at `time`, and shows the
@@ -189,6 +191,22 @@ private:
 public:
     // Alt+Shift+P/R/S/T, as in After Effects: key a group at the playhead.
     bool toggleGroupKeys(const juce::String& group);
+    // A row Properties shows for its target, as search finds it: its group
+    // (Position), its fields' names (Position X...), the section it sits in,
+    // and whether it is folded under Advanced.
+    struct SearchableRow {
+        std::string property;
+        juce::String group, section;
+        juce::StringArray labels;
+        bool advanced = false;
+        // Why it isn't shown now (Noise phase while there is no noise).
+        juce::String unavailable;
+    };
+    std::vector<SearchableRow> searchableRows() const;
+    // Scrolls to the row holding `property` and marks it, opening Advanced
+    // first when it is folded there, with its first field taking the keys;
+    // false when no row shows it.
+    bool revealProperty(const std::string& property);
     // Whether what it shows has `group` (Position, Colour...) to key.
     bool showsGroup(const juce::String& group) const;
 private:

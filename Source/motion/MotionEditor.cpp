@@ -73,7 +73,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // Full screen, the transport is the only bar; it ends with the way out.
     scopeTransport.onExit = [this] { setScopeFullScreen(false); };
     addAndMakeVisible(outputButton);
-    addAndMakeVisible(outputLabel);
     addAndMakeVisible(loopButton);
     addAndMakeVisible(speedButton);
     speedButton.setWantsKeyboardFocus(false);
@@ -102,6 +101,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     setUpProperties();
     setUpTimeline();
     setUpGraph();
+    setUpSearch();
     processor.document.addChangeListener(this);
     auto* holder = juce::StandalonePluginHolder::getInstance();
     if (holder != nullptr) { holder->deviceManager.addChangeListener(this); }
@@ -173,7 +173,9 @@ void MotionEditor::setUpMenus() {
     // File is built when opened (it lists recent projects); the rest are
     // command lists.
     menus.addTopLevelMenu("File");
+    menus.onActivated = [this](bool active) { menusActivated(active); };
     menus.customMenuLogic = [this](juce::PopupMenu& menu, int index) {
+        if (!indexingMenus) { menuOpened(); }
         if (index == fileMenu) { buildFileMenu(menu); }
         if (index == timingMenuIndex) {
             menu = timingMenu();
@@ -236,6 +238,8 @@ void MotionEditor::setUpMenus() {
     menus.addTopLevelMenu("Timing");
     menus.addTopLevelMenu("Help");
     registerCommands();
+    // Search heads Help: what to try when something can't be found.
+    menus.addMenuItem(helpMenu, "Search...", [this] { openSearch(); }, motion::style::shortcutText("Cmd+F"));
     menus.addMenuItem(helpMenu, "Keyboard shortcuts...", [this] { showShortcuts(); }, motion::style::shortcutText("Cmd+/"));
     menus.addMenuSeparator(helpMenu);
     menus.addMenuItem(helpMenu, "About osci-motion", [this] {
@@ -288,10 +292,9 @@ void MotionEditor::setUpCompositionNavigation() {
 }
 
 void MotionEditor::setUpTransport() {
-    outputLabel.setText("Output", juce::dontSendNotification);
-    outputLabel.setFont(motion::style::caption());
-    outputLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-    outputLabel.setJustificationType(juce::Justification::centredRight);
+    // In the status bar, as wide as its routing says.
+    outputButton.setInStatusBar(true);
+    outputButton.onWidthChanged = [this] { resized(); };
     outputButton.setRouting(processor.getRouting(), outputDevice().outputs > 0);
     outputButton.onClick = [this] { showOutputPanel(); };
     playButton.setTooltip("Play / pause (Space)");
@@ -366,6 +369,10 @@ void MotionEditor::setUpTransport() {
 }
 
 MotionEditor::~MotionEditor() {
+    // Search's windows take this editor's look, which goes before them.
+    searchPopup.reset();
+    searchPopupClosing.reset();
+    searchNote.reset();
     // An open popover goes first: it may be a window of its own, styled by
     // this editor's look and calling back into it, and it deletes itself
     // only when dismissed.
@@ -488,6 +495,7 @@ void MotionEditor::setScopeFullScreen(bool value) {
 }
 
 void MotionEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
+    closeSearch();
     auto& shown = *overlay;
     shown.setControlLookAndFeel(&dialogStyle.look);
     CommonPluginEditor::showOverlay(std::move(overlay));
@@ -505,7 +513,9 @@ void MotionEditor::refreshUndo() {
     const auto history = motion::style::dot() + "right-click for history";
     undoButton.setTooltip((undo.isNotEmpty() ? "Undo " + undo : juce::String("Undo")) + undoKeys + (undoManager.canUndo() ? history : juce::String()));
     redoButton.setTooltip((redo.isNotEmpty() ? "Redo " + redo : juce::String("Redo")) + redoKeys + (undoManager.canRedo() ? history : juce::String()));
-    undoDescription.setText(undo.isNotEmpty() ? "Undo " + undo : juce::String(), juce::dontSendNotification);
+    // The slot always says something, so the bar's right end stays put.
+    undoDescription.setText(undo.isNotEmpty() ? "Undo " + undo : juce::String("Nothing to undo"), juce::dontSendNotification);
+    undoDescription.setColour(juce::Label::textColourId, undo.isNotEmpty() ? osci::Colours::textMuted() : osci::Colours::textSubtle());
     motion::style::tooltipWhenCut(undoDescription);
 }
 
@@ -717,6 +727,14 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
 }
 
 void MotionEditor::refreshFromDocument() {
+    // Search lists the project as it was when it opened: another project
+    // closes it; a change (an import finishing) lists it afresh.
+    if (searchPopup != nullptr && processor.document.generation() != searchIndexGeneration) {
+        closeSearch();
+    } else if (searchPopup != nullptr && processor.document.revision() != searchIndexRevision) {
+        buildSearchIndex();
+        refreshSearch();
+    }
     // A drawing belongs to the project it was started in.
     if (sceneEditor != nullptr && processor.document.generation() != sceneEditorGeneration) { closeSceneEditor(); }
     // So does an export waiting for its Lua sliders.
@@ -1268,7 +1286,8 @@ void MotionEditor::showOutputPanel() {
         auto* holder = juce::StandalonePluginHolder::getInstance();
         if (holder != nullptr) { holder->showAudioSettingsDialog(); }
     };
-    showPopover(std::move(panel), getLocalArea(&outputButton, outputButton.getLocalBounds()), Placement::below);
+    // Above its place in the status bar.
+    showPopover(std::move(panel), getLocalArea(&outputButton, outputButton.getLocalBounds()), Placement::best);
 }
 
 // The routing chosen last, when the same device is open: another (the

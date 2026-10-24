@@ -64,6 +64,8 @@ public:
         setTitle("Output");
         setTooltip("Where the project plays on your audio interface: its sound, and the beam for a real oscilloscope");
     }
+    // What it says changed, and with it how wide it wants to be.
+    std::function<void()> onWidthChanged;
     // With no device open nothing plays, whatever the routing.
     void setRouting(const motion::OutputRouting& value, bool deviceOpen = true) {
         if (value == routing && deviceOpen == open) { return; }
@@ -71,11 +73,29 @@ public:
         open = deviceOpen;
         setDescription(open ? motion::ui::output::summary(routing) : juce::String("No audio device"));
         repaint();
+        if (onWidthChanged) { onWidthChanged(); }
+    }
+    // In the status bar, by the rates: smaller, and naming itself, as it
+    // has no label beside it there.
+    void setInStatusBar(bool value) {
+        inStatusBar = value;
+        repaint();
+    }
+    // As wide as what it says (in the status bar).
+    int idealWidth() const {
+        using namespace motion::ui::output;
+        const auto font = motion::style::caption();
+        const auto width = [&](const juce::String& text) { return static_cast<int>(std::ceil(juce::TextLayout::getStringWidth(font, text))) + 2; };
+        int needed = 8 + width("Output") + 8 + 16;
+        if (!open || (!routing.soundOn() && !routing.beamOn())) { return needed + width(open ? "Nothing" : "No audio device"); }
+        if (routing.soundOn()) { needed += 12 + width("Sound " + range(routing.sound, 2)) + 10; }
+        if (routing.beamOn()) { needed += 12 + width(shortFormName(routing.beam) + " " + range(routing.beamFirst, routing.beamChannels())) + 10; }
+        return needed;
     }
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
         using namespace motion::ui::output;
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour(osci::Colours::surfaceRaised().brighter(down ? .08f : 0.0f));
+        g.setColour(inStatusBar ? (highlighted ? motion::style::restFill() : motion::style::hoverFill()) : osci::Colours::surfaceRaised().brighter(down ? .08f : 0.0f));
         g.fillRoundedRectangle(bounds, motion::style::radiusControl);
         if (highlighted || hasKeyboardFocus(true)) {
             g.setColour(hasKeyboardFocus(true) ? motion::style::accent().withAlpha(.8f) : osci::Colours::outlineSubtle().withAlpha(.8f));
@@ -84,7 +104,14 @@ public:
         // Each part after its own colour's dot, as the panel's outputs show
         // them; short of room, the sound's name goes (its dot says it).
         auto area = getLocalBounds().reduced(8, 0).withTrimmedRight(16);
-        g.setFont(motion::style::body());
+        g.setFont(inStatusBar ? motion::style::caption() : motion::style::body());
+        if (inStatusBar) {
+            const auto label = juce::String("Output");
+            // As quiet as the rates beside it.
+            g.setColour(osci::Colours::textSubtle());
+            g.drawText(label, area.removeFromLeft(static_cast<int>(std::ceil(juce::TextLayout::getStringWidth(g.getCurrentFont(), label))) + 2), juce::Justification::centredLeft, false);
+            area.removeFromLeft(8);
+        }
         const auto width = [&](const juce::String& text) { return static_cast<int>(std::ceil(juce::TextLayout::getStringWidth(g.getCurrentFont(), text))) + 2; };
         const auto beamText = shortFormName(routing.beam) + " " + range(routing.beamFirst, routing.beamChannels());
         auto soundText = "Sound " + range(routing.sound, 2);
@@ -101,7 +128,8 @@ public:
         if (open && routing.soundOn()) { part(soundColour(), soundText); }
         if (open && routing.beamOn()) { part(beamColour(), beamText); }
         if (!open || (!routing.soundOn() && !routing.beamOn())) {
-            g.setColour(osci::Colours::textMuted());
+            // Nothing plays: said plainly, in red where it is easy to miss.
+            g.setColour(inStatusBar ? motion::style::error() : osci::Colours::textMuted());
             g.drawText(open ? "Nothing" : "No audio device", area, juce::Justification::centredLeft, true);
         }
         const auto centre = juce::Point<float>(static_cast<float>(getWidth()) - 12.0f, static_cast<float>(getHeight()) * .5f);
@@ -115,7 +143,7 @@ public:
 
 private:
     motion::OutputRouting routing {motion::OutputRouting::off, motion::OutputMode::soundtrack, 0};
-    bool open = false;
+    bool open = false, inStatusBar = false;
 };
 
 // Where the project plays: its sound on a pair of the interface's outputs,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SearchEverywhere.h"
+
 #include "MotionStyle.h"
 #include "DocumentMenu.h"
 #include "FormControls.h"
@@ -21,6 +23,8 @@ public:
 
     std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition, onReplace, onEditDrawing;
     std::function<void()> onCancelImport;
+    // A search here that found nothing, searched across everything.
+    std::function<void(const juce::String&)> onSearchEverywhere;
     std::function<void(motion::Id)> onBake;
     // The source (or composition) selected, or 0.
     motion::Id chosen() const { return validRow(list.getSelectedRow()) ? assetId(list.getSelectedRow()) : 0; }
@@ -144,6 +148,7 @@ private:
     juce::ListBox list;
     osci::ListBoxScrollFades fades {list};
     juce::TextEditor search, rename;
+    motion::ui::SearchEverywhereButton searchEverywhere;
     motion::Id renaming = 0;
     juce::Label status;
     juce::TextButton cancelImport;

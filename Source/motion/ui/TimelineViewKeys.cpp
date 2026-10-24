@@ -232,13 +232,16 @@ void MotionTimelineView::showKeyMenu() {
     menu.addItem(std::move(remove));
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this](int result) {
         if (result == 10) { deleteSelectedKeys(); return; }
-        const auto shape = static_cast<motion::Interpolation>(result - 1);
-        const auto keys = selectedKeys;
-        processor.document.tryEdit("Change key interpolation", [&](motion::Project& project) {
-            // Keys on locked tracks keep theirs; the others change.
-            std::vector<KeyRef> open;
-            std::copy_if(keys.begin(), keys.end(), std::back_inserter(open), [&project](const auto& key) { return !keysLocked(project, std::array {key}); });
-            return changeKeys(project, open, [shape](motion::Curve& curve, const KeyRef& key) { return motion::keyedit::setInterpolation(curve, key.time, shape); });
-        });
+        setSelectedInterpolation(static_cast<motion::Interpolation>(result - 1));
+    });
+}
+
+bool MotionTimelineView::setSelectedInterpolation(motion::Interpolation shape) {
+    const auto keys = selectedKeys;
+    return processor.document.tryEdit("Change key interpolation", [&](motion::Project& project) {
+        // Keys on locked tracks keep theirs; the others change.
+        std::vector<KeyRef> open;
+        std::copy_if(keys.begin(), keys.end(), std::back_inserter(open), [&project](const auto& key) { return !keysLocked(project, std::array {key}); });
+        return changeKeys(project, open, [shape](motion::Curve& curve, const KeyRef& key) { return motion::keyedit::setInterpolation(curve, key.time, shape); });
     });
 }

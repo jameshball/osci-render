@@ -338,8 +338,9 @@ void MotionModulatorLibrary::setKind(std::size_t index) {
     });
 }
 
-void MotionModulatorLibrary::add() {
+void MotionModulatorLibrary::add(motion::ModulationWaveform waveform) {
     motion::Modulator modulator;
+    modulator.shape.waveform = waveform;
     const auto base = motion::ui::modulatorKindName(modulator).toStdString();
     const auto& existing = processor.document.project().modulators;
     for (int number = 1;; ++number) {

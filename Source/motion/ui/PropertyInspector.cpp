@@ -738,6 +738,7 @@ double MotionPropertyInspector::baseValue(const motion::PropertyTarget& found, s
 
 bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, double time) {
     bool changed = false;
+    outOfPlay.clear();
     const auto wasAvailable = advancedAvailable;
     advancedAvailable = false;
     const auto& project = processor.document.project();
@@ -765,6 +766,9 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         // Hatching's rows only while it hatches, or is keyed or driven to.
         const auto hatched = amount > 0 || moves != motion::ui::TileGrid::Moves::no;
         advancedAvailable = hatched;
+        for (const auto& row : rows) {
+            if (!hatched && row->section == "Shading" && !row->fields.empty()) { outOfPlay[std::string(row->fields.front()->spec.id)] = "Choose Hatching in Shading first"; }
+        }
         const auto shown = hatched && advanced.getToggleState();
         for (auto& row : rows) {
             if (row->section != "Shading" || row->isVisible() == shown) { continue; }
@@ -804,6 +808,7 @@ bool MotionPropertyInspector::refreshTiles(const motion::PropertyTarget& found, 
         const auto style = property == "solid" || std::any_of(surfaceStyles.begin(), surfaceStyles.end(), [&](const auto& candidate) { return candidate.property == property; });
         const auto inPlay = style || (property == "fillDetail" ? patterned : noiseMotion ? live("noise") || valueOf(property) != 0 : live(property));
         if (isAdvanced(*row)) { advancedAvailable = advancedAvailable || inPlay; }
+        if (isAdvanced(*row) && !inPlay) { outOfPlay[std::string(property)] = noiseMotion ? "Turn on Noise first" : "Turn on a pattern first"; }
         const auto shown = !isAdvanced(*row) || (inPlay && advanced.getToggleState());
         if (row->isVisible() != shown) {
             row->setVisible(shown);
@@ -1039,6 +1044,38 @@ void MotionPropertyInspector::commitValue(const std::string& property, double va
     processor.document.editCoalesced(label, "property:" + juce::String(target) + ":" + juce::String(property), [&](motion::Project& project) { applyEdit(project, property, value, time); });
     if (onPropertySelected) { onPropertySelected(target, property); }
     if (onKeyTimeEdited) { onKeyTimeEdited(); }
+}
+
+std::vector<MotionPropertyInspector::SearchableRow> MotionPropertyInspector::searchableRows() const {
+    std::vector<SearchableRow> found;
+    for (const auto& row : rows) {
+        if (row->fields.empty()) { continue; }
+        SearchableRow made {std::string(row->fields.front()->spec.id), row->group, row->section, {}, isAdvanced(*row), {}};
+        const auto out = outOfPlay.find(made.property);
+        if (out != outOfPlay.end()) { made.unavailable = out->second; }
+        for (const auto& field : row->fields) { made.labels.addIfNotAlreadyThere(juce::String(field->spec.label.data(), field->spec.label.size())); }
+        // Folded under Advanced, or there only while in use.
+        if (row->isVisible() || made.advanced) { found.push_back(std::move(made)); }
+    }
+    return found;
+}
+
+bool MotionPropertyInspector::revealProperty(const std::string& property) {
+    const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) {
+        return std::any_of(row->fields.begin(), row->fields.end(), [&](const auto& field) { return field->spec.id == property; });
+    });
+    if (found == rows.end()) { return false; }
+    auto& row = **found;
+    if (isAdvanced(row) && !advanced.getToggleState()) { advanced.setToggleState(true, juce::sendNotification); }
+    if (!row.isVisible()) { return false; }
+    osci::RevealOptions options;
+    options.align = osci::RevealOptions::Align::centre;
+    juce::Component::SafePointer<juce::Component> first(&row.fields.front()->editor);
+    options.onArrived = [first] {
+        if (first != nullptr && first->isShowing()) { first->grabKeyboardFocus(); }
+    };
+    reveal(row, std::move(options));
+    return true;
 }
 
 bool MotionPropertyInspector::showsGroup(const juce::String& group) const {

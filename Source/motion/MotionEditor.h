@@ -32,6 +32,7 @@
 #include "ui/OutputPanel.h"
 #include "ui/CompositionPanel.h"
 #include "ui/ScopeTransport.h"
+#include "ui/SearchBox.h"
 #include <deque>
 #include <variant>
 
@@ -111,6 +112,8 @@ private:
     void setUpProperties();
     void setUpTimeline();
     void setUpGraph();
+    // What Add source offers, each item adding its own; shown under its button.
+    juce::PopupMenu addSourceMenu();
     void showAddSourceMenu();
     bool openSourceFile(const juce::File& file) override;
 #if OSCI_PREMIUM
@@ -368,7 +371,7 @@ private:
     void saveLayout();
     // The panel holding keyboard focus is outlined, so it is clear where
     // shortcuts go.
-    void globalFocusChanged(juce::Component*) override { repaint(); }
+    void globalFocusChanged(juce::Component* focused) override;
     juce::Rectangle<int> focusedPanel() const;
     void splitAtPlayhead();
     // Whether the selected clip is under the playhead, to split there.
@@ -377,6 +380,74 @@ private:
     bool clipSelected() const;
     void placeClipAtPlayhead(bool start, bool trim);
     void showShortcuts();
+    // Search: a field in the top bar (Cmd+F) that finds every action,
+    // setting and property, with a list under it of what matches.
+    motion::ui::SearchField searchField;
+    std::unique_ptr<motion::ui::SearchPopup> searchPopup;
+    // A list closed by a click, kept a moment so a second click lands on it
+    // rather than on what was under it.
+    std::unique_ptr<motion::ui::SearchPopup> searchPopupClosing;
+    motion::search::Index searchIndex;
+    // While the menus are built to be searched, not opened.
+    bool indexingMenus = false;
+    // A refresh waiting for the typing to pause.
+    bool searchRefreshPending = false;
+    juce::String searchedText;
+    void setUpSearch();
+    // Focuses the field (with `query`, if given) and lists what matches.
+    void openSearch(const juce::String& query = {});
+    // `byMouse`: a click chose; the list stays a moment to catch a double-click.
+    void closeSearch(bool byMouse = false);
+    void refreshSearch();
+    void runSearchResult(const motion::search::Result& result, bool byMouse = false);
+    // Why search can't act now (a sheet, the start screen, an editor over
+    // the Scene), or empty.
+    juce::String searchBlocked();
+    // Menus held open one after another, as when looking for something:
+    // once a session (and only the first few times ever, until search has
+    // been used), a note by the field points to search once the menu closes.
+    void menuOpened();
+    void menusActivated(bool active);
+    std::vector<double> menuOpenings, menusLookedIn;
+    bool searchHintShown = false;
+    // The last component other than search's own to have the keys, to give
+    // them back when search closes.
+    juce::Component::SafePointer<juce::Component> lastWorkFocus;
+    void restoreFocusAfterSearch();
+    void buildSearchIndex();
+    // The project and its state the index was built from.
+    std::uint64_t searchIndexGeneration = 0, searchIndexRevision = 0;
+    // The parts of the index: the menus, what can be added, the selection's
+    // own, the settings, the project's objects, tools and places, goals.
+    void indexMenus();
+    void indexAdding();
+    void indexSelection();
+    void indexSettings();
+    void indexObjects();
+    void indexTools();
+    void indexGoals();
+    // A menu's items, and its submenus', as entries found under `path`;
+    // `choose` runs an item that has an id rather than an action;
+    // `ticked` says whether an item (by id) is ticked now; `unavailable`:
+    // why a greyed submenu holding them is greyed.
+    void addMenuEntries(const juce::PopupMenu& menu, const juce::String& path, std::function<void(int)> choose, std::function<bool(int)> ticked, const juce::String& unavailable = {});
+    // Whether the item `id` of menu `index` is ticked as the menu stands.
+    bool menuItemTicked(int index, int id);
+    // Says what came of a result by the field, with a way to act on it.
+    std::unique_ptr<motion::ui::SearchNote> searchNote;
+    // Notes said so far, so a note after a run knows whether the run said its own.
+    int searchNotesSaid = 0;
+    // Commands whose keys a note has taught this session.
+    juce::StringArray searchTaught;
+    void sayAfterSearch(const juce::String& text, const juce::String& actionLabel = {}, std::function<void()> act = {});
+    // Selects `target` (unless it is selected) and then does `then`; when that
+    // changed the selection, says it shows `what`, with a way back.
+    void goToForSearch(motion::Id target, const juce::String& what, std::function<void(MotionEditor&)> then);
+    // Shows `property` of the selection in Properties, or says it can't.
+    void revealForSearch(const std::string& property, const juce::String& what);
+    // What is selected, by name, and what browsing suggests for it.
+    juce::String selectedSearchName;
+    juce::StringArray suggestedSearchIds;
     // The start screen: recent projects and the examples, as pictures, and
     // the ways to begin. Shown as osci-motion opens unless turned off.
     void showStartScreen();
@@ -469,7 +540,10 @@ private:
     // On an XY-only scope in a lit scene, offers to shade by hatching.
     void offerHatchingForXY();
     // The Scene's right-click menu: framing, views along an axis, keys.
+    // `forSearch`: also what needs a selection, greyed without one.
+    juce::PopupMenu sceneMenu(bool forSearch = false);
     void showSceneMenu();
+    void sceneMenuChosen(int result);
 
     juce::TextButton importButton { "Add source" };
     motion::icons::Button playButton { "Play", motion::icons::Icon::play };
@@ -526,7 +600,6 @@ private:
     motion::Id soundtrackClip() const;
     void detectTempo();
     void tap();
-    juce::Label outputLabel;
     MotionOutputButton outputButton;
     juce::Component::SafePointer<MotionOutputPanel> outputPanel;
     // The device the routing is for.
@@ -592,6 +665,8 @@ private:
     osci::PanelHeader inspectorHeader;
     osci::PanelHeader timelineHeader { "Timeline" };
     juce::Rectangle<int> libraryBounds, viewportBounds, inspectorBounds, timelineBounds;
+    // Between the menus and the transport.
+    juce::Rectangle<int> menuRule;
     // Last, so it stops before anything it moves goes.
     juce::VBlankAttachment displaySync { this, [this] { displayFrame(); } };
 };

@@ -85,6 +85,11 @@ public:
     std::function<void(double, double, std::optional<double>)> onEditTempo;
     // The tempo change at (or nearest a beat to) `seconds`, as the ruler's menu edits it.
     void editTempoAt(double seconds) { editTempoChange(seconds); }
+    // The editing tools (V, S, R, B) and the Add track button, as search uses them.
+    enum class Tool { move, slip, stretch, ripple };
+    void setTool(Tool next);
+    Tool currentTool() const { return tool; }
+    void addNewTrack() { addTrack.triggerClick(); }
     // A point on the ruler at `seconds` for a popover to aim at, kept within
     // the visible lanes.
     juce::Rectangle<int> rulerAnchor(double seconds) const;
@@ -207,6 +212,8 @@ public:
         scrollY = 0;
     }
     bool easeSelectedKeys(bool in, bool out);
+    // The selected keys' interpolation (those on locked tracks keep theirs).
+    bool setSelectedInterpolation(motion::Interpolation shape);
 
 private:
     double pixelsPerSecond = 70;
@@ -557,7 +564,6 @@ private:
     // track by its header, or a group; 0 for nothing.
     motion::Id effectOwnerAt(juce::Point<int> position) const;
     void insertEffect(const std::string& type, juce::Point<int> position);
-    enum class Tool { move, slip, stretch, ripple };
     enum class Mode { move, left, right, slip, stretch, rippleLeft, rippleRight };
 
     // Right-clicking empty track space offers what people look for first.
@@ -701,7 +707,6 @@ private:
     // puts that back, and letting go records one undo step.
     motion::ui::PreviewGesture edit {processor.document};
     Tool tool = Tool::move;
-    void setTool(Tool next);
     void updateToolButtons();
     struct ClipDrag {
         motion::Clip original;

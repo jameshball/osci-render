@@ -435,6 +435,8 @@
             resource="0" file="Source/motion/MotionEditorExport.cpp"/>
       <FILE id="MotMotionEditorLayoutcpp" name="MotionEditorLayout.cpp" compile="1"
             resource="0" file="Source/motion/MotionEditorLayout.cpp"/>
+      <FILE id="MotMotionEditorSearchcpp" name="MotionEditorSearch.cpp" compile="1"
+            resource="0" file="Source/motion/MotionEditorSearch.cpp"/>
       <FILE id="MotMotionEditorPanelscpp" name="MotionEditorPanels.cpp" compile="1"
             resource="0" file="Source/motion/MotionEditorPanels.cpp"/>
       <FILE id="MotMotionEditorSourcescpp" name="MotionEditorSources.cpp"
@@ -657,6 +659,8 @@
               file="Source/motion/search/FuzzyMatch.h"/>
         <FILE id="MotsearchSearchIndexh" name="SearchIndex.h" compile="0"
               resource="0" file="Source/motion/search/SearchIndex.h"/>
+        <FILE id="MotsearchVocabularyh" name="Vocabulary.h" compile="0" resource="0"
+              file="Source/motion/search/Vocabulary.h"/>
         <FILE id="MotsearchSynonymsh" name="Synonyms.h" compile="0" resource="0"
               file="Source/motion/search/Synonyms.h"/>
       </GROUP>
@@ -761,6 +765,10 @@
         <FILE id="MotuiScrubFieldh" name="ScrubField.h" compile="0" resource="0"
               file="Source/motion/ui/ScrubField.h"/>
         <FILE id="MotuiSheeth" name="Sheet.h" compile="0" resource="0" file="Source/motion/ui/Sheet.h"/>
+        <FILE id="MotuiSearchBoxh" name="SearchBox.h" compile="0" resource="0"
+              file="Source/motion/ui/SearchBox.h"/>
+        <FILE id="MotuiSearchEverywhereh" name="SearchEverywhere.h" compile="0"
+              resource="0" file="Source/motion/ui/SearchEverywhere.h"/>
         <FILE id="MotuiShortcutsOverlayh" name="ShortcutsOverlay.h" compile="0"
               resource="0" file="Source/motion/ui/ShortcutsOverlay.h"/>
         <FILE id="MotuiStartScreenh" name="StartScreen.h" compile="0" resource="0"

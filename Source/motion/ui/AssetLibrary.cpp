@@ -1,4 +1,5 @@
 #include "AssetLibrary.h"
+#include "../search/SearchIndex.h"
 #include "../../parser/FileFormatRegistry.h"
 #include "SourcePreview.h"
 #include "GeneratorIcons.h"
@@ -37,6 +38,13 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     motion::style::styleField(search);
     search.onTextChange = [this] { refresh(); };
     search.onEscapeKey = [this] { search.clear(); refresh(); };
+    search.onReturnKey = [this] {
+        if (searchEverywhere.isVisible() && onSearchEverywhere) { onSearchEverywhere(search.getText().trim()); }
+    };
+    searchEverywhere.onClick = [this] {
+        if (onSearchEverywhere) { onSearchEverywhere(search.getText().trim()); }
+    };
+    addChildComponent(searchEverywhere);
     addAndMakeVisible(search);
     rename.setName("Rename source");
     rename.setFont(motion::style::body());
@@ -69,10 +77,11 @@ void MotionAssetLibrary::refresh() {
     assets.clear();
     definitions.clear();
     for (const auto& asset : document.project().assets) {
-        if (asset != nullptr && (filter.isEmpty() || asset->name.containsIgnoreCase(filter))) { assets.push_back(asset); }
+        // Matched as search matches: another word for it, or a near miss.
+        if (asset != nullptr && (filter.isEmpty() || motion::search::Index::matches(filter, asset->name))) { assets.push_back(asset); }
     }
     for (const auto& definition : document.mainProject().definitions) {
-        if (definition != nullptr && (filter.isEmpty() || juce::String(definition->name).containsIgnoreCase(filter))) { definitions.push_back(definition); }
+        if (definition != nullptr && (filter.isEmpty() || motion::search::Index::matches(filter, juce::String(definition->name)))) { definitions.push_back(definition); }
     }
     std::erase_if(thumbnails, [&](const Thumbnail& thumbnail) {
         return std::none_of(document.project().assets.begin(), document.project().assets.end(), [&](const auto& asset) { return asset != nullptr && asset->source == thumbnail.source; });
@@ -80,6 +89,13 @@ void MotionAssetLibrary::refresh() {
     list.updateContent();
     list.deselectAllRows();
     selectAsset(selectedId);
+    // Nothing here: search the rest.
+    const auto nothing = filter.isNotEmpty() && assets.empty() && definitions.empty();
+    searchEverywhere.setQuery(filter);
+    if (nothing != searchEverywhere.isVisible()) {
+        searchEverywhere.setVisible(nothing);
+        resized();
+    }
     repaint();
 }
 
@@ -161,6 +177,9 @@ void MotionAssetLibrary::resized() {
     const auto statusHeight = status.getText().isEmpty() && importStatus.isEmpty() ? 0 : live ? 48 : 52;
     status.setBounds(area.removeFromBottom(statusHeight).reduced(6, statusHeight > 0 ? 4 : 0));
     list.setBounds(area);
+    // Under the words saying nothing matches.
+    const auto width = searchEverywhere.idealWidth(area.getWidth() - 16);
+    searchEverywhere.setBounds(area.withSizeKeepingCentre(width, motion::style::controlHeight).translated(0, 22));
     placeEdit();
 }
 
@@ -225,7 +244,7 @@ void MotionAssetLibrary::paint(juce::Graphics& graphics) {
     }
     graphics.setColour(osci::Colours::text().withAlpha(0.6f));
     graphics.setFont(motion::style::body());
-    graphics.drawFittedText("No sources match " + juce::String::fromUTF8("\xe2\x80\x9c") + filter + juce::String::fromUTF8("\xe2\x80\x9d"), list.getBounds().reduced(12), juce::Justification::centred, 3);
+    graphics.drawFittedText("No sources match " + juce::String::fromUTF8("\xe2\x80\x9c") + filter + juce::String::fromUTF8("\xe2\x80\x9d"), list.getBounds().reduced(12).translated(0, -16), juce::Justification::centred, 3);
 }
 
 void MotionAssetLibrary::selectedRowsChanged(int row) {

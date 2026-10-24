@@ -54,6 +54,7 @@ public:
         // Automation finds the controls by their names, which say whose they
         // are by id; read out, they say it by the track's name.
         const juce::String label(track.name);
+        name.setName("Track name " + juce::String(id));
         disclosure.setName(group ? "Fold group " + juce::String(id) : "Key lanes " + juce::String(id));
         disclosure.setTitle(group ? "Fold " + label : "Key lanes of " + label);
         disclosure.setTooltip(group ? juce::String() : "Show or hide key lanes");

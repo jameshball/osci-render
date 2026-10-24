@@ -841,6 +841,7 @@ void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition, s
 
 template <typename Editor>
 Editor& MotionEditor::openSceneEditor(std::unique_ptr<Editor> editor) {
+    closeSearch();
     auto& opened = *editor;
     sceneEditor = std::move(editor);
     sceneEditorGeneration = processor.document.generation();

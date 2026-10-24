@@ -60,6 +60,8 @@ public:
     void itemDropped(const SourceDetails& details) override;
     // Adds an effect of `type` at insertion point `index` (or last).
     void addEffect(const std::string& type, int index = -1);
+    // What an added effect goes on: none for a camera, the Scope or audio.
+    std::optional<motion::Id> effectOwner() const { return owner; }
 
 private:
     static constexpr int chipHeight = 22, dropZoneHeight = 36;

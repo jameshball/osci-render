@@ -201,6 +201,8 @@ void MotionEditor::setUpLibrary() {
     };
     // Double-clicking an effect adds it to what Properties shows.
     effectLibrary.onInsert = [this](const std::string& type) { effectStack.addEffect(type); };
+    effectLibrary.onSearchEverywhere = [this](const juce::String& query) { openSearch(query); };
+    assetLibrary.onSearchEverywhere = [this](const juce::String& query) { openSearch(query); };
     importButton.onClick = [this] { showAddSourceMenu(); };
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
     assetLibrary.onEditDrawing = [this](motion::Id id) { showDrawingEditor(id); };
@@ -252,29 +254,38 @@ void MotionEditor::setUpLibrary() {
 }
 
 // The Add source menu, under its button.
-void MotionEditor::showAddSourceMenu() {
+juce::PopupMenu MotionEditor::addSourceMenu() {
     namespace icons = motion::ui::menu_icons;
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    // Each item does its own adding, so search runs the same items.
+    const auto acting = [owner](std::function<void(MotionEditor&)> act) {
+        return [owner, act = std::move(act)] {
+            if (owner != nullptr) { act(*owner); }
+        };
+    };
     juce::PopupMenu menu;
-    const auto item = [](int id, const juce::String& text, juce::Path glyph) {
+    const auto item = [&acting](int id, const juce::String& text, juce::Path glyph, std::function<void(MotionEditor&)> act) {
         juce::PopupMenu::Item result(text);
         result.itemID = id;
         result.image = icons::stroked(std::move(glyph), icons::ink());
+        result.action = acting(std::move(act));
         return result;
     };
     // A generator, with its picture: in Generate by category, and in Light.
-    const auto generatorItem = [](std::size_t index) {
+    const auto generatorItem = [&acting](std::size_t index) {
         const auto& definition = motion::generatorDefinitions[index];
         juce::PopupMenu::Item result(juce::String(definition.name.data(), definition.name.size()));
         result.itemID = AddMenuId::firstGenerator + static_cast<int>(index);
         result.image = motion::ui::generatorIcon(definition, icons::ink());
+        result.action = acting([index](MotionEditor& editor) { editor.addGenerator(motion::generatorDefinitions[index]); });
         return result;
     };
     // In groups: a file, one drawn or written here, one osci-motion makes,
     // and one from elsewhere (another app, or an example).
-    menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder()));
+    menu.addItem(item(AddMenuId::importFile, "Import source...", icons::glyph::folder(), [](MotionEditor& editor) { editor.chooseSourceFile(); }));
     menu.addSeparator();
-    menu.addItem(item(AddMenuId::drawing, "Draw a shape...", icons::glyph::pencil()));
-    menu.addItem(item(AddMenuId::newScript, "Write a script...", icons::glyph::braces()));
+    menu.addItem(item(AddMenuId::drawing, "Draw a shape...", icons::glyph::pencil(), [](MotionEditor& editor) { editor.showDrawingEditor(0); }));
+    menu.addItem(item(AddMenuId::newScript, "Write a script...", icons::glyph::braces(), [](MotionEditor& editor) { editor.newScript(); }));
     menu.addSeparator();
     // Sources made from a few numbers, by category, each with its picture.
     juce::PopupMenu generate;
@@ -297,6 +308,7 @@ void MotionEditor::showAddSourceMenu() {
         juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
         entry.itemID = AddMenuId::firstLightPreset + static_cast<int>(index);
         entry.image = icons::unit(motion::ui::pictures::lightPresetPicture(motion::lightPresets[index]), icons::ink());
+        entry.action = acting([index](MotionEditor& editor) { editor.addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[index]); });
         lights.addItem(std::move(entry));
     }
     menu.addSubMenu("Light", lights, true, icons::stroked(icons::glyph::bulb(), icons::ink()));
@@ -308,18 +320,19 @@ void MotionEditor::showAddSourceMenu() {
         entry.itemID = AddMenuId::firstMirror + static_cast<int>(index);
         // Pictured as the Add a mirror panel pictures them.
         entry.image = icons::unit(motion::ui::pictures::ofMirror(preset).lines, icons::ink());
+        entry.action = acting([index](MotionEditor& editor) { editor.addMirror(motion::mirrorPresets[index]); });
         mirrors.addItem(std::move(entry));
     }
     menu.addSubMenu("Mirror", mirrors, true, icons::unit(motion::ui::pictures::mirrorBall().lines, icons::ink()));
     menu.addSeparator();
     // Live: what other apps send, drawn as it arrives, never prepared ahead.
     juce::PopupMenu live;
-    live.addItem(item(AddMenuId::blenderSource, "Blender...", icons::glyph::live()));
-    const auto senders = motion::LiveTextureController::senders();
+    live.addItem(item(AddMenuId::blenderSource, "Blender...", icons::glyph::live(), [](MotionEditor& editor) { editor.showBlenderSettings(); }));
     if (motion::LiveTextureController::available()) {
+        const auto senders = motion::LiveTextureController::senders();
         live.addSectionHeader(motion::texture::technology());
         for (std::size_t index = 0; index < senders.size(); ++index) {
-            live.addItem(item(AddMenuId::firstTexture + static_cast<int>(index), senders[index].describe(), icons::glyph::screen()));
+            live.addItem(item(AddMenuId::firstTexture + static_cast<int>(index), senders[index].describe(), icons::glyph::screen(), [sender = senders[index]](MotionEditor& editor) { editor.addTextureSource(sender); }));
         }
         if (senders.empty()) {
             juce::PopupMenu::Item none("No app is sharing a picture");
@@ -331,46 +344,29 @@ void MotionEditor::showAddSourceMenu() {
     // The examples that ship with osci-motion, by kind, each pictured as
     // it draws (a blank space until its picture is made).
     juce::PopupMenu examples;
-    std::vector<juce::String> resources;
+    int exampleId = AddMenuId::firstExample;
     const std::array<juce::Path, motion::ui::exampleKinds.size()> kindGlyphs {icons::glyph::cube(), icons::glyph::braces(), icons::glyph::play(), icons::glyph::tree(), icons::glyph::letter()};
     for (std::size_t kindIndex = 0; kindIndex < motion::ui::exampleKinds.size(); ++kindIndex) {
         const auto& exampleKind = motion::ui::exampleKinds[kindIndex];
         juce::PopupMenu kind;
         for (const auto& resource : motion::ui::examples::resources(exampleKind.extension)) {
-            resources.push_back(resource);
             juce::PopupMenu::Item entry(motion::ui::examples::displayName(resource));
-            entry.itemID = AddMenuId::firstExample + static_cast<int>(resources.size()) - 1;
-            const auto picture = examplePictures.picture(resources.back());
+            entry.itemID = exampleId++;
+            const auto picture = examplePictures.picture(resource);
             entry.image = picture.has_value() ? icons::picture(*picture) : icons::blank();
+            entry.action = acting([resource](MotionEditor& editor) { editor.importExample(resource); });
             kind.addItem(std::move(entry));
         }
         if (kind.getNumItems() > 0) { examples.addSubMenu(exampleKind.title, kind, true, icons::stroked(kindGlyphs[kindIndex], icons::ink())); }
     }
     menu.addSubMenu("Examples", examples, true, icons::stroked(icons::glyph::book(), icons::ink()));
-    const juce::Component::SafePointer<MotionEditor> owner(this);
+    return menu;
+}
+
+void MotionEditor::showAddSourceMenu() {
+    auto menu = addSourceMenu();
     menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner, resources, senders](int choice) {
-        if (owner == nullptr) { return; }
-        // Which of a list's items was chosen, if one was.
-        const auto chosen = [choice](int first, std::size_t count) -> std::optional<std::size_t> {
-            if (choice < first || choice - first >= static_cast<int>(count)) { return std::nullopt; }
-            return static_cast<std::size_t>(choice - first);
-        };
-        if (choice == AddMenuId::importFile) { owner->chooseSourceFile(); }
-        if (choice == AddMenuId::blenderSource) { owner->showBlenderSettings(); }
-        if (choice == AddMenuId::drawing) { owner->showDrawingEditor(0); }
-        if (choice == AddMenuId::newScript) { owner->newScript(); }
-        const auto generator = chosen(AddMenuId::firstGenerator, motion::generatorDefinitions.size());
-        const auto lightPreset = chosen(AddMenuId::firstLightPreset, motion::lightPresets.size());
-        const auto mirror = chosen(AddMenuId::firstMirror, motion::mirrorPresets.size());
-        const auto example = chosen(AddMenuId::firstExample, resources.size());
-        const auto sender = chosen(AddMenuId::firstTexture, senders.size());
-        if (sender.has_value()) { owner->addTextureSource(senders[*sender]); }
-        if (generator.has_value()) { owner->addGenerator(motion::generatorDefinitions[*generator]); }
-        if (lightPreset.has_value()) { owner->addGenerator(motion::generatorNamed("pointLight"), motion::lightPresets[*lightPreset]); }
-        if (mirror.has_value()) { owner->addMirror(motion::mirrorPresets[*mirror]); }
-        if (example.has_value()) { owner->importExample(resources[*example]); }
-    });
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton));
 }
 
 void MotionEditor::setUpProperties() {

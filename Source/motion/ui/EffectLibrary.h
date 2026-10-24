@@ -2,6 +2,9 @@
 
 #include "MotionStyle.h"
 #include "LibraryCard.h"
+#include "SearchEverywhere.h"
+#include "../search/SearchIndex.h"
+#include "../search/Vocabulary.h"
 
 #include "../model/Effects.h"
 #include "../render/PreparedEffects.h"
@@ -17,6 +20,11 @@ public:
             content.addAndMakeVisible(*tile);
             tiles.push_back(std::move(tile));
             names.add(juce::String(definition.name.data(), definition.name.size()));
+            juce::StringArray words;
+            for (const auto& parameter : definition.parameters) { words.add(juce::String(parameter.name.data(), parameter.name.size())); }
+            // The names it goes by elsewhere, as search knows them.
+            words.addArray(motion::search::vocabulary::effectAliases(juce::String(definition.id.data(), definition.id.size())));
+            keywords.push_back(words);
         }
         // The same search field as Sources'.
         search.setName("Search effects");
@@ -25,12 +33,21 @@ public:
         motion::style::styleField(search);
         search.onTextChange = [this] { resized(); };
         search.onEscapeKey = [this] { search.clear(); resized(); };
+        search.onReturnKey = [this] {
+            if (searchEverywhere.isVisible() && onSearchEverywhere) { onSearchEverywhere(search.getText().trim()); }
+        };
         addAndMakeVisible(search);
+        searchEverywhere.onClick = [this] {
+            if (onSearchEverywhere) { onSearchEverywhere(search.getText().trim()); }
+        };
+        addChildComponent(searchEverywhere);
         viewport.setViewedComponent(&content, false);
         motion::style::fadeScrolling(viewport);
         addAndMakeVisible(viewport);
     }
     std::function<void(const std::string&)> onInsert;
+    // A search here that found nothing, searched across everything.
+    std::function<void(const juce::String&)> onSearchEverywhere;
     void resized() override {
         // The search sits in the top slot every library tab shares, where
         // Add source and Add modulator sit in theirs; the rows line up with
@@ -45,13 +62,26 @@ public:
         int y = 0;
         for (std::size_t index = 0; index < tiles.size(); ++index) {
             auto& tile = tiles[index];
-            const auto shown = query.isEmpty() || names[static_cast<int>(index)].containsIgnoreCase(query);
+            // Matched as search matches: by its settings too, another word for it, or a near miss.
+            const auto shown = query.isEmpty() || motion::search::Index::matches(query, names[static_cast<int>(index)], keywords[index]);
             tile->setVisible(shown);
             if (!shown) { continue; }
             tile->setBounds(juce::Rectangle<int>(0, y, width, motion::ui::LibraryCard::pitch).reduced(4, motion::style::gap / 2));
             y += motion::ui::LibraryCard::pitch;
         }
         content.setSize(width, y);
+        // Nothing here: say so, and offer to search the rest.
+        searchEverywhere.setVisible(y == 0 && query.isNotEmpty());
+        searchEverywhere.setQuery(query);
+        const auto room = viewport.getBounds().withHeight(80);
+        searchEverywhere.setBounds(room.withSizeKeepingCentre(searchEverywhere.idealWidth(room.getWidth() - 16), motion::style::controlHeight).translated(0, 14));
+        repaint();
+    }
+    void paint(juce::Graphics& g) override {
+        if (!searchEverywhere.isVisible()) { return; }
+        g.setColour(osci::Colours::text().withAlpha(.6f));
+        g.setFont(motion::style::body());
+        g.drawFittedText("No effects match " + juce::String::fromUTF8("\xe2\x80\x9c") + search.getText().trim() + juce::String::fromUTF8("\xe2\x80\x9d"), viewport.getBounds().withHeight(40).reduced(12, 0), juce::Justification::centred, 2);
     }
 
 private:
@@ -154,5 +184,7 @@ private:
     juce::Component content;
     std::vector<std::unique_ptr<Tile>> tiles;
     juce::StringArray names;
+    std::vector<juce::StringArray> keywords;
     juce::TextEditor search;
+    motion::ui::SearchEverywhereButton searchEverywhere;
 };

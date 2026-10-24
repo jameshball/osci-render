@@ -119,6 +119,11 @@ public:
     }
 
     void refresh();
+    // Adds a modulator of a kind (a sine unless asked), selected and named for it.
+    void add(motion::ModulationWaveform waveform = motion::ModulationWaveform::sine);
+    // Its kinds as the shape buttons name them.
+    struct Kind { const char* name; motion::ModulationWaveform waveform; };
+    static const std::array<Kind, 7>& kinds();
 
     void resized() override;
     void paint(juce::Graphics& g) override { g.fillAll(osci::Colours::surface()); }
@@ -149,12 +154,9 @@ private:
         motion::style::Fade fade {*this};
     };
     const motion::Modulator* current() const;
-    struct Kind { const char* name; motion::ModulationWaveform waveform; };
-    static const std::array<Kind, 7>& kinds();
     static std::size_t kindIndex(const motion::Modulator& modulator);
     // Changing the kind renames a modulator that still has its default name.
     void setKind(std::size_t index);
-    void add();
     void change(const std::function<void(motion::Modulator&)>& update);
     void bind(motion::ui::LabelledScrub& row, std::function<void(motion::Modulator&, double)> apply);
     void report(const juce::Result& result) {

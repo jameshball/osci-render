@@ -259,6 +259,10 @@ void MotionEditor::registerCommands() {
     addCommand(keyOnly, "Import source...", juce::KeyPress('i', command, 0), "Cmd+I", [this] { chooseSourceFile(); });
     // In Help; its key is listed with File's.
     addCommand(keyOnly, "Keyboard shortcuts", juce::KeyPress('/', command, 0), "Cmd+/", [this] { showShortcuts(); });
+    // Search, and the keys a code editor uses for its command palette.
+    addCommand(keyOnly, "Search", juce::KeyPress('f', command, 0), "Cmd+F", [this] { openSearch(); });
+    addCommand(keyOnly, "Search", juce::KeyPress('p', command | juce::ModifierKeys::shiftModifier, 0), {}, [this] { openSearch(); });
+    addCommand(keyOnly, "Search", juce::KeyPress(juce::KeyPress::F3Key), {}, [this] { openSearch(); });
 }
 
 void MotionEditor::copySelection(bool cut) {
@@ -313,7 +317,7 @@ void MotionEditor::stepFrames(int frames) {
 
 // Right-clicking the Scene: framing, views along an axis, picking parts and
 // keying the selection.
-void MotionEditor::showSceneMenu() {
+juce::PopupMenu MotionEditor::sceneMenu(bool forSearch) {
     const std::array<std::pair<const char*, const char*>, 6> views {{{"Front", "1"}, {"Right", "3"}, {"Top", "7"}, {"Back", "Ctrl+1"}, {"Left", "Ctrl+3"}, {"Bottom", "Ctrl+7"}}};
     const std::array<std::pair<const char*, const char*>, 5> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key colour", "Alt+Shift+C"}, {"Key opacity", "Alt+Shift+T"}}};
     juce::PopupMenu menu;
@@ -331,33 +335,43 @@ void MotionEditor::showSceneMenu() {
     menu.addItem(motion::style::menuItem(composition.drivenCamera() != 0 ? "Stop looking through camera" : "Look through camera", 51, {}));
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Pick parts", 40, "Tab"));
-    if (selection != 0) {
+    // What acts on the selection; search finds it greyed without one (the
+    // Clip menu has the keys).
+    if (selection != 0 || forSearch) {
         menu.addSeparator();
-        for (std::size_t index = 0; index < keys.size(); ++index) { menu.addItem(motion::style::menuItem(keys[index].first, 20 + static_cast<int>(index), keys[index].second)); }
-        menu.addSeparator();
-        menu.addItem(motion::style::menuItem("Centre anchor", 41, {}));
-        menu.addItem(motion::style::menuItem("Show in timeline", 30, {}));
+        if (!forSearch) {
+            for (std::size_t index = 0; index < keys.size(); ++index) { menu.addItem(motion::style::menuItem(keys[index].first, 20 + static_cast<int>(index), keys[index].second)); }
+            menu.addSeparator();
+        }
+        menu.addItem(motion::style::menuItem("Centre anchor", 41, {}).setEnabled(selection != 0));
+        menu.addItem(motion::style::menuItem("Show in timeline", 30, {}).setEnabled(selection != 0));
     }
+    return menu;
+}
+
+void MotionEditor::showSceneMenu() {
     const auto options = juce::PopupMenu::Options().withTargetComponent(composition).withMousePosition();
-    motion::ui::showDocumentMenu(menu, *this, processor.document, options, [this](int result) {
-        using Preset = MotionCompositionView::ViewPreset;
-        const std::array<Preset, 6> presets {Preset::front, Preset::right, Preset::top, Preset::back, Preset::left, Preset::bottom};
-        if (result >= 1 && result <= 6) { composition.setViewPreset(presets[static_cast<std::size_t>(result - 1)]); }
-        if (result == 7) { composition.frameSelection(); }
-        if (result == 8) { composition.resetView(); }
-        const std::array<const char*, 5> groups {"Position", "Rotation", "Scale", "Colour", "Opacity"};
-        if (result >= 20 && result < 25 && !propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
-            statusBar.show("The selection has no such property to key.", MotionStatusBar::Kind::notice);
-        }
-        if (result == 30) { timelineTabs.setSelectedIndex(0); timeline.revealSelection(); }
-        if (result == 40) { composition.setPartMode(true); }
-        if (result == 50) { addCamera(processor.position.load(), true); }
-        if (result == 51) { setLookingThrough(composition.drivenCamera() == 0); }
-        if (result == 41) {
-            const auto problem = composition.centreAnchor(selection);
-            if (problem.isNotEmpty()) { statusBar.show(problem); }
-        }
-    });
+    motion::ui::showDocumentMenu(sceneMenu(), *this, processor.document, options, [this](int result) { sceneMenuChosen(result); });
+}
+
+void MotionEditor::sceneMenuChosen(int result) {
+    using Preset = MotionCompositionView::ViewPreset;
+    const std::array<Preset, 6> presets {Preset::front, Preset::right, Preset::top, Preset::back, Preset::left, Preset::bottom};
+    if (result >= 1 && result <= 6) { composition.setViewPreset(presets[static_cast<std::size_t>(result - 1)]); }
+    if (result == 7) { composition.frameSelection(); }
+    if (result == 8) { composition.resetView(); }
+    const std::array<const char*, 5> groups {"Position", "Rotation", "Scale", "Colour", "Opacity"};
+    if (result >= 20 && result < 25 && !propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
+        statusBar.show("The selection has no such property to key.", MotionStatusBar::Kind::notice);
+    }
+    if (result == 30) { timelineTabs.setSelectedIndex(0); timeline.revealSelection(); }
+    if (result == 40) { composition.setPartMode(true); }
+    if (result == 50) { addCamera(processor.position.load(), true); }
+    if (result == 51) { setLookingThrough(composition.drivenCamera() == 0); }
+    if (result == 41) {
+        const auto problem = composition.centreAnchor(selection);
+        if (problem.isNotEmpty()) { statusBar.show(problem); }
+    }
 }
 
 void MotionEditor::togglePlayback() {
@@ -664,6 +678,7 @@ juce::String edited(juce::Time time) {
 }
 
 void MotionEditor::showStartScreen() {
+    closeSearch();
     if (startScreenOverlay != nullptr) {
         return;
     }

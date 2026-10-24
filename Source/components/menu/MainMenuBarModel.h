@@ -44,12 +44,14 @@ public:
     std::function<bool(int, int)> customMenuSelectedLogic;
     // Like customMenuLogic, but adds to the menu after its registered items.
     std::function<void(juce::PopupMenu&, int)> customMenuAfterLogic;
+    // The menu bar opening a menu (true) and closing again (false).
+    std::function<void(bool)> onActivated;
 
 private:
     juce::StringArray getMenuBarNames() override;
     juce::PopupMenu getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) override;
     void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
-    void menuBarActivated(bool isActive);
+    void menuBarActivated(bool isActive) override;
 
     struct MenuItem
     {

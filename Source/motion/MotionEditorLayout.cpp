@@ -31,47 +31,39 @@ void MotionEditor::resized() {
     constexpr auto gutter = osci::PanelHeader::panelGap;
     auto area = getLocalBounds().reduced(3);
     auto top = area.removeFromTop(30);
-    // Menus keep their natural width; the transport follows them.
+    // Menus keep their natural width; the transport follows them, past a
+    // rule, then search fills the rest of the row up to undo and redo.
     int menuWidth = 0;
     const auto names = static_cast<juce::MenuBarModel&>(menus).getMenuBarNames();
     for (int index = 0; index < names.size(); ++index) { menuWidth += menuBar.getLookAndFeel().getMenuBarItemWidth(menuBar, index, names[index]); }
-    // Narrow windows keep the Output picker: the undo description shortens first.
-    // Without room for the whole description only the buttons stay; a clipped
-    // description would wrap onto two lines.
-    const auto spare = top.getWidth() - menuWidth - 16 - 390 - 12 - (46 + 160) - 8;
-    const auto wide = spare >= 200;
+    // The step undo would take back, written out only where there is room to
+    // spare (its tooltip has it otherwise), in a slot that never moves search.
+    const auto described = getWidth() >= 1680;
     {
-        auto undo = top.removeFromRight(wide ? 200 : 56);
+        auto undo = top.removeFromRight(described ? 56 + 180 : 56);
         redoButton.setBounds(undo.removeFromRight(28).reduced(1, 3));
         undoButton.setBounds(undo.removeFromRight(28).reduced(1, 3));
-        undoDescription.setVisible(wide);
+        undoDescription.setVisible(described);
         // One line, shortened at its end when long (its tooltip has it whole).
         const auto line = undo.withTrimmedRight(4);
         undoDescription.setBounds(line.withSizeKeepingCentre(line.getWidth(), 16));
         motion::style::tooltipWhenCut(undoDescription);
     }
-    top.removeFromRight(8);
-    // Transport sits centred in the menu row, leaving the full height below
-    // for the workspace.
-    // The transport goes compact (a tighter readout) before the Output
-    // picker would have to hide.
-    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 424 ? 424 : 378;
-    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, transportWidth), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - transportWidth / 2));
-    // What the audio interface plays sits with the other audio state (the
-    // DSP meter), not in the Scope. It is the only way to the Output panel.
+    top.removeFromRight(12);
+    constexpr int transportGap = 24, searchGap = 24, widestSearch = 640, narrowestSearch = 280;
+    // The transport goes compact (a tighter readout) before search would be
+    // too narrow to say what it is for.
+    const auto fullTransport = top.getWidth() - menuWidth - transportGap - 424 - searchGap >= narrowestSearch;
+    auto transport = top.withTrimmedLeft(menuWidth + transportGap).withWidth(fullTransport ? 424 : 378);
+    menuRule = juce::Rectangle<int>(top.getX() + menuWidth + transportGap / 2, top.getCentreY() - 8, 1, 16);
+    // Search: its right edge by undo, as wide as there is room up to a
+    // readable width; a wider window leaves the room after the transport.
     {
-        // Narrower windows drop the label, then shrink the picker, which
-        // hides only below 100 px, less than the minimum window leaves it.
-        auto output = top.withLeft(transport.getRight() + 12);
-        const auto labelled = output.getWidth() >= 46 + 160;
-        const auto pickerWidth = labelled ? 160 : std::min(160, output.getWidth());
-        outputLabel.setVisible(labelled);
-        outputButton.setVisible(pickerWidth >= 100);
-        output = output.removeFromRight(pickerWidth + (labelled ? 46 : 0));
-        if (labelled) { outputLabel.setBounds(output.removeFromLeft(46).withTrimmedRight(6)); }
-        outputButton.setBounds(output.reduced(0, 4));
+        auto room = top.withLeft(transport.getRight() + searchGap);
+        const auto width = std::min(room.getWidth(), widestSearch);
+        searchField.setBounds(room.removeFromRight(width).withSizeKeepingCentre(width, motion::style::controlHeight));
     }
-    menuBar.setBounds(top.withRight(transport.getX()));
+    menuBar.setBounds(top.withWidth(menuWidth));
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     playButton.setBounds(transport.removeFromLeft(32).reduced(1, 3));
     endButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
@@ -89,7 +81,12 @@ void MotionEditor::resized() {
     tempoValue.setBounds(transport.removeFromLeft(64).reduced(0, 4));
     tapButton.setBounds(transport.removeFromLeft(38).reduced(1, 4));
     area.removeFromTop(gutter);
-    statusBar.setBounds(area.removeFromBottom(20));
+    auto statusArea = area.removeFromBottom(20);
+    // Where the project plays, in the status bar beside its rates: routing
+    // set once, and the audio state it belongs with.
+    outputButton.setBounds(statusArea.removeFromRight(std::min(outputButton.idealWidth(), 260)).reduced(0, 1));
+    statusArea.removeFromRight(8);
+    statusBar.setBounds(statusArea);
     layoutAlert();
     area.removeFromBottom(2);
     workspaceHeight = area.getHeight();
@@ -267,6 +264,8 @@ void MotionEditor::paint(juce::Graphics& graphics) {
     for (const auto& panel : {libraryBounds, viewportBounds, inspectorBounds, timelineBounds}) {
         motion::style::fillPanel(graphics, panel);
     }
+    graphics.setColour(motion::style::hairline());
+    graphics.fillRect(menuRule);
 }
 
 // The column fills the side, the selected key above Routing; it scrolls
