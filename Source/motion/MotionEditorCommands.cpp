@@ -108,12 +108,20 @@ void MotionEditor::registerCommands() {
     addCommand(editMenu, "Copy", juce::KeyPress('c', command, 0), "Cmd+C", [this] { copySelection(false); });
     addCommand(editMenu, "Paste", juce::KeyPress('v', command, 0), "Cmd+V", [this] { pasteClipboard(); });
     addCommand(editMenu, "Delete", juce::KeyPress(), "Delete", [this] {
-        if (graphShown()) { curveEditor.deleteSelected(); } else { timeline.deleteSelection(); }
+        if (graphShown()) {
+            curveEditor.deleteSelected();
+        } else if (selectionIsCamera() && !timeline.hasSelectedKeys()) {
+            const auto removed = processor.document.removeCamera(selection);
+            if (removed.failed()) { statusBar.show(removed.getErrorMessage()); }
+        } else {
+            timeline.deleteSelection();
+        }
     });
     // Cut, Copy and Delete act on what the shown editor has selected: the
     // Graph's keys, or the timeline's keys or clips. Paste needs a copy.
     const auto anySelection = [this] { return graphShown() ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
-    for (const auto* name : {"Cut", "Copy", "Delete"}) { menus.setMenuItemEnabled(editMenu, name, anySelection); }
+    for (const auto* name : {"Cut", "Copy"}) { menus.setMenuItemEnabled(editMenu, name, anySelection); }
+    menus.setMenuItemEnabled(editMenu, "Delete", [this, anySelection] { return anySelection() || (!graphShown() && (timeline.hasPickedRows() || selectionIsCamera())); });
     menus.setMenuItemEnabled(editMenu, "Paste", [this] { return !std::holds_alternative<std::monostate>(clipboard); });
     menus.addMenuSeparator(editMenu);
     addCommand(editMenu, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] {
@@ -152,7 +160,7 @@ void MotionEditor::registerCommands() {
     for (const auto& [letter, group, name] : keyed) {
         const juce::String groupName(group);
         addCommand(clipMenu, name, juce::KeyPress(letter, alt | shift, 0), "Alt+Shift+" + juce::String::charToString(letter).toUpperCase(), [this, groupName] {
-            if (!propertyInspector.toggleGroupKeys(groupName)) { statusBar.show("Select a clip or camera with " + groupName.toLowerCase() + " to key it."); }
+            if (!propertyInspector.toggleGroupKeys(groupName)) { statusBar.show("Select a clip or camera with " + groupName.toLowerCase() + " to key it.", MotionStatusBar::Kind::warning); }
         }, groupName);
         menus.setMenuItemEnabled(clipMenu, groupName, [this, groupName] { return propertyInspector.showsGroup(groupName); });
     }
@@ -318,6 +326,10 @@ void MotionEditor::showSceneMenu() {
     }
     menu.addSubMenu("View from", from);
     menu.addSeparator();
+    // Cameras are placed where the Scene looks from, and looked through to move them as the view moves.
+    menu.addItem(motion::style::menuItem("Add camera from this view", 50, {}));
+    menu.addItem(motion::style::menuItem(composition.drivenCamera() != 0 ? "Stop looking through camera" : "Look through camera", 51, {}));
+    menu.addSeparator();
     menu.addItem(motion::style::menuItem("Pick parts", 40, "Tab"));
     if (selection != 0) {
         menu.addSeparator();
@@ -339,6 +351,8 @@ void MotionEditor::showSceneMenu() {
         }
         if (result == 30) { timelineTabs.setSelectedIndex(0); timeline.revealSelection(); }
         if (result == 40) { composition.setPartMode(true); }
+        if (result == 50) { addCamera(processor.position.load(), true); }
+        if (result == 51) { setLookingThrough(composition.drivenCamera() == 0); }
         if (result == 41) {
             const auto problem = composition.centreAnchor(selection);
             if (problem.isNotEmpty()) { statusBar.show(problem); }
@@ -548,7 +562,7 @@ void MotionEditor::placeClipAtPlayhead(bool start, bool trim) {
         }
     }
     if (timings.empty()) {
-        if (skipped > 0) { statusBar.show(trim ? "The playhead is outside the selected clips." : "The selected clips can't start before 0."); }
+        if (skipped > 0) { statusBar.show(trim ? "The playhead is outside the selected clips." : "The selected clips can't start before 0.", MotionStatusBar::Kind::warning); }
         return;
     }
     const auto result = processor.document.setClipTimings(timings);
@@ -627,7 +641,7 @@ void MotionEditor::showShortcuts() {
         {"F / Shift+F", "Frame all curves / this curve"}, {"Right-click a key", "Interpolation and easing"}, {"Drag the time axis", "Scrub"},
         {"Alt+arrows", "Nudge the selected keys"}, {"Alt+Shift+arrows", "Nudge them further"}, {"Right-click a curve's name", "Show or hide curves"}}});
     sections.push_back({"Scene", {{"G / R / S", "Move, rotate and scale tools"}, {"Y", "Anchor tool"}, {"Tab", "Pick parts"}, {"E", "Extract the picked parts"}, {"F", "Frame the selection"}, {"0", "Reset the view"},
-        {"Click again", "Select what is behind"}, {"1 / 3 / 7", "Front, right and top views"}, {"Ctrl+1 / 3 / 7", "Back, left and bottom views"}, {"N", "Fly through the scene"}, {"P", "Show the motion path"},
+        {"Click again", "Select what is behind"}, {"1 / 3 / 7", "Front, right and top views"}, {"Ctrl+1 / 3 / 7", "Back, left and bottom views"}, {"N", "Free look: look with the mouse, move with the keys"}, {"Double-click a camera", "Look through it, in the Scene or the Cameras row (Esc to stop)"}, {"P", "Show the motion path"},
         {"Two fingers / wheel", "Orbit / zoom"}, {"Shift + two fingers", "Pan"}, {"Alt+drag", "Orbit with the mouse"}}});
     sections.push_back({"Navigation", {{"Wheel / two fingers", "Pan the timeline or graph"}, {"Shift+wheel", "Pan sideways"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
         {"Alt+wheel", "Track height, value range or key height"}, {"Middle-drag", "Grab and move the view"}}});
@@ -657,7 +671,7 @@ void MotionEditor::showStartScreen() {
     std::vector<motion::ui::StartCard> recents, examples;
     for (int index = 0; index < processor.getNumRecentProjectFiles(); ++index) {
         const auto file = processor.getRecentProjectFile(index);
-        // The project open now is Continue's, not one to switch to.
+        // The project open now has its own card, first.
         if (!file.existsAsFile() || file == current) {
             continue;
         }
@@ -682,15 +696,21 @@ void MotionEditor::showStartScreen() {
         card.picture = summary.picture;
         examples.push_back(std::move(card));
     }
-    // Carrying on is offered when there is something to carry on with.
+    // Carrying on is offered when there is something to carry on with: the
+    // project open now, in a card of its own before the recent ones.
     const auto& project = processor.document.mainProject();
     const auto anything = std::any_of(project.tracks.begin(), project.tracks.end(), [](const motion::Track& track) { return !track.clips.empty(); });
-    juce::String continuing;
     if (anything) {
+        motion::ui::StartCard card;
         // An unsaved one by its own name, such as the example it came from.
         const auto named = juce::String(project.name).trim();
-        continuing = current.existsAsFile() ? current.getFileNameWithoutExtension() : named.isNotEmpty() ? named : juce::String("Untitled project");
-        if (processor.document.unsaved()) { continuing << motion::style::dot() << "edited"; }
+        card.name = current.existsAsFile() ? current.getFileNameWithoutExtension() : named.isNotEmpty() ? named : juce::String("Untitled project");
+        card.detail = processor.document.unsaved() ? juce::String("Edited, not saved yet") : project.description.isNotEmpty() ? project.description : juce::String("Carry on where you were");
+        card.file = current;
+        // The Scope's latest frame, or before one is drawn the session's.
+        card.picture = recentFrame.isValid() ? recentFrame : juce::ImageFileFormat::loadFrom(processor.picture.getData(), processor.picture.getSize());
+        card.open = true;
+        recents.insert(recents.begin(), std::move(card));
     }
     const juce::Component::SafePointer<MotionEditor> owner(this);
     motion::ui::StartScreen::Actions actions;
@@ -710,7 +730,7 @@ void MotionEditor::showStartScreen() {
         }
     };
     const auto atStartup = processor.globalSettings.getBool("showStartScreen", true);
-    auto screen = std::make_unique<motion::ui::StartScreen>(std::move(recents), std::move(examples), continuing, atStartup, juce::String("Version ") + JucePlugin_VersionString, std::move(actions));
+    auto screen = std::make_unique<motion::ui::StartScreen>(std::move(recents), std::move(examples), atStartup, juce::String("Version ") + JucePlugin_VersionString, std::move(actions));
     startScreen = screen.get();
     startScreenOverlay = motion::ui::StartScreen::show(*this, std::move(screen));
 }
@@ -750,7 +770,7 @@ bool MotionEditor::restoreAtLaunch() {
     juce::MemoryBlock session;
     if (left.existsAsFile() && left.loadFileAsData(session) && session.getSize() > 0) {
         processor.setStateInformation(session.getData(), static_cast<int>(session.getSize()));
-        statusBar.show("Reopened your work from " + left.getLastModificationTime().formatted("%H:%M") + ", after osci-motion closed unexpectedly. Save it to keep it.", MotionStatusBar::Kind::notice);
+        statusBar.show("Reopened your work from " + left.getLastModificationTime().formatted("%H:%M") + ", after osci-motion closed unexpectedly. Save it to keep it.", MotionStatusBar::Kind::warning);
     }
     recoveredState = {processor.document.generation(), processor.document.revision(), processor.document.unsaved()};
     return !osci::isJucewrightAutomationLaunch() && processor.globalSettings.getBool("showStartScreen", true);

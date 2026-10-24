@@ -223,12 +223,32 @@ std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id 
     return std::nullopt;
 }
 
-// The gizmo for whatever is selected: a clip, or a group, which moves all
-// it holds.
+// A camera's: its position in its group's space (cameras run on project
+// time), turned as an object is; it has no size or anchor.
+template <typename ProjectType>
+std::optional<EulerGizmoFrame> gizmoFrameForCamera(const ProjectType& project, Id cameraId, double projectTime) {
+    const auto camera = std::find_if(project.cameras.begin(), project.cameras.end(), [cameraId](const auto& item) { return item.id == cameraId; });
+    if (camera == project.cameras.end() || !std::isfinite(projectTime)) { return std::nullopt; }
+    const auto own = transform_detail::evaluate(camera->properties, projectTime);
+    if (!own.has_value()) { return std::nullopt; }
+    TransformFrame frame;
+    frame.worldOrigin = own->position;
+    if (!frame.addGroups(project, camera->parent, projectTime)) { return std::nullopt; }
+    return EulerGizmoFrame { frame, own->rotation, { 1, 1, 1 }, {} };
+}
+
+// The gizmo for whatever is selected: a clip, a camera, or a group, which
+// moves all it holds.
 template <typename ProjectType>
 std::optional<EulerGizmoFrame> gizmoFrameFor(const ProjectType& project, Id id, double projectTime) {
     const auto* group = findGroup(project, id);
-    if (group == nullptr) { return gizmoFrameForClip(project, id, projectTime); }
+    if (group == nullptr) {
+        if constexpr (requires { project.cameras; }) {
+            const auto camera = gizmoFrameForCamera(project, id, projectTime);
+            if (camera.has_value()) { return camera; }
+        }
+        return gizmoFrameForClip(project, id, projectTime);
+    }
     const auto parent = groupTransformFrame(project, id, projectTime);
     const auto transform = transform_detail::evaluate(group->properties, projectTime);
     if (!parent.has_value() || !transform.has_value()) { return std::nullopt; }

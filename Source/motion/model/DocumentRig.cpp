@@ -101,7 +101,7 @@ juce::Result Document::removeCut(Id cut) {
     return removed ? juce::Result::ok() : juce::Result::fail("The cut no longer exists.");
 }
 
-juce::Result Document::addCamera(double time, Id& cameraId) {
+juce::Result Document::addCamera(double time, Id& cameraId, const PropertyMap& pose) {
     const auto& current = project();
     if (!std::isfinite(time) || time < 0 || time > current.duration) { return juce::Result::fail("Add cameras inside the composition."); }
     Camera camera;
@@ -120,6 +120,10 @@ juce::Result Document::addCamera(double time, Id& cameraId) {
         camera.target = showing->target;
         camera.parent = showing->parent;
     }
+    if (!pose.empty()) {
+        camera.target = camera.parent = 0;
+        for (const auto& [name, curve] : pose) { camera.properties[name] = curve; }
+    }
     for (int number = static_cast<int>(current.cameras.size()) + 1;; ++number) {
         camera.name = "Camera " + std::to_string(number);
         const auto taken = std::any_of(current.cameras.begin(), current.cameras.end(), [&camera](const auto& item) { return item.name == camera.name; });
@@ -135,6 +139,9 @@ juce::Result Document::addCamera(double time, Id& cameraId) {
 }
 
 juce::Result Document::removeCamera(Id camera) {
+    // The last camera stays, so the Scene always shows what the Scope frames.
+    const auto& cameras = project().cameras;
+    if (cameras.size() == 1 && cameras.front().id == camera) { return juce::Result::fail("A project keeps one camera: move it, or change its lens."); }
     const auto removed = tryEdit("Delete camera", [camera](Project& updated) {
         const auto before = updated.cameras.size();
         std::erase_if(updated.cameras, [camera](const auto& item) { return item.id == camera; });

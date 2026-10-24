@@ -92,27 +92,24 @@ public:
     }
 
     void testMarkers() {
-        beginTest("The beam's base frequency is the frame rate times whole cycles, Auto reaching 45 Hz, and it is saved");
+        beginTest("The beam's frequency is the Scope's own, keyed like any property, and it is saved");
         {
-            expectEquals(motion::beamCycleRate(24), 48.0);
-            expectEquals(motion::beamCycleRate(60), 60.0);
-            expectEquals(motion::beamCycleRate(24, 1), 24.0);
-            expectEquals(motion::beamCycleRate(24, 3), 72.0);
-            expectEquals(motion::beamCycleRate(0, 3), 60.0);
             juce::UndoManager undo;
             motion::Document document(undo);
-            document.edit("Change beam frequency", [](motion::Project& project) { project.beamCycles = 3; });
+            expectEquals(document.mainProject().beam.frequencyAt(0), 60.0);
+            document.edit("Change frequency", [](motion::Project& project) {
+                project.beam.properties["frequency"].setKey({0, 90, motion::Interpolation::linear});
+                project.beam.properties["frequency"].setKey({2, 180, motion::Interpolation::linear});
+            });
             juce::UndoManager loadedUndo;
             motion::Document loaded(loadedUndo);
             expect(loaded.load(document.save()).wasOk());
-            expectEquals(loaded.mainProject().beamCycles, 3);
-            expectEquals(motion::PreparedComposition(loaded.mainProject()).beamRate, 180.0);
-            auto wild = document.save();
-            wild.setAttribute("beamCycles", 99);
-            expect(opensLeavingOut(loaded, wild), "a beam frequency no setting makes is reset to Auto");
-            expectEquals(loaded.mainProject().beamCycles, 0);
+            expectWithinAbsoluteError(loaded.mainProject().beam.frequencyAt(1), 135.0, 1.0e-9);
+            const motion::PreparedComposition prepared(loaded.mainProject());
+            expect(!prepared.steadyBeamRate);
+            expectWithinAbsoluteError(prepared.beamRateAt(2), 180.0, 1.0e-9);
             expect(undo.undo());
-            expectEquals(document.mainProject().beamCycles, 0);
+            expectEquals(document.mainProject().beam.frequencyAt(1), 60.0);
         }
 
         beginTest("Markers support scoped editing, undo, persistence and independent composition copies");
@@ -1248,8 +1245,8 @@ private:
             value.id = routeId++; value.modulator = lfo.id; value.target = target; value.property = property; value.amount = amount;
             project.routes.push_back(value);
         };
-        auto clipEffect = motion::makeEffect(900, *motion::effectDefinition("translate"));
-        clipEffect.properties["translateX"] = motion::Curve(0);
+        auto clipEffect = motion::makeEffect(900, *motion::effectDefinition("skew"));
+        clipEffect.properties["skewX"] = motion::Curve(0);
         clip.effects.push_back(clipEffect);
         auto trackEffect = clipEffect;
         trackEffect.id = 901;
@@ -1268,7 +1265,7 @@ private:
         camera.id = 905;
         project.cameras.push_back(camera);
         route(clip.id, "position.x");
-        for (const auto effect : {900, 901, 903, 904}) { route(static_cast<motion::Id>(effect), "translateX"); }
+        for (const auto effect : {900, 901, 903, 904}) { route(static_cast<motion::Id>(effect), "skewX"); }
         route(group.id, "position.x");
         route(camera.id, "position.x");
         const double time = 2.25;
@@ -1278,10 +1275,15 @@ private:
         motion::PreparedComposition prepared(project);
         const auto raw = sourceProject.assets[0]->source->sample(localTime, 0.2);
         const auto world = prepared.clips[0].sample(time, 0.2);
-        expectWithinAbsoluteError(world.x, static_cast<float>(raw.x + 5 * movement), 0.00001f);
-        // Equal movement of the composition's translation and the camera cancels.
-        expectWithinAbsoluteError(prepared.projectPoint(world, time).x, world.x, 0.00001f);
-        expectWithinAbsoluteError(prepared.applyCompositionEffects(world, time).x, static_cast<float>(world.x + movement), 0.00001f);
+        // Each skew moves x by its skewX (the movement) times y, which nothing here changes.
+        expect(std::abs(raw.y) > 0.01f, "the sampled point is off the X axis, so every skew moves it");
+        expectWithinAbsoluteError(world.y, raw.y, 0.00001f);
+        // The clip's and group's positions move by the movement; the clip's, track's and group's skews by it times y.
+        expectWithinAbsoluteError(world.x, static_cast<float>(raw.x + 2 * movement + 3 * movement * raw.y), 0.00001f);
+        // The composition's skew adds movement times y, and the camera's equal movement takes movement away
+        // (the default camera shows the plane z = 0 at unit scale).
+        expectWithinAbsoluteError(prepared.projectPoint(world, time).x, static_cast<float>(world.x + movement * world.y - movement), 0.00001f);
+        expectWithinAbsoluteError(prepared.applyCompositionEffects(world, time).x, static_cast<float>(world.x + movement * world.y), 0.00001f);
         const auto original = prepared.sample(time, 0.2);
         for (int index = 20; index >= 0; --index) {
             prepared.sample(index * 0.2, 0.2);
@@ -1327,13 +1329,14 @@ private:
         inner.parent = outer.id;
         inner.properties["position.x"].setKey({ 0, 0, motion::Interpolation::linear });
         inner.properties["position.x"].setKey({ 10, 1 });
+        inner.properties["position.y"] = motion::Curve(1);
         inner.properties["red"] = motion::Curve(0.5);
         inner.properties["opacity"] = motion::Curve(50);
-        auto innerEffect = motion::makeEffect(702, *motion::effectDefinition("translate"));
-        innerEffect.properties["translateX"] = motion::Curve(0.1);
+        auto innerEffect = motion::makeEffect(702, *motion::effectDefinition("skew"));
+        innerEffect.properties["skewX"] = motion::Curve(0.1);
         inner.effects.push_back(innerEffect);
-        auto trackEffect = motion::makeEffect(703, *motion::effectDefinition("translate"));
-        trackEffect.properties["translateX"] = motion::Curve(0.2);
+        auto trackEffect = motion::makeEffect(703, *motion::effectDefinition("skew"));
+        trackEffect.properties["skewX"] = motion::Curve(0.2);
         project.tracks.change(0).effects.push_back(trackEffect);
         project.groups = { outer, inner };
         project.tracks.change(0).group = inner.id;
@@ -1341,7 +1344,10 @@ private:
         motion::PreparedComposition nested(project);
         const auto raw = sourceProject.assets[0]->source->sample(clip.localTime(3, motion::Tempo(120)), 0.2);
         const auto world = nested.clips[0].sample(3, 0.2);
-        expectWithinAbsoluteError(world.x, (raw.x + 0.2f + 0.3f + 0.1f) * 2, 0.00001f);
+        // The track's skew (x += 0.2y) sees the source's y; then the inner group moves it by (0.3, 1)
+        // (its X keyed 0 to 1 over 10 s, at 3 s), its skew (x += 0.1y) sees y + 1, and the outer group doubles x.
+        expectWithinAbsoluteError(world.y, raw.y + 1, 0.00001f);
+        expectWithinAbsoluteError(world.x, (raw.x + 0.2f * raw.y + 0.3f + 0.1f * (raw.y + 1)) * 2, 0.00001f);
         // Each group's colour and opacity multiply in: (0.5 x 50%) twice.
         expectWithinAbsoluteError(world.r, 0.0625f, 0.000001f);
         expect(nested.clips[0].visible(3));
@@ -1617,11 +1623,11 @@ private:
         motion::Group group; group.id = 70004;
         group.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});
         group.properties["position.x"].setKey({20, 2, motion::Interpolation::linear});
-        auto effect = motion::makeEffect(70005, *motion::effectDefinition("translate"));
-        effect.properties["translateY"].setKey({0, 0, motion::Interpolation::linear});
-        effect.properties["translateY"].setKey({20, 1, motion::Interpolation::linear});
+        auto effect = motion::makeEffect(70005, *motion::effectDefinition("skew"));
+        effect.properties["skewX"].setKey({0, 0, motion::Interpolation::linear});
+        effect.properties["skewX"].setKey({20, 1, motion::Interpolation::linear});
         track.effects = {effect}; project.tracks = {track}; project.groups = {group};
-        auto global = motion::makeEffect(70006, *motion::effectDefinition("scale")); project.effects = {global};
+        auto global = motion::makeEffect(70006, *motion::effectDefinition("twist")); project.effects = {global};
         juce::UndoManager undo; motion::Document document(undo); document.reset(project);
         const motion::PreparedComposition before(project);
         motion::Id instance = 0;
@@ -1838,12 +1844,12 @@ private:
         child.properties["position.x"].setKey({10, 10, motion::Interpolation::linear});
         child.properties["opacity"] = motion::Curve(50);
         motion::Track nestedTrack; nestedTrack.id = 61002; nestedTrack.clips = {child};
-        auto translate = motion::makeEffect(61003, *motion::effectDefinition("translate"));
-        translate.properties["translateX"] = motion::Curve(0.25);
-        nestedTrack.effects = {translate};
+        auto skew = motion::makeEffect(61003, *motion::effectDefinition("skew"));
+        skew.properties["skewX"] = motion::Curve(0.25);
+        nestedTrack.effects = {skew};
         motion::Group group; group.id = 61004; group.properties["scale.x"] = motion::Curve(2);
         nestedTrack.group = group.id; motif->groups = {group}; motif->tracks = {nestedTrack};
-        translate.id = 61005; translate.properties["translateX"] = motion::Curve(0.5); motif->effects = {translate};
+        skew.id = 61005; skew.properties["skewX"] = motion::Curve(0.5); motif->effects = {skew};
         visual.definitions = {motif};
         motion::Clip placement; placement.id = 61006; placement.composition = motif->id;
         placement.start = 4; placement.duration = 3; placement.offset = 2; placement.rate = 2;
@@ -1856,7 +1862,9 @@ private:
         expectEquals(static_cast<int>(nestedVisual.clips.size()), 1);
         if (!nestedVisual.clips.empty()) {
             const auto& leaf = nestedVisual.clips.front();
-            expectWithinAbsoluteError(leaf.processPoint({0, 0, 0, 1, 1, 1}, 5).x, 22.0f, 0.0001f);
+            // At 5 s the placement is 4 s into the motif and the child 3 s into itself, so its X is 3:
+            // ((3 + 0.25 * 0.5) * 2 + 0.5 * 0.5) * 3 + 1 = 20.5, the skews taking y (0.5, unchanged throughout) in order.
+            expectWithinAbsoluteError(leaf.processPoint({0, 0.5f, 0, 1, 1, 1}, 5).x, 20.5f, 0.0001f);
             // Its red (0.2) dimmed by its own 50% and the placement's 25%.
             expectWithinAbsoluteError(leaf.processPoint({0, 0, 0, 1, 1, 1}, 5).r, 0.025f, 0.000001f);
             expect(leaf.visible(5));
@@ -1875,7 +1883,8 @@ private:
         expectEquals(static_cast<int>(repeatedVisual.clips.size()), 2);
         if (repeatedVisual.clips.size() == 2) {
             expect(repeatedVisual.clips[0].source == repeatedVisual.clips[1].source);
-            expectWithinAbsoluteError(repeatedVisual.clips[1].processPoint({0, 0, 0, 1, 1, 1}, 11).x, 16.0f, 0.0001f);
+            // 3 s into the motif, 2 s into the child: ((2 + 0.25 * 0.5) * 2 + 0.5 * 0.5) * 3 + 1 = 14.5.
+            expectWithinAbsoluteError(repeatedVisual.clips[1].processPoint({0, 0.5f, 0, 1, 1, 1}, 11).x, 14.5f, 0.0001f);
         }
         beginTest("Repeated definitions stay visible across instance cuts");
         visual.tracks.change(0).clips[0].duration = 2;
@@ -1967,26 +1976,43 @@ private:
         const motion::PreparedComposition restoredSignal(restoredColour.project());
         const auto reopenedColour = restoredSignal.clips[0].processPoint(red.withColour(-1, -1, -1), 2);
         expectEquals(reopenedColour.r, signal.r); expectEquals(reopenedColour.g, signal.g); expectEquals(reopenedColour.b, signal.b);
-        auto translate = motion::makeEffect(101, *motion::effectDefinition("translate"));
-        translate.properties["translateX"] = motion::Curve(0.5);
-        expectWithinAbsoluteError(motion::PreparedEffect(translate).apply(input, 0).x, 0.75f, 0.000001f);
-        auto rotate = motion::makeEffect(102, *motion::effectDefinition("rotate"));
-        rotate.properties["rotateZ"] = motion::Curve(0.5);
-        const auto rotated = motion::PreparedEffect(rotate).apply(input, 0);
-        expectWithinAbsoluteError(rotated.x, -input.y, 0.000001f);
-        expectWithinAbsoluteError(rotated.y, input.x, 0.000001f);
-        auto scale = motion::makeEffect(103, *motion::effectDefinition("scale"));
-        scale.properties["scaleX"] = motion::Curve(2);
-        scale.properties["scaleY"] = motion::Curve(1);
-        scale.properties["scaleZ"] = motion::Curve(1);
-        const auto firstOrder = motion::applyEffects(motion::prepareEffects({ translate, scale }), input, 0);
-        const auto reverseOrder = motion::applyEffects(motion::prepareEffects({ scale, translate }), input, 0);
-        expectWithinAbsoluteError(firstOrder.x, 1.5f, 0.000001f);
-        expectWithinAbsoluteError(reverseOrder.x, 1.0f, 0.000001f);
-        translate.range = motion::EffectRange { -1, 2 };
-        const motion::PreparedEffect ranged(translate);
+        // Skew adds to each axis a share of the next one's input value: x += 0.5y, y += 0.5z, z += 0.5x.
+        auto skew = motion::makeEffect(101, *motion::effectDefinition("skew"));
+        skew.properties["skewX"] = motion::Curve(0.5);
+        skew.properties["skewY"] = motion::Curve(0.5);
+        skew.properties["skewZ"] = motion::Curve(0.5);
+        const auto skewed = motion::PreparedEffect(skew).apply(input, 0);
+        expectWithinAbsoluteError(skewed.x, 0.5f, 0.000001f); // 0.25 + 0.5 * 0.5
+        expectWithinAbsoluteError(skewed.y, 0.4f, 0.000001f); // 0.5 + 0.5 * -0.2
+        expectWithinAbsoluteError(skewed.z, -0.075f, 0.000001f); // -0.2 + 0.5 * 0.25
+        // Half strength goes half way: 0.25 + 0.5 * (0.5 - 0.25).
+        skew.properties["strength"] = motion::Curve(0.5);
+        expectWithinAbsoluteError(motion::PreparedEffect(skew).apply(input, 0).x, 0.375f, 0.000001f);
+        skew.properties["strength"] = motion::Curve(1);
+        skew.properties["skewY"] = motion::Curve(0);
+        skew.properties["skewZ"] = motion::Curve(0);
+        expectWithinAbsoluteError(motion::PreparedEffect(skew).apply(input, 0).x, 0.5f, 0.000001f);
+        // Twist turns about Y by twist * 4 pi * y: here 0.25 * 4 pi * 0.5, a quarter turn, taking (x, z) to (z, -x).
+        auto twist = motion::makeEffect(102, *motion::effectDefinition("twist"));
+        twist.properties["twist"] = motion::Curve(0.25);
+        const auto twisted = motion::PreparedEffect(twist).apply(input, 0);
+        expectWithinAbsoluteError(twisted.x, input.z, 0.000001f);
+        expectWithinAbsoluteError(twisted.y, input.y, 0.000001f);
+        expectWithinAbsoluteError(twisted.z, -input.x, 0.000001f);
+        // Skewing y by z (y: 0.5 + 0.5 * -0.2 = 0.4) before skewing x by y gives x = 0.25 + 0.5 * 0.4 = 0.45;
+        // after it, x = 0.25 + 0.5 * 0.5 = 0.5.
+        auto lift = motion::makeEffect(103, *motion::effectDefinition("skew"));
+        lift.properties["skewY"] = motion::Curve(0.5);
+        const auto firstOrder = motion::applyEffects(motion::prepareEffects({ skew, lift }), input, 0);
+        const auto reverseOrder = motion::applyEffects(motion::prepareEffects({ lift, skew }), input, 0);
+        expectWithinAbsoluteError(firstOrder.x, 0.5f, 0.000001f);
+        expectWithinAbsoluteError(firstOrder.y, 0.4f, 0.000001f);
+        expectWithinAbsoluteError(reverseOrder.x, 0.45f, 0.000001f);
+        expectWithinAbsoluteError(reverseOrder.y, 0.4f, 0.000001f);
+        skew.range = motion::EffectRange { -1, 2 };
+        const motion::PreparedEffect ranged(skew);
         expectEquals(ranged.apply(input, -1.01).x, input.x);
-        expectWithinAbsoluteError(ranged.apply(input, -1).x, 0.75f, 0.000001f);
+        expectWithinAbsoluteError(ranged.apply(input, -1).x, 0.5f, 0.000001f);
         expectEquals(ranged.apply(input, 1).x, input.x);
 
         beginTest("Clip, track and composition stacks run in scope order with owner clocks");
@@ -1997,31 +2023,39 @@ private:
         clip.offset = 0.5;
         clip.rate = 2;
         clip.properties["position.x"] = motion::Curve(0.25);
+        clip.properties["position.y"] = motion::Curve(0.5);
         clip.properties["scale.x"] = motion::Curve(2);
-        translate.range.reset();
-        translate.properties["translateX"] = motion::Curve(0);
-        translate.properties["translateX"].setKey({0, 0, motion::Interpolation::linear});
-        translate.properties["translateX"].setKey({10, 1});
-        clip.effects = { translate };
-        scale.id = 104;
-        project.tracks.change(0).effects = { scale };
-        auto global = motion::makeEffect(105, *motion::effectDefinition("translate"));
-        global.properties["translateX"] = motion::Curve(0.1);
+        skew.range.reset();
+        skew.properties["skewX"] = motion::Curve(0);
+        skew.properties["skewX"].setKey({0, 0, motion::Interpolation::linear});
+        skew.properties["skewX"].setKey({10, 1});
+        clip.effects = { skew };
+        auto trackSkew = motion::makeEffect(104, *motion::effectDefinition("skew"));
+        trackSkew.properties["skewX"] = motion::Curve(0.5);
+        project.tracks.change(0).effects = { trackSkew };
+        auto global = motion::makeEffect(105, *motion::effectDefinition("skew"));
+        global.properties["skewX"] = motion::Curve(0.1);
         project.effects = { global };
         motion::PreparedComposition composition(project);
         const auto local = clip.localTime(3, motion::Tempo(120));
         const auto raw = sourceProject.assets[0]->source->sample(local, 0.2);
-        const auto expectedWorldX = ((raw.x + local / 10.0) * 2 + 0.25) * 2;
+        expect(std::abs(raw.y) > 0.01f, "the sampled point is off the X axis, so the clip's skew moves it");
+        // The clip's skew, keyed on its own clock (local / 10), acts on the source point; then the clip
+        // doubles x and moves it by (0.25, 0.5); then the track's skew (x += 0.5y) sees the moved y.
+        const auto clipY = raw.y + 0.5;
+        const auto expectedWorldX = (raw.x + local / 10.0 * raw.y) * 2 + 0.25 + 0.5 * clipY;
         const auto world = composition.clips[0].sample(3, 0.2);
+        expectWithinAbsoluteError(world.y, static_cast<float>(clipY), 0.00001f);
         expectWithinAbsoluteError(world.x, static_cast<float>(expectedWorldX), 0.00001f);
+        // The composition's skew (x += 0.1y) comes before the camera.
         const auto output = composition.projectPoint(world, 3);
-        expectWithinAbsoluteError(output.x, static_cast<float>((expectedWorldX + 0.1) * 4 / (4 - world.z)), 0.00001f);
-        const auto clipTarget = motion::findPropertyTarget(project, translate.id);
+        expectWithinAbsoluteError(output.x, static_cast<float>((expectedWorldX + 0.1 * clipY) * 4 / (4 - world.z)), 0.00001f);
+        const auto clipTarget = motion::findPropertyTarget(project, skew.id);
         expect(clipTarget.has_value() && clipTarget->isEffect && !clipTarget->camera);
         if (clipTarget.has_value()) {
             expectEquals(clipTarget->localTime(3), local);
         }
-        const auto trackTarget = motion::findPropertyTarget(project, scale.id);
+        const auto trackTarget = motion::findPropertyTarget(project, trackSkew.id);
         expect(trackTarget.has_value() && trackTarget->isEffect);
         if (trackTarget.has_value()) {
             expectEquals(trackTarget->localTime(3), 3.0);
@@ -2051,7 +2085,7 @@ private:
             return;
         }
         expect(loaded.newId() > global.id);
-        const auto* restoredEffect = motion::findEffect(loaded.project(), translate.id);
+        const auto* restoredEffect = motion::findEffect(loaded.project(), skew.id);
         expect(restoredEffect != nullptr && restoredEffect->range.has_value());
         motion::PreparedComposition restored(loaded.project());
         expectWithinAbsoluteError(restored.sample(3, 0.2).x, composition.sample(3, 0.2).x, 0.00001f);

@@ -63,7 +63,7 @@ void MotionEditor::setUpScene() {
         };
         showPopover(std::move(panel), getLocalArea(&composition, composition.extractAnchor()));
     };
-    composition.onStatus = [this](const juce::String& message) { if (message.isNotEmpty()) { statusBar.show(message); } };
+    composition.onStatus = [this](const juce::String& message) { if (message.isNotEmpty()) { statusBar.show(message, MotionStatusBar::Kind::warning); } };
     composition.onSelectClips = [this](const std::vector<motion::Id>& ids, MotionCompositionView::SelectionChange change) {
         using Change = MotionCompositionView::SelectionChange;
         const auto& current = timeline.selectedClipIds();
@@ -90,10 +90,10 @@ void MotionEditor::setUpScene() {
     sceneTools.fly.onClick = [this] { composition.setNavigating(!composition.isNavigating()); };
     composition.onNavigationChanged = [this](bool active) { sceneTools.fly.setToggleState(active, juce::dontSendNotification); };
     sceneTools.frame.onClick = [this] { composition.frameSelection(); };
+    composition.onLookThrough = [this](motion::Id camera) { lookThrough(camera); };
+    timeline.onLookThrough = [this](motion::Id camera) { lookThrough(camera); };
     sceneTools.lookThrough.onClick = [this] {
-        composition.setDrivenCamera(sceneTools.lookThrough.getToggleState() ? selection : 0);
-        // A camera that cannot be driven leaves the button off.
-        sceneTools.lookThrough.setToggleState(composition.drivenCamera() != 0, juce::dontSendNotification);
+        setLookingThrough(sceneTools.lookThrough.getToggleState());
         resized();
     };
     composition.onDrivenCameraChanged = [this](motion::Id id) {
@@ -375,6 +375,7 @@ void MotionEditor::showAddSourceMenu() {
 
 void MotionEditor::setUpProperties() {
     effectStack.onPropertySelected = [this](motion::Id id, std::string property) { selectCurveTarget(id, property, false, true); };
+    effectStack.onModulate = [this](motion::Id id, const std::string& property) { modulate(id, property, false); };
     effectStack.onShowOwner = [this](motion::Id id) { select(id); };
     propertyInspector.onRouteModulator = [this](motion::Id modulator, motion::Id target, std::vector<std::string> properties) {
         const auto result = processor.document.routeModulator(modulator, target, properties);
@@ -390,6 +391,7 @@ void MotionEditor::setUpProperties() {
     effectStack.onReveal = [this](juce::Component& card) {
         osci::RevealOptions options;
         options.margin = motion::style::padding;
+        options.cornerRadius = motion::style::radiusPanel;
         propertyInspector.reveal(card, options);
     };
     // A clip's timing leads its Properties, as layer timing does in other editors.
@@ -441,10 +443,7 @@ void MotionEditor::setUpProperties() {
     // The owner's effects follow its properties.
     propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); }, "Effects");
     propertyInspector.onPropertySelected = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, selectionIsCamera(), true); };
-    propertyInspector.onModulate = [this](motion::Id id, const std::string& property) {
-        selectCurveTarget(id, property, selectionIsCamera(), true);
-        timelineTabs.setSelectedIndex(1);
-    };
+    propertyInspector.onModulate = [this](motion::Id id, const std::string& property) { modulate(id, property, selectionIsCamera()); };
     propertyInspector.onRename = [this](motion::Id id, const juce::String& text) {
         processor.document.tryEdit("Rename camera", [id, name = text.toStdString()](motion::Project& project) {
             for (auto& camera : project.cameras) {
@@ -568,7 +567,7 @@ void MotionEditor::setUpTimeline() {
         assetLibrary.refresh();
         assetLibrary.revealAsset(asset);
     };
-    timeline.onError = [this](const juce::String& message) { statusBar.show(message); };
+    timeline.onError = [this](const juce::String& message) { statusBar.show(message, MotionStatusBar::Kind::warning); };
     timeline.chosenSource = [this] { return assetLibrary.chosen(); };
     timeline.onHint = [this](const juce::String& message) { statusBar.show(message, MotionStatusBar::Kind::notice); };
     timeline.onEffectPreview = [this](const std::string& type, std::optional<motion::Id> owner) { previewEffect(type, owner); };

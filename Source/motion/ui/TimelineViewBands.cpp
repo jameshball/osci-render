@@ -197,22 +197,28 @@ void MotionTimelineView::showCutMenu(motion::Id cut, double time) {
         cutTo.addItem(100 + static_cast<int>(cameras.size()) - 1, juce::String(camera.name));
         show.addItem(200 + static_cast<int>(cameras.size()) - 1, juce::String(camera.name));
     }
+    const auto camera = cameraAt(cut);
+    if (camera != 0) {
+        menu.addItem(4, "Look through " + cameraName(camera));
+        menu.addSeparator();
+    }
     menu.addItem(3, "Add camera here");
     menu.addSubMenu("Cut to camera here", cutTo, !cameras.empty());
     if (cut != 0) {
         menu.addSubMenu("Show camera", show);
         menu.addItem(1, "Delete cut");
     }
-    const auto* cutValue = findCut(cut);
-    const auto camera = cutValue != nullptr ? cutValue->camera : cameras.empty() ? motion::Id(0) : cameras.front();
     if (camera != 0) {
         menu.addSeparator();
-        menu.addItem(2, "Delete " + cameraName(camera));
+        // The last camera stays (Document::removeCamera).
+        menu.addItem(2, "Delete " + cameraName(camera), processor.document.project().cameras.size() > 1);
     }
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, cut, time, camera, cameras](int result) {
         auto& document = processor.document;
         const auto chosen = [&](int base) { return cameras[static_cast<std::size_t>(result - base)]; };
-        if (result == 3) {
+        if (result == 4) {
+            if (onLookThrough) { onLookThrough(camera); }
+        } else if (result == 3) {
             if (onAddCamera) { onAddCamera(time); }
         } else if (result == 2) {
             report(document.removeCamera(camera));
@@ -230,6 +236,15 @@ void MotionTimelineView::showCutMenu(motion::Id cut, double time) {
         }
         repaint();
     });
+}
+
+// The camera a cut shows, or with none (a gap) the first camera, which the
+// output shows there.
+motion::Id MotionTimelineView::cameraAt(motion::Id cut) const {
+    const auto* cutValue = findCut(cut);
+    if (cutValue != nullptr) { return cutValue->camera; }
+    const auto& cameras = processor.document.project().cameras;
+    return cameras.empty() ? motion::Id(0) : cameras.front().id;
 }
 
 const motion::Camera* MotionTimelineView::selectedCamera() const {

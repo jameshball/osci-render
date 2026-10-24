@@ -46,10 +46,9 @@ void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
         }
     } else {
         const auto row = trackAtY(dropPosition->y);
-        const auto time = dropTime(dropPosition->x);
         motion::Clip candidate;
         candidate.id = std::numeric_limits<motion::Id>::max();
-        candidate.start = snapTime(time, juce::ModifierKeys::getCurrentModifiers());
+        candidate.start = dropSnapped;
         const auto asset = motion::findAsset(processor.document.project().assets, dropAssetId);
         const auto definition = motion::findDefinition(processor.document.project(), dropAssetId);
         if (asset != nullptr) {
@@ -100,12 +99,14 @@ void MotionTimelineView::itemDragMove(const SourceDetails& details) {
     dropEffect = description.startsWith("motion-effect:") ? description.fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
     dropInstance = description.startsWith("motion-effect-instance:") ? static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()) : motion::Id(0);
     dropAssetId = description.startsWith("motion-asset:") ? static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()) : motion::Id(0);
+    if (dropAssetId != 0) { dropSnapped = dropStart(details.localPosition.x, dropAssetId, juce::ModifierKeys::getCurrentModifiers()); }
     previewEffect(dropEffect.empty() && dropInstance == 0 ? 0 : effectOwnerAt(details.localPosition));
     repaint();
 }
 
 void MotionTimelineView::itemDragExit(const SourceDetails&) {
     dropPosition.reset();
+    snapGuide.reset();
     addTrack.setVisible(true);
     previewEffect(0);
     repaint();
@@ -131,6 +132,7 @@ void MotionTimelineView::setEffectDragActive(bool active) {
 
 void MotionTimelineView::itemDropped(const SourceDetails& details) {
     dropPosition.reset();
+    snapGuide.reset();
     addTrack.setVisible(true);
     previewEffect(0);
     if (details.description.toString().startsWith("motion-effect:")) {
@@ -150,10 +152,35 @@ void MotionTimelineView::itemDropped(const SourceDetails& details) {
     repaint();
 }
 
+double MotionTimelineView::dropStart(int x, motion::Id id, juce::ModifierKeys modifiers) {
+    const auto time = dropTime(x);
+    snapGuide.reset();
+    if (modifiers.isAltDown()) { return time; }
+    const auto& project = processor.document.project();
+    const auto asset = motion::findAsset(project.assets, id);
+    const auto definition = motion::findDefinition(project, id);
+    const auto clip = asset != nullptr ? std::optional(motion::Document::makeClip(0, *asset, 0)) : definition != nullptr ? std::optional(motion::Document::makeCompositionClip(0, *definition, 0)) : std::nullopt;
+    const auto length = clip.has_value() ? clip->timing(project.tempo()).end() : 0.0;
+    const auto startTarget = magnet(time, project, {});
+    const auto endTarget = length > 0 ? magnet(time + length, project, {}) : std::nullopt;
+    const auto startDistance = startTarget.has_value() ? std::abs(*startTarget - time) : 1.0e300;
+    const auto endDistance = endTarget.has_value() ? std::abs(*endTarget - (time + length)) : 1.0e300;
+    if (startTarget.has_value() && startDistance <= endDistance) {
+        snapGuide = startTarget;
+        return *startTarget;
+    }
+    if (endTarget.has_value() && *endTarget - length >= 0) {
+        snapGuide = endTarget;
+        return *endTarget - length;
+    }
+    return snapTime(time, modifiers);
+}
+
 bool MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
     const auto& project = processor.document.project();
     const auto asset = motion::findAsset(project.assets, assetId);
-    const auto snapped = snapTime(dropTime(x), juce::ModifierKeys::getCurrentModifiers());
+    const auto snapped = dropStart(x, assetId, juce::ModifierKeys::getCurrentModifiers());
+    snapGuide.reset();
     const auto row = trackAtY(y);
     const auto group = groupAtY(y);
     if (asset == nullptr) {
@@ -496,7 +523,8 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
     // A name longer than the clip fades out at its edge instead of an ellipsis.
     {
         juce::Graphics::ScopedSaveState clipLabel(g);
-        g.reduceClipRegion(labelBounds.toNearestInt());
+        // Cut at the clip's sides only: a band shorter than the font would cut its descenders.
+        g.reduceClipRegion(labelBounds.withY(bounds.getY()).withHeight(bounds.getHeight()).toNearestInt());
         g.setFont(audio ? motion::style::caption() : motion::style::body());
         const auto font = g.getCurrentFont();
         const auto textWidth = juce::TextLayout::getStringWidth(font, label);

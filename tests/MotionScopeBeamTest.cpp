@@ -35,8 +35,10 @@ public:
             // Owns the parameters, which a processor normally does.
             OfflineVisualiserParameters offline;
             auto& parameters = offline.params;
-            // The Scope's specs mirror the visualiser's own parameters.
+            // The Scope's specs mirror the visualiser's own parameters, but for
+            // its frequency, which is the beam's.
             for (const auto& spec : motion::beamPropertySpecs) {
+                if (spec.id == "frequency") { continue; }
                 const juce::String id(spec.id.data(), spec.id.size());
                 const osci::EffectParameter* found = nullptr;
                 for (const auto* list : {&parameters.effects, &parameters.audioEffects}) {
@@ -65,9 +67,10 @@ public:
                 project.beam.properties["glow"].base = 5.0;
             });
             const auto prepared = f.prepare();
-            expectWithinAbsoluteError(prepared.beam.at(0)[0], 2.0f, 1.0e-4f);
-            expectWithinAbsoluteError(prepared.beam.at(2)[0], 5.0f, 1.0e-4f);
-            expectWithinAbsoluteError(prepared.beam.at(6)[0], 8.0f, 1.0e-4f);
+            constexpr auto intensity = motion::specIndex(motion::beamPropertySpecs, "intensity");
+            expectWithinAbsoluteError(prepared.beam.at(0)[intensity], 2.0f, 1.0e-4f);
+            expectWithinAbsoluteError(prepared.beam.at(2)[intensity], 5.0f, 1.0e-4f);
+            expectWithinAbsoluteError(prepared.beam.at(6)[intensity], 8.0f, 1.0e-4f);
             // Glow's range is 0-1.
             expectWithinAbsoluteError(prepared.beam.at(1)[4], 1.0f, 1.0e-6f);
             f.undo.undo();
@@ -85,7 +88,7 @@ public:
             const auto prepared = f.prepare();
             float lowest = 1.0e9f, highest = -1.0e9f;
             for (int step = 0; step < 40; ++step) {
-                const auto value = prepared.beam.at(step * 0.025)[5];
+                const auto value = prepared.beam.at(step * 0.025)[motion::specIndex(motion::beamPropertySpecs, "hue")];
                 lowest = std::min(lowest, value);
                 highest = std::max(highest, value);
             }
@@ -140,7 +143,7 @@ public:
             const motion::ScopeBeamSlots slots(parameters);
             const auto before = parameters.intensityEffect->parameters[0]->getValueUnnormalised();
             parameters.intensityEffect->animateValues(16, nullptr);
-            slots.fill(0, 16, [](int) { return 7.5f; });
+            slots.fill(motion::specIndex(motion::beamPropertySpecs, "intensity"), 16, [](int) { return 7.5f; });
             parameters.intensityEffect->publishAnimatedToActual(16);
             expectWithinAbsoluteError(parameters.intensityEffect->getActualValue(), 7.5f, 1.0e-6f);
             expectWithinAbsoluteError(parameters.intensityEffect->parameters[0]->getValueUnnormalised(), before, 1.0e-6f);

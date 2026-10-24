@@ -23,7 +23,7 @@ public:
     // What the Scope shows across the output canvas; message thread.
     motion::hidden::Reach canvasReach() {
         const auto size = recordingParameters.getCanvasSize();
-        return motion::hidden::Reach::ofCanvas(size.width, size.height, VisualiserGeometry::signalGain);
+        return motion::scopeReach(size.width, size.height);
     }
     using OutputMode = motion::OutputMode;
     // Pausing the Scope or sharing its picture are view settings, not edits.
@@ -48,6 +48,11 @@ public:
     motion::Document document { getUndoManager() };
     std::atomic<bool> playing { false };
     std::atomic<double> position { 0.0 };
+    // The playhead as shown: `position` carried on from when the last block
+    // stored it, at the speed it plays, never more than two blocks ahead (a
+    // stalled device stops it) and wrapped at the loop. Message thread.
+    double shownPosition() const;
+    std::atomic<double> positionStamp { 0.0 }, positionAdvance { 0.0 }, blockSeconds { 0.0 };
     // Loop playback (seconds); the editor mirrors the project's loop range.
     std::atomic<double> loopStart { 0.0 }, loopEnd { 0.0 };
     std::atomic<bool> looping { false };

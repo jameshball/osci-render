@@ -29,7 +29,7 @@ public:
     void setHiddenCurves(std::set<std::string> curves);
     // Curves shown faintly behind the edited group (from the channel list).
     void setContextCurves(std::map<std::string, juce::Colour> curves);
-    void repaintPlayhead() { playheadStrip.moveTo(*this, playheadX()); }
+    void setPlayhead(double time) { playheadStrip.moveTo(*this, time, [this](double at) { return playheadX(at); }); }
     // Page-follows the playhead during playback unless the view was just moved.
     void followPlayhead(double time, bool playing);
 
@@ -220,7 +220,7 @@ private:
     static constexpr double viewLimit = std::numeric_limits<double>::max() / 2;
     void setView(double start, double end);
     void normalizeValueRange();
-    std::optional<int> playheadX() const;
+    std::optional<float> playheadX(double time) const;
     float timeX(double time) const;
     float valueY(double value) const;
     double projectTime(float x) const;

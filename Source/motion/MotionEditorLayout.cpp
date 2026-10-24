@@ -90,6 +90,7 @@ void MotionEditor::resized() {
     tapButton.setBounds(transport.removeFromLeft(38).reduced(1, 4));
     area.removeFromTop(gutter);
     statusBar.setBounds(area.removeFromBottom(20));
+    layoutAlert();
     area.removeFromBottom(2);
     workspaceHeight = area.getHeight();
     timelineBounds = area.removeFromBottom(std::clamp(juce::roundToInt(workspaceHeight * timelineFraction), 240, workspaceHeight - 370));
@@ -215,8 +216,13 @@ void MotionEditor::resized() {
             visualiserControls->toFront(false);
         }
     }
-    // The tool strips came to the front above; an open popover stays over them.
-    if (popover != nullptr) { popover->toFront(false); }
+}
+
+// Centred over the foot of the window, just above the status bar.
+void MotionEditor::layoutAlert() {
+    const auto width = alert.widthFor(std::min(560, getWidth() - 32));
+    const auto height = alert.heightFor(width);
+    alert.setBounds((getWidth() - width) / 2, statusBar.getY() - height - 10, width, height);
 }
 
 void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
@@ -226,6 +232,7 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
     juce::Graphics::ScopedSaveState state(graphics);
     // Dialogs sit above the panels, so the corners stay off them.
     for (const auto& overlay : activeOverlays) { graphics.excludeClipRegion(overlay->getPanelBounds() + overlay->getPosition()); }
+    if (alert.isVisible()) { graphics.excludeClipRegion(alert.getBounds()); }
     graphics.setColour(osci::Colours::veryDark());
     for (const auto& panel : {libraryBounds, viewportBounds, scope, inspectorBounds, timelineBounds}) {
         if (panel.isEmpty()) { continue; }

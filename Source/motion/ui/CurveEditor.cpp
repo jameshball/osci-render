@@ -219,7 +219,6 @@ void MotionCurveEditor::paintReadout(juce::Graphics& g, juce::Point<float> ancho
 
 void MotionCurveEditor::paint(juce::Graphics& g) {
     g.fillAll(osci::Colours::veryDark());
-    playheadStrip.drawn(std::nullopt);
     const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
     const auto* storedCurve = findCurve(clip, propertyName);
     if (storedCurve == nullptr) {
@@ -404,13 +403,12 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         g.drawRoundedRectangle(marquee->reduced(.5f), motion::style::radiusSmall, 1.0f);
     }
     g.restoreState();
-    const auto x = playheadX();
+    const auto x = playheadX(playheadStrip.time());
     if (x.has_value()) {
-        playheadStrip.drawn(x);
         g.setColour(motion::style::playhead());
-        g.drawVerticalLine(*x, 0.0f, area.getBottom());
+        g.fillRect(juce::Rectangle<float>(*x - .5f, 0.0f, 1.0f, static_cast<float>(area.getBottom())));
         juce::Path head;
-        head.addTriangle(*x - 5.0f, 0.0f, *x + 5.0f, 0.0f, static_cast<float>(*x), 8.0f);
+        head.addTriangle(*x - 5.0f, 0.0f, *x + 5.0f, 0.0f, *x, 8.0f);
         g.fillPath(head);
     }
     if (modulated) {
@@ -1269,8 +1267,8 @@ void MotionCurveEditor::normalizeValueRange() {
     }
 }
 
-std::optional<int> MotionCurveEditor::playheadX() const {
-    const auto x = juce::roundToInt(timeX(processor.position.load()));
+std::optional<float> MotionCurveEditor::playheadX(double time) const {
+    const auto x = timeX(time);
     if (x < plot().getX() || x > plot().getRight()) { return std::nullopt; }
     return x;
 }

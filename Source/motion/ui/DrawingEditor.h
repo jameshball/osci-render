@@ -16,6 +16,8 @@ public:
     std::function<void(const motion::drawing::Drawing&, const juce::String&)> onDone;
     std::function<void()> onCancel, onChanged;
     const motion::drawing::Drawing& current() const { return drawing; }
+    // The name typed in its header ("Drawing" when there is none).
+    juce::String currentName() const;
 
     void setTool(Tool value);
 

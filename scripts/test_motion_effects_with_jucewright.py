@@ -77,21 +77,21 @@ try:
     step("add graph effect key", "click", "--class", "MotionCurveEditor", "--position", "560,60", "--click-count", 2)
     wait_undo("Add key")
     # Double-clicking an effect adds it to what Properties shows.
-    step("append translate", "click", tile("Translate")["ref"], "--click-count", 2)
-    wait_undo("Add Translate")
+    step("append skew", "click", tile("Skew")["ref"], "--click-count", 2)
+    wait_undo("Add Skew")
     swirl = find(snapshot(), lambda node: node.get("class") == "MotionEffectStack::Card" and node.get("componentName") == "Swirl effect")["bounds"]
-    translate = find(snapshot(), lambda node: node.get("class") == "MotionEffectStack::Card" and node.get("componentName") == "Translate effect")["bounds"]
+    skew = find(snapshot(), lambda node: node.get("class") == "MotionEffectStack::Card" and node.get("componentName") == "Skew effect")["bounds"]
     # The new effect scrolls into view; its header drags it above Swirl.
-    step("reorder effects by their header", "drag-xy", translate["x"] + 60, translate["y"] + 14, translate["x"] + 60, translate["y"] - 60, "--steps", 16)
+    step("reorder effects by their header", "drag-xy", skew["x"] + 60, skew["y"] + 14, skew["x"] + 60, skew["y"] - 60, "--steps", 16)
     wait_undo("Move effect")
     # A track's own effects: select it by its name.
     step("show timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     header = find(snapshot(), lambda node: str(node.get("componentName", "")).startswith("Track name ") and node.get("value") == "cube.obj")
     step("select track", "click", header["ref"])
     command("wait-for-value", "--component-name", "Inspector title", "--value", "cube.obj")
-    step("add track rotate", "click", tile("Rotate")["ref"], "--click-count", 2)
-    wait_undo("Add Rotate")
-    step("rotate track", "set-value", "--component-name", "Effect rotateZ", "--exact", "0.2")
+    step("add track twist", "click", tile("Twist")["ref"], "--click-count", 2)
+    wait_undo("Add Twist")
+    step("twist track", "set-value", "--component-name", "Effect twist", "--exact", "0.2")
     # With nothing selected, effects apply to the whole composition.
     step("select nothing", "click", "--class", "MotionTimelineView", "--position", "714,140")
     command("wait-for-value", "--component-name", "Inspector title", "--value", "Composition")

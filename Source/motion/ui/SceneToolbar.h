@@ -5,8 +5,7 @@
 #include "KeyPositions.h"
 
 // Blender-style tools inside the Scene: a vertical strip with the transform
-// tools, the motion path, fly navigation and framing, and Look through while
-// a camera is selected.
+// tools, the motion path, free look and framing, and Look through.
 class MotionSceneToolbar final : public motion::icons::ToolStrip {
 public:
     using Tool = motion::icons::Button;
@@ -24,18 +23,15 @@ public:
         parts.setTooltip("Pick parts (Tab)");
         path.setTooltip("Motion path (P)");
         faces.setTooltip("Solid view: faces hide the lines behind them");
-        fly.setTooltip("Fly (N): mouse to look, " + motion::ui::keysAtPositions({motion::ui::KeyPosition::w, motion::ui::KeyPosition::a, motion::ui::KeyPosition::s, motion::ui::KeyPosition::d}) + " or the arrows to move, Esc to finish");
+        fly.setTooltip("Free look (N): move the mouse to look around, " + motion::ui::keysAtPositions({motion::ui::KeyPosition::w, motion::ui::KeyPosition::a, motion::ui::KeyPosition::s, motion::ui::KeyPosition::d}) + " or the arrows to move, Esc to finish");
         frame.setTooltip("Frame selection (F)");
         lookThrough.setClickingTogglesState(true);
-        lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");
         setGroups({{&move, &rotate, &scale, &anchor, &parts}, {&path, &faces, &fly, &frame}, {&lookThrough}});
-        // Shown once a camera is selected (MotionEditor::refreshCameraTools).
-        lookThrough.setVisible(false);
         resized();
     }
     Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale}, anchor {"Anchor tool", motion::icons::Icon::anchor}, parts {"Pick parts", motion::icons::Icon::parts};
     Tool lookThrough {"Look through camera", motion::icons::Icon::videocam};
-    Tool path {"Show motion path", motion::icons::Icon::path}, faces {"Solid view", motion::icons::Icon::solidView}, fly {"Navigate composition view", motion::icons::Icon::fly}, frame {"Frame composition selection", motion::icons::Icon::frame};
+    Tool path {"Show motion path", motion::icons::Icon::path}, faces {"Solid view", motion::icons::Icon::solidView}, fly {"Free look", motion::icons::Icon::fly}, frame {"Frame composition selection", motion::icons::Icon::frame};
     // A short Scene keeps only the transform tools.
     void setCompact(bool value) {
         if (compact == value) { return; }

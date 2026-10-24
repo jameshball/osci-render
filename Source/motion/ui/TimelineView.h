@@ -69,6 +69,8 @@ public:
     std::function<bool()> canPaste;
     // Add a camera that takes over the output at the playhead.
     std::function<void(double)> onAddCamera;
+    // Double-clicking a camera's shot, or its menu: look through it.
+    std::function<void(motion::Id)> onLookThrough;
     std::function<void(motion::Id)> onSelection, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
     std::function<void()> onLoopSelection;
     // The composition's effects row was clicked: show its effects.
@@ -104,6 +106,8 @@ public:
 
     bool hasSelectedKeys() const { return !selectedKeys.empty(); }
     bool hasSelectedClips() const { return !selectedClips.empty(); }
+    // Tracks or groups picked by their headers (or the one selected).
+    bool hasPickedRows() const { return !pickedTracks().empty(); }
     // Whether Group tracks has tracks to group (see tracksToGroup).
     bool canGroupTracks() const { return !tracksToGroup().empty(); }
     std::vector<motion::Document::CopiedKey> copiedKeys() const;
@@ -133,7 +137,8 @@ public:
     // The lifted block floats over every row and header: an opaque card with
     // a shadow all round, its own rows, and its header drawn in place.
     void paintOverChildren(juce::Graphics& g) override;
-    void repaintPlayhead() { playheadStrip.moveTo(*this, playheadX()); }
+    // Shows the playhead at `time` (the editor moves it every display frame).
+    void setPlayhead(double time) { playheadStrip.moveTo(*this, time, [this](double at) { return playheadX(at); }); }
     // The editor's timer: the bake strip repaints while the bake changes.
     void updateBake();
     bool isInterestedInDragSource(const SourceDetails& details) override;
@@ -254,7 +259,8 @@ private:
     bool scrollsAtEdge() { return dragOrigin() != nullptr || active<Scrub>() != nullptr; }
     // What a dragged source or effect would do where it is.
     void paintDropPreview(juce::Graphics& g);
-    std::optional<int> playheadX() const;
+    // Where the playhead at `time` is drawn, between pixels as it moves.
+    std::optional<float> playheadX(double time) const;
     void paintPlayhead(juce::Graphics& g);
     void previewEffect(motion::Id owner);
     motion::Id previewedOwner = 0;
@@ -431,6 +437,7 @@ private:
     bool addHover = false;
     const motion::CameraCut* findCut(motion::Id id) const;
     const motion::CameraCut* cutAt(juce::Point<int> point) const;
+    motion::Id cameraAt(motion::Id cut) const;
     // Delete acts on the camera's key or cut only while one is what was picked last.
     void clearCameraSelection();
     void cameraBandDown(const juce::MouseEvent& event);
@@ -628,6 +635,10 @@ private:
     double visibleSpan() const { return std::max(1, getWidth() - namesWidth) / pixelsPerSecond; }
     // Where something dropped at x lands: over the names column, the playhead.
     double dropTime(int x) const { return x < namesWidth ? processor.position.load() : std::max(0.0, timeAt(x)); }
+    // Where source `id` dropped at `x` starts, either edge of its clip caught
+    // as a moving clip's is (shown by the snap guide); Alt places it freely.
+    double dropStart(int x, motion::Id id, juce::ModifierKeys modifiers);
+    double dropSnapped = 0;
     // Along the ruler's foot, the main composition's hidden-line bake: frames
     // baked, being baked and still to bake (each drawn whole until it is),
     // fading once every frame is.

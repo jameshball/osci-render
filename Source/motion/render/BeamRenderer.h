@@ -75,8 +75,8 @@ public:
         std::array<float, 3> hue {0, 0, 0};
     };
 
-    // Cycles never straddle a frame of the project's frame rate, so exported
-    // video frames integrate a whole number of cycles and do not pulse.
+    // A steady frequency's cycles lie on a fixed grid, the same however
+    // playback reached them.
     static std::int64_t cycleStart(std::int64_t cycle, double rate, double cycleRate) {
         return static_cast<std::int64_t>(std::ceil(static_cast<double>(cycle) * rate / cycleRate - 1.0e-9));
     }
@@ -101,15 +101,24 @@ public:
     osci::Point sample(const PreparedComposition& composition, double time, std::int64_t index, double rate, bool advancing,
         std::uint64_t generation, const LiveSourceFrames* liveFrames = nullptr, double speed = 1.0) {
         if (index < 0 || !std::isfinite(rate) || rate <= 0 || !std::isfinite(time)) { return {0, 0, 0, 0, 0, 0}; }
-        const auto cycleRate = composition.beamRate;
+        // A keyed or modulated frequency has no grid (0 here).
+        const auto cycleRate = composition.steadyBeamRate ? composition.beamRate : 0.0;
         auto first = planFirst, end = planEnd;
-        if (!planned || index < planFirst || index >= planEnd || rate != planRate || cycleRate != planCycleRate || generation != planGeneration) {
+        const auto outside = !planned || index < planFirst || index >= planEnd || rate != planRate;
+        if (outside || cycleRate != planCycleRate || generation != planGeneration) {
             // Every cycle draws the whole frame: a dense scene is drawn faster
             // and simpler (see finishPlan), never shared across cycles, which
             // would show its parts by turns.
-            const auto cycle = cycleOf(index, rate, cycleRate);
-            first = cycleStart(cycle, rate, cycleRate);
-            end = cycleStart(cycle + 1, rate, cycleRate);
+            if (cycleRate > 0) {
+                const auto cycle = cycleOf(index, rate, cycleRate);
+                first = cycleStart(cycle, rate, cycleRate);
+                end = cycleStart(cycle + 1, rate, cycleRate);
+            } else if (outside) {
+                // Each cycle as long as the frequency where it starts, straight
+                // after the last (or here, after a seek).
+                first = planned && index == planEnd && rate == planRate ? planEnd : index;
+                end = first + cycleStart(1, rate, composition.beamRateAt(time));
+            }
         }
         // Per-sample transport time carries rounding; half a sample of drift is
         // the same cycle, anything more is a seek. Off 1x the timeline moves in
@@ -130,7 +139,7 @@ public:
     // the beam is shared; read it with plannedSegments().
     void planCycle(const PreparedComposition& composition, double time, double rate, const LiveSourceFrames* liveFrames = nullptr) {
         if (!std::isfinite(rate) || rate <= 0 || !std::isfinite(time)) { segmentCount = 0; layerCount = 0; return; }
-        plan(composition, time, 0, cycleStart(1, rate, composition.beamRate), rate, liveFrames);
+        plan(composition, time, 0, cycleStart(1, rate, composition.beamRateAt(time)), rate, liveFrames);
         planned = false;
     }
 

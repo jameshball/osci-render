@@ -29,6 +29,8 @@ public:
 
     // Selecting a parameter (to graph it) and jumping to another stage.
     std::function<void(motion::Id, std::string)> onPropertySelected;
+    // A parameter's modulate glyph: its curve, opened in the Graph.
+    std::function<void(motion::Id, const std::string&)> onModulate;
     std::function<void(motion::Id)> onShowOwner;
     std::function<void()> onHeightChanged;
     // A newly added effect asks to be scrolled into view.
@@ -69,15 +71,12 @@ private:
         ~Card() override { removeMouseListener(&hover); }
         int preferredHeight() const {
             if (folded()) { return headerHeight; }
-            return headerHeight + static_cast<int>(rows.size()) * (motion::style::controlHeight + motion::style::gap);
+            // Its rows, then as much below the last as between two.
+            return headerHeight + static_cast<int>(rows.size()) * (motion::style::controlHeight + motion::style::gap) + motion::style::gap;
         }
         motion::Id getEffectId() const { return id; }
-        // A hairline above it, parting it from the effect before.
-        void setRuled(bool value) {
-            if (ruled == value) { return; }
-            ruled = value;
-            repaint();
-        }
+        // Between one card's outline and the next.
+        static constexpr int spacing = motion::style::padding;
         void update();
         void resized() override;
         void paint(juce::Graphics& g) override;
@@ -88,6 +87,8 @@ private:
         void mouseExit(const juce::MouseEvent&) override { repaint(); }
     private:
         static constexpr int headerHeight = 28;
+        // The header and rows sit this far inside the card's outline.
+        static constexpr int inset = motion::style::padding;
         bool folded() const { return stack.folded.contains(id); }
         void jump(const std::string& property, bool forward);
         // A parameter, drawn as a property's row: its name, muted, then its
@@ -111,7 +112,7 @@ private:
         MotionEffectStack& stack;
         motion::Id id;
         juce::String name;
-        bool enabled = true, ruled = false;
+        bool enabled = true;
         juce::Rectangle<float> fold;
         motion::ui::Switch power {"Effect on"};
         motion::icons::Button close {"Remove effect", motion::icons::Icon::close};
@@ -150,6 +151,8 @@ private:
     std::optional<motion::Id> owner;
     motion::Id context = 0;
     std::vector<motion::Id> listed;
+    // Whose effects `listed` holds, so a new selection never reads as an added effect.
+    std::optional<motion::Id> listedOwner;
     std::vector<std::unique_ptr<Card>> cards;
     std::vector<std::pair<juce::String, motion::Id>> listedStages;
     std::vector<std::unique_ptr<motion::ui::Chip>> stages;

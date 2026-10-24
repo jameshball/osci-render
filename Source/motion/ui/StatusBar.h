@@ -14,7 +14,10 @@ public:
     MotionStatusBar() {
         setName("Status bar");
         dismiss.setIconPadding(2);
-        dismiss.onClick = [this] { clear(); };
+        dismiss.onClick = [this] {
+            clear();
+            if (onDismissed) { onDismissed(); }
+        };
         addChildComponent(dismiss);
         message.setName("Status message");
         message.setFont(motion::style::caption());
@@ -70,6 +73,8 @@ public:
     // `actionLabel` and `act`, when given: a button after the message that
     // does what it suggests, and clears it.
     void show(const juce::String& text, Kind kind = Kind::error, const juce::String& actionLabel = {}, std::function<void()> act = {}) {
+        // Something went wrong or needs a choice: raised where it is seen too.
+        if (kind != Kind::notice && text.isNotEmpty() && onAlert) { onAlert(text, kind, actionLabel, act); }
         if (task) {
             held = {text, kind, actionLabel, std::move(act), false};
             return;
@@ -134,6 +139,10 @@ public:
             show(next.text, next.kind, next.actionLabel, std::move(next.act));
         }
     }
+    // An error or a warning shown: `act` (when given) is its action.
+    std::function<void(const juce::String&, Kind, const juce::String&, std::function<void()>)> onAlert;
+    // The line dismissed by hand.
+    std::function<void()> onDismissed;
     void clear() {
         // During a task, what is cleared is any message waiting behind it.
         if (task) {
@@ -240,4 +249,102 @@ private:
     };
     bool task = false;
     Held held;
+};
+
+// An error or a warning, raised over the window above the status bar so it is
+// not missed: what happened, a button to act on it when there is one, and a
+// close button. It goes after a while (longer for more to read); the status
+// bar keeps the line.
+class MotionStatusAlert final : public juce::Component, private juce::Timer {
+public:
+    MotionStatusAlert() {
+        setName("Alert");
+        setAlwaysOnTop(true);
+        message.setFont(motion::style::body());
+        message.setColour(juce::Label::textColourId, osci::Colours::text());
+        message.setJustificationType(juce::Justification::centredLeft);
+        message.setMinimumHorizontalScale(1.0f);
+        message.setInterceptsMouseClicks(false, false);
+        addAndMakeVisible(message);
+        action.getProperties().set(motion::style::captionButton, true);
+        action.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+        action.setColour(juce::TextButton::textColourOffId, motion::style::accent());
+        action.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        action.onClick = [this] {
+            auto act = std::move(onAction);
+            dismissAlert();
+            if (act) { act(); }
+        };
+        addChildComponent(action);
+        close.setIconPadding(2);
+        close.onClick = [this] { dismissAlert(); };
+        addAndMakeVisible(close);
+    }
+
+    void show(const juce::String& text, bool error, const juce::String& actionLabel, std::function<void()> act) {
+        message.setText(text, juce::dontSendNotification);
+        isError = error;
+        onAction = std::move(act);
+        action.setButtonText(actionLabel);
+        action.setVisible(actionLabel.isNotEmpty() && onAction != nullptr);
+        startTimer(juce::jlimit(6000, 20000, text.length() * 70 + 4000));
+        // Placed for its text first: the fade ends where it starts.
+        if (onLayout) { onLayout(); }
+        if (!isVisible()) {
+            setAlpha(0.0f);
+            setVisible(true);
+            juce::Desktop::getInstance().getAnimator().animateComponent(this, getBounds(), 1.0f, 140, false, 1.0, 0.0);
+        }
+        toFront(false);
+        repaint();
+    }
+    void dismissAlert() {
+        stopTimer();
+        onAction = nullptr;
+        if (isVisible()) { juce::Desktop::getInstance().getAnimator().fadeOut(this, 160); }
+    }
+    // Asks its owner to place it, once its height for the text is known.
+    std::function<void()> onLayout;
+    // As wide as its text on one line needs, up to `maximum`.
+    int widthFor(int maximum) const {
+        const auto text = juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::body(), message.getText())));
+        return std::clamp(text + 4 + (maximum - textRoom(maximum)), std::min(280, maximum), maximum);
+    }
+    int heightFor(int width) const {
+        const auto textWidth = std::max(80, textRoom(width));
+        juce::AttributedString text;
+        text.append(message.getText(), motion::style::body());
+        juce::TextLayout layout;
+        layout.createLayout(text, static_cast<float>(textWidth));
+        return std::max(44, static_cast<int>(std::ceil(layout.getHeight())) + 24);
+    }
+    void paint(juce::Graphics& g) override {
+        const auto bounds = getLocalBounds().toFloat();
+        motion::style::fillFloatingPanel(g, bounds, motion::style::popoverSurface());
+        const auto colour = isError ? osci::Colours::danger() : osci::Colours::warning();
+        g.setColour(colour);
+        g.fillRoundedRectangle(bounds.withWidth(4.0f).reduced(0, 8).translated(8, 0), 2.0f);
+        g.setColour(colour.withAlpha(.5f));
+        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radiusPanel, 1.0f);
+    }
+    void resized() override {
+        auto area = getLocalBounds().reduced(12, 8);
+        area.removeFromLeft(textInset - 12);
+        close.setBounds(area.removeFromRight(20).withSizeKeepingCentre(14, 14));
+        if (action.isVisible()) { action.setBounds(area.removeFromRight(actionWidth()).withSizeKeepingCentre(actionWidth(), 24)); }
+        message.setBounds(area.withTrimmedRight(8));
+    }
+
+private:
+    static constexpr int textInset = 22;
+    // What is left for the text in an alert `width` wide (see resized).
+    int textRoom(int width) const { return width - 24 - (textInset - 12) - 20 - (action.isVisible() ? actionWidth() : 0) - 8; }
+    int actionWidth() const { return juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), action.getButtonText())) + 20; }
+    void timerCallback() override { dismissAlert(); }
+
+    juce::Label message;
+    juce::TextButton action;
+    osci::CloseButton close {"Dismiss alert"};
+    std::function<void()> onAction;
+    bool isError = true;
 };

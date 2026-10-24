@@ -5,12 +5,11 @@
 #include "../../../modules/osci_render_core/effects/osci_PointEffectKernels.h"
 #include <array>
 #include <cmath>
-#include <numbers>
 
 namespace motion {
 struct PreparedEffect {
     using Kind = EffectKind;
-    Kind kind = Kind::rotate;
+    Kind kind = Kind::skew;
     bool enabled = false;
     std::optional<EffectRange> range;
     static constexpr std::size_t maximumParameters = 5;
@@ -40,8 +39,6 @@ struct PreparedEffect {
     struct Parameters {
         bool active = false;
         std::array<double, maximumParameters> values {};
-        // Wobble's offset, which depends only on the time.
-        float wobble = 0;
     };
     Parameters parametersAt(double time) const {
         Parameters result;
@@ -56,7 +53,6 @@ struct PreparedEffect {
             result.values[index] = std::clamp(value, minimum[index], maximum[index]);
         }
         result.active = result.values[0] > 0;
-        if (kind == Kind::wobble) { result.wobble = static_cast<float>(.5 * result.values[1] * std::sin((time * result.values[2] + result.values[3]) * 2 * std::numbers::pi)); }
         return result;
     }
 
@@ -70,9 +66,6 @@ struct PreparedEffect {
         auto output = input;
         using namespace osci::point_effects;
         switch (kind) {
-            case Kind::rotate: output = rotate(input, values[1], values[2], values[3]); break;
-            case Kind::scale: output = scale(input, values[1], values[2], values[3]); break;
-            case Kind::translate: output = translate(input, values[1], values[2], values[3]); break;
             case Kind::skew: output = skew(input, values[1], values[2], values[3]); break;
             case Kind::swirl: output = swirl(input, values[1]); break;
             case Kind::bulge: output = bulge(input, values[1]); break;
@@ -84,12 +77,6 @@ struct PreparedEffect {
             case Kind::twist: output = twist(input, values[1]); break;
             case Kind::polygon: output = polygon(input, values[1], values[2], values[3], values[4]); break;
             case Kind::spiralCrush: output = spiralCrush(input, values[1], values[2], values[3], values[4]); break;
-            case Kind::perspective: output = perspective(input, values[1]); break;
-            case Kind::wobble: {
-                const auto delta = parameters.wobble;
-                output = osci::Point(input.x + delta, input.y + delta, input.z + delta).withColour(input.r, input.g, input.b);
-                break;
-            }
         }
         output = ((1 - strength) * input + strength * output).withColour(
             input.r + strength * (output.r - input.r), input.g + strength * (output.g - input.g), input.b + strength * (output.b - input.b));

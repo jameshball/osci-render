@@ -138,7 +138,7 @@ public:
         motion::style::inspector::styleHeading(formatTitle, "Format");
         addAndMakeVisible(timingTitle);
         addAndMakeVisible(formatTitle);
-        const std::array<const char*, 3> timingLabels {"Duration", "Frames", "Meter"}, formatLabels {"Canvas", "Samples", "Beam"};
+        const std::array<const char*, 3> timingLabels {"Duration", "Frames", "Meter"}, formatLabels {"Canvas", "Samples", "Frequency"};
         for (std::size_t index = 0; index < timingCaptions.size(); ++index) {
             motion::style::inspector::styleCaption(timingCaptions[index], timingLabels[index]);
             motion::style::inspector::styleCaption(formatCaptions[index], formatLabels[index]);
@@ -159,12 +159,16 @@ public:
         for (std::size_t index = 0; index < rateNames.size(); ++index) { frameRate.addItem(rateNames[index], static_cast<int>(index) + 1); }
         meter.setName("Composition meter");
         for (const auto beats : {2, 3, 4, 5, 6, 7}) { meter.addItem(juce::String(beats) + "/4", beats); }
-        // The beam's base frequency: whole times a frame is drawn, so each
-        // frame plays whole; the items are made for the frame rate in refresh().
+        // How many times a second the beam draws the picture (the Scope's
+        // Frequency, which can be keyed there): a few in its list, or any typed.
         beam.setName("Composition beam frequency");
-        beam.setTitle("Beam frequency");
-        beam.setTooltip("The beam's base frequency: how many times a second the picture is drawn. Each frame is drawn a whole number of times, so it follows the frame rate. Below 45 Hz a scope's picture flickers; higher draws each frame with fewer points.");
-        frameRate.setTooltip("Frames a second. The beam draws each frame a whole number of times (see Beam)");
+        beam.setTitle("Frequency");
+        beam.setTooltip("How many times a second the beam draws the picture, whatever the frame rate (at 60 fps and 120 Hz each frame is drawn twice). Below 45 Hz a scope's picture flickers; higher draws each picture with fewer points. Key or modulate it in the Scope's properties.");
+        for (std::size_t index = 0; index < frequencies.size(); ++index) { beam.addItem(motion::style::hertz(frequencies[index]), static_cast<int>(index) + 1); }
+        beam.setEditableText(true);
+        frameRate.setTooltip("Frames per second: choose one or type any rate. How often the picture changes; Frequency is how often it is drawn");
+        // Any rate can be typed (23.976, 12, 90...), not only the list's.
+        frameRate.setEditableText(true);
         // The project's canvas: the presets, or any size from its popover.
         // The field shows the size; the list names the shapes.
         canvas.setName("Composition canvas");
@@ -233,14 +237,15 @@ public:
         int rate = 0;
         for (std::size_t index = 0; index < rates.size(); ++index) { if (std::abs(project.frameRate - rates[index]) < 1.0e-9) { rate = static_cast<int>(index) + 1; } }
         frameRate.setSelectedId(rate, juce::dontSendNotification);
-        if (rate == 0) { frameRate.setText(juce::String(project.frameRate, 3) + " fps", juce::dontSendNotification); }
+        if (rate == 0) { frameRate.setText(rateText(project.frameRate), juce::dontSendNotification); }
         meter.setSelectedId(project.beatsPerBar, juce::dontSendNotification);
-        // Beam: Auto, or once, twice... a frame, each named for its frequency.
         const auto& main = processor.document.mainProject();
-        beam.clear(juce::dontSendNotification);
-        const auto choices = beamChoices(main.frameRate);
-        for (std::size_t cycles = 0; cycles < choices.size(); ++cycles) { beam.addItem(choices[cycles], static_cast<int>(cycles) + 1); }
-        beam.setSelectedId(main.beamCycles + 1, juce::dontSendNotification);
+        // The frequency at the playhead (it may be keyed).
+        const auto frequency = beamFrequency();
+        int frequencyId = 0;
+        for (std::size_t index = 0; index < frequencies.size(); ++index) { if (std::abs(frequency - frequencies[index]) < 1.0e-9) { frequencyId = static_cast<int>(index) + 1; } }
+        beam.setSelectedId(frequencyId, juce::dontSendNotification);
+        if (frequencyId == 0) { beam.setText(motion::style::hertz(frequency), juce::dontSendNotification); }
         int sampleRateId = 0;
         for (std::size_t index = 0; index < sampleRates.size(); ++index) {
             if (std::abs(main.sampleRate - sampleRates[index]) < .5) { sampleRateId = static_cast<int>(index) + 1; }
@@ -280,17 +285,8 @@ private:
     };
     static constexpr std::array<CanvasPreset, 3> canvasPresets {{{"Square", {1024, 1024}}, {"Landscape", {1920, 1080}}, {"Portrait", {1080, 1920}}}};
     static juce::String sizeText(VisualiserRenderSize size) { return juce::String(size.width) + juce::String::fromUTF8(" \xc3\x97 ") + juce::String(size.height); }
-    // The beam's frequencies: Auto, then 1 to 8 cycles a frame.
-    static std::vector<juce::String> beamChoices(double frameRate) {
-        std::vector<juce::String> choices;
-        choices.push_back("Auto" + motion::style::dot() + motion::style::hertz(motion::beamCycleRate(frameRate)));
-        for (int cycles = 1; cycles <= motion::Project::mostBeamCycles; ++cycles) {
-            const auto times = cycles == 1 ? juce::String("once a frame") : cycles == 2 ? juce::String("twice a frame") : juce::String(cycles) + " times a frame";
-            const auto rate = motion::beamCycleRate(frameRate, cycles);
-            choices.push_back(motion::style::hertz(rate) + motion::style::dot() + times + (rate < 45 ? " (flickers)" : ""));
-        }
-        return choices;
-    }
+    static constexpr std::array<double, 6> frequencies {50, 60, 90, 120, 144, 240};
+    double beamFrequency() const { return processor.document.mainProject().beam.frequencyAt(processor.position.load()); }
     int rule = 0;
     void applyLength() {
         auto& document = processor.document;
@@ -344,14 +340,27 @@ private:
         }
         refresh();
     }
+    // A typed rate, without its "fps", to three places at most.
+    static juce::String rateText(double rate) {
+        auto text = juce::String(rate, 3);
+        while (text.containsChar('.') && (text.endsWithChar('0') || text.endsWithChar('.'))) { text = text.dropLastCharacters(1); }
+        return text + " fps";
+    }
     void applyFrameRate() {
         const auto index = frameRate.getSelectedId() - 1;
-        if (index < 0 || index >= static_cast<int>(rates.size())) { return; }
-        const auto rate = rates[static_cast<std::size_t>(index)];
+        const auto typed = frameRate.getText().retainCharacters("0123456789.").getDoubleValue();
+        const auto rate = index >= 0 && index < static_cast<int>(rates.size()) ? rates[static_cast<std::size_t>(index)] : typed;
+        if (!std::isfinite(rate) || rate < minimumRate || rate > maximumRate) {
+            refresh();
+            return;
+        }
         if (std::abs(processor.document.project().frameRate - rate) >= 1.0e-9) {
             processor.document.edit("Change frame rate", [rate](motion::Project& project) { project.frameRate = rate; });
         }
+        refresh();
     }
+    // What a video exports at (and a source prepares frames for at most).
+    static constexpr double minimumRate = 10, maximumRate = 240;
     // A beat grid of a whole bar stays a whole bar.
     void applyMeter() {
         const auto beats = meter.getSelectedId();
@@ -362,10 +371,22 @@ private:
         });
     }
     // The project's, as the sample rate is.
+    // A chosen or typed frequency: the Scope's own, keyed at the playhead
+    // when it is animated.
     void applyBeam() {
-        const auto cycles = beam.getSelectedId() - 1;
-        if (cycles < 0 || cycles > motion::Project::mostBeamCycles || cycles == processor.document.mainProject().beamCycles) { return; }
-        processor.document.edit("Change beam frequency", [cycles](motion::Project& project) { project.beamCycles = cycles; });
+        const auto index = beam.getSelectedId() - 1;
+        const auto typed = beam.getText().retainCharacters("0123456789.").getDoubleValue();
+        const auto& spec = motion::beamPropertySpecs[motion::beamFrequencyIndex];
+        const auto value = index >= 0 && index < static_cast<int>(frequencies.size()) ? frequencies[static_cast<std::size_t>(index)] : typed;
+        if (!std::isfinite(value) || value < spec.minimum || value > spec.maximum || std::abs(value - beamFrequency()) < 1.0e-9) {
+            refresh();
+            return;
+        }
+        const auto time = processor.position.load();
+        processor.document.edit("Change frequency", [value, time, id = std::string(spec.id)](motion::Project& project) {
+            auto& curve = project.beam.properties[id];
+            if (curve.animated()) { curve.setKeyValue(time, value); } else { curve.base = value; }
+        });
     }
 
     MotionProcessor& processor;

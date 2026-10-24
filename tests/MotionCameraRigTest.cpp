@@ -128,6 +128,7 @@ public:
             expect(document.removeCamera(second).wasOk());
             expect(document.project().cameraCuts.empty() && document.project().cameras.size() == 1);
             expect(document.removeCamera(second).failed());
+            expect(document.removeCamera(first).failed(), "the last camera stays");
             expect(document.addCamera(11, second).failed(), "cameras are added inside the project");
         }
         beginTest("Targets and parents save, reload, and are cleared with their objects");

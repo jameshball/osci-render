@@ -41,7 +41,15 @@ MotionCompositionView::~MotionCompositionView() {
     if (navigating) { releaseCursor(); }
 }
 
+bool MotionCompositionView::toolApplies(MotionTransformTool value) const {
+    const auto* found = selectedCamera();
+    if (found == nullptr) { return true; }
+    if (value == MotionTransformTool::scale || value == MotionTransformTool::anchor) { return false; }
+    return value != MotionTransformTool::rotate || found->target == 0;
+}
+
 void MotionCompositionView::setTool(MotionTransformTool value) {
+    if (!toolApplies(value)) { return; }
     // Choosing a transform tool ends fly navigation and part picking, like
     // any modal tool.
     setPartMode(false);
@@ -101,13 +109,14 @@ void MotionCompositionView::setNavigating(bool enabled) {
 void MotionCompositionView::frameSelection() {
     const auto liveFrames = processor.liveSourcePreview();
     cancelGesture();
+    setDrivenCamera(0);
     if (prepared == nullptr) { return; }
     const auto time = editingTime();
     const auto hasSelection = std::any_of(prepared->clips.begin(), prepared->clips.end(), [&](const auto& clip) { return clip.editorId() == selected && clip.active(time); });
     motion::Vec3 minimum { 1e12, 1e12, 1e12 }, maximum { -1e12, -1e12, -1e12 };
     bool found = false;
     for (const auto& clip : prepared->clips) {
-        if (!clip.active(time) || (hasSelection && clip.editorId() != selected)) { continue; }
+        if (!clip.active(time) || (hasSelection && clip.editorId() != selected) || selectedCamera() != nullptr) { continue; }
         for (int index = 0; index < 512; ++index) {
             const auto sample = clip.sample(time, index / 512.0, 0, 0, liveFrames.get());
             if (sample.r == 0 && sample.g == 0 && sample.b == 0) { continue; }
@@ -117,6 +126,20 @@ void MotionCompositionView::frameSelection() {
             maximum = { std::max(maximum.x, point.x), std::max(maximum.y, point.y), std::max(maximum.z, point.z) };
             found = true;
         }
+    }
+    // A selected camera frames itself; with nothing else to show, the cameras do.
+    const auto cameraSelected = selectedCamera() != nullptr, onlyCameras = !found && !hasSelection;
+    for (const auto& item : prepared->cameras) {
+        if (cameraSelected ? item.id != selected : !onlyCameras) { continue; }
+        const auto outline = item.frame(time);
+        if (!outline.has_value()) { continue; }
+        for (const auto& [a, b] : cameraOutline(*outline)) {
+            for (const auto& point : {a, b}) {
+                minimum = { std::min(minimum.x, point.x), std::min(minimum.y, point.y), std::min(minimum.z, point.z) };
+                maximum = { std::max(maximum.x, point.x), std::max(maximum.y, point.y), std::max(maximum.z, point.z) };
+            }
+        }
+        found = true;
     }
     if (found) {
         // Fit what is clear of the tool strip, when it covers the output's
@@ -144,8 +167,9 @@ juce::String MotionCompositionView::driveBlocker(motion::Id id) const {
     return {};
 }
 
-void MotionCompositionView::setDrivenCamera(motion::Id id) {
-    if (id == lockedCamera || (id != 0 && !canDriveCamera(id))) { return; }
+void MotionCompositionView::setDrivenCamera(motion::Id id, bool followOutput) {
+    followingOutput = id != 0 && followOutput;
+    if (id == lockedCamera || (id != 0 && !cameraExists(id))) { return; }
     if (lockedCamera == 0 && id != 0) { viewBeforeLock = camera; }
     lockedCamera = id;
     lastPose.reset();
@@ -154,6 +178,7 @@ void MotionCompositionView::setDrivenCamera(motion::Id id) {
         cameraSync.startTimerHz(30);
     } else {
         cameraSync.stopTimer();
+        camera.rig.reset();
         if (viewBeforeLock.has_value()) { camera = *viewBeforeLock; }
         viewBeforeLock.reset();
     }
@@ -161,9 +186,26 @@ void MotionCompositionView::setDrivenCamera(motion::Id id) {
     repaint();
 }
 
+motion::Id MotionCompositionView::outputCamera() const {
+    if (prepared == nullptr) { return 0; }
+    const auto* active = prepared->activeCamera(cameraTime());
+    return active != nullptr ? active->id : 0;
+}
+
+motion::PropertyMap MotionCompositionView::viewAsCamera() const {
+    const auto pose = viewPose();
+    motion::PropertyMap properties;
+    for (const auto& [name, value] : std::initializer_list<std::pair<const char*, double>> {{"position.x", pose.x}, {"position.y", pose.y}, {"position.z", pose.z}, {"rotation.x", pose.pitch}, {"rotation.y", -pose.yaw}, {"rotation.z", 0}, {"fov", pose.fov}}) {
+        properties[name] = motion::Curve(value);
+    }
+    return properties;
+}
+
 void MotionCompositionView::setViewPreset(ViewPreset preset) {
     cancelGesture();
     setNavigating(false);
+    // A view chosen outright is the Scene's own, not a camera's.
+    setDrivenCamera(0);
     const auto distance = std::clamp(camera.distance() > 0 ? camera.distance() : 4.0, motion::editor::Camera::minimumDistance, motion::editor::Camera::maximumDistance);
     const auto pi = juce::MathConstants<double>::pi;
     const auto limit = motion::editor::Camera::pitchLimit;
@@ -205,6 +247,14 @@ void MotionCompositionView::prepare(const motion::Project& project) {
 }
 
 void MotionCompositionView::paint(juce::Graphics& g) {
+    // How long it takes, so playback asks for frames no faster than it draws.
+    const struct Timed {
+        double& last;
+        double started = juce::Time::getMillisecondCounterHiRes();
+        ~Timed() { last = juce::Time::getMillisecondCounterHiRes() - started; }
+    } timed {lastPaintMilliseconds};
+    // Looking through, the view moves with the camera at the display's rate.
+    if (lockedCamera != 0) { followCamera(); }
     const auto liveFrames = processor.liveSourcePreview();
     g.fillAll(osci::Colours::veryDark());
     // The ground grid; its two axes take X's and Y's colours. Seen edge-on
@@ -219,14 +269,24 @@ void MotionCompositionView::paint(juce::Graphics& g) {
         g.setColour(line == 0 ? motion::style::axisX().withAlpha(.3f) : osci::Colours::text().withAlpha(.045f * gridFade));
         drawWorldLine(g, {-5, value, 0}, {5, value, 0});
     }
+    // An empty Scene still has its cameras, framing what will be drawn,
+    // and they can be moved before anything is in front of them.
+    const auto cameras = prepared != nullptr && !prepared->cameras.empty();
+    if (cameras && prepared->clips.empty()) {
+        paintCameras(g, editingTime());
+        currentGizmo().paint(g, edit.active() ? dragAxis : hoverHandle);
+        paintLookThrough(g);
+    }
     if (prepared == nullptr || prepared->clips.empty()) {
         // On a pill of its own, so the axes never run through it; clear of
-        // the tool strip on the left, and on two lines in a narrow Scene.
+        // the tool strip on the left, and on two lines in a narrow Scene;
+        // at the foot when a camera is drawn in the middle.
         const auto message = prepared == nullptr ? juce::String("Preparing...") : emptyMessage();
         const auto room = getLocalBounds().withTrimmedLeft(48).reduced(12, 0);
         const auto width = juce::TextLayout::getStringWidth(motion::style::body(), message) + 28;
         const auto lines = width <= static_cast<float>(room.getWidth()) ? 1 : 2;
-        const auto pill = room.toFloat().withSizeKeepingCentre(std::min(width, static_cast<float>(room.getWidth())), lines * 18.0f + 12.0f);
+        auto pill = room.toFloat().withSizeKeepingCentre(std::min(width, static_cast<float>(room.getWidth())), lines * 18.0f + 12.0f);
+        if (cameras) { pill.setY(static_cast<float>(getHeight()) - pill.getHeight() - 16); }
         motion::style::fillFloatingPanel(g, pill, osci::Colours::veryDark());
         g.setColour(osci::Colours::text().withAlpha(0.6f));
         g.setFont(motion::style::body());
@@ -293,10 +353,31 @@ void MotionCompositionView::paint(juce::Graphics& g) {
         juce::PathStrokeType(1.0f).createDashedStroke(dashed, region, dashes, 2);
         g.fillPath(dashed);
     }
+    paintLookThrough(g);
     paintOrientation(g);
     if (partCount.isVisible()) {
         motion::style::fillFloatingPanel(g, partBar().toFloat(), osci::Colours::veryDark());
     }
+}
+
+// A camera as the Scene draws it: lines from its eye to a frame a little
+// ahead (as wide as the Scope shows), and a triangle above it marking up.
+std::vector<std::pair<motion::Vec3, motion::Vec3>> MotionCompositionView::cameraOutline(const motion::PreparedCamera::Frame& frame) {
+    const auto& [position, right, up, forward, focalLength] = frame;
+    constexpr double depth = .45;
+    const auto half = depth / focalLength * motion::squareScope().x;
+    const auto centre = position + forward * depth;
+    const std::array<motion::Vec3, 4> corners {centre - right * half + up * half, centre + right * half + up * half, centre + right * half - up * half, centre - right * half - up * half};
+    std::vector<std::pair<motion::Vec3, motion::Vec3>> lines;
+    for (std::size_t index = 0; index < corners.size(); ++index) {
+        lines.emplace_back(position, corners[index]);
+        lines.emplace_back(corners[index], corners[(index + 1) % corners.size()]);
+    }
+    const auto top = (corners[0] + corners[1]) * .5;
+    const auto width = (corners[1] - corners[0]) * .3;
+    lines.emplace_back(top - width, top + up * .12);
+    lines.emplace_back(top + width, top + up * .12);
+    return lines;
 }
 
 void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
@@ -308,7 +389,7 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
         if (!frame.has_value()) { continue; }
         const auto& [position, right, up, forward, focalLength] = *frame;
         const auto rectangle = [&](double depth) {
-            const auto half = depth / focalLength;
+            const auto half = depth / focalLength * motion::squareScope().x;
             const auto centre = position + forward * depth;
             return std::array<motion::Vec3, 4> {centre - right * half + up * half, centre + right * half + up * half, centre + right * half - up * half, centre - right * half - up * half};
         };
@@ -319,16 +400,7 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
         // view reaches its own position (a camera added where the view is).
         const auto nearness = std::clamp(((this->camera.position - position).length() - .15) / .5, 0.0, 1.0);
         g.setColour(colour.withAlpha((isSelected || isActive ? .85f : .5f) * static_cast<float>(nearness)));
-        const auto corners = rectangle(.45);
-        for (std::size_t index = 0; index < corners.size(); ++index) {
-            drawWorldLine(g, position, corners[index]);
-            drawWorldLine(g, corners[index], corners[(index + 1) % corners.size()]);
-        }
-        // The triangle above the frame marks which way is up.
-        const auto top = (corners[0] + corners[1]) * .5;
-        const auto width = (corners[1] - corners[0]) * .3;
-        drawWorldLine(g, top - width, top + up * .12);
-        drawWorldLine(g, top + width, top + up * .12);
+        for (const auto& [a, b] : cameraOutline(*frame)) { drawWorldLine(g, a, b); }
         if (!isActive) { continue; }
         const auto depth = (motion::Vec3 {} - position).dot(forward);
         if (depth <= .5) { continue; }
@@ -345,6 +417,24 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
             g.drawDashedLine(*line, dashes, 2, 1.0f);
         }
     }
+}
+
+// Looking through a camera, what it doesn't see is dimmed: only the square
+// the Scope shows is its view, named for the camera.
+void MotionCompositionView::paintLookThrough(juce::Graphics& g) const {
+    if (lockedCamera == 0) { return; }
+    const auto frame = scopeFrame();
+    juce::RectangleList<float> outside(getLocalBounds().toFloat());
+    outside.subtract(frame);
+    g.setColour(juce::Colours::black.withAlpha(.45f));
+    g.fillRectList(outside);
+    g.setColour(motion::style::selection().withAlpha(.6f));
+    g.drawRect(frame.expanded(.5f), 1.0f);
+    const auto& cameras = processor.document.project().cameras;
+    const auto found = std::find_if(cameras.begin(), cameras.end(), [this](const auto& item) { return item.id == lockedCamera; });
+    if (found == cameras.end()) { return; }
+    g.setFont(motion::style::caption());
+    g.drawText(juce::String(found->name), frame.reduced(8, 6).toNearestInt(), juce::Justification::bottomLeft, false);
 }
 
 bool MotionCompositionView::lookingAlong(ViewPreset preset) const {
@@ -445,9 +535,15 @@ void MotionCompositionView::mouseDoubleClick(const juce::MouseEvent& event) {
         return;
     }
     const auto hit = pickAt(event.position, nullptr);
-    if (hit == 0 || !onOpenSource) { return; }
+    if (hit == 0) { return; }
     cancelGesture();
-    onOpenSource(hit);
+    // A camera opens as what it sees; anything else as its source.
+    const auto& cameras = processor.document.project().cameras;
+    if (std::any_of(cameras.begin(), cameras.end(), [hit](const auto& item) { return item.id == hit; })) {
+        if (onLookThrough) { onLookThrough(hit); }
+        return;
+    }
+    if (onOpenSource) { onOpenSource(hit); }
 }
 
 void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
@@ -551,12 +647,10 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     if (cycleOnRelease) {
         object = selected;
         float nearest = std::numeric_limits<float>::max();
-        for (const auto& piece : screenPieces()) {
-            juce::Point<float> closest;
-            const auto distance = piece.clip->editorId() == selected ? piece.line.getDistanceFromPoint(event.position, closest) : nearest;
-            if (distance < nearest) {
-                nearest = distance;
-                dragAnchor = nearestOnSegment(event.position, piece.a, piece.b);
+        for (const auto& hit : hitsNear(event.position)) {
+            if (hit.id == selected && hit.distance < nearest) {
+                nearest = hit.distance;
+                dragAnchor = hit.point;
             }
         }
     }
@@ -856,7 +950,9 @@ void MotionCompositionView::mouseUp(const juce::MouseEvent& event) {
         return;
     }
     if (validGesture()) {
-        const auto noun = motion::findGroup(processor.document.project(), editSelection) != nullptr ? juce::String(" group") : juce::String(" object");
+        const auto& project = processor.document.project();
+        const auto camera = std::any_of(project.cameras.begin(), project.cameras.end(), [this](const auto& item) { return item.id == editSelection; });
+        const auto noun = camera ? juce::String(" camera") : motion::findGroup(project, editSelection) != nullptr ? juce::String(" group") : juce::String(" object");
         const auto many = !companions.empty() && tool != MotionTransformTool::anchor;
         const auto label = tool == MotionTransformTool::anchor ? juce::String("Move anchor") : (tool == MotionTransformTool::move ? "Move" : tool == MotionTransformTool::rotate ? "Rotate" : "Scale") + (many ? juce::String(" objects") : noun);
         // The Graph shows the channel the drag changed.
@@ -865,30 +961,56 @@ void MotionCompositionView::mouseUp(const juce::MouseEvent& event) {
     }
 }
 
-motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::Vec3* anchor) const {
-    float nearest = 18;
-    const ScreenPiece* hit = nullptr;
-    for (const auto& piece : screenPieces()) {
+// Everything drawn within reach of `position`: the objects' lines and the
+// cameras' outlines (but not the one looked through), each with its nearest
+// point and how far it is from the pointer.
+std::vector<MotionCompositionView::Hit> MotionCompositionView::hitsNear(juce::Point<float> position) const {
+    std::vector<Hit> hits;
+    const auto consider = [&](juce::Line<float> line, motion::Vec3 a, motion::Vec3 b, motion::Id id, float depth) {
         juce::Point<float> closest;
-        const auto distance = piece.line.getDistanceFromPoint(position, closest);
-        if (distance < nearest) {
-            nearest = distance;
-            hit = &piece;
+        const auto distance = line.getDistanceFromPoint(position, closest);
+        if (distance < pickReach) { hits.push_back({id, distance, nearestOnSegment(position, a, b), depth}); }
+    };
+    for (const auto& piece : screenPieces()) { consider(piece.line, piece.a, piece.b, piece.clip->editorId(), piece.depth); }
+    if (prepared == nullptr) { return hits; }
+    const auto view = camera.view();
+    const auto time = editingTime();
+    for (const auto& item : prepared->cameras) {
+        const auto frame = item.id == lockedCamera ? std::nullopt : item.frame(time);
+        if (!frame.has_value()) { continue; }
+        juce::Path body;
+        for (const auto& [a, b] : cameraOutline(*frame)) {
+            const auto line = screenLine(view, a, b);
+            if (line.has_value()) {
+                consider(*line, a, b, item.id, static_cast<float>(view->toEye((a + b) * .5).z));
+                // Its sides as triangles from the eye: inside them is the camera too.
+                const auto eye = screenPoint(view, frame->position);
+                if (eye.has_value()) { body.addTriangle(*eye, line->getStart(), line->getEnd()); }
+            }
+        }
+        // Grabbed anywhere on its body, as a filled object is, but a line
+        // near the pointer still wins.
+        if (body.contains(position) && std::none_of(hits.begin(), hits.end(), [&](const Hit& hit) { return hit.id == item.id; })) {
+            hits.push_back({item.id, pickReach * .75f, frame->position, static_cast<float>(view->toEye(frame->position).z)});
         }
     }
-    if (hit == nullptr) { return 0; }
-    if (anchor != nullptr) { *anchor = nearestOnSegment(position, hit->a, hit->b); }
-    return hit->clip->editorId();
+    return hits;
+}
+
+motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::Vec3* anchor) const {
+    const auto hits = hitsNear(position);
+    const auto hit = std::min_element(hits.begin(), hits.end(), [](const Hit& a, const Hit& b) { return a.distance < b.distance; });
+    if (hit == hits.end()) { return 0; }
+    if (anchor != nullptr) { *anchor = hit->point; }
+    return hit->id;
 }
 
 std::vector<motion::Id> MotionCompositionView::hitsAt(juce::Point<float> position) const {
     const auto ray = camera.ray(normalized(position));
     std::vector<std::pair<double, motion::Id>> nearest;
-    for (const auto& piece : screenPieces()) {
-        juce::Point<float> closest;
-        if (piece.line.getDistanceFromPoint(position, closest) >= 18) { continue; }
-        const auto id = piece.clip->editorId();
-        const auto depth = ray.has_value() ? (nearestOnSegment(position, piece.a, piece.b) - ray->origin).length() : static_cast<double>(piece.depth);
+    for (const auto& hit : hitsNear(position)) {
+        const auto id = hit.id;
+        const auto depth = ray.has_value() ? (hit.point - ray->origin).length() : static_cast<double>(hit.depth);
         const auto found = std::find_if(nearest.begin(), nearest.end(), [&](const auto& item) { return item.second == id; });
         if (found == nearest.end()) {
             nearest.emplace_back(depth, id);
@@ -1083,6 +1205,7 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
             return true;
         }
         if (marqueeArmed) { resetMarquee(); repaint(); return true; }
+        if (lockedCamera != 0) { setDrivenCamera(0); return true; }
         // Escape clears the picked parts, then leaves part mode.
         if (partMode && !picked.empty()) { picked.clear(); refreshPartBar(); return true; }
         if (partMode) { setPartMode(false); return true; }
@@ -1235,8 +1358,23 @@ bool MotionCompositionView::seekMotionKey(juce::Point<float> position) {
     return true;
 }
 
+const motion::Camera* MotionCompositionView::selectedCamera() const {
+    const auto& cameras = processor.document.project().cameras;
+    const auto found = std::find_if(cameras.begin(), cameras.end(), [this](const auto& item) { return item.id == selected; });
+    return found == cameras.end() ? nullptr : &*found;
+}
+
+// Why the selected camera can't take the current tool, if it can't.
+juce::String MotionCompositionView::cameraBlocker() const {
+    const auto* found = selectedCamera();
+    if (found == nullptr) { return {}; }
+    if (found->id == lockedCamera) { return "You're looking through this camera: move the view to move it"; }
+    return toolApplies(tool) ? juce::String() : juce::String("This camera is aimed by Look at: move it, or clear Look at to turn it");
+}
+
 bool MotionCompositionView::editable(double time) const {
     const auto& project = processor.document.project();
+    if (selectedCamera() != nullptr) { return cameraBlocker().isEmpty(); }
     if (motion::findGroup(project, selected) != nullptr) {
         // A group moves while anything it holds is shown and unlocked.
         return std::any_of(project.tracks.begin(), project.tracks.end(), [&](const auto& track) {
@@ -1268,7 +1406,8 @@ bool MotionCompositionView::beginGesture(double time) {
     }
     gizmoAtDown = motion::editor::gizmoFrameFor(processor.document.project(), selected, time);
     if (!editable(time) || !gizmoAtDown.has_value()) {
-        dragHint = "Edit this object's transform in Properties";
+        const auto blocker = cameraBlocker();
+        dragHint = blocker.isNotEmpty() ? blocker : juce::String("Edit this object's transform in Properties");
         return false;
     }
     // A plain click only selects: the document is touched only once the
@@ -1332,9 +1471,18 @@ bool MotionCompositionView::validGesture() {
     return edit.active();
 }
 
-juce::Rectangle<float> MotionCompositionView::outputFrame() const {
+juce::Rectangle<float> MotionCompositionView::scopeFrame() const {
     const auto size = std::max(10, std::min(getWidth(), getHeight()) - 48);
     return getLocalBounds().toFloat().withSizeKeepingCentre(size, size);
+}
+
+// Looking through a camera, the frame is the Scope's own square, which shows a
+// little past the output's -1 to 1, so the Scene lines up with it exactly.
+juce::Rectangle<float> MotionCompositionView::outputFrame() const {
+    const auto frame = scopeFrame();
+    if (lockedCamera == 0) { return frame; }
+    const auto reach = static_cast<float>(motion::squareScope().x);
+    return frame.withSizeKeepingCentre(frame.getWidth() / reach, frame.getHeight() / reach);
 }
 
 motion::editor::Vec2 MotionCompositionView::normalized(juce::Point<float> point) const {
@@ -1397,7 +1545,24 @@ std::optional<MotionCompositionView::Pose> MotionCompositionView::documentPose(m
 
 void MotionCompositionView::syncCamera() {
     if (lockedCamera == 0) { return; }
+    // Following the output, a cut moves the view on to the next camera.
+    if (followingOutput) {
+        const auto showing = outputCamera();
+        if (showing != 0 && showing != lockedCamera) {
+            lockedCamera = showing;
+            lastPose.reset();
+            if (onDrivenCameraChanged) { onDrivenCameraChanged(lockedCamera); }
+        }
+    }
     const auto view = viewPose();
+    // Navigating away from a camera the view can't move lets it go, the view
+    // carrying on from where the camera was.
+    if (lastPose.has_value() && !(view == *lastPose) && camera.rig.has_value()) {
+        camera.rig.reset();
+        viewBeforeLock.reset();
+        setDrivenCamera(0);
+        return;
+    }
     // The view drives the camera only while the transport is stopped.
     if (lastPose.has_value() && !(view == *lastPose) && !processor.playing.load() && documentPose(lockedCamera).has_value()) {
         const auto id = lockedCamera;
@@ -1426,12 +1591,43 @@ void MotionCompositionView::syncCamera() {
         lastPose = view;
         return;
     }
-    const auto pose = documentPose(lockedCamera);
-    if (!pose.has_value()) {
-        setDrivenCamera(0);
+    if (!followCamera()) {
+        if (lockedCamera != 0 && !cameraExists(lockedCamera)) { setDrivenCamera(0); }
         return;
     }
-    if (lastPose.has_value() && *pose == *lastPose) { return; }
+    repaint();
+}
+
+// The view takes the camera's, when it has moved (playback, an undo, the
+// inspector): a free camera's pose, which the view can then move, or a rigged
+// camera's exact frame, which it only shows.
+bool MotionCompositionView::followCamera() {
+    if (lockedCamera == 0) { return false; }
+    auto pose = documentPose(lockedCamera);
+    if (!pose.has_value()) {
+        const auto* found = prepared != nullptr ? prepared->camera(lockedCamera) : nullptr;
+        const auto frame = found != nullptr ? found->frame(cameraTime()) : std::nullopt;
+        if (!frame.has_value()) { return false; }
+        const motion::editor::Camera::View rig {frame->position, frame->forward, frame->right, frame->up, 1 / frame->focalLength};
+        if (camera.rig.has_value() && camera.rig->position == rig.position && camera.rig->forward == rig.forward && camera.rig->up == rig.up && camera.rig->tangent == rig.tangent) { return false; }
+        // Its yaw and pitch too, so a navigation away carries on from here.
+        const auto distance = std::clamp(camera.distance() > 0 ? camera.distance() : 4.0, motion::editor::Camera::minimumDistance, motion::editor::Camera::maximumDistance);
+        camera.rig.reset();
+        camera.position = rig.position;
+        camera.pitch = std::clamp(std::asin(std::clamp(rig.forward.y, -1.0, 1.0)), -motion::editor::Camera::pitchLimit, motion::editor::Camera::pitchLimit);
+        camera.yaw = std::atan2(rig.forward.x, -rig.forward.z);
+        camera.fovDegrees = std::clamp(2 * std::atan(rig.tangent) * 180 / std::numbers::pi, 1.0, 150.0);
+        camera.pivot = camera.position + rig.forward * distance;
+        camera.rig = rig;
+        lastPose = viewPose();
+        return true;
+    }
+    camera.rig.reset();
+    // As the view can show it, so a camera past its limits still matches the
+    // view once shown, rather than being shown again every tick.
+    pose->pitch = std::clamp(pose->pitch, -motion::editor::Camera::pitchLimit * 180 / std::numbers::pi, motion::editor::Camera::pitchLimit * 180 / std::numbers::pi);
+    pose->fov = std::clamp(pose->fov, 1.0, 150.0);
+    if (lastPose.has_value() && pose->near(*lastPose)) { return false; }
     const auto distance = std::clamp(camera.distance() > 0 ? camera.distance() : 4.0, motion::editor::Camera::minimumDistance, motion::editor::Camera::maximumDistance);
     camera.position = {pose->x, pose->y, pose->z};
     camera.pitch = std::clamp(pose->pitch * std::numbers::pi / 180, -motion::editor::Camera::pitchLimit, motion::editor::Camera::pitchLimit);
@@ -1439,7 +1635,12 @@ void MotionCompositionView::syncCamera() {
     camera.fovDegrees = std::clamp(pose->fov, 1.0, 150.0);
     camera.pivot = camera.position + camera.forward() * distance;
     lastPose = viewPose();
-    repaint();
+    return true;
+}
+
+bool MotionCompositionView::cameraExists(motion::Id id) const {
+    const auto& cameras = processor.document.project().cameras;
+    return std::any_of(cameras.begin(), cameras.end(), [id](const auto& item) { return item.id == id; });
 }
 
 std::optional<motion::ui::generator_handles::Context> MotionCompositionView::handleContext() const {

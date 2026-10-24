@@ -56,7 +56,26 @@ MotionProcessor::MotionProcessor()
         if (!(recordingParameters.getCanvasSize() == frame)) { recordingParameters.setCanvasSize(frame); }
         prepareComposition(project);
     };
+    // A new project starts with a camera, so the frame shows in the Scene
+    // from the first, and it can be picked and moved like anything else.
+    auto fresh = document.mainProject();
+    motion::Camera camera;
+    camera.id = document.newId();
+    camera.name = "Camera 1";
+    fresh.cameras.push_back(camera);
+    document.reset(std::move(fresh));
     document.onChanged();
+}
+
+double MotionProcessor::shownPosition() const {
+    const auto at = position.load();
+    const auto advance = positionAdvance.load(std::memory_order_relaxed);
+    if (advance <= 0) { return at; }
+    const auto elapsed = std::clamp((juce::Time::getMillisecondCounterHiRes() - positionStamp.load(std::memory_order_relaxed)) / 1000.0, 0.0, 2 * blockSeconds.load(std::memory_order_relaxed));
+    auto time = at + elapsed * advance;
+    const auto start = loopStart.load(), end = loopEnd.load();
+    if (looping.load() && end > start && at < end && time >= end) { time = start + (time - end); }
+    return std::min(time, document.mainProject().duration);
 }
 
 MotionProcessor::~MotionProcessor() {
@@ -249,6 +268,10 @@ void MotionProcessor::processChunk(juce::AudioBuffer<float>& buffer) {
     beamSimplified.store(beam.plannedSimplified(), std::memory_order_relaxed);
     audioTime = static_cast<double>(audioSample) / sampleRate;
     position.store(audioTime);
+    // When, and how fast, so the editor can move its playhead between blocks.
+    positionStamp.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
+    positionAdvance.store(running ? speed : 0.0, std::memory_order_relaxed);
+    blockSeconds.store(count / sampleRate, std::memory_order_relaxed);
     const auto picture = prepared->beam.at(audioTime);
     for (std::size_t index = 0; index < picture.size(); ++index) { scopeBeam[index].store(picture[index], std::memory_order_relaxed); }
     juce::AudioBuffer<float> block(signal.getArrayOfWritePointers(), 6, count);

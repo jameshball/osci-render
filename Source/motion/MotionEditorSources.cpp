@@ -898,19 +898,48 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
     }
     // The drawing takes over the Scene; the Scope shows it live as a beam.
     drawingAsset = asset;
+    drawingMade.reset();
     auto& editor = openSceneEditor(std::make_unique<MotionDrawingEditor>(initial, name, asset != 0));
-    editor.onChanged = [this] { previewDrawing(); };
+    editor.onChanged = [this] {
+        if (drawingAsset == 0) { addDrawingSource(); }
+        previewDrawing();
+    };
+    // Cancelling a new drawing takes away the source and clip it made.
+    editor.onCancel = [this] {
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] {
+            if (owner == nullptr) { return; }
+            const auto made = owner->drawingMade;
+            owner->closeSceneEditor();
+            if (!made.has_value()) { return; }
+            owner->processor.document.edit("Discard drawing", [made](motion::Project& project) {
+                project.tracks.eraseIf([&](const auto& track) { return track.id == made->second; });
+                std::erase_if(project.assets, [&](const auto& item) { return item->id == made->first; });
+            });
+            owner->assetLibrary.refresh();
+        });
+    };
+    // Done keeps the drawing in its source, renamed as its header says.
     editor.onDone = [this](const motion::drawing::Drawing& drawing, const juce::String& text) {
-        const auto file = writeTemporary("drawings", juce::File::createLegalFileName(text) + ".svg", motion::drawing::toSvg(drawing));
-        if (!file.has_value()) {
-            statusBar.show("Couldn't save the drawing.");
+        const auto found = motion::findAsset(processor.document.project().assets, drawingAsset);
+        if (found == nullptr) { return; }
+        auto asset = std::make_shared<motion::Asset>(*found);
+        const auto svg = motion::drawing::toSvg(drawing);
+        asset->data.reset();
+        asset->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
+        if (text != found->name.upToLastOccurrenceOf(".", false, false)) { asset->name = motion::Document::uniqueAssetName(processor.document.mainProject(), text + ".svg"); }
+        if (motion::decodeAsset(*asset).failed()) {
+            statusBar.show("Couldn't keep the drawing.");
             return;
         }
-        const auto asset = drawingAsset;
-        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), file = *file, asset] {
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), asset = std::shared_ptr<const motion::Asset>(asset)] {
             if (owner == nullptr) { return; }
             owner->closeSceneEditor();
-            owner->importSourceFile(file, asset);
+            owner->processor.document.edit("Edit drawing", [asset](motion::Project& project) {
+                for (auto& item : project.assets) {
+                    if (item->id == asset->id) { item = asset; }
+                }
+            });
+            owner->assetLibrary.refresh();
         });
     };
     resized();
@@ -1077,6 +1106,34 @@ void MotionEditor::previewText() {
         return;
     }
     previewSource(asset, asset->id, {});
+}
+
+void MotionEditor::addDrawingSource() {
+    const auto* editor = sceneEditorAs<MotionDrawingEditor>();
+    if (editor == nullptr || editor->current().empty()) { return; }
+    auto& document = processor.document;
+    auto asset = std::make_shared<motion::Asset>();
+    asset->id = document.newId();
+    asset->name = motion::Document::uniqueAssetName(document.mainProject(), editor->currentName() + ".svg");
+    asset->extension = ".svg";
+    const auto svg = motion::drawing::toSvg(editor->current());
+    asset->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
+    if (motion::decodeAsset(*asset).failed()) { return; }
+    auto clip = motion::Document::makeClip(document.newId(), *asset, document.project().frameTime(processor.position.load()));
+    motion::Track track;
+    track.id = document.newId();
+    track.name = editor->currentName().toStdString();
+    track.insert(clip, document.project().tempo());
+    document.edit("Add drawing", [&](motion::Project& project) {
+        project.assets.push_back(asset);
+        project.tracks.push_back(track);
+        project.duration = std::max(project.duration, clip.timing(project.tempo()).end());
+    });
+    drawingAsset = asset->id;
+    drawingMade = std::pair {asset->id, track.id};
+    assetLibrary.refresh();
+    assetLibrary.selectAsset(asset->id);
+    select(clip.id);
 }
 
 // The drawing in progress on the output: an edited source is swapped in place;

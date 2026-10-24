@@ -26,9 +26,6 @@ inline bool bends(const PreparedEffect& effect) {
     if (!effect.enabled) { return false; }
     switch (effect.kind) {
         case EffectKind::colour:
-        case EffectKind::rotate:
-        case EffectKind::scale:
-        case EffectKind::translate:
         case EffectKind::skew:
             return false;
         default:

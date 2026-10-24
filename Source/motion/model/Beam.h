@@ -16,5 +16,12 @@ struct Beam {
     PropertyMap properties = defaultProperties(beamPropertySpecs);
 
     bool valid() const { return id == beamIdentity && validProperties(properties, beamPropertySpecs); }
+    // How many times a second it draws the picture at `time`, by its keys
+    // (modulation moves it only as it plays).
+    double frequencyAt(double time) const {
+        const auto& spec = beamPropertySpecs[beamFrequencyIndex];
+        const auto found = properties.find(std::string(spec.id));
+        return found != properties.end() ? spec.clamp(found->second.evaluate(time)) : spec.defaultValue;
+    }
 };
 }

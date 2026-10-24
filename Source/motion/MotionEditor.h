@@ -173,6 +173,8 @@ private:
     std::shared_ptr<ProjectLoad> projectLoad;
     juce::Component::SafePointer<osci::OverlayComponent> projectLoadOverlay;
     void timerCallback() override;
+    void displayFrame();
+    double lastDisplayFrame = 0, shownPlayhead = 0, sceneDue = 0;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     // Brings every view up to date with the document after an edit.
     void refreshFromDocument();
@@ -196,9 +198,18 @@ private:
     void refreshInspector();
     bool selectionExists() const;
     bool selectionIsCamera() const;
-    motion::Id toolCamera() const;
     void refreshCameraTools();
-    void addCamera(double time);
+    // `fromView`: where the Scene is looking from, rather than as the camera
+    // on the output at `time` is.
+    motion::Id addCamera(double time, bool fromView = false);
+    // Looks through the selected camera, else the one on the Scope at the
+    // playhead (following its cuts), else a new one made from the view.
+    void setLookingThrough(bool on);
+    // Selects `camera` and looks through it (a double-click or a menu).
+    void lookThrough(motion::Id camera) {
+        select(camera);
+        setLookingThrough(true);
+    }
     // An effect dragged over `owner` plays there: a new one of `type` at the
     // end of its stack, or the card `effect` moved (copied, with Alt) there.
     void previewEffect(const std::string& type, std::optional<motion::Id> owner);
@@ -228,7 +239,12 @@ private:
     void addGenerator(const motion::GeneratorDefinition& definition, std::optional<motion::LightPreset> preset = std::nullopt, std::string_view named = {}, const motion::PropertyMap& settings = {});
     void addMirror(const motion::MirrorPreset& preset);
     void previewDrawing();
+    // A new drawing becomes a source with a clip of its own at the playhead
+    // as soon as it has a stroke, and is edited from then on.
+    void addDrawingSource();
     motion::Id drawingAsset = 0;
+    // The source and track a new drawing made, taken away again by Cancel.
+    std::optional<std::pair<motion::Id, motion::Id>> drawingMade;
     // Text sources are written in the Scene, with the Scope previewing them.
     void showTextEditor(SourceRequest request);
     void previewText();
@@ -266,6 +282,11 @@ private:
     // `chosen`: the user picked this property; otherwise a new target opens
     // on its first animated channel.
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen = false);
+    // A modulate glyph's click, wherever the row is: its curve, shown in the Graph.
+    void modulate(motion::Id id, const std::string& property, bool camera) {
+        selectCurveTarget(id, property, camera, true);
+        timelineTabs.setSelectedIndex(1);
+    }
     // `leaveOutLive`: export without the clips of live sources.
     // Audio as an Output choice plays it: the project's audio, or the beam.
     void exportSignal(MotionProcessor::OutputMode mode, bool leaveOutLive = false);
@@ -518,6 +539,9 @@ private:
     MotionOutputPanel::Device outputDevice() const;
     MotionPropertyInspector propertyInspector;
     MotionStatusBar statusBar;
+    // Errors and warnings, raised above the status bar so they're seen.
+    MotionStatusAlert alert;
+    void layoutAlert();
     // When a frame was last simplified to fit the beam's time.
     double overloadSeenAt = -1.0e9;
     motion::Id selection = 0;
@@ -568,4 +592,6 @@ private:
     osci::PanelHeader inspectorHeader;
     osci::PanelHeader timelineHeader { "Timeline" };
     juce::Rectangle<int> libraryBounds, viewportBounds, inspectorBounds, timelineBounds;
+    // Last, so it stops before anything it moves goes.
+    juce::VBlankAttachment displaySync { this, [this] { displayFrame(); } };
 };

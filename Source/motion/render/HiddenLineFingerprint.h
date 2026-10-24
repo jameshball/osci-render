@@ -87,7 +87,7 @@ private:
             const auto parameters = effect.parametersAt(time);
             add(parameters.active ? 1.0 : 0.0);
             if (!parameters.active) { continue; }
-            add(static_cast<double>(effect.kind), parameters.wobble);
+            add(static_cast<double>(effect.kind));
             for (std::size_t index = 0; index < effect.count; ++index) { add(parameters.values[index]); }
         }
     }

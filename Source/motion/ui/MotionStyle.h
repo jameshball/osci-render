@@ -590,6 +590,21 @@ inline void styleHeading(juce::Label& label, const juce::String& text) {
     label.setColour(juce::Label::textColourId, osci::Colours::text());
     label.setBorderSize({});
 }
+// A label's editor fills the label from its left edge, under a caption laid
+// over the field; this keeps the typed text where the shown text sits.
+inline void editInPlace(juce::Label& label) {
+    struct Placer : juce::Label::Listener {
+        void labelTextChanged(juce::Label*) override {}
+        void editorShown(juce::Label* shown, juce::TextEditor& editor) override {
+            editor.setJustification(shown->getJustificationType());
+            editor.setIndents(0, 0);
+            editor.setBorder(shown->getBorderSize());
+        }
+    };
+    static Placer placer;
+    // Adding a listener twice is a no-op, so this is safe on every layout.
+    label.addListener(&placer);
+}
 // Two fields to a row, each with its caption inside on the left as X, Y
 // and Z carry their axis, and the value on the right. They share the left
 // and right edges of Properties' value columns, clear of the keys' gutter;
@@ -621,7 +636,10 @@ inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, cou
             fields[index]->setBounds(cell);
             caption.setBounds(cell.withTrimmedLeft(6).withWidth(width));
             auto* label = dynamic_cast<juce::Label*>(fields[index]);
-            if (label != nullptr) { label->setBorderSize({0, 6 + width + 4, 0, 6}); }
+            if (label != nullptr) {
+                label->setBorderSize({0, 6 + width + 4, 0, 6});
+                editInPlace(*label);
+            }
             caption.toFront(false);
         }
     }

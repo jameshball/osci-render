@@ -54,17 +54,6 @@ struct PreparedLight {
 // editorGeometry: the editor's shapes, rebuilt during drags.
 enum class CompositionPurpose { signal, culling, editorGeometry };
 
-// The beam's base frequency: whole cycles per video frame, `cycles` of them,
-// or (0) as few as reach 45 Hz so scopes do not flicker.
-inline double automaticBeamCycles(double frameRate) {
-    if (!std::isfinite(frameRate) || frameRate <= 0) { return 1; }
-    return std::max(1.0, std::ceil(45.0 / frameRate - 1.0e-9));
-}
-inline double beamCycleRate(double frameRate, int cycles = 0) {
-    if (!std::isfinite(frameRate) || frameRate <= 0) { return 60; }
-    return frameRate * (cycles > 0 ? static_cast<double>(cycles) : automaticBeamCycles(frameRate));
-}
-
 // The Scope's picture in project time: each beam property's curve with its
 // routes, clamped to the visualiser's range (keys and modulation can
 // overshoot). Allocation-free, for the audio and offline render threads.
@@ -83,13 +72,17 @@ struct PreparedBeam {
     }
 };
 
-// What the Scope shows of a square canvas: a little past -1 to 1.
-inline hidden::Reach squareScope() { return hidden::Reach::ofCanvas(1, 1, VisualiserGeometry::signalGain); }
+// What the Scope shows of a canvas `width` by `height`: a little past -1 to 1,
+// so a beam at the edge is whole. Everything drawn to match the Scope (bakes,
+// exports, the Scene looking through a camera, cameras' frames, the drawing
+// editor's) takes its extent from here.
+inline hidden::Reach scopeReach(int width = 1, int height = 1) { return hidden::Reach::ofCanvas(width, height, VisualiserGeometry::signalGain); }
+inline hidden::Reach squareScope() { return scopeReach(); }
 
 struct PreparedComposition {
     // `sharedLoudness`: the project's soundtrack loudness, already built (a
     // bake's, for its workers), so it is not built again.
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = squareScope(), std::shared_ptr<const SoundtrackEnvelope> sharedLoudness = nullptr) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate, project.beamCycles)), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), loudness(std::move(sharedLoudness)), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal, hidden::Reach reach = squareScope(), std::shared_ptr<const SoundtrackEnvelope> sharedLoudness = nullptr) : duration(project.duration), sampleRate(destinationSampleRate), scope(project.scope), soundtrack(project, cancel), hiddenLineReach(reach), loudness(std::move(sharedLoudness)), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         // Editor geometry is rebuilt during drags; loudness modulation only
         // matters to the signal (and what bakes it), so the envelope is built
@@ -142,6 +135,8 @@ struct PreparedComposition {
             beam.curves[index] = curveOrDefault(project.beam.properties, beamPropertySpecs[index]);
             drivers.driveBeam(beam.curves[index], project, beamPropertySpecs[index].id);
         }
+        beamRate = beam.value(beamFrequencyIndex, 0);
+        steadyBeamRate = beam.curves[beamFrequencyIndex].steady();
         for (const auto& cut : project.cameraCuts) {
             const auto camera = std::find_if(cameras.begin(), cameras.end(), [&](const auto& item) { return item.id == cut.camera; });
             if (cut.valid() && camera != cameras.end()) {
@@ -299,7 +294,11 @@ struct PreparedComposition {
         return {};
     }
 
-    const PreparedCamera* activeCamera(double time) const {
+    const PreparedCamera* camera(Id id) const {
+        const auto found = std::find_if(cameras.begin(), cameras.end(), [id](const auto& item) { return item.id == id; });
+        return found == cameras.end() ? nullptr : &*found;
+    }
+        const PreparedCamera* activeCamera(double time) const {
         if (cameras.empty()) {
             return nullptr;
         }
@@ -437,7 +436,12 @@ public:
 
     double duration;
     double sampleRate = 48000;
+    // How many times a second the beam draws the picture: the Scope's
+    // Frequency, at the start (`beamRate`) or at `time` when it is keyed or
+    // modulated.
     double beamRate = 60;
+    bool steadyBeamRate = true;
+    double beamRateAt(double time) const { return steadyBeamRate ? beamRate : beam.value(beamFrequencyIndex, time); }
     ScopeProfile scope;
     std::uint64_t publicationRevision = 0;
     juce::String preparationError;

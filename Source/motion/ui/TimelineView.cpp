@@ -109,19 +109,35 @@ std::vector<motion::Id> MotionTimelineView::tracksToGroup() const {
     return result;
 }
 
+// The picked rows: tracks, and groups (which go with all they hold).
 std::vector<motion::Id> MotionTimelineView::pickedTracks() const {
     std::vector<motion::Id> result;
-    for (const auto& track : processor.document.project().tracks) {
-        if (selectedTracks.size() > 1 ? selectedTracks.contains(track.id) : track.id == selected) { result.push_back(track.id); }
+    const auto picked = [this](motion::Id id) { return selectedTracks.size() > 1 ? selectedTracks.contains(id) : id == selected; };
+    const auto& project = processor.document.project();
+    for (const auto& track : project.tracks) {
+        if (picked(track.id)) { result.push_back(track.id); }
+    }
+    for (const auto& group : project.groups) {
+        if (picked(group.id)) { result.push_back(group.id); }
     }
     return result;
 }
 
 void MotionTimelineView::deleteTracks(const std::vector<motion::Id>& ids) {
     if (ids.empty()) { return; }
-    const std::set<motion::Id> doomed(ids.begin(), ids.end());
-    processor.document.edit(ids.size() == 1 ? juce::String("Delete track") : "Delete " + juce::String(static_cast<int>(ids.size())) + " tracks", [&doomed](motion::Project& project) {
-        project.tracks.eraseIf([&doomed](const auto& item) { return doomed.contains(item.id); });
+    const auto& project = processor.document.project();
+    const auto groups = std::count_if(ids.begin(), ids.end(), [&project](motion::Id id) { return motion::findGroup(project, id) != nullptr; });
+    const auto count = juce::String(static_cast<int>(ids.size()));
+    const auto name = ids.size() == 1 ? juce::String(groups == 1 ? "Delete group" : "Delete track") : "Delete " + count + (groups == 0 ? " tracks" : " rows");
+    processor.document.edit(name, [doomed = std::set<motion::Id>(ids.begin(), ids.end())](motion::Project& project) mutable {
+        // A group takes the groups and tracks nested in it.
+        for (std::size_t depth = 0; depth < motion::maximumGroupDepth; ++depth) {
+            for (const auto& group : project.groups) {
+                if (doomed.contains(group.parent)) { doomed.insert(group.id); }
+            }
+        }
+        project.tracks.eraseIf([&doomed](const auto& track) { return doomed.contains(track.id) || doomed.contains(track.group); });
+        std::erase_if(project.groups, [&doomed](const auto& group) { return doomed.contains(group.id); });
     });
     selectedTracks.clear();
     refreshTracks();
@@ -475,19 +491,18 @@ void MotionTimelineView::paintOverChildren(juce::Graphics& g) {
     paintPlayhead(g);
 }
 
-std::optional<int> MotionTimelineView::playheadX() const {
-    const auto x = timeX(processor.position.load());
+std::optional<float> MotionTimelineView::playheadX(double time) const {
+    const auto x = static_cast<float>(namesWidth + std::clamp((time - scrollTime) * pixelsPerSecond, -1.0e6, 1.0e6));
     if (x < namesWidth || x > getWidth()) { return std::nullopt; }
     return x;
 }
 
 void MotionTimelineView::paintPlayhead(juce::Graphics& g) {
-    const auto x = playheadX();
-    playheadStrip.drawn(x);
+    const auto x = playheadX(playheadStrip.time());
     if (!x.has_value()) { return; }
     const auto playhead = *x;
     g.setColour(motion::style::playhead());
-    g.drawVerticalLine(playhead, 0, static_cast<float>(getHeight()));
+    g.fillRect(juce::Rectangle<float>(playhead - .5f, 0, 1, static_cast<float>(getHeight())));
     juce::Path head;
     head.addTriangle(playhead - 5, 0, playhead + 5, 0, playhead, 8);
     g.fillPath(head);
@@ -1111,6 +1126,13 @@ void MotionTimelineView::mouseDoubleClick(const juce::MouseEvent& event) {
     }
     const auto* marker = markerAt(event.getPosition());
     if (marker != nullptr && onEditMarker) { onEditMarker(marker->id, marker->time); return; }
+    // A camera's shot: look through the camera.
+    if (inCameraBand(event.y) && event.x >= namesWidth) {
+        const auto* cut = cutAt(event.getPosition());
+        const auto camera = cameraAt(cut != nullptr ? cut->id : motion::Id(0));
+        if (camera != 0 && onLookThrough) { onLookThrough(camera); }
+        return;
+    }
     int row = 0;
     const auto* clip = clipAt(event.getPosition(), row);
     if (clip != nullptr && clip->composition != 0 && onEnterComposition) { onEnterComposition(clip->id); return; }

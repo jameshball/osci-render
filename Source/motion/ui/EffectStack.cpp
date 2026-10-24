@@ -36,7 +36,7 @@ void MotionEffectStack::setDragActive(bool active) {
 int MotionEffectStack::preferredHeight() const {
     if (!owner.has_value()) { return 0; }
     int height = 0;
-    for (const auto& card : cards) { height += card->preferredHeight() + motion::style::gap; }
+    for (const auto& card : cards) { height += card->preferredHeight() + Card::spacing; }
     // With none, the hint sits beside the heading, so nothing is left here
     // but the drop zone while an effect is dragged.
     if (cards.empty() && dragActive) { height += dropZoneHeight; }
@@ -52,15 +52,16 @@ void MotionEffectStack::refresh() {
         for (const auto& effect : *effects) { ids.push_back(effect.id); }
     }
     std::optional<motion::Id> added;
-    if (ids.size() == listed.size() + 1) {
+    if (owner == listedOwner && ids.size() == listed.size() + 1) {
         for (const auto id : ids) {
             if (std::find(listed.begin(), listed.end(), id) == listed.end()) { added = id; }
         }
     }
-    if (ids != listed) {
+    if (ids != listed || owner != listedOwner) {
         cancelGesture();
         cancelledGesture = false;
         listed = ids;
+        listedOwner = owner;
         cards.clear();
         cardShift.clear();
         // A hover over the old cards no longer names a card here.
@@ -86,9 +87,8 @@ void MotionEffectStack::refresh() {
 void MotionEffectStack::resized() {
     auto area = getLocalBounds();
     for (std::size_t index = 0; index < cards.size(); ++index) {
-        cards[index]->setRuled(index > 0);
         cards[index]->setBounds(area.removeFromTop(cards[index]->preferredHeight()));
-        area.removeFromTop(motion::style::gap);
+        area.removeFromTop(Card::spacing);
     }
     dropZone = dragActive && cards.empty() ? area.removeFromTop(dropZoneHeight) : juce::Rectangle<int>();
     // Where effects come from, said beside the heading while there are none.
@@ -140,7 +140,7 @@ void MotionEffectStack::itemDragMove(const SourceDetails& details) {
     const auto found = std::find(listed.begin(), listed.end(), moving);
     dragged = found != listed.end() ? static_cast<int>(found - listed.begin()) : -1;
     gapIndex = cards.empty() ? -1 : insertionIndex(details.localPosition.y);
-    gapHeight = dragged >= 0 ? cards[static_cast<std::size_t>(dragged)]->getHeight() + motion::style::gap : 40;
+    gapHeight = dragged >= 0 ? cards[static_cast<std::size_t>(dragged)]->getHeight() + Card::spacing : 40;
     // Restarting a running timer on every move would postpone its ticks.
     if (!cardAnimation.isTimerRunning()) { cardAnimation.startTimerHz(60); }
     repaint();
@@ -219,7 +219,7 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->field.onCancel = [this] { stack.cancelGesture(); update(); };
         row->field.onCommit = [this, property](double value) { stack.commitValue(id, property, value); };
         row->key.onClick = [this, property] { stack.toggleKey(id, property); };
-        row->modulate.onClick = [this, property] { if (stack.onPropertySelected) { stack.onPropertySelected(id, property); } };
+        row->modulate.onClick = [this, property] { if (stack.onModulate) { stack.onModulate(id, property); } };
         row->previous.onClick = [this, property] { jump(property, false); };
         row->next.onClick = [this, property] { jump(property, true); };
         row->addAndMakeVisible(row->field);
@@ -283,7 +283,7 @@ void MotionEffectStack::Card::jump(const std::string& property, bool forward) {
 }
 
 void MotionEffectStack::Card::resized() {
-    auto area = getLocalBounds();
+    auto area = getLocalBounds().reduced(inset, 0);
     // The header starts where the rows' names do, as a section's heading.
     auto header = area.removeFromTop(headerHeight);
     fold = header.removeFromLeft(12).toFloat();
@@ -300,17 +300,19 @@ void MotionEffectStack::Card::resized() {
 }
 
 void MotionEffectStack::Card::paint(juce::Graphics& g) {
-    if (ruled) {
-        g.setColour(motion::style::hairline());
-        g.fillRect(0, 0, getWidth(), 1);
-    }
-    const auto header = getLocalBounds().removeFromTop(headerHeight);
+    // Each effect is a card of its own, set off from the panel and the next.
+    const auto frame = getLocalBounds().toFloat();
+    g.setColour(osci::Colours::text().withAlpha(.025f));
+    g.fillRoundedRectangle(frame, motion::style::radiusPanel);
+    g.setColour(motion::style::hairline());
+    g.drawRoundedRectangle(frame.reduced(.5f), motion::style::radiusPanel, 1.0f);
+    const auto header = getLocalBounds().reduced(inset, 0).removeFromTop(headerHeight);
     // Hovered, the header brightens: it folds at a click, and drags.
     const auto hovered = isMouseOver(true) && getMouseXYRelative().y < headerHeight;
     motion::style::drawFold(g, fold.withSizeKeepingCentre(8, 8), !folded(), hovered ? osci::Colours::text() : osci::Colours::textMuted());
     g.setColour(osci::Colours::text().withAlpha(enabled ? (hovered ? 1.0f : .9f) : .45f));
     g.setFont(motion::style::heading());
-    const auto nameArea = header.withTrimmedLeft(power.getRight() + 8).withTrimmedRight(getWidth() - close.getX() + 4);
+    const auto nameArea = header.withLeft(power.getRight() + 8).withRight(close.getX() - 4);
     g.drawText(name, nameArea, juce::Justification::centredLeft, true);
 }
 

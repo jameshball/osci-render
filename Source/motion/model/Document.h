@@ -183,10 +183,6 @@ struct Project : Composition {
     // are, resampled to the audio device as it plays. Higher draws more of
     // the beam each frame, for a dense scene drawn cleanly.
     double sampleRate = defaultSampleRate;
-    // Whole times each frame is drawn: the beam's base frequency is the frame
-    // rate times this. 0: as few as reach 45 Hz, so scopes don't flicker.
-    int beamCycles = 0;
-    static constexpr int mostBeamCycles = 8;
     ExportSettings exportSettings;
     // What the project is, in a sentence or two: shown under its name on
     // the start screen.
@@ -361,10 +357,11 @@ public:
     static juce::Result applyCutRange(Project& project, Id cut, double start, double end);
     juce::Result removeCut(Id cut);
     // Adds a camera framed like the one showing at `time`, so the output does
-    // not jump. The first camera is the default view; later ones cut in at
-    // `time`. One undo step.
-    juce::Result addCamera(double time, Id& cameraId);
-    // Removes a camera and its cuts.
+    // not jump, or, given a `pose` (its properties), placed there freely. The
+    // first camera is the default view; later ones cut in at `time`. One undo
+    // step.
+    juce::Result addCamera(double time, Id& cameraId, const PropertyMap& pose = {});
+    // Removes a camera and its cuts; never the last one.
     juce::Result removeCamera(Id camera);
     // Aims a camera at a clip or group origin (0: free) and/or places it in a
     // group's space (0: world).

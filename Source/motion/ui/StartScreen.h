@@ -14,6 +14,8 @@ struct StartCard {
     juce::Image picture;
     juce::File file;
     juce::String resource;
+    // The project open now, in a tile of its own: choosing it carries on.
+    bool open = false;
     bool isExample() const { return resource.isNotEmpty(); }
 };
 
@@ -30,9 +32,9 @@ public:
     };
     static constexpr int width = 896, height = 556;
 
-    // `continuing`: the name of the project open now, when it has anything
-    // in it to go back to.
-    StartScreen(std::vector<StartCard> recentCards, std::vector<StartCard> exampleCards, const juce::String& continuing, bool atStartup, const juce::String& version, Actions toTake)
+    // The project open now, when it has anything in it to go back to, leads
+    // `recentCards` as a card marked `open`.
+    StartScreen(std::vector<StartCard> recentCards, std::vector<StartCard> exampleCards, bool atStartup, const juce::String& version, Actions toTake)
         : actions(std::move(toTake)), versionText(version), grid(*this) {
         setName("Start screen");
         setWantsKeyboardFocus(false);
@@ -42,11 +44,6 @@ public:
         rows.getLast()->onClick = [this] { finish(actions.newProject); };
         rows.add(new RailRow("Open...", icons::Icon::folder, "Cmd+O"));
         rows.getLast()->onClick = [this] { finish(actions.openProject); };
-        if (continuing.isNotEmpty()) {
-            rows.add(new RailRow("Continue", icons::Icon::play, "Esc"));
-            rows.getLast()->detail = continuing;
-            rows.getLast()->onClick = [this] { finish({}); };
-        }
         rows.add(new RailRow("Keyboard shortcuts", icons::Icon::keyboard, "Cmd+/"));
         rows.getLast()->onClick = [this] { finish(actions.showShortcuts); };
         for (auto* row : rows) { addAndMakeVisible(row); }
@@ -196,7 +193,9 @@ private:
         overlay->requestDismiss();
     }
     void choose(const StartCard& card) {
-        if (card.isExample()) {
+        if (card.open) {
+            finish({});
+        } else if (card.isExample()) {
             finish([open = actions.openExample, resource = card.resource] { if (open != nullptr) { open(resource); } });
         } else {
             finish([open = actions.openRecent, file = card.file] { if (open != nullptr) { open(file); } });
@@ -339,7 +338,7 @@ private:
 
     // The cards: projects opened lately, then the examples, each a picture
     // with its name and a line about it.
-    class Grid final : public juce::Component, public juce::TooltipClient, private juce::Timer {
+    class Grid final : public juce::Component, private juce::Timer {
     public:
         explicit Grid(StartScreen& screen) : owner(screen) {
             setWantsKeyboardFocus(true);
@@ -452,15 +451,6 @@ private:
             owner.choose(*placed[static_cast<std::size_t>(std::max(0, selected))].card);
         }
 
-        juce::String getTooltip() override {
-            const auto index = cardAt(getMouseXYRelative());
-            if (index < 0) {
-                return {};
-            }
-            const auto& card = *placed[static_cast<std::size_t>(index)].card;
-            // What it is in full, and where it is.
-            return card.isExample() ? card.detail : card.detail + "\n" + card.file.getFullPathName();
-        }
         void mouseMove(const juce::MouseEvent& event) override { setHovered(cardAt(event.getPosition())); }
         void mouseExit(const juce::MouseEvent&) override { setHovered(-1); }
         void mouseDown(const juce::MouseEvent& event) override {
@@ -471,8 +461,8 @@ private:
             }
             const auto& card = *placed[static_cast<std::size_t>(index)].card;
             juce::PopupMenu menu;
-            menu.addItem(1, "Open");
-            if (!card.isExample()) {
+            menu.addItem(1, card.open ? "Continue" : "Open");
+            if (!card.isExample() && !card.open) {
 #if JUCE_MAC
                 menu.addItem(2, "Show in Finder");
 #elif JUCE_WINDOWS
@@ -639,6 +629,16 @@ private:
                 // A faint sheen along the top edge, as on glass.
                 g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(.05f), picture.getX(), picture.getY(), juce::Colours::transparentWhite, picture.getX(), picture.getY() + picture.getHeight() * .45f, false));
                 g.fillRect(picture);
+                if (card.open) {
+                    const auto badge = juce::Rectangle<float>(picture.getX() + 8, picture.getY() + 8, juce::TextLayout::getStringWidth(style::caption(), "Open now") + 26, 20);
+                    g.setColour(juce::Colours::black.withAlpha(.6f));
+                    g.fillRoundedRectangle(badge, 10.0f);
+                    g.setColour(style::accent());
+                    g.fillEllipse(badge.getX() + 7, badge.getCentreY() - 2.5f, 5, 5);
+                    g.setFont(style::caption());
+                    g.setColour(osci::Colours::text());
+                    g.drawText("Open now", badge.withTrimmedLeft(16), juce::Justification::centredLeft, false);
+                }
             }
             if (chosen) {
                 g.setColour(style::accent());

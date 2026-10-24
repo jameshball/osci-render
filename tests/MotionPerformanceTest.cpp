@@ -247,7 +247,7 @@ private:
         motion::Id next = 1;
         const auto still = drawnAsset(next++, 1, 256), animated = drawnAsset(next++, 30, 512);
         project.assets = {still, animated};
-        const std::array<const char*, 5> effects {"wobble", "twist", "polygon", "bitCrush", "perspective"};
+        const std::array<const char*, 5> effects {"swirl", "twist", "polygon", "bitCrush", "ripple"};
         std::vector<std::pair<motion::Id, std::string>> routable;
         for (int trackIndex = 0; trackIndex < scale.tracks; ++trackIndex) {
             motion::Track track;

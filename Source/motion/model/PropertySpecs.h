@@ -172,6 +172,9 @@ inline constexpr auto cameraHatchingIndex = specIndex(cameraPropertySpecs, "hatc
 
 // The Scope's picture: one row each, in the visualiser's own ranges.
 inline constexpr auto beamPropertySpecs = std::to_array<PropertySpec>({
+    // How many times a second the picture is drawn, whatever the frame rate:
+    // at 60 fps and 120 Hz each frame is drawn twice.
+    {"frequency", "Frequency", "Frequency", "", 10, 1000, 60, .1, 1, " Hz"},
     {"intensity", "Intensity", "Intensity", "", 0, 50, 5, .02, 2, ""},
     {"focus", "Focus", "Focus", "", .3, 10, 1, .02, 2, ""},
     {"persistence", "Persistence", "Persistence", "", 0, 6, .5, .01, 2, ""},
@@ -182,6 +185,8 @@ inline constexpr auto beamPropertySpecs = std::to_array<PropertySpec>({
     {"ambient", "Ambient", "Ambient", "", 0, 5, 0, .01, 2, ""},
     {"visualiserSmoothing", "Smoothing", "Smoothing", "", 0, 1, 0, .005, 2, ""},
 });
+
+inline constexpr auto beamFrequencyIndex = specIndex(beamPropertySpecs, "frequency");
 
 // Every list's properties are named, each differently.
 template <std::size_t size>

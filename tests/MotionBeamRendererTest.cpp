@@ -85,19 +85,40 @@ public:
     }
 
     void runTest() override {
-        beginTest("Cycle rates are whole multiples of the frame rate at or above 45 Hz");
-        expectEquals(motion::beamCycleRate(24), 48.0);
-        expectEquals(motion::beamCycleRate(25), 50.0);
-        expectEquals(motion::beamCycleRate(30), 60.0);
-        expectEquals(motion::beamCycleRate(60), 60.0);
-        expectEquals(motion::beamCycleRate(12), 48.0);
-        expectEquals(motion::beamCycleRate(120), 120.0);
-        expectWithinAbsoluteError(motion::beamCycleRate(29.97), 59.94, 1e-9);
+        beginTest("The beam draws at the Scope's frequency, whatever the frame rate, on a fixed grid of cycles");
+        {
+            auto drawn = project({{square(1, .1f), 0}});
+            drawn.frameRate = 24;
+            expectEquals(motion::PreparedComposition(drawn).beamRate, 60.0);
+            drawn.beam.properties["frequency"] = motion::Curve(137.5);
+            const motion::PreparedComposition composition(drawn);
+            expectEquals(composition.beamRate, 137.5);
+            expect(composition.steadyBeamRate);
+        }
         for (const double rate : {44100.0, 47999.0, 48000.0, 192000.0}) {
             for (std::int64_t index : {0ll, 1ll, 799ll, 800ll, 801ll, 123456ll, 9999999ll}) {
                 const auto cycle = motion::BeamRenderer::cycleOf(index, rate, 60);
                 expect(motion::BeamRenderer::cycleStart(cycle, rate, 60) <= index && index < motion::BeamRenderer::cycleStart(cycle + 1, rate, 60));
             }
+        }
+
+        beginTest("A keyed frequency sets each cycle's length where the cycle starts");
+        {
+            auto keyed = project({{square(1, .1f), 0}});
+            auto& frequency = keyed.beam.properties["frequency"];
+            frequency.setKey({0, 50, motion::Interpolation::hold});
+            frequency.setKey({1, 200, motion::Interpolation::hold});
+            const double rate = 48000;
+            const motion::PreparedComposition composition(keyed, rate);
+            expect(!composition.steadyBeamRate);
+            motion::BeamRenderer beam;
+            // A second at 50 Hz, then a second at 200 Hz: about 50 and 200 plans.
+            for (std::int64_t index = 0; index < 48000; ++index) { beam.sample(composition, index / rate, index, rate, true, 1); }
+            const auto slow = beam.plansMade();
+            for (std::int64_t index = 48000; index < 96000; ++index) { beam.sample(composition, index / rate, index, rate, true, 1); }
+            const auto fast = beam.plansMade() - slow;
+            expect(slow >= 49 && slow <= 51, juce::String(static_cast<juce::int64>(slow)) + " cycles at 50 Hz");
+            expect(fast >= 199 && fast <= 201, juce::String(static_cast<juce::int64>(fast)) + " cycles at 200 Hz");
         }
 
         beginTest("Off normal speed, each beam cycle still plans once");
@@ -407,7 +428,7 @@ public:
             const double rate = 44100;
             const motion::PreparedComposition composition(layers, rate);
             const auto label = "profile " + juce::String(profile.dwellMicros) + "/" + juce::String(profile.travelMicrosPerUnit) + "/" + juce::String(profile.settleMicros);
-            expectEquals(composition.beamRate, 48.0);
+            expectEquals(composition.beamRate, 60.0);
             motion::BeamRenderer sequential;
             std::vector<osci::Point> reference;
             for (std::int64_t index = 0; index < 20000; ++index) { reference.push_back(sequential.sample(composition, index / rate, index, rate, true, 1)); }

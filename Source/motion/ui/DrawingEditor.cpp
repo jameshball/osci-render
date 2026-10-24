@@ -1,4 +1,5 @@
 #include "DrawingEditor.h"
+#include "../render/CompositionRenderer.h"
 
 MotionDrawingEditor::MotionDrawingEditor(motion::drawing::Drawing initial, const juce::String& initialName, bool editing) : drawing(std::move(initial)), mode(editing ? "Editing" : "New drawing") {
     setName("Drawing editor");
@@ -39,8 +40,9 @@ MotionDrawingEditor::MotionDrawingEditor(motion::drawing::Drawing initial, const
     addAndMakeVisible(name);
     cancelButton.setButtonText("Cancel");
     cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
-    doneButton.setButtonText(editing ? "Apply" : "Add");
-    doneButton.setTooltip((editing ? "Apply the drawing (" : "Add the drawing to the project (") + motion::style::shortcutText("Cmd+Return") + ")");
+    // A new drawing is in the project from its first stroke: Done only ends the editing.
+    doneButton.setButtonText("Done");
+    doneButton.setTooltip("Finish drawing (" + motion::style::shortcutText("Cmd+Return") + ")");
     motion::style::makePrimary(doneButton);
     doneButton.onClick = [this] { finish(); };
     for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
@@ -84,7 +86,9 @@ void MotionDrawingEditor::paint(juce::Graphics& g) {
         g.setColour(juce::Colours::white.withAlpha(line == 0 ? .12f : .04f));
         g.drawLine(juce::Line<float>(toScreen({low.x, line * .25f}), toScreen({high.x, line * .25f})), 1.0f);
     }
-    const auto frame = juce::Rectangle<float>(toScreen({-1, 1}), toScreen({1, -1}));
+    // What the Scope shows with the default camera.
+    const auto extent = static_cast<float>(motion::squareScope().x);
+    const auto frame = juce::Rectangle<float>(toScreen({-extent, extent}), toScreen({extent, -extent}));
     const float dashes[] {5.0f, 4.0f};
     g.setColour(juce::Colours::white.withAlpha(.3f));
     for (const auto& edge : {juce::Line<float>(frame.getTopLeft(), frame.getTopRight()), juce::Line<float>(frame.getTopRight(), frame.getBottomRight()), juce::Line<float>(frame.getBottomRight(), frame.getBottomLeft()), juce::Line<float>(frame.getBottomLeft(), frame.getTopLeft())}) {
@@ -551,12 +555,15 @@ void MotionDrawingEditor::deselect() {
     selectedAnchor = -1;
 }
 
+juce::String MotionDrawingEditor::currentName() const {
+    const auto text = name.getText().trim();
+    return text.isEmpty() ? juce::String("Drawing") : text;
+}
+
 void MotionDrawingEditor::finish() {
     finishStroke();
     if (drawing.empty()) { return; }
-    auto text = name.getText().trim();
-    if (text.isEmpty()) { text = "Drawing"; }
-    if (onDone) { onDone(drawing, text); }
+    if (onDone) { onDone(drawing, currentName()); }
 }
 
 void MotionDrawingEditor::remember() {

@@ -65,8 +65,8 @@ public:
                     clip.properties["rotation.z"].setKey({key * 4.0, key * 45.0, motion::Interpolation::cubic});
                 }
                 clip.properties["scale.x"].base = clip.properties["scale.y"].base = 0.2;
-                clip.effects.push_back(motion::makeEffect(document.newId(), *motion::effectDefinition("rotate")));
-                clip.effects.push_back(motion::makeEffect(document.newId(), *motion::effectDefinition("wobble")));
+                clip.effects.push_back(motion::makeEffect(document.newId(), *motion::effectDefinition("twist")));
+                clip.effects.push_back(motion::makeEffect(document.newId(), *motion::effectDefinition("ripple")));
                 project.routes.push_back({document.newId(), wave.id, clip.id, "position.y", 0.25, motion::ModulationMode::add});
                 track.insert(clip, project.tempo());
             }

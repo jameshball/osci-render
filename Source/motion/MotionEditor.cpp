@@ -109,6 +109,14 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // The interface size chosen last: the window was saved at it.
     const auto size = static_cast<float>(processor.globalSettings.getDouble("interfaceSize", 1.0));
     if (std::abs(size - 1.0f) > .001f) { setInterfaceSize(size, false); }
+    addChildComponent(alert);
+    alert.onLayout = [this] { layoutAlert(); };
+    statusBar.onAlert = [this](const juce::String& text, MotionStatusBar::Kind kind, const juce::String& label, std::function<void()> act) {
+        // Acting from the alert settles the status line as well.
+        auto acted = act ? std::function<void()>([this, act] { statusBar.clear(); act(); }) : std::function<void()>();
+        alert.show(text, kind == MotionStatusBar::Kind::error, label, std::move(acted));
+    };
+    statusBar.onDismissed = [this] { alert.dismissAlert(); };
     sliderBakes.onStatus = [this](const juce::String& text, bool error) {
         statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice);
         // A failed bake abandons an export that waited for it.
@@ -404,7 +412,7 @@ void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::R
     // A window of its own where the Scope's OpenGL view would cover it.
     const auto available = placement == Placement::below ? getLocalBounds().withTop(anchor.getBottom()) : placement == Placement::left ? getLocalBounds().withRight(anchor.getX()) : getLocalBounds();
     // In the editor itself, as everything else it shows.
-    auto& box = osci::launchCallOut(std::move(content), *this, anchor, available, this);
+    auto& box = osci::launchCallOut(std::move(content), *this, anchor, available);
     box.setArrowSize(9.0f);
     popover = &box;
     // Escape in a field closes the popover, as it does anywhere else in it.
@@ -501,12 +509,36 @@ void MotionEditor::refreshUndo() {
     motion::style::tooltipWhenCut(undoDescription);
 }
 
-void MotionEditor::timerCallback() {
+// Every display frame the playhead glides on at the speed it plays, kept to
+// the audio's own position by small corrections, so it moves smoothly at the
+// display's rate rather than stepping with the audio's blocks; a seek, a
+// loop or a stop puts it straight where the audio is.
+void MotionEditor::displayFrame() {
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto seconds = (now - lastDisplayFrame) / 1000.0;
+    lastDisplayFrame = now;
+    const auto heard = processor.shownPosition();
+    const auto advance = processor.positionAdvance.load(std::memory_order_relaxed);
+    if (advance <= 0 || seconds <= 0 || seconds > .25 || std::abs(heard - shownPlayhead) > .25) {
+        shownPlayhead = heard;
+    } else {
+        shownPlayhead += seconds * advance;
+        shownPlayhead += (heard - shownPlayhead) * std::min(1.0, seconds * 8);
+    }
+    timeline.setPlayhead(shownPlayhead);
+    if (curveEditor.isVisible()) { curveEditor.setPlayhead(shownPlayhead); }
+    if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(shownPlayhead)), juce::dontSendNotification); }
+    // What plays moves in the Scene as often as it can be drawn: a heavy
+    // Scene gets a frame when its last one is done, leaving time for the rest.
+    if (advance > 0 && now >= sceneDue) {
+        composition.repaint();
+        sceneDue = now + composition.paintMilliseconds();
+    }
     if (scopeFullScreen) {
         const auto& project = processor.document.project();
         const auto grid = project.timeGrid();
         MotionScopeTransport::State state;
-        state.position = processor.position.load();
+        state.position = shownPlayhead;
         state.duration = project.duration;
         state.loopStart = project.loopStart;
         state.loopEnd = project.loopEnd;
@@ -517,13 +549,22 @@ void MotionEditor::timerCallback() {
         state.length = juce::String(grid.positionLabel(project.duration));
         scopeTransport.setState(state);
     }
+}
+
+void MotionEditor::timerCallback() {
     continueCommandLineRender();
     keepRecovery();
     const auto now = juce::Time::getMillisecondCounterHiRes();
     if (now - recentFrameRequested > 2000.0) {
         recentFrameRequested = now;
         const juce::Component::SafePointer<MotionEditor> owner(this);
-        visualiser.captureFrame([owner](juce::Image frame) { if (owner != nullptr && frame.isValid()) { owner->recentFrame = frame; } });
+        // Kept as the session's picture too, so the start screen shows the
+        // project as it was left even when it was never saved.
+        visualiser.captureFrame([owner](juce::Image frame) {
+            if (owner == nullptr || !frame.isValid()) { return; }
+            owner->recentFrame = frame;
+            owner->processor.picture = motion::ProjectSummary::encode(frame);
+        });
     }
     refreshUndo();
     if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) { previewText(); }
@@ -550,7 +591,7 @@ void MotionEditor::timerCallback() {
     }
     {
         const auto rate = processor.exportSampleRate();
-        const auto beamRate = motion::beamCycleRate(processor.document.mainProject().frameRate, processor.document.mainProject().beamCycles);
+        const auto beamRate = processor.document.mainProject().beam.frequencyAt(processor.position.load());
         const auto layers = processor.beamLayers.load(std::memory_order_relaxed);
         const auto simplified = processor.beamSimplified.load(std::memory_order_relaxed);
         const auto dot = motion::style::dot();
@@ -628,12 +669,11 @@ void MotionEditor::timerCallback() {
         playButton.setTitle(playButton.getName());
     }
     if (timeLabel.isBeingEdited() && (positionEditGeneration != processor.document.scopeGeneration() || positionEditRevision != processor.document.revision())) { timeLabel.hideEditor(true); }
-    if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification); }
     if (!tempoValue.isBeingEdited() && !tappedBpm.has_value()) { tempoValue.setText(motion::style::bpm(processor.document.project().bpm), juce::dontSendNotification); }
-    // A moving playhead repaints only its own columns of the time views, and a
-    // slow full refresh (about 3 Hz) catches anything that changes without an
-    // edit or a playhead move. Live Blender capture shows in the Scene, which
-    // repaints for it while stopped too.
+    // The playhead moves every display frame (displayFrame); a slow full
+    // refresh (about 3 Hz) catches anything that changes without an edit or a
+    // playhead move. Live Blender capture shows in the Scene, which repaints
+    // for it while stopped too.
     const auto position = processor.position.load();
     const auto liveFrames = processor.liveSourcePreview();
     // The snapshot is held, so a new one can never reuse the old address.
@@ -648,11 +688,9 @@ void MotionEditor::timerCallback() {
     if (slowTick) {
         timeline.repaint();
         if (curveEditor.isVisible()) { curveEditor.repaint(); }
-    } else if (moved) {
-        timeline.repaintPlayhead();
-        if (curveEditor.isVisible()) { curveEditor.repaintPlayhead(); }
     }
-    if (slowTick || moved || live) { composition.repaint(); }
+    // While playing, displayFrame repaints the Scene.
+    if (slowTick || live || (moved && !playing)) { composition.repaint(); }
     // The playhead moves values; the slow tick also refreshes structure.
     if (slowTick) {
         keepEndedCaptures();
@@ -724,32 +762,20 @@ void MotionEditor::refreshFromDocument() {
     repaint();
 }
 
-// The camera the Scene's camera tools act on: the one looked through, or else
-// the selected one.
-motion::Id MotionEditor::toolCamera() const {
-    const auto& cameras = processor.document.project().cameras;
-    const auto driven = composition.drivenCamera();
-    // A deleted camera stays driven until the Scene's next sync.
-    if (driven != 0 && std::any_of(cameras.begin(), cameras.end(), [driven](const auto& camera) { return camera.id == driven; })) { return driven; }
-    return selectionIsCamera() ? selection : 0;
-}
-
-// Look through follows the selection, the playhead and edits: shown only
-// with a camera to look through, and a camera that cannot be looked through
-// says why.
+// Look through follows the selection, the playhead and edits; its tooltip
+// says which camera it would look through.
 void MotionEditor::refreshCameraTools() {
     // The cog is lit while the Scope's properties are shown.
     scopeTools.settings.setToggleState(selection != 0 && selection == processor.document.project().beam.id, juce::dontSendNotification);
-    const auto camera = toolCamera();
-    if (sceneTools.lookThrough.isVisible() != (camera != 0)) {
-        sceneTools.lookThrough.setVisible(camera != 0);
-        sceneTools.resized();
-        resized();
+    // A camera has no size or anchor; one aimed by Look at isn't turned by hand.
+    for (const auto& [button, tool] : {std::pair {&sceneTools.rotate, MotionTransformTool::rotate}, std::pair {&sceneTools.scale, MotionTransformTool::scale}, std::pair {&sceneTools.anchor, MotionTransformTool::anchor}}) {
+        button->setEnabled(composition.toolApplies(tool));
     }
-    const auto driven = camera != 0 && camera == composition.drivenCamera();
-    const auto blocker = composition.driveBlocker(camera);
-    sceneTools.lookThrough.setEnabled(driven || blocker.isEmpty());
-    sceneTools.lookThrough.setTooltip(driven || blocker.isEmpty() ? "Look through the selected camera: moving the view moves the camera" : blocker);
+    const auto driven = composition.drivenCamera() != 0;
+    sceneTools.lookThrough.setToggleState(driven, juce::dontSendNotification);
+    sceneTools.lookThrough.setTooltip(driven ? "Stop looking through the camera (the view goes back to where it was)"
+        : selectionIsCamera() ? "Look through the selected camera: moving the view moves it"
+        : "Look through the camera on screen at the playhead: moving the view moves it");
 }
 
 void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
@@ -831,9 +857,10 @@ void MotionEditor::select(motion::Id id) {
     timeline.setSelection(id);
     timeline.revealSelection();
     composition.setSelection(id);
-    // A free camera can be driven from the Scene until its button is released
-    // or another camera is chosen.
-    if (camera && composition.drivenCamera() != 0 && composition.drivenCamera() != id) { composition.setDrivenCamera(0); }
+    // Looking through, choosing another camera looks through that one.
+    if (camera && composition.drivenCamera() != 0 && composition.drivenCamera() != id) {
+        composition.setDrivenCamera(id);
+    }
     // Look through shows with a camera selected.
     refreshCameraTools();
     selectCurveTarget(id, curvePropertyName, camera);
@@ -903,15 +930,32 @@ void MotionEditor::dragOperationEnded(const juce::DragAndDropTarget::SourceDetai
     effectStack.setDragActive(false);
 }
 
-void MotionEditor::addCamera(double at) {
+motion::Id MotionEditor::addCamera(double at, bool fromView) {
     const auto frame = processor.document.project().frameTime(at);
     motion::Id id = 0;
-    const auto result = processor.document.addCamera(frame, id);
+    const auto result = processor.document.addCamera(frame, id, fromView ? composition.viewAsCamera() : motion::PropertyMap {});
     if (result.failed()) {
         statusBar.show(result.getErrorMessage());
-        return;
+        return 0;
     }
     select(id);
+    return id;
+}
+
+void MotionEditor::setLookingThrough(bool on) {
+    if (!on) {
+        composition.setDrivenCamera(0);
+        refreshCameraTools();
+        return;
+    }
+    const auto chosen = selectionIsCamera();
+    auto id = chosen ? selection : composition.outputCamera();
+    if (id == 0) { id = addCamera(processor.position.load(), true); }
+    // A rigged camera is shown as it sees, but moved in Properties.
+    const auto blocker = id != 0 ? composition.driveBlocker(id) : juce::String();
+    if (blocker.isNotEmpty()) { statusBar.show(blocker + ", so the view follows it; moving the view leaves it.", MotionStatusBar::Kind::notice); }
+    composition.setDrivenCamera(id, !chosen);
+    refreshCameraTools();
 }
 
 bool MotionEditor::selectionExists() const {
@@ -1026,6 +1070,17 @@ bool MotionEditor::keyPressed(const juce::KeyPress& key) {
     for (const auto& command : commands) {
         if (command.key.isValid() && command.key == key) {
             command.action();
+            return true;
+        }
+    }
+    // Delete and Backspace delete what is selected wherever the focus is (the
+    // Scene, Properties), when the focused view had no use for them.
+    const auto code = key.getKeyCode();
+    const auto modifiers = key.getModifiers();
+    if ((code == juce::KeyPress::deleteKey || code == juce::KeyPress::backspaceKey) && !modifiers.isCommandDown() && !modifiers.isCtrlDown() && !modifiers.isAltDown()) {
+        const auto found = std::find_if(commands.begin(), commands.end(), [](const auto& command) { return command.name == "Delete"; });
+        if (found != commands.end()) {
+            found->action();
             return true;
         }
     }
@@ -1188,7 +1243,7 @@ void MotionEditor::keepOutputPlayable() {
     if (playable == routing) { return; }
     processor.setRouting(playable);
     outputButton.setRouting(playable);
-    statusBar.show(device->getName() + " plays " + juce::String(active) + " outputs, too few for " + motion::ui::output::summary(routing) + ": now " + motion::ui::output::summary(playable) + ".");
+    statusBar.show(device->getName() + " plays " + juce::String(active) + " outputs, too few for " + motion::ui::output::summary(routing) + ": now " + motion::ui::output::summary(playable) + ".", MotionStatusBar::Kind::warning);
 }
 
 void MotionEditor::refreshOutputChoices() {

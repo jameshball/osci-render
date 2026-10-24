@@ -89,7 +89,7 @@ int main() {
     motion::Group inner;
     inner.id = 51;
     inner.parent = 50;
-    inner.effects.push_back(motion::makeEffect(52, *motion::effectDefinition("scale")));
+    inner.effects.push_back(motion::makeEffect(52, *motion::effectDefinition("skew")));
     project.groups = { outer, inner };
     project.tracks.change(0).group = 51;
     check(motion::validGroupHierarchy(project), "nested group references are valid");

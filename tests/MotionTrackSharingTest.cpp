@@ -21,7 +21,7 @@ public:
             clip.start = 1;
             clip.duration = 4;
             clip.properties = motion::defaultProperties(motion::objectPropertySpecs);
-            clip.effects.push_back(motion::makeEffect(document.newId(), *motion::effectDefinition("rotate")));
+            clip.effects.push_back(motion::makeEffect(document.newId(), *motion::effectDefinition("twist")));
             track.clips.push_back(clip);
             project.tracks.push_back(track);
         }

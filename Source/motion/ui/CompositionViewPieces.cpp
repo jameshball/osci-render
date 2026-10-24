@@ -13,9 +13,8 @@ bool MotionCompositionView::askForLighting(double time) const {
     const auto asked = std::tuple {preparedSerial, time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, getWidth(), getHeight()};
     if (lightingAsked == asked) { return true; }
     lightingAsked = asked;
-    // The view's lens as a camera's: its screen spans the aspect across and 1 up.
-    const auto aspect = static_cast<double>(getWidth()) / getHeight();
-    const motion::hidden::OtherEye eye {{view->position, view->right, view->up, view->forward, 1 / view->tangent}, {aspect * 1.1, 1.1}};
+    // The view's lens as a camera's, reaching across the whole Scene.
+    const motion::hidden::OtherEye eye {{view->position, view->right, view->up, view->forward, 1 / view->tangent}, sceneReach()};
     scenePreview->request(shownProject, preparedSerial, time, eye);
     return true;
 }
@@ -103,7 +102,7 @@ void MotionCompositionView::keepUnhidden(const CameraView& view, double time) co
     // they pass behind, cheap enough to draw every frame of a drag.
     const auto frame = outputFrame();
     const auto across = std::clamp(static_cast<int>(frame.getWidth() / 1.5f), 64, 768);
-    motion::hidden::DepthBuffer depth(motion::hidden::Reach {getWidth() / frame.getWidth(), getHeight() / frame.getHeight()}, across);
+    motion::hidden::DepthBuffer depth(sceneReach(), across);
     // A face in eye space, cut where it crosses the near plane.
     const auto fill = [&](const std::array<motion::Vec3, 3>& corners) {
         std::array<motion::Vec3, 4> kept {};

@@ -123,22 +123,22 @@ try:
     library = find(snapshot(), lambda node: node.get("class") == "osci::TabBar" and node.get("name") == "Library tabs")
     tab = find(library, lambda node: node.get("class") == "osci::TabBar::Tab" and node.get("name") == "Effects")
     step("effects library", "click", tab["ref"])
-    source = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Scale"))["bounds"]
+    source = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Skew"))["bounds"]
     target = header_bounds(group)
     step("effect on group", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
-    wait_undo("Add Scale")
-    command("wait-for-locator", "--component-name", "Effect scaleX", "--exact")
+    wait_undo("Add Skew")
+    command("wait-for-locator", "--component-name", "Effect skewX", "--exact")
     step("group effects screenshot", "screenshot", "--file", session.artifact_dir / "group-effects.png")
     header_menu("empty grouped track menu", group)
     step("add empty grouped track", "click", "--name", "Add track to group", "--role", "menuItem", "--exact")
     wait_undo("Add track")
     empty = header_id("New track")
-    source = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Translate"))["bounds"]
+    source = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Twist"))["bounds"]
     target = header_bounds(empty)
     step("effect on empty grouped track", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
-    wait_undo("Add Translate")
+    wait_undo("Add Twist")
     # The empty track's group chip shows the group's effects; a double-click adds there.
     step("show the group's effects", "click", "--component-name", "Effects of Group 1", "--exact")
     command("wait-for-value", "--component-name", "Inspector title", "--value", "Group 1")

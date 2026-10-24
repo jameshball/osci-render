@@ -22,11 +22,15 @@ public:
     ~MotionCompositionView() override;
     // The selection the editor shows everywhere: highlighted here, with its gizmo.
     void setSelection(motion::Id id) {
-        if (selected != id) {
-            selected = id;
-            repaint();
-        }
+        if (selected == id) { return; }
+        selected = id;
+        // A camera has no size or anchor: its tools give way to Move.
+        if (!toolApplies(tool)) { setTool(MotionTransformTool::move); }
+        repaint();
     }
+    // Whether `value` can act on the selection: a camera has no size or
+    // anchor, and one aimed by Look at isn't turned by hand.
+    bool toolApplies(MotionTransformTool value) const;
     // Dragging over empty space selects the objects it touches (Shift adds).
     // Shift-clicking an object toggles it; a Shift drag adds.
     enum class SelectionChange { replace, add, toggle };
@@ -87,17 +91,31 @@ public:
     // How far from the left the tool strip floating over the view reaches;
     // framing keeps what it frames clear of it.
     void setCoveredLeft(int pixels) { coveredLeft = pixels; }
-    void resetView() { cancelGesture(); camera = {}; repaint(); }
+    void resetView() {
+        cancelGesture();
+        setDrivenCamera(0);
+        camera = {};
+        repaint();
+    }
 
-    // Looking through an output camera: the Scene shows exactly its view, and
-    // orbiting, panning, zooming or flying moves the camera itself (keying the
-    // whole camera at the playhead once it has keys). Rigged cameras cannot be
-    // driven; driveBlocker says why.
-    bool canDriveCamera(motion::Id id) const { return documentPose(id).has_value(); }
+    // Looking through an output camera: the Scene shows exactly its view. A
+    // free camera moves as the view is orbited, panned, zoomed or flown
+    // (keyed as a whole at the playhead once it has keys); a rigged one is
+    // only shown, and moving the view leaves it (driveBlocker says why).
     juce::String driveBlocker(motion::Id id) const;
     motion::Id drivenCamera() const { return lockedCamera; }
-    void setDrivenCamera(motion::Id id);
+    // How long the last paint took.
+    double paintMilliseconds() const { return lastPaintMilliseconds; }
+    // `followOutput`: looks through whichever camera the Scope is on at the
+    // playhead, moving on as cuts do.
+    void setDrivenCamera(motion::Id id, bool followOutput = false);
+    // The camera on the Scope at the playhead (0: none).
+    motion::Id outputCamera() const;
+    // A camera's properties for where the Scene is looking from.
+    motion::PropertyMap viewAsCamera() const;
     std::function<void(motion::Id)> onDrivenCameraChanged;
+    // A camera double-clicked: look through it.
+    std::function<void(motion::Id)> onLookThrough;
     // Blender's numpad views: look along an axis at the current pivot and
     // distance.
     enum class ViewPreset { front, back, right, left, top, bottom };
@@ -129,6 +147,15 @@ public:
 
     // The visible clip drawn nearest the point (within 18 px), and the world
     // point there.
+    struct Hit {
+        motion::Id id;
+        float distance;
+        motion::Vec3 point;
+        float depth;
+    };
+    static constexpr float pickReach = 18;
+    std::vector<Hit> hitsNear(juce::Point<float> position) const;
+    static std::vector<std::pair<motion::Vec3, motion::Vec3>> cameraOutline(const motion::PreparedCamera::Frame& frame);
     motion::Id pickAt(juce::Point<float> position, motion::Vec3* anchor) const;
     motion::Id pickTarget(juce::Point<float> position, motion::Vec3* anchor) const;
     // Every object drawn within 18 px of the point, nearest the eye first.
@@ -184,6 +211,10 @@ private:
     enum class Gesture { plane, moveAxis, rotateAxis, scaleAxis, uniformScale };
     bool dragStarted = false;
     bool editable(double time) const;
+    const motion::Camera* selectedCamera() const;
+    juce::String cameraBlocker() const;
+    bool followCamera();
+    bool cameraExists(motion::Id id) const;
     MotionCompositionGizmo currentGizmo() const;
     bool beginGesture(double time);
     void timerCallback() override;
@@ -192,6 +223,13 @@ private:
     void cancelGesture();
     bool validGesture();
     juce::Rectangle<float> outputFrame() const;
+    juce::Rectangle<float> scopeFrame() const;
+    // How far the whole Scene reaches past the output's -1 to 1.
+    motion::hidden::Reach sceneReach() const {
+        const auto frame = outputFrame();
+        return {getWidth() / frame.getWidth(), getHeight() / frame.getHeight()};
+    }
+    void paintLookThrough(juce::Graphics& g) const;
     motion::editor::Vec2 normalized(juce::Point<float> point) const;
     motion::Vec3 worldPoint(osci::Point point, double time) const;
     using CameraView = std::optional<motion::editor::Camera::View>;
@@ -326,8 +364,16 @@ private:
     struct Pose {
         double x = 0, y = 0, z = 0, pitch = 0, yaw = 0, fov = 0;
         bool operator==(const Pose&) const = default;
+        // Equal but for rounding (degrees to radians and back).
+        bool near(const Pose& other) const {
+            constexpr double tolerance = 1.0e-9;
+            return std::abs(x - other.x) < tolerance && std::abs(y - other.y) < tolerance && std::abs(z - other.z) < tolerance
+                && std::abs(pitch - other.pitch) < tolerance && std::abs(yaw - other.yaw) < tolerance && std::abs(fov - other.fov) < tolerance;
+        }
     };
     motion::Id lockedCamera = 0;
+    bool followingOutput = false;
+    double lastPaintMilliseconds = 0;
     std::optional<Pose> lastPose;
     std::optional<motion::editor::Camera> viewBeforeLock;
     struct Sync final : juce::Timer {

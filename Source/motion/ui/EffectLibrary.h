@@ -84,10 +84,10 @@ private:
         }
     private:
         // Shapes run through the effect at its defaults, with a few values
-        // turned up (or, for scale, down) so every tile shows a change.
+        // turned up so every tile shows a change.
         void buildThumbnail() {
             auto instance = motion::makeEffect(1, definition);
-            for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"rotateZ", .12}, {"rotateY", .08}, {"scaleX", .65}, {"scaleY", .65}, {"translateX", .3}, {"translateY", .25}, {"skewX", .35}, {"hue", 150}, {"rippleDepth", .1}, {"rippleAmount", .08}, {"crush", .8}, {"twist", .25}, {"phase", .25}, {"fov", 110}}) {
+            for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"skewX", .35}, {"hue", 150}, {"rippleDepth", .1}, {"rippleAmount", .08}, {"crush", .8}, {"twist", .25}}) {
                 const auto found = instance.properties.find(property);
                 if (found != instance.properties.end()) { found->second = motion::Curve(value); }
             }
@@ -107,7 +107,7 @@ private:
             // over a faint grid as it was.
             using Kind = motion::EffectKind;
             const auto kind = definition.kind;
-            const auto moves = kind == Kind::rotate || kind == Kind::scale || kind == Kind::translate || kind == Kind::skew || kind == Kind::wobble;
+            const auto moves = kind == Kind::skew;
             const auto rows = kind == Kind::ripple;
             const auto rings = kind == Kind::polygon || kind == Kind::spiralCrush || kind == Kind::bitCrush;
             std::vector<std::vector<osci::Point>> lines;
@@ -129,8 +129,6 @@ private:
                         for (int step = 0; step <= steps; ++step) {
                             const auto along = -.6f + 1.2f * static_cast<float>(step) / steps;
                             points.push_back(vertical ? osci::Point(across, along, 0) : osci::Point(along, across, 0));
-                            // A grid tilted away at the top shows depth effects.
-                            if (kind == Kind::perspective) { points.back().z = points.back().y * 1.4f; }
                         }
                     }
                 }

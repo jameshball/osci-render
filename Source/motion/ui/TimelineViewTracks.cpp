@@ -42,14 +42,8 @@ void MotionTimelineView::showGroupMenu(motion::Id id) {
             track.name = "New track";
             processor.document.edit("Add track", [track](motion::Project& project) { project.tracks.push_back(track); });
         } else if (result == 4) {
-            processor.document.edit("Delete group", [id](motion::Project& project) {
-                std::set<motion::Id> removed { id };
-                for (std::size_t depth = 0; depth < motion::maximumGroupDepth; ++depth) {
-                    for (const auto& group : project.groups) { if (removed.contains(group.parent)) { removed.insert(group.id); } }
-                }
-                project.tracks.eraseIf([&](const auto& track) { return removed.contains(track.group); });
-                std::erase_if(project.groups, [&](const auto& group) { return removed.contains(group.id); });
-            });
+            deleteTracks({id});
+            return;
         }
         refreshTracks();
     });

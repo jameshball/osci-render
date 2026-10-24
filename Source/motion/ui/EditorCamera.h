@@ -40,15 +40,17 @@ public:
         if (!valid()) {
             return {};
         }
+        if (rig.has_value()) { return rig->forward; }
         return { std::sin(yaw) * std::cos(pitch), std::sin(pitch), -std::cos(yaw) * std::cos(pitch) };
     }
     Vec3 right() const {
         if (!valid()) {
             return {};
         }
+        if (rig.has_value()) { return rig->right; }
         return { std::cos(yaw), 0, std::sin(yaw) };
     }
-    Vec3 up() const { return right().cross(forward()); }
+    Vec3 up() const { return rig.has_value() && valid() ? rig->up : right().cross(forward()); }
     double distance() const { return valid() ? (position - pivot).length() : 0; }
 
     // The camera's basis and lens, worked out once to project many points.
@@ -101,6 +103,10 @@ public:
             return std::make_pair(start, end);
         }
     };
+    // Looking through a camera the Scene can't steer (aimed, carried, rolled
+    // or modulated), the view is exactly its frame, roll and all; navigating
+    // lets it go.
+    std::optional<View> rig;
     std::optional<View> view() const {
         if (!valid()) {
             return std::nullopt;
@@ -262,7 +268,7 @@ private:
         return value.finite() && std::abs(value.x) <= maximumCoordinate && std::abs(value.y) <= maximumCoordinate && std::abs(value.z) <= maximumCoordinate;
     }
     static bool validAspect(double aspect) { return std::isfinite(aspect) && aspect >= 0.000001 && aspect <= 1000000; }
-    double tangent() const { return std::tan(fovDegrees * std::numbers::pi / 360); }
+    double tangent() const { return rig.has_value() ? rig->tangent : std::tan(fovDegrees * std::numbers::pi / 360); }
     bool commit(const Camera& next) {
         if (!next.valid()) {
             return false;
