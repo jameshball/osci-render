@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace motion::gpu {
@@ -38,10 +39,20 @@ public:
     // The steps of a program (for tests).
     std::vector<Step> stepsOf(std::uint32_t program) const;
 
-private:
+    // Where each program's steps are.
     struct Range {
         std::uint32_t first, count;
     };
+    // The programs, for another kernel that runs them (see chainFunctions).
+    std::span<const Step> stepData() const { return steps; }
+    std::span<const Range> programData() const { return programs; }
+
+    // The kernel's functions (Step, Range, applyStep and the effects), for
+    // another kernel that bends its points first; it binds `steps` at 0
+    // and `programs` at 1.
+    static const char* chainFunctions();
+
+private:
     struct Point {
         std::array<float, 3> position;
         std::uint32_t program;

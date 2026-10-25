@@ -248,6 +248,9 @@ bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::ve
 // drawn, the surfaces gathered for crossings, the lights' shadows, and the
 // scratch lists of points and runs. One per thread.
 struct Workspace {
+    // Whether culling may light lines on the GPU, when there is one (see
+    // gpu::Device); off, it lights them on the CPU, as with none.
+    bool gpu = true;
     DepthBuffer depth;
     // Every surface the camera sees, for its hatching, when that is more
     // than what is solid (which alone is in `depth`).

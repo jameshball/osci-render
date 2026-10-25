@@ -145,7 +145,12 @@ Made make() {
         made.reason = "only a software stand-in (" + impl->name + "), slower than baking on the CPU";
         return made;
     }
+    // As much as the adapter allows: the bake's kernels bind more storage
+    // buffers, and larger, than WebGPU's defaults.
+    WGPULimits limits = WGPU_LIMITS_INIT;
+    const auto knowsLimits = wgpuAdapterGetLimits(impl->adapter, &limits) == WGPUStatus_Success;
     WGPUDeviceDescriptor deviceDescriptor = WGPU_DEVICE_DESCRIPTOR_INIT;
+    if (knowsLimits) { deviceDescriptor.requiredLimits = &limits; }
     deviceDescriptor.uncapturedErrorCallbackInfo.callback = [](WGPUDevice const*, WGPUErrorType, WGPUStringView message, void* owner, void*) {
         auto* into = static_cast<Device::Impl*>(owner);
         into->error = text(message);

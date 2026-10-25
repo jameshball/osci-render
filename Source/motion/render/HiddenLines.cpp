@@ -1,4 +1,5 @@
 #include "HiddenLines.h"
+#include "gpu/GpuLighting.h"
 
 namespace motion::hidden {
 namespace {
@@ -754,6 +755,7 @@ private:
     // it within a little of what it is all along. False when cancelled.
     bool lightKept() {
         if (!lit) { return true; }
+        if (lightKeptOnGpu()) { return !cancelled(); }
         for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
             if (cancelled()) { return false; }
             const auto& item = items[surface];
@@ -767,24 +769,101 @@ private:
         return true;
     }
 
+    // How many steps a piece is lit in: one every couple of pixels of it.
+    static int lightSteps(double length) { return stepCount(length * 1.25 / (2 * DepthBuffer::pixel), 1, 4096); }
+    // A kept piece is straight when it is a straight line or a part of one.
+    static bool straightPiece(osci::Shape& shape) {
+        auto* part = dynamic_cast<ShapePart*>(&shape);
+        return dynamic_cast<ColouredLine*>(&shape) != nullptr || isStraight(part != nullptr ? part->whole() : shape);
+    }
+
+    // lightKept on the GPU, when there is one: every kept piece's points bent
+    // and lit there in one batch, each a couple of pixels apart, then its lit
+    // parts made as on the CPU. Each piece's length on the frame is found
+    // first, also there: from its ends where it is a straight line nothing
+    // bends (it stays straight through the camera), else from eight steps
+    // along it. False, with nothing changed, when it can't: no device, no
+    // camera framing the lines, or the device failing.
+    bool lightKeptOnGpu() {
+        auto* device = workspace.gpu ? gpu::Device::shared() : nullptr;
+        if (device == nullptr || (other == nullptr && !view.has_value())) { return false; }
+        gpu::ChainBatch chain;
+        std::vector<std::uint32_t> programs(items.size(), 0);
+        std::vector<int> probesOf;
+        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+            if (keptBy[surface].empty()) { continue; }
+            programs[surface] = chain.program(composition, *items[surface].clip, time);
+            for (auto& piece : keptBy[surface]) {
+                const auto probes = !items[surface].bent && straightPiece(*piece.shape) ? 1 : 8;
+                for (int probe = 0; probe <= probes; ++probe) { chain.add(programs[surface], piece.shape->nextVector(static_cast<float>(probe) / static_cast<float>(probes))); }
+                probesOf.push_back(probes);
+            }
+        }
+        if (probesOf.empty()) {
+            std::fill(lostBy.begin(), lostBy.end(), 1);
+            return true;
+        }
+        const auto placed = chain.run(*device);
+        if (!placed.has_value() || cancelled()) { return false; }
+        const auto onFrame = [&](const std::optional<Vec3>& at) -> std::optional<Screen> {
+            if (!at.has_value()) { return std::nullopt; }
+            return other != nullptr ? otherProjection(otherEye.see(*at)) : cameraProjection(cameraEye.see(*at));
+        };
+        gpu::LightingBatch batch(chain);
+        batch.setLights(lights);
+        std::vector<std::pair<std::size_t, std::size_t>> samplesOf;
+        std::size_t probe = 0, index = 0;
+        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+            const auto response = static_cast<float>(items[surface].response);
+            for (auto& piece : keptBy[surface]) {
+                const auto probes = probesOf[index++];
+                double length = 0;
+                for (int step = 1; step <= probes; ++step) {
+                    const auto from = onFrame((*placed)[probe + static_cast<std::size_t>(step) - 1]), to = onFrame((*placed)[probe + static_cast<std::size_t>(step)]);
+                    if (from.has_value() && to.has_value()) { length += std::hypot(to->x - from->x, to->y - from->y); }
+                }
+                probe += static_cast<std::size_t>(probes) + 1;
+                const auto steps = lightSteps(length);
+                const auto made = batch.piece(piece.normals, response);
+                samplesOf.emplace_back(batch.size(), static_cast<std::size_t>(steps) + 1);
+                for (int step = 0; step <= steps; ++step) {
+                    const auto t = static_cast<float>(step) / static_cast<float>(steps);
+                    batch.sample(programs[surface], made, piece.shape->nextVector(t), t);
+                }
+            }
+        }
+        const auto litSamples = batch.run(*device);
+        if (!litSamples.has_value() || cancelled()) { return false; }
+        index = 0;
+        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+            std::vector<Kept> litPieces;
+            for (auto& piece : keptBy[surface]) {
+                const auto [first, count] = samplesOf[index++];
+                lighting.ts.resize(count);
+                lighting.light.resize(count);
+                for (std::size_t sample = 0; sample < count; ++sample) {
+                    const auto& value = (*litSamples)[first + sample];
+                    lighting.ts[sample] = static_cast<double>(sample) / static_cast<double>(count - 1);
+                    lighting.light[sample] = {value[0], value[1], value[2]};
+                }
+                litRuns(piece, std::shared_ptr<osci::Shape>(std::move(piece.shape)), litPieces);
+            }
+            keptBy[surface] = std::move(litPieces);
+            lostBy[surface] = 1;
+        }
+        return true;
+    }
+
     // One piece kept, lit, into `litPieces`.
     void lightPiece(const SceneItem& item, float response, Kept& piece, std::vector<Kept>& litPieces) {
-        constexpr double litStep = 2 * DepthBuffer::pixel;
         constexpr float dark = 1.0f / 512;
-        constexpr double tolerance = 1.0 / 64;
         auto& ts = lighting.ts;
         auto& light = lighting.light;
         auto& shades = lighting.shades;
-        auto& breaks = lighting.breaks;
-        // A kept piece is straight when it is a straight line or a part of one.
-        const auto straightPiece = [](osci::Shape& shape) {
-            auto* part = dynamic_cast<ShapePart*>(&shape);
-            return dynamic_cast<ColouredLine*>(&shape) != nullptr || isStraight(part != nullptr ? part->whole() : shape);
-        };
         std::shared_ptr<osci::Shape> shape = std::move(piece.shape);
         // Its length in the frame, from a few points of it.
         const auto length = screenLength(*shape, 8, [&](const osci::Point& point) { return onFrame(*item.clip, point); });
-        const auto steps = stepCount(length * 1.25 / litStep, 1, 4096);
+        const auto steps = lightSteps(length);
         ts.resize(static_cast<std::size_t>(steps) + 1);
         light.resize(static_cast<std::size_t>(steps) + 1);
         shades.resize(static_cast<std::size_t>(steps) + 1);
@@ -816,6 +895,18 @@ private:
             ts[static_cast<std::size_t>(step)] = static_cast<double>(step) / steps;
             light[static_cast<std::size_t>(step)] = mixed(light[static_cast<std::size_t>(from)], light[static_cast<std::size_t>(to)], share);
         });
+        litRuns(piece, std::move(shape), litPieces);
+    }
+
+    // A piece's lit parts, into `litPieces`, from its light at the samples in
+    // `lighting` (ts, light): the parts any light reaches, each blended
+    // between as few stops as keep it within a little of its light.
+    void litRuns(const Kept& piece, std::shared_ptr<osci::Shape> shape, std::vector<Kept>& litPieces) {
+        constexpr float dark = 1.0f / 512;
+        constexpr double tolerance = 1.0 / 64;
+        auto& ts = lighting.ts;
+        auto& light = lighting.light;
+        auto& breaks = lighting.breaks;
         const auto isDark = [&](std::size_t index) { return std::max({light[index][0], light[index][1], light[index][2]}) < dark; };
         // The parts any light reaches: from halfway to the dark either side.
         const auto firstMade = litPieces.size();

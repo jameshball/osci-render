@@ -2,6 +2,8 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/gpu/GpuChain.h"
+#include "../Source/motion/render/HiddenLines.h"
+#include <cstring>
 #include <random>
 
 // The GPU bends points as the CPU does: every effect, on a clip in a turned
@@ -69,9 +71,82 @@ public:
                 expect(differ <= allowed, juce::String(differ) + " of " + juce::String(static_cast<int>(sources.size())) + " points differ at " + juce::String(time) + " s (worst by " + juce::String(worst, 6) + ")");
             }
         }
+
+        beginTest("Lines are lit on the GPU as on the CPU");
+        {
+            // A solid box, twisted so its faces are diced, over a solid grid,
+            // lit by a point light and a spot that cast shadows, and ambient.
+            motion::Project project;
+            project.duration = 3;
+            addClip(project, generatorAsset(1, "box"), 10, {{"rotation.y", 20}, {"solid", 100}});
+            project.tracks.change(0).clips.front().effects.push_back(motion::makeEffect(70, *motion::effectDefinition("twist")));
+            addClip(project, generatorAsset(2, "grid"), 20, {{"rotation.x", -90}, {"position.y", -.8}, {"scale.x", 3}, {"scale.y", 3}, {"solid", 100}});
+            addClip(project, generatorAsset(32, "pointLight"), 30, {{"position.x", 1}, {"position.y", 1.5}, {"light.range", 6}});
+            addClip(project, generatorAsset(42, "spotLight"), 40, {{"position.x", -1.5}, {"position.y", 2}, {"rotation.x", -60}});
+            addClip(project, generatorAsset(52, "ambientLight"), 50, {{"light.intensity", .2}});
+            motion::Camera camera;
+            camera.id = 60;
+            camera.properties["position.y"] = motion::Curve(1.5);
+            camera.properties["rotation.x"] = motion::Curve(-20);
+            project.cameras.push_back(camera);
+            const motion::PreparedComposition composition(project);
+            for (const double time : {0.0, 1.5}) {
+                motion::hidden::Workspace onCpu, onGpu;
+                onCpu.gpu = false;
+                const auto cpu = motion::hidden::cull(composition, time, onCpu);
+                const auto gpu = motion::hidden::cull(composition, time, onGpu);
+                expect(cpu != nullptr && gpu != nullptr, "both are culled");
+                if (cpu == nullptr || gpu == nullptr) { continue; }
+                expectEquals(static_cast<int>(gpu->drawings.size()), static_cast<int>(cpu->drawings.size()), "the same clips are drawn");
+                for (std::size_t index = 0; index < std::min(cpu->drawings.size(), gpu->drawings.size()); ++index) {
+                    const auto [cpuLength, cpuLight] = measure(*cpu->drawings[index].drawing);
+                    const auto [gpuLength, gpuLight] = measure(*gpu->drawings[index].drawing);
+                    expectWithinAbsoluteError(gpuLength, cpuLength, .01 * cpuLength + 1.0e-6, "a clip's lines are as long at " + juce::String(time) + " s");
+                    expectWithinAbsoluteError(gpuLight, cpuLight, .02 * cpuLight + 1.0e-3, "and as bright");
+                }
+            }
+        }
     }
 
 private:
+    // A drawing's length, and its length weighted by how bright it is drawn
+    // along it, from points every so often along each line.
+    static std::pair<double, double> measure(const motion::PreparedDrawing& drawing) {
+        double length = 0, light = 0;
+        for (std::size_t index = 0; index < drawing.shapeCount(); ++index) {
+            auto* shape = drawing.shape(index);
+            if (shape == nullptr) { continue; }
+            const auto whole = static_cast<double>(shape->length());
+            length += whole;
+            for (int step = 0; step < 8; ++step) {
+                const auto point = shape->nextVector((static_cast<float>(step) + .5f) / 8);
+                light += whole / 8 * std::max({point.r, point.g, point.b});
+            }
+        }
+        return {length, light};
+    }
+
+    static std::shared_ptr<motion::Asset> generatorAsset(motion::Id id, const char* kind) {
+        auto asset = std::make_shared<motion::Asset>();
+        asset->id = id;
+        asset->name = motion::findGenerator(kind)->name.data();
+        asset->extension = ".generator";
+        asset->data.append(kind, std::strlen(kind));
+        motion::decodeAsset(*asset);
+        return asset;
+    }
+
+    static void addClip(motion::Project& project, std::shared_ptr<motion::Asset> asset, motion::Id id, std::initializer_list<std::pair<const char*, double>> properties) {
+        project.assets.push_back(asset);
+        auto clip = motion::Document::makeClip(id, *asset, 0);
+        clip.duration = 3;
+        for (const auto& [name, value] : properties) { clip.properties[name] = motion::Curve(value); }
+        motion::Track track;
+        track.id = id + 1;
+        track.insert(clip, project.tempo());
+        project.tracks.push_back(track);
+    }
+
     // A cube with `definition`'s effect (its values away from their
     // defaults, so it acts), copied three times, in a turned and scaled
     // group, under a Twist on the whole composition.

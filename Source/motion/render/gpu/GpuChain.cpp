@@ -7,18 +7,15 @@ namespace {
 // The kernel: each point runs its program's steps. The effects are those of
 // osci_PointEffectKernels.h and PreparedEffects.h, in single precision;
 // rounding is C's (halves away from zero), not WGSL's (halves to even).
-constexpr const char* chainKernel = R"(
+constexpr const char* functions = R"(
 struct Step {
     kind: u32, copy: u32, flag: u32, padding: u32,
     v: array<vec4<f32>, 6>,
 }
 struct Range { first: u32, count: u32 }
-struct Point { position: vec3<f32>, program: u32, colour: vec4<f32> }
 
 @group(0) @binding(0) var<storage, read> steps: array<Step>;
 @group(0) @binding(1) var<storage, read> programs: array<Range>;
-@group(0) @binding(2) var<storage, read> points: array<Point>;
-@group(0) @binding(3) var<storage, read_write> bent: array<vec4<f32>>;
 
 const pi = 3.14159265358979323846;
 const twoPi = 6.28318530717958647692;
@@ -211,20 +208,37 @@ fn applyStep(step: Step, p: ptr<function, vec3<f32>>, c: ptr<function, vec3<f32>
     if (!finite3(*p) || !finite3(*c)) { *p = vec3<f32>(0.0); *c = vec3<f32>(0.0); }
 }
 
+// A point through its program.
+fn bend(program: u32, position: vec3<f32>, colour: vec3<f32>) -> vec3<f32> {
+    let range = programs[program];
+    var p = position;
+    var c = colour;
+    for (var step = range.first; step < range.first + range.count; step++) {
+        applyStep(steps[step], &p, &c);
+    }
+    return p;
+}
+)";
+
+constexpr const char* bending = R"(
+struct Point { position: vec3<f32>, program: u32, colour: vec4<f32> }
+@group(0) @binding(2) var<storage, read> points: array<Point>;
+@group(0) @binding(3) var<storage, read_write> bent: array<vec4<f32>>;
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
     let index = id.x + id.y * groups.x * 64u;
     if (index >= arrayLength(&points)) { return; }
     let point = points[index];
-    let range = programs[point.program];
-    var p = point.position.xyz;
-    var c = point.colour.xyz;
-    for (var step = range.first; step < range.first + range.count; step++) {
-        applyStep(steps[step], &p, &c);
-    }
+    let p = bend(point.program, point.position, point.colour.xyz);
     bent[index] = vec4<f32>(p, select(0.0, 1.0, finite3(p)));
 }
 )";
+
+const juce::String& chainKernel() {
+    static const juce::String source = juce::String(functions) + bending;
+    return source;
+}
 
 std::uint32_t effectFlag(EffectKind kind) {
     switch (kind) {
@@ -322,6 +336,8 @@ void ChainBatch::clear() {
     points.clear();
 }
 
+const char* ChainBatch::chainFunctions() { return functions; }
+
 std::vector<ChainBatch::Step> ChainBatch::stepsOf(std::uint32_t program) const {
     const auto& range = programs.at(program);
     return {steps.begin() + range.first, steps.begin() + range.first + range.count};
@@ -333,7 +349,7 @@ std::optional<std::vector<std::optional<Vec3>>> ChainBatch::run(Device& device) 
     // An empty program list still needs a step to bind.
     const std::vector<Step> none(1);
     const std::array<Device::Input, 3> inputs {std::as_bytes(std::span(steps.empty() ? none : steps)), std::as_bytes(std::span(programs)), std::as_bytes(std::span(points))};
-    const auto result = device.run(chainKernel, inputs, {}, points.size() * 4 * sizeof(float), static_cast<std::uint32_t>(points.size()));
+    const auto result = device.run(chainKernel(), inputs, {}, points.size() * 4 * sizeof(float), static_cast<std::uint32_t>(points.size()));
     if (!result.has_value()) { return std::nullopt; }
     bent.reserve(points.size());
     for (std::size_t index = 0; index < points.size(); ++index) {

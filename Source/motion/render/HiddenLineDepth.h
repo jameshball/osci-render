@@ -267,6 +267,23 @@ public:
         return total > 0 ? shown / total : 1;
     }
 
+    // Its contents, for a GPU's copy: where it is and how it is divided (in
+    // pixels of `size`, `originX` and `originY` from the middle), each pixel's
+    // nearest inverse depth (0 where nothing is drawn) and the plane that is
+    // nearest there, and each plane's inverse depth at the origin and its
+    // slopes across pixels.
+    struct Layout {
+        double originX, originY, size;
+        int width, height;
+        bool empty;
+    };
+    Layout layout() const { return {originX, originY, size, width, height, empty}; }
+    template <typename Pixels, typename Planes>
+    void copyInto(Pixels&& pixel, Planes&& plane) const {
+        for (const auto& here : pixels) { pixel(here.w, here.owner); }
+        for (const auto& each : planes) { plane(each.w, each.dwdx, each.dwdy); }
+    }
+
 private:
     // Whether a point is in front of a surface at `w` there, or on it: within
     // a small part of its own depth, so a surface reaching far nearer the eye
