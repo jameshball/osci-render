@@ -43,6 +43,8 @@ if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$VERSION $platform" ]; then
     exit 0
 fi
 
+# Windows runners may have only `python`.
+PYTHON="$(command -v python3 || command -v python)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
@@ -51,7 +53,7 @@ fetch() {
     local name="$1"
     echo "Fetching $name"
     curl -fsSL --retry 3 -o "$work/$name" "$BASE/$name"
-    python3 - "$work/$name" "$(checksum "$name")" "$work/${name%.zip}" <<'EOF'
+    "$PYTHON" - "$work/$name" "$(checksum "$name")" "$work/${name%.zip}" <<'EOF'
 import hashlib, sys, zipfile
 path, expected, into = sys.argv[1:4]
 digest = hashlib.sha256(open(path, "rb").read()).hexdigest()

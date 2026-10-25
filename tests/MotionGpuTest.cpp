@@ -13,7 +13,7 @@
 // snaps to steps (Bit crush, Polygon, Spiral crush) may land a point either
 // side of one where the two round it differently, so a few such are allowed.
 // Without a GPU (a machine with none, or OSCI_MOTION_GPU=off) it says so and
-// checks nothing.
+// checks nothing, unless one was asked for (OSCI_MOTION_GPU=force).
 class MotionGpuTest : public juce::UnitTest {
 public:
     MotionGpuTest() : juce::UnitTest("Motion GPU", "Motion") {}
@@ -22,8 +22,9 @@ public:
         beginTest("The GPU, when there is one, passes its first check");
         auto* device = motion::gpu::Device::shared();
         if (device == nullptr) {
+            // Asked for (OSCI_MOTION_GPU=force), there must be one.
+            expect(motion::gpu::mode() != motion::gpu::Mode::force, "a GPU was asked for, but: " + motion::gpu::Device::unavailableReason());
             logMessage("No GPU: " + motion::gpu::Device::unavailableReason());
-            expect(true);
             return;
         }
         logMessage("GPU: " + device->describe());

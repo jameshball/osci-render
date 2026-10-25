@@ -65,6 +65,11 @@ if { [ "$PLUGIN" = "osci-render" ] || [ "$PLUGIN" = "osci-motion" ]; } && [ "$OS
   "$ROOT/luajit_linux_macos.sh"
 fi
 
+# wgpu-native, through which osci-motion bakes hidden lines on the GPU.
+if [ "$PLUGIN" = "osci-motion" ]; then
+  "$ROOT/scripts/fetch_wgpu_native.sh"
+fi
+
 # Resave jucer file
 RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
 eval "$RESAVE_COMMAND"

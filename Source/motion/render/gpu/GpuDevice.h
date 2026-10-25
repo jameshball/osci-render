@@ -28,9 +28,14 @@ public:
     Device(const Device&) = delete;
     Device& operator=(const Device&) = delete;
 
-    // The device, or none when the mode is off, no adapter suits it, or the
-    // device fails its first check. Made once; later calls are cheap.
+    // The device, or none when the mode is off, no adapter suits it, the
+    // device fails its first check, or it is lost later (a driver reset, a
+    // GPU unplugged): from then on hidden lines bake on the CPU. Made once;
+    // later calls are cheap.
     static Device* shared();
+    // The device if it has been made and is usable, without making it (for
+    // saying where frames bake, from a thread that mustn't wait).
+    static const Device* existing();
     // Why there is no device, when there isn't.
     static juce::String unavailableReason();
 

@@ -11,6 +11,8 @@
 namespace motion::gpu {
 namespace {
 std::atomic<int> requestedMode {-1};
+// Whether the device has been made (or found unavailable).
+std::atomic<bool> made {false};
 
 juce::String text(WGPUStringView view) {
     if (view.data == nullptr) { return {}; }
@@ -53,6 +55,8 @@ struct Device::Impl {
     // What the device reported wrong since the last run began (a kernel that
     // failed to compile or validate).
     std::atomic<bool> failed {false};
+    // Lost (a driver reset, a GPU unplugged): never used again.
+    std::atomic<bool> lost {false};
     juce::String error;
     // Runs wait on the GPU for their results, far longer than a spin is for.
     std::mutex running;
@@ -159,6 +163,15 @@ Made make() {
         DBG("WebGPU error: " << into->error);
     };
     deviceDescriptor.uncapturedErrorCallbackInfo.userdata1 = impl.get();
+    deviceDescriptor.deviceLostCallbackInfo.mode = WGPUCallbackMode_AllowSpontaneous;
+    deviceDescriptor.deviceLostCallbackInfo.callback = [](WGPUDevice const*, WGPUDeviceLostReason reason, WGPUStringView message, void* owner, void*) {
+        // Released when the process ends: not a loss.
+        if (reason == WGPUDeviceLostReason_Destroyed || reason == WGPUDeviceLostReason_CallbackCancelled) { return; }
+        auto* into = static_cast<Device::Impl*>(owner);
+        into->lost.store(true);
+        DBG("WebGPU device lost: " << text(message));
+    };
+    deviceDescriptor.deviceLostCallbackInfo.userdata1 = impl.get();
     WGPURequestDeviceCallbackInfo deviceCallback = WGPU_REQUEST_DEVICE_CALLBACK_INFO_INIT;
     deviceCallback.mode = WGPUCallbackMode_AllowSpontaneous;
     deviceCallback.callback = [](WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView, void* into, void*) {
@@ -197,16 +210,29 @@ Made make() {
 }
 
 Made& process() {
-    static Made made = make();
-    return made;
+    static Made once = [] {
+        auto result = make();
+        made.store(true);
+        return result;
+    }();
+    return once;
 }
 }
 
-Device* Device::shared() { return process().device.get(); }
-juce::String Device::unavailableReason() { return process().device != nullptr ? juce::String() : process().reason; }
+Device* Device::shared() {
+    auto* device = process().device.get();
+    return device != nullptr && !device->impl->lost.load() ? device : nullptr;
+}
+
+const Device* Device::existing() { return made.load() ? shared() : nullptr; }
+juce::String Device::unavailableReason() {
+    if (process().device == nullptr) { return process().reason; }
+    return process().device->impl->lost.load() ? juce::String("the GPU (" + process().device->describe() + ") was lost") : juce::String();
+}
 
 std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std::span<const Input> inputs, std::span<const std::byte> uniforms, std::size_t outputBytes, std::uint32_t invocations) {
     const std::lock_guard lock(impl->running);
+    if (impl->lost.load()) { return std::nullopt; }
     impl->failed.store(false);
     impl->error.clear();
     const auto pipeline = impl->pipelineFor(wgsl);
