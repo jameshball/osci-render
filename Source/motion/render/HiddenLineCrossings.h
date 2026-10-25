@@ -176,29 +176,39 @@ private:
 
 // Pieces end to end as runs: a piece follows another of the same surface
 // that ends where it starts (turned round if need be). Ends meet within a
-// millionth of a unit, found through a hash of the cells they fall in.
+// millionth of a unit, found through a hash of the cells they fall in: cells
+// twice that across, so an end that meets a point is in the point's cell or
+// a neighbour on the side of it the point is nearer (eight in all).
 inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const std::vector<Triangle>& triangles) {
     constexpr double reach = 1.0e-6;
     using Cell = std::array<std::int64_t, 3>;
-    const auto cellOf = [](const Vec3& point) { return Cell {static_cast<std::int64_t>(std::floor(point.x / reach)), static_cast<std::int64_t>(std::floor(point.y / reach)), static_cast<std::int64_t>(std::floor(point.z / reach))}; };
+    constexpr double size = 2 * reach;
+    const auto cellOf = [](const Vec3& point) { return Cell {static_cast<std::int64_t>(std::floor(point.x / size)), static_cast<std::int64_t>(std::floor(point.y / size)), static_cast<std::int64_t>(std::floor(point.z / size))}; };
     // Unsigned, so the multiplies wrap rather than overflow.
     const auto hash = [](const Cell& cell) { return static_cast<std::size_t>((static_cast<std::uint64_t>(cell[0]) * 73856093u) ^ (static_cast<std::uint64_t>(cell[1]) * 19349663u) ^ (static_cast<std::uint64_t>(cell[2]) * 83492791u)); };
-    std::unordered_multimap<std::size_t, std::size_t> ends;
+    // Each end by its cell's hash, sorted, so a cell's ends are found by
+    // halving (a table of nodes would allocate one an end).
+    std::vector<std::pair<std::size_t, std::size_t>> ends;
     ends.reserve(pieces.size() * 2);
     for (std::size_t index = 0; index < pieces.size(); ++index) {
-        ends.emplace(hash(cellOf(pieces[index].eyeFrom)), index);
-        ends.emplace(hash(cellOf(pieces[index].eyeTo)), index);
+        ends.emplace_back(hash(cellOf(pieces[index].eyeFrom)), index);
+        ends.emplace_back(hash(cellOf(pieces[index].eyeTo)), index);
     }
+    std::sort(ends.begin(), ends.end());
     const auto meets = [](const Vec3& p, const Vec3& q) { return (p - q).length() <= reach; };
     std::vector<bool> used(pieces.size(), false);
     // An unused piece of `surface` with an end at `point`.
     const auto nextAt = [&](const Vec3& point, std::uint32_t surface) -> std::optional<std::size_t> {
         const auto centre = cellOf(point);
-        for (std::int64_t dx = -1; dx <= 1; ++dx) {
-            for (std::int64_t dy = -1; dy <= 1; ++dy) {
-                for (std::int64_t dz = -1; dz <= 1; ++dz) {
-                    const auto range = ends.equal_range(hash({centre[0] + dx, centre[1] + dy, centre[2] + dz}));
-                    for (auto it = range.first; it != range.second; ++it) {
+        // Toward the nearer side of its cell, on each axis.
+        const auto side = [](double value, std::int64_t cell) { return value / size - static_cast<double>(cell) < .5 ? std::int64_t {-1} : std::int64_t {1}; };
+        const std::array<std::int64_t, 2> xs {0, side(point.x, centre[0])}, ys {0, side(point.y, centre[1])}, zs {0, side(point.z, centre[2])};
+        for (const auto dx : xs) {
+            for (const auto dy : ys) {
+                for (const auto dz : zs) {
+                    const auto key = hash({centre[0] + dx, centre[1] + dy, centre[2] + dz});
+                    const auto first = std::lower_bound(ends.begin(), ends.end(), key, [](const auto& end, std::size_t value) { return end.first < value; });
+                    for (auto it = first; it != ends.end() && it->first == key; ++it) {
                         const auto& candidate = pieces[it->second];
                         if (!used[it->second] && triangles[candidate.triangle].surface == surface && (meets(candidate.eyeFrom, point) || meets(candidate.eyeTo, point))) { return it->second; }
                     }
