@@ -84,7 +84,9 @@ void MotionEditor::resized() {
     auto statusArea = area.removeFromBottom(20);
     // Where the project plays, in the status bar beside its rates: routing
     // set once, and the audio state it belongs with.
-    outputButton.setBounds(statusArea.removeFromRight(std::min(outputButton.idealWidth(), 260)).reduced(0, 1));
+    // Clear of the window's corner, and never so narrow it reads as a chip.
+    statusArea.removeFromRight(6);
+    outputButton.setBounds(statusArea.removeFromRight(std::clamp(outputButton.idealWidth(), 160, 280)).reduced(0, 1));
     statusArea.removeFromRight(8);
     statusBar.setBounds(statusArea);
     layoutAlert();

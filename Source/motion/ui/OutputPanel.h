@@ -99,7 +99,8 @@ public:
         using namespace motion::ui::output;
         const auto font = motion::style::caption();
         const auto width = [&](const juce::String& text) { return static_cast<int>(std::ceil(juce::TextLayout::getStringWidth(font, text))) + 2; };
-        int needed = 8 + width("Output") + 8 + 16;
+        // The insets paintButton keeps: 8 either side, and the chevron's 16.
+        int needed = 8 + width("Output") + 8 + 16 + 8;
         if (!open || (!routing.soundOn() && !routing.beamOn())) { return needed + width(open ? "Nothing" : "No audio device"); }
         if (routing.soundOn()) { needed += 12 + width("Sound " + range(routing.sound, 2)) + 10; }
         if (routing.beamOn()) { needed += 12 + width(beamText()) + 10; }
