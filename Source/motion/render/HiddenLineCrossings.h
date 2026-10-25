@@ -192,8 +192,9 @@ inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const 
     const auto cellOf = [](const Vec3& point) { return Cell {static_cast<std::int64_t>(std::floor(point.x / size)), static_cast<std::int64_t>(std::floor(point.y / size)), static_cast<std::int64_t>(std::floor(point.z / size))}; };
     // Unsigned, so the multiplies wrap rather than overflow.
     const auto hash = [](const Cell& cell) { return static_cast<std::size_t>((static_cast<std::uint64_t>(cell[0]) * 73856093u) ^ (static_cast<std::uint64_t>(cell[1]) * 19349663u) ^ (static_cast<std::uint64_t>(cell[2]) * 83492791u)); };
-    // Each end by its cell's hash, sorted, so a cell's ends are found by
-    // halving (a table of nodes would allocate one an end).
+    // Each end by its cell's hash, sorted, and each hash's run of ends found
+    // through a table of them, open addressed (a table of nodes would
+    // allocate one an end).
     std::vector<std::pair<std::size_t, std::size_t>> ends;
     ends.reserve(pieces.size() * 2);
     for (std::size_t index = 0; index < pieces.size(); ++index) {
@@ -201,6 +202,28 @@ inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const 
         ends.emplace_back(hash(cellOf(pieces[index].eyeTo)), index);
     }
     std::sort(ends.begin(), ends.end());
+    struct Slot {
+        std::size_t key = 0, first = 0, last = 0;
+    };
+    std::size_t slots = 16;
+    while (slots < ends.size() * 2) { slots *= 2; }
+    std::vector<Slot> table(slots);
+    const auto slotOf = [&](std::size_t key) { return static_cast<std::size_t>((static_cast<std::uint64_t>(key) * 0x9e3779b97f4a7c15ull) >> 20) & (slots - 1); };
+    for (std::size_t first = 0; first < ends.size();) {
+        auto last = first + 1;
+        while (last < ends.size() && ends[last].first == ends[first].first) { ++last; }
+        auto slot = slotOf(ends[first].first);
+        while (table[slot].last != 0) { slot = (slot + 1) & (slots - 1); }
+        table[slot] = {ends[first].first, first, last};
+        first = last;
+    }
+    // The ends whose cell has hash `key`.
+    const auto endsOf = [&](std::size_t key) -> std::pair<std::size_t, std::size_t> {
+        for (auto slot = slotOf(key); table[slot].last != 0; slot = (slot + 1) & (slots - 1)) {
+            if (table[slot].key == key) { return {table[slot].first, table[slot].last}; }
+        }
+        return {0, 0};
+    };
     const auto meets = [](const Vec3& p, const Vec3& q) { return (p - q).length() <= reach; };
     std::vector<bool> used(pieces.size(), false);
     // An unused piece of `surface` with an end at `point`.
@@ -212,11 +235,11 @@ inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const 
         for (const auto dx : xs) {
             for (const auto dy : ys) {
                 for (const auto dz : zs) {
-                    const auto key = hash({centre[0] + dx, centre[1] + dy, centre[2] + dz});
-                    const auto first = std::lower_bound(ends.begin(), ends.end(), key, [](const auto& end, std::size_t value) { return end.first < value; });
-                    for (auto it = first; it != ends.end() && it->first == key; ++it) {
-                        const auto& candidate = pieces[it->second];
-                        if (!used[it->second] && triangles[candidate.triangle].surface == surface && (meets(candidate.eyeFrom, point) || meets(candidate.eyeTo, point))) { return it->second; }
+                    const auto [first, last] = endsOf(hash({centre[0] + dx, centre[1] + dy, centre[2] + dz}));
+                    for (auto end = first; end < last; ++end) {
+                        const auto index = ends[end].second;
+                        const auto& candidate = pieces[index];
+                        if (!used[index] && triangles[candidate.triangle].surface == surface && (meets(candidate.eyeFrom, point) || meets(candidate.eyeTo, point))) { return index; }
                     }
                 }
             }
