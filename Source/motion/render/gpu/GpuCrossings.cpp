@@ -161,7 +161,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) g
         if (max(cover.x0, other.x0) != x || max(cover.y0, other.y0) != y) { continue; }
         if (!overlaps(box, boxes[j]) || !mayCross(mine, theirs)) { continue; }
         let at = atomicAdd(&found.count, 1u);
-        if (at < arrayLength(&found.pairs)) { found.pairs[at] = vec4<u32>(cell, i, j, 0u); }
+        if (at < arrayLength(&found.pairs)) { found.pairs[at] = vec4<u32>(entry, i, j, 0u); }
     }
 }
 )";
@@ -219,10 +219,13 @@ std::optional<std::vector<std::array<std::uint32_t, 2>>> mayCross(Device& device
         }
         std::vector<std::array<std::uint32_t, 4>> found(count);
         std::memcpy(found.data(), output->data() + 16, count * 16);
-        std::sort(found.begin(), found.end());
-        std::vector<std::array<std::uint32_t, 2>> pairs;
-        pairs.reserve(found.size());
-        for (const auto& pair : found) { pairs.push_back({pair[1], pair[2]}); }
+        // In order of the entry that found them: eachPair's order, as an
+        // entry's own pairs, counted up one at a time, come back in order.
+        std::vector<std::uint32_t> firsts(members.size() + 1, 0);
+        for (const auto& pair : found) { ++firsts[pair[0] + 1]; }
+        for (std::size_t entry = 0; entry < members.size(); ++entry) { firsts[entry + 1] += firsts[entry]; }
+        std::vector<std::array<std::uint32_t, 2>> pairs(found.size());
+        for (const auto& pair : found) { pairs[firsts[pair[0]]++] = {pair[1], pair[2]}; }
         return pairs;
     }
     return std::nullopt;
