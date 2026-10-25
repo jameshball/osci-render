@@ -380,3 +380,6 @@ vital/
 /.wrangler/
 # Generated per-build Release-plane pin, not a manually maintained document source.
 /ci/release.json
+
+# wgpu-native, fetched by scripts/fetch_wgpu_native.sh
+/External/

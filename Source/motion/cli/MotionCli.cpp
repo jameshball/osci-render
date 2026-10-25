@@ -3,6 +3,7 @@
 #include "SignalDiff.h"
 #include "ScopeRender.h"
 #include "../export/SignalExporter.h"
+#include "../render/gpu/GpuDevice.h"
 #include "../../video/VideoEncodingConstants.h"
 
 // osci-motion on the command line: projects drawn offline exactly as Export
@@ -356,6 +357,13 @@ void diff(const juce::ArgumentList& args) {
 // Every project and recipe under a folder against the stats kept beside it
 // (<name>.stats.json): what changed, frame by frame. --update keeps the new
 // stats instead.
+// The GPU hidden lines bake on, or why none is used.
+void gpu(const juce::ArgumentList&) {
+    const auto* device = motion::gpu::Device::shared();
+    if (device == nullptr) { juce::ConsoleApplication::fail("No GPU: " + motion::gpu::Device::unavailableReason() + ". Hidden lines bake on the CPU."); }
+    say("GPU: " + device->describe() + (device->software() ? " (software)" : ""));
+}
+
 void check(const juce::ArgumentList& args) {
     const auto folders = positional(args);
     if (folders.size() != 1) { juce::ConsoleApplication::fail("check takes one folder of projects."); }
@@ -419,9 +427,21 @@ void check(const juce::ArgumentList& args) {
 
 int main(int argc, char* argv[]) {
     const juce::ScopedJuceInitialiser_GUI initialiser;
+    // --gpu=auto|off|force, for any command.
+    for (int index = 1; index < argc; ++index) {
+        const juce::String argument(argv[index]);
+        if (!argument.startsWith("--gpu=")) { continue; }
+        const auto mode = motion::gpu::modeFrom(argument.fromFirstOccurrenceOf("=", false, false));
+        if (!mode.has_value()) {
+            std::cerr << "--gpu takes auto, off or force." << std::endl;
+            return 1;
+        }
+        motion::gpu::setMode(*mode);
+    }
     juce::ConsoleApplication app;
     app.addHelpCommand("--help|-h", "osci-motion-cli: draws osci-motion projects offline, as Export draws them.\n"
-        "Times are in seconds; --rate=Hz sets the sample rate (the project's own).", true);
+        "Times are in seconds; --rate=Hz sets the sample rate (the project's own).\n"
+        "--gpu=auto|off|force bakes hidden lines on the GPU when there is one (auto), never, or always.", true);
     app.addCommand({"make", "make <scene.recipe.json> [--out=scene.osci-motion]",
         "Makes a project from a recipe: objects from generators or files, their properties and keys, a camera.",
         "Every command takes a recipe wherever it takes a project. See Source/motion/cli/Recipe.h for the format.", make});
@@ -437,6 +457,7 @@ int main(int argc, char* argv[]) {
         "Compares two signals sample by sample, or two projects frame by frame.", {}, diff});
     app.addCommand({"frame", "frame <project> [--frames=N | --at=t1,t2] [--rate=Hz]",
         "What a baked frame is made of: each clip's drawing and what each mirror shows, with length and pieces.", {}, frame});
+    app.addCommand({"gpu", "gpu [--gpu=auto|off|force]", "Says which GPU hidden lines bake on, or why none is used.", {}, gpu});
     app.addCommand({"check", "check <folder> [--update] [--frames=N] [--rate=Hz]",
         "Draws every project and recipe under a folder and compares each with the stats kept beside it.", {}, check});
     return app.findAndRunCommand(argc, argv);
