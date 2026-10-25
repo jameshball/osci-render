@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <span>
@@ -31,10 +32,10 @@ struct DiceView {
 
 // Cuts a face something bends into pieces flat enough, once bent, to draw as
 // triangles in every view at once: the frame's surfaces are bent once, in the
-// scene, and each view draws the same pieces. A piece is measured in the
-// pixels of the view that sees it most finely (its footprint: the size of a
-// pixel there, for the nearest of its corners), so it is as fine as the
-// finest view needs and no finer; one no view sees is dropped. Large pieces
+// scene, and each view draws the same pieces. A piece's edges are measured in
+// pixels of the view that sees it most finely (see measure), and how flat it
+// is in every view that sees it (see curving), so it is as fine as the finest
+// view needs and no finer; one no view sees is dropped. Large pieces
 // are halved across their longest edge, through a new point bent like any
 // other. Once a piece is a few cells across, it is cut into an even grid
 // instead, each of whose points is bent once: as fine as a cell where the
@@ -45,8 +46,9 @@ public:
     // Edges, in pixels, past which pieces are halved, and past which a piece
     // is too large to grid.
     static constexpr double cell = 4, gridReach = 8 * cell;
-    // How far a piece drawn flat may be from the bent surface, in pixels.
-    static constexpr double flatTolerance = .125;
+    // How far a piece drawn flat may be from the bent surface: on screen, in
+    // pixels, and in depth, as a share of the room a depth test leaves.
+    static constexpr double flatTolerance = .125, depthTolerance = DepthBuffer::depthPush / 4;
 
     // How many pieces a frame's surfaces may be cut into, some eight to each
     // cell of the depth buffer. Close to an eye a bend can throw a face
@@ -73,7 +75,7 @@ public:
             if ((++emitted & 1023) == 0 && cancelled()) { stopped = true; }
             if (!stopped) { emit(p, q, r); }
         };
-        halve(a, b, c, deepest, true, cell * cell, std::nullopt, bend, asked);
+        halve(a, b, c, deepest, true, cell * cell, bend, asked);
         return !stopped;
     }
     template <typename Bend, typename Emit>
@@ -81,36 +83,47 @@ public:
         dice(a, b, c, bend, emit, [] { return false; });
     }
 
-    // The size of a pixel at a piece in the view that sees it most finely,
-    // or none when no view sees it.
-    std::optional<double> footprint(const Vec3& p, const Vec3& q, const Vec3& r) const {
-        auto finest = std::numeric_limits<double>::infinity();
-        for (const auto& view : views) {
-            const std::array<Vec3, 3> seen {view.eye.see(p), view.eye.see(q), view.eye.see(r)};
+    // A piece as the views that see it need it: the size of a pixel where
+    // it is in the view that sees it most finely (in perspective its nearest
+    // corner's depth over the focal length; toward a view's edge a length
+    // can land up to half as long again, which the cells' margin allows),
+    // and which views see it.
+    struct Measure {
+        double pixel = std::numeric_limits<double>::infinity();
+        std::uint64_t seenBy = 0;
+    };
+    // None when no view sees it.
+    std::optional<Measure> measure(const Vec3& p, const Vec3& q, const Vec3& r) const {
+        Measure measured;
+        bool any = false;
+        for (std::size_t index = 0; index < views.size(); ++index) {
+            const auto& view = views[index];
             const auto& projection = view.projection;
             // Wholly past one side of the view (or behind its eye) it doesn't see it.
             const auto x = view.reach.x * DepthBuffer::overscan, y = view.reach.y * DepthBuffer::overscan;
             int left = 0, right = 0, below = 0, above = 0, behind = 0;
             auto nearest = std::numeric_limits<double>::infinity();
-            for (const auto& point : seen) {
-                if (!projection.parallel && !(point.z > nearPlane)) {
+            for (const auto* corner : {&p, &q, &r}) {
+                const auto seen = view.eye.see(*corner);
+                const auto at = projection(seen);
+                if (!at.has_value()) {
                     ++behind;
                     continue;
                 }
-                const auto scale = projection.parallel ? projection.focalLength : projection.focalLength / point.z;
-                const auto sx = point.x * scale, sy = point.y * scale;
-                left += sx < -x;
-                right += sx > x;
-                below += sy < -y;
-                above += sy > y;
-                nearest = std::min(nearest, point.z);
+                left += at->x < -x;
+                right += at->x > x;
+                below += at->y < -y;
+                above += at->y > y;
+                nearest = std::min(nearest, seen.z);
             }
             // Partly behind the eye, it may come into view anywhere.
             if (behind == 3 || (behind == 0 && (left == 3 || right == 3 || below == 3 || above == 3))) { continue; }
-            const auto size = projection.parallel ? view.pixel / projection.focalLength : view.pixel * std::max(nearest, nearPlane) / projection.focalLength;
-            finest = std::min(finest, size);
+            any = true;
+            if (index < 64) { measured.seenBy |= std::uint64_t {1} << index; }
+            const auto depth = projection.parallel ? 1.0 : std::max(nearest, nearPlane);
+            measured.pixel = std::min(measured.pixel, view.pixel * depth / projection.focalLength);
         }
-        return std::isfinite(finest) ? std::optional(finest) : std::nullopt;
+        return any ? std::optional(measured) : std::nullopt;
     }
 
 private:
@@ -121,19 +134,20 @@ private:
     // its ends, however long the edge, the bend jumps across it.
     static constexpr double jumpLength = 1.0e-4;
 
-    // Squared lengths in pixels of `size`.
-    static double lengthSquared(const DiceCorner& u, const DiceCorner& v, double size) {
-        const auto offset = v.at - u.at;
+    // An edge's length, squared, in pixels of `size`.
+    static double lengthSquared(const Vec3& u, const Vec3& v, double size) {
+        const auto offset = v - u;
         return offset.dot(offset) / (size * size);
     }
     // Whether the bend jumps across an edge (a step Bit crush makes, or a
     // stripe Polygon snaps to): halving it would never shorten it, as its
-    // middle lands on one of its ends, or, once pieces are `deep`, one of
-    // its halves is nearly as long as it. A continuous bend shortens both.
-    static bool jumps(const DiceCorner& u, const DiceCorner& v, const DiceCorner& middle, bool deep, double size) {
-        const auto first = lengthSquared(u, middle, size), second = lengthSquared(middle, v, size);
+    // middle lands on one of its ends, or, once pieces are `deep`, the half
+    // across the step is nearly as long as it and the other, on one side,
+    // short. A continuous bend shortens both.
+    static bool jumps(const DiceCorner& u, const DiceCorner& v, const DiceCorner& middle, bool deep, double whole, double size) {
+        const auto first = lengthSquared(u.at, middle.at, size), second = lengthSquared(middle.at, v.at, size);
         if (std::min(first, second) < jumpLength) { return true; }
-        return deep && std::max(first, second) > .81 * lengthSquared(u, v, size);
+        return deep && std::max(first, second) > .81 * whole && std::min(first, second) < .25 * whole;
     }
 
     static osci::Point mix(const osci::Point& from, const osci::Point& u, const osci::Point& v, double s, double t) {
@@ -147,20 +161,19 @@ private:
     // edges all jump is drawn as it is, like a step's riser. A piece small
     // enough to grid is gridded unless it came from a grid (halving it never
     // grids again, so the grid's points are never overwritten while in use).
-    // A grid's pieces keep its footprint (`known`): none is nearer an eye.
     template <typename Bend, typename Emit>
-    void halve(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, int depthLeft, bool mayGrid, double limit, std::optional<double> known, Bend& bend, Emit& emit) {
+    void halve(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, int depthLeft, bool mayGrid, double limit, Bend& bend, Emit& emit) {
         if (stopped) { return; }
-        const auto size = known.has_value() ? known : footprint(p.at, q.at, r.at);
-        if (!size.has_value()) { return; }
-        const auto pq = lengthSquared(p, q, *size), qr = lengthSquared(q, r, *size), rp = lengthSquared(r, p, *size);
+        const auto measured = measure(p.at, q.at, r.at);
+        if (!measured.has_value()) { return; }
+        const auto pq = lengthSquared(p.at, q.at, measured->pixel), qr = lengthSquared(q.at, r.at, measured->pixel), rp = lengthSquared(r.at, p.at, measured->pixel);
         const auto longest = std::max({pq, qr, rp});
         if (longest <= limit || depthLeft <= 0 || ++spent > budget) {
             emit(p, q, r);
             return;
         }
         if (mayGrid && longest <= gridReach * gridReach) {
-            grid(p, q, r, std::sqrt(longest), *size, depthLeft, bend, emit);
+            grid(p, q, r, std::sqrt(longest), measured->seenBy, depthLeft, bend, emit);
             return;
         }
         // A middle the bend can't place is left where the flat edge has it.
@@ -179,16 +192,16 @@ private:
             const auto& u = edge == 0 ? p : edge == 1 ? q : r;
             const auto& v = edge == 0 ? q : edge == 1 ? r : p;
             const auto m = middle(u, v);
-            if (jumps(u, v, m, depthLeft <= deepAfter, *size)) { continue; }
+            if (jumps(u, v, m, depthLeft <= deepAfter, length, measured->pixel)) { continue; }
             if (edge == 0) {
-                halve(p, m, r, depthLeft - 1, mayGrid, limit, std::nullopt, bend, emit);
-                halve(m, q, r, depthLeft - 1, mayGrid, limit, std::nullopt, bend, emit);
+                halve(p, m, r, depthLeft - 1, mayGrid, limit, bend, emit);
+                halve(m, q, r, depthLeft - 1, mayGrid, limit, bend, emit);
             } else if (edge == 1) {
-                halve(p, q, m, depthLeft - 1, mayGrid, limit, std::nullopt, bend, emit);
-                halve(p, m, r, depthLeft - 1, mayGrid, limit, std::nullopt, bend, emit);
+                halve(p, q, m, depthLeft - 1, mayGrid, limit, bend, emit);
+                halve(p, m, r, depthLeft - 1, mayGrid, limit, bend, emit);
             } else {
-                halve(p, q, m, depthLeft - 1, mayGrid, limit, std::nullopt, bend, emit);
-                halve(m, q, r, depthLeft - 1, mayGrid, limit, std::nullopt, bend, emit);
+                halve(p, q, m, depthLeft - 1, mayGrid, limit, bend, emit);
+                halve(m, q, r, depthLeft - 1, mayGrid, limit, bend, emit);
             }
             return;
         }
@@ -196,30 +209,64 @@ private:
     }
 
     // How far the bend takes a piece off the flat triangle between its
-    // corners, at a few points of it, in units of what may be drawn flat: a
-    // piece under 1 is flat enough to draw whole, and as the error shrinks
-    // with the square of a piece's size, one over 1 is flat enough cut into
-    // its square root as many pieces along each edge.
+    // corners, at a few points of it, in units of what may be drawn flat, in
+    // the worst of the views that see it (`seenBy`): a piece under 1 is flat
+    // enough to draw whole, and as the error shrinks with the square of a
+    // piece's size, one over 1 is flat enough cut into its square root as many
+    // pieces along each edge. Inverse depth is linear over a view's screen
+    // across a flat triangle, so a point's depth is measured from that plane,
+    // allowing as much as the depth test does: a share of its depth and of
+    // how much the plane's depth changes across a pixel. A point on an edge is
+    // also measured from the edge's line, as it shapes the outline the surface
+    // hides with. A view that sees the piece partly behind its eye measures
+    // nothing (the piece is cut where it comes into view).
     template <typename Bend>
-    static double curving(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, double size, Bend& bend) {
-        double worst = 0;
-        const auto measure = [&](double s, double t) {
-            const auto point = bend(mix(p.source, q.source, r.source, s, t));
-            if (!point.has_value()) {
-                worst = std::numeric_limits<double>::infinity();
-                return;
-            }
-            worst = std::max(worst, (*point - mix(p.at, q.at, r.at, s, t)).length() / (flatTolerance * size));
-        };
+    double curving(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, std::uint64_t seenBy, Bend& bend) const {
+        constexpr auto endless = std::numeric_limits<double>::infinity();
         // Each edge's middle, the middle of the piece, and halfway from there
-        // to each corner.
-        measure(.5, 0);
-        measure(.5, .5);
-        measure(0, .5);
-        measure(1.0 / 3, 1.0 / 3);
-        measure(1.0 / 6, 1.0 / 6);
-        measure(2.0 / 3, 1.0 / 6);
-        measure(1.0 / 6, 2.0 / 3);
+        // to each corner; an edge's middle is measured from its line too.
+        struct Probe {
+            double s, t;
+            int from, to;
+        };
+        constexpr std::array<Probe, 7> probes {{{.5, 0, 0, 1}, {.5, .5, 1, 2}, {0, .5, 2, 0}, {1.0 / 3, 1.0 / 3, -1, -1}, {1.0 / 6, 1.0 / 6, -1, -1}, {2.0 / 3, 1.0 / 6, -1, -1}, {1.0 / 6, 2.0 / 3, -1, -1}}};
+        std::array<Vec3, 7> bent {};
+        for (std::size_t index = 0; index < probes.size(); ++index) {
+            const auto point = bend(mix(p.source, q.source, r.source, probes[index].s, probes[index].t));
+            if (!point.has_value()) { return endless; }
+            bent[index] = *point;
+        }
+        double worst = 0;
+        for (std::size_t index = 0; index < views.size(); ++index) {
+            if (index < 64 && (seenBy >> index & 1) == 0) { continue; }
+            const auto& view = views[index];
+            const auto& projection = view.projection;
+            const auto ap = projection(view.eye.see(p.at)), bp = projection(view.eye.see(q.at)), cp = projection(view.eye.see(r.at));
+            if (!ap.has_value() || !bp.has_value() || !cp.has_value()) { continue; }
+            const std::array<Screen, 3> corners {*ap, *bp, *cp};
+            const auto& a = corners[0];
+            const auto& b = corners[1];
+            const auto& c = corners[2];
+            const auto ux = b.x - a.x, uy = b.y - a.y, vx = c.x - a.x, vy = c.y - a.y;
+            const auto area = ux * vy - uy * vx;
+            // Seen edge on, it has no plane to measure from.
+            if (!(std::abs(area) > 0)) { return endless; }
+            const auto dwdx = ((b.w - a.w) * vy - (c.w - a.w) * uy) / area;
+            const auto dwdy = ((c.w - a.w) * ux - (b.w - a.w) * vx) / area;
+            const auto slope = (std::abs(dwdx) + std::abs(dwdy)) * view.pixel;
+            for (std::size_t probe = 0; probe < probes.size(); ++probe) {
+                const auto point = projection(view.eye.see(bent[probe]));
+                if (!point.has_value()) { return endless; }
+                const auto plane = a.w + dwdx * (point->x - a.x) + dwdy * (point->y - a.y);
+                worst = std::max(worst, std::abs(point->w - plane) / (depthTolerance * std::abs(point->w) + flatTolerance * slope));
+                if (probes[probe].from < 0) { continue; }
+                const auto& from = corners[static_cast<std::size_t>(probes[probe].from)];
+                const auto& to = corners[static_cast<std::size_t>(probes[probe].to)];
+                const auto ex = to.x - from.x, ey = to.y - from.y;
+                const auto length = std::sqrt(ex * ex + ey * ey);
+                if (length > 0) { worst = std::max(worst, std::abs((point->x - from.x) * ey - (point->y - from.y) * ex) / length / (flatTolerance * view.pixel)); }
+            }
+        }
         return worst;
     }
 
@@ -228,10 +275,10 @@ private:
     // row j holds n + 1 - j of them. A piece the bend still stretches past
     // half as long again as the grid's pieces is halved on.
     template <typename Bend, typename Emit>
-    void grid(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, double longest, double size, int depthLeft, Bend& bend, Emit& emit) {
+    void grid(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, double longest, std::uint64_t seenBy, int depthLeft, Bend& bend, Emit& emit) {
         const auto finest = std::max(2.0, std::ceil(longest / cell));
         // Endless (or not a number) where it cannot be measured: as fine as a cell.
-        const auto needed = std::ceil(std::sqrt(curving(p, q, r, size, bend)));
+        const auto needed = std::ceil(std::sqrt(curving(p, q, r, seenBy, bend)));
         const auto n = static_cast<int>(needed < finest ? std::max(1.0, needed) : finest);
         const auto stretch = std::max(cell, 1.5 * longest / n);
         points.resize(static_cast<std::size_t>(gridIndex(n, n + 1, 0)));
@@ -252,7 +299,7 @@ private:
             }
         }
         const auto at = [&](int i, int j) -> const DiceCorner& { return points[static_cast<std::size_t>(gridIndex(n, j, i))]; };
-        const auto piece = [&](const DiceCorner& u, const DiceCorner& v, const DiceCorner& w) { halve(u, v, w, depthLeft - 1, false, stretch * stretch, size, bend, emit); };
+        const auto piece = [&](const DiceCorner& u, const DiceCorner& v, const DiceCorner& w) { halve(u, v, w, depthLeft - 1, false, stretch * stretch, bend, emit); };
         for (int j = 0; j < n; ++j) {
             for (int i = 0; i + j < n; ++i) {
                 piece(at(i, j), at(i + 1, j), at(i, j + 1));

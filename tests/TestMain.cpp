@@ -271,7 +271,14 @@ int main(int argc, char* argv[]) {
     juce::UnitTestRunner runner;
     runner.setAssertOnFailure(false);
     
-    if (argc > 1) {
+    if (argc > 2 && juce::String(argv[1]) == "--test") {
+        // Only the tests with this name, e.g. "Motion hidden lines"
+        juce::Array<juce::UnitTest*> named;
+        for (auto* test : juce::UnitTest::getAllTests()) {
+            if (test->getName() == juce::String(argv[2])) { named.add(test); }
+        }
+        runner.runTests(named);
+    } else if (argc > 1) {
         // Run only tests matching the given category
         juce::String category(argv[1]);
         runner.runTestsInCategory(category);

@@ -443,6 +443,90 @@ public:
             expectEquals(static_cast<int>(dice(neither)), 0, "a face no view sees is dropped");
         }
 
+        beginTest("Diced once for several views, a face is fine enough in every view that sees it");
+        {
+            // No piece over twice the grid's reach across in any view that sees
+            // it (a length lands longer toward a view's edge than at its
+            // middle), and hardly a point further from the bent surface than a
+            // pixel on screen or the room the depth test leaves a surface (a
+            // share of its inverse depth, and of how much that changes across a
+            // pixel): flatness is judged from a few points of each piece.
+            using motion::hidden::Dicer;
+            const auto view = [&](motion::Vec3 at, double focal, bool parallel = false) {
+                auto made = lookingAlongZ();
+                made.eye.position = at;
+                made.projection.focalLength = focal;
+                made.projection.parallel = parallel;
+                made.projection.farthest = made.projection.span = 8;
+                return made;
+            };
+            const std::array views {view({0, 0, 0}, 1), view({.6, .4, -.5}, .5), view({0, 0, -3}, 3), view({0, 0, -2}, .4, true)};
+            const auto bulge = [&](const osci::Point& point) { return inScene(osci::Point(point.x, point.y, point.z - .3f * (1 - point.x * point.x) * (1 - point.y * point.y))); };
+            const auto twist = [&](const osci::Point& point) {
+                const auto angle = 2.0 * point.y;
+                return std::optional(motion::Vec3 {point.x * std::cos(angle) + (point.z - 2) * std::sin(angle), point.y, 2 - point.x * std::sin(angle) + (point.z - 2) * std::cos(angle)});
+            };
+            const auto ripple = [&](const osci::Point& point) { return inScene(osci::Point(point.x, point.y, point.z + .1f * std::sin(10.0f * (point.x * point.x + point.y * point.y)))); };
+            const std::array<std::array<osci::Point, 3>, 2> faces {{{osci::Point(-1, -1, 2), osci::Point(1, -1, 2), osci::Point(-1, 1, 2)}, {osci::Point(.5f, .5f, 1.2f), osci::Point(1.5f, .5f, 2), osci::Point(.5f, 1.2f, 3)}}};
+            int checked = 0, sampled = 0, wide = 0, curved = 0, deep = 0;
+            const auto check = [&](auto&& bend) {
+                for (const auto& face : faces) {
+                    Dicer dicer;
+                    dicer.begin(views);
+                    std::vector<std::array<motion::hidden::DiceCorner, 3>> pieces;
+                    const auto corner = [&](const osci::Point& point) { return motion::hidden::DiceCorner {point, *bend(point)}; };
+                    dicer.dice(corner(face[0]), corner(face[1]), corner(face[2]), bend, [&](const auto& a, const auto& b, const auto& c) { pieces.push_back({a, b, c}); });
+                    for (const auto& seenBy : views) {
+                        const auto& projection = seenBy.projection;
+                        const auto onScreen = [&](motion::Vec3 world) { return projection(seenBy.eye.see(world)); };
+                        for (const auto& piece : pieces) {
+                            // Only what this view sees whole, in front of its eye and in its frame.
+                            std::array<motion::hidden::Screen, 3> at {};
+                            bool whole = true, inFrame = false;
+                            for (std::size_t index = 0; index < 3 && whole; ++index) {
+                                const auto point = onScreen(piece[index].at);
+                                whole = point.has_value();
+                                if (whole) {
+                                    at[index] = *point;
+                                    inFrame = inFrame || (std::abs(point->x) <= motion::hidden::DepthBuffer::overscan && std::abs(point->y) <= motion::hidden::DepthBuffer::overscan);
+                                }
+                            }
+                            if (!whole || !inFrame) { continue; }
+                            ++checked;
+                            const auto pixels = [&](const motion::hidden::Screen& u, const motion::hidden::Screen& v) { return std::hypot(v.x - u.x, v.y - u.y) / seenBy.pixel; };
+                            const auto longest = std::max({pixels(at[0], at[1]), pixels(at[1], at[2]), pixels(at[2], at[0])});
+                            wide += longest > 2 * Dicer::gridReach ? 1 : 0;
+                            // The flat piece's inverse depth over the screen, as the depth buffer has it.
+                            const auto ux = at[1].x - at[0].x, uy = at[1].y - at[0].y, vx = at[2].x - at[0].x, vy = at[2].y - at[0].y;
+                            const auto area = ux * vy - uy * vx;
+                            if (!(std::abs(area) > 0)) { continue; }
+                            const auto dwdx = ((at[1].w - at[0].w) * vy - (at[2].w - at[0].w) * uy) / area, dwdy = ((at[2].w - at[0].w) * ux - (at[1].w - at[0].w) * vx) / area;
+                            const auto room = [&](double w) { return motion::hidden::DepthBuffer::depthPush * std::abs(w) + motion::hidden::DepthBuffer::insidePush * (std::abs(dwdx) + std::abs(dwdy)) * seenBy.pixel; };
+                            for (const auto& [s, t] : std::array<std::pair<double, double>, 5> {{{.25, .25}, {.6, .2}, {.2, .6}, {.4, .4}, {.1, .1}}}) {
+                                const auto mixed = [&](auto u, auto v, auto w) { return u + (v - u) * s + (w - u) * t; };
+                                const auto source = osci::Point(static_cast<float>(mixed(piece[0].source.x, piece[1].source.x, piece[2].source.x)), static_cast<float>(mixed(piece[0].source.y, piece[1].source.y, piece[2].source.y)), static_cast<float>(mixed(piece[0].source.z, piece[1].source.z, piece[2].source.z)));
+                                const auto bent = bend(source);
+                                const auto flat = mixed(piece[0].at, piece[1].at, piece[2].at);
+                                const auto trueAt = onScreen(*bent), flatAt = onScreen(flat);
+                                if (!trueAt.has_value() || !flatAt.has_value()) { continue; }
+                                ++sampled;
+                                curved += pixels(*trueAt, *flatAt) > 1 ? 1 : 0;
+                                const auto plane = at[0].w + dwdx * (trueAt->x - at[0].x) + dwdy * (trueAt->y - at[0].y);
+                                deep += std::abs(trueAt->w - plane) > room(trueAt->w) ? 1 : 0;
+                            }
+                        }
+                    }
+                }
+            };
+            check(bulge);
+            check(twist);
+            check(ripple);
+            expect(checked > 1000, "pieces are checked in every view (" + juce::String(checked) + ")");
+            expectEquals(wide, 0, "no piece is over twice the grid's reach in any view that sees it");
+            expect(curved * 1000 < sampled, "hardly a point strays a pixel from the bent surface on screen (" + juce::String(curved) + " of " + juce::String(sampled) + ")");
+            expect(deep * 1000 < sampled, "hardly a point strays from the bent surface past the depth test's room (" + juce::String(deep) + " of " + juce::String(sampled) + ")");
+        }
+
         beginTest("A bake reuses a frame for a time that depends on just the same");
         {
             // A still cube: every frame is the first, shared. Turning it, none is.
