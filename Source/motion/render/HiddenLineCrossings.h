@@ -148,20 +148,26 @@ public:
     ScreenGrid(const std::vector<std::uint32_t>& members, const std::vector<Box>& boxes, double typicalSize, const Box& area) : area(area) {
         const auto span = std::max(area.right - area.left, area.top - area.bottom);
         cells = std::clamp(static_cast<int>(span / std::max(2 * typicalSize, 1.0e-9)), 16, 512);
-        starts.assign(static_cast<std::size_t>(cells * cells) + 1, 0);
+        cellStarts.assign(static_cast<std::size_t>(cells * cells) + 1, 0);
         const auto covered = [&](const Box& box, auto&& visit) {
             for (auto y = axisCell(box.bottom, area.bottom, area.top); y <= axisCell(box.top, area.bottom, area.top); ++y) {
                 for (auto x = axisCell(box.left, area.left, area.right); x <= axisCell(box.right, area.left, area.right); ++x) { visit(y * cells + x); }
             }
         };
-        for (const auto member : members) { covered(boxes[member], [&](int cell) { ++starts[static_cast<std::size_t>(cell) + 1]; }); }
-        for (std::size_t index = 1; index < starts.size(); ++index) { starts[index] += starts[index - 1]; }
-        entries.resize(starts.back());
-        auto fill = starts;
+        for (const auto member : members) { covered(boxes[member], [&](int cell) { ++cellStarts[static_cast<std::size_t>(cell) + 1]; }); }
+        for (std::size_t index = 1; index < cellStarts.size(); ++index) { cellStarts[index] += cellStarts[index - 1]; }
+        entries.resize(cellStarts.back());
+        auto fill = cellStarts;
         for (const auto member : members) { covered(boxes[member], [&](int cell) { entries[fill[static_cast<std::size_t>(cell)]++] = member; }); }
     }
     int cellCount() const { return cells * cells; }
-    std::span<const std::uint32_t> cell(int index) const { return {entries.data() + starts[static_cast<std::size_t>(index)], starts[static_cast<std::size_t>(index) + 1] - starts[static_cast<std::size_t>(index)]}; }
+    int across() const { return cells; }
+    // The cells a box covers: columns, then rows, each first to last.
+    std::array<int, 4> range(const Box& box) const { return {axisCell(box.left, area.left, area.right), axisCell(box.right, area.left, area.right), axisCell(box.bottom, area.bottom, area.top), axisCell(box.top, area.bottom, area.top)}; }
+    // Where each cell's members start in `members()`, and one past the last.
+    std::span<const std::size_t> starts() const { return cellStarts; }
+    std::span<const std::uint32_t> members() const { return entries; }
+    std::span<const std::uint32_t> cell(int index) const { return {entries.data() + cellStarts[static_cast<std::size_t>(index)], cellStarts[static_cast<std::size_t>(index) + 1] - cellStarts[static_cast<std::size_t>(index)]}; }
     int cellAt(double x, double y) const { return axisCell(y, area.bottom, area.top) * cells + axisCell(x, area.left, area.right); }
 
 private:
@@ -170,7 +176,7 @@ private:
     }
     Box area;
     int cells = 16;
-    std::vector<std::size_t> starts;
+    std::vector<std::size_t> cellStarts;
     std::vector<std::uint32_t> entries;
 };
 
@@ -243,25 +249,24 @@ inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const 
     }
     return runs;
 }
-}
 
-// Every crossing between different surfaces' triangles, in runs: pieces end
-// to end as the triangles they lie on are, so each run draws as one line.
-// `triangles` comes surface by surface. Only triangles where another surface
-// overlaps them on screen and in depth can cross it; those are paired through
-// a grid over the screen sized to them, and only across surfaces, never
-// within one. `focalLength` projects eye space onto the screen; nothing past
-// what the Scope shows (`reach`) is ever seen.
-// None, once `cancel` is set partway (a bake stopping, the app closing).
-inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangles, double focalLength, Reach reach = {}, const std::atomic<bool>* cancel = nullptr) {
-    std::vector<Piece> pieces;
-    if (triangles.size() < 2) { return {}; }
-    using detail::Box;
+// The triangles that could cross another surface's, and how they are paired:
+// each triangle's box on screen and in depth, those of them in the frame
+// that overlap another surface's box, and a grid over the screen sized to
+// them. None with fewer than two such.
+struct Pairing {
     std::vector<Box> boxes;
+    std::vector<std::uint32_t> candidates;
+    std::optional<ScreenGrid> grid;
+};
+inline std::optional<Pairing> pairing(const std::vector<Triangle>& triangles, double focalLength, Reach reach) {
+    if (triangles.size() < 2) { return std::nullopt; }
+    Pairing made;
+    auto& boxes = made.boxes;
     boxes.reserve(triangles.size());
     std::vector<Box> surfaceBoxes;
     for (const auto& triangle : triangles) {
-        auto box = detail::boxOf(triangle, focalLength);
+        auto box = boxOf(triangle, focalLength);
         boxes.push_back(box);
         if (surfaceBoxes.size() <= triangle.surface) { surfaceBoxes.resize(triangle.surface + 1, Box::empty()); }
         surfaceBoxes[triangle.surface].include(box);
@@ -269,7 +274,6 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
     // Where some other surface could be.
     const auto x = reach.x * DepthBuffer::overscan, y = reach.y * DepthBuffer::overscan;
     const auto frame = Box {-x, x, -y, y, -1.0e300, 1.0e300};
-    std::vector<std::uint32_t> candidates;
     std::vector<double> extents;
     for (std::uint32_t index = 0; index < triangles.size(); ++index) {
         const auto& box = boxes[index];
@@ -278,17 +282,28 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
         bool shared = false;
         for (std::uint32_t surface = 0; surface < surfaceBoxes.size() && !shared; ++surface) { shared = surface != own && box.overlaps(surfaceBoxes[surface]); }
         if (!shared) { continue; }
-        candidates.push_back(index);
+        made.candidates.push_back(index);
         extents.push_back(std::max(box.right - box.left, box.top - box.bottom));
     }
-    if (candidates.size() < 2) { return {}; }
+    if (made.candidates.size() < 2) { return std::nullopt; }
     // Cells sized to the middling triangle: a few huge ones (a floor seen
     // close) would otherwise make every cell hold thousands of small ones.
     const auto middle = extents.begin() + static_cast<std::ptrdiff_t>(extents.size() / 2);
     std::nth_element(extents.begin(), middle, extents.end());
-    const detail::ScreenGrid grid(candidates, boxes, *middle, frame);
+    made.grid.emplace(made.candidates, boxes, *middle, frame);
+    return made;
+}
+
+// Every pair of triangles of different surfaces whose boxes overlap, each
+// once (in the cell where their boxes' overlap starts), in order of that
+// cell then of the two triangles: `visit(a, b)`, `a` of the earlier
+// surface. False once `cancel` is set partway.
+template <typename Visit>
+bool eachPair(const std::vector<Triangle>& triangles, const Pairing& pairing, const std::atomic<bool>* cancel, Visit&& visit) {
+    const auto& grid = *pairing.grid;
+    const auto& boxes = pairing.boxes;
     for (int cell = 0; cell < grid.cellCount(); ++cell) {
-        if ((cell & 63) == 0 && cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return {}; }
+        if ((cell & 63) == 0 && cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return false; }
         const auto members = grid.cell(cell);
         // Members come surface by surface: each surface's run is paired with
         // every later surface's.
@@ -300,15 +315,34 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
                     const auto& p = boxes[members[i]];
                     const auto& q = boxes[members[j]];
                     if (!p.overlaps(q)) { continue; }
-                    // Each pair once: in the cell where their boxes' overlap starts.
                     if (grid.cellAt(std::max(p.left, q.left), std::max(p.bottom, q.bottom)) != cell) { continue; }
-                    const auto piece = between(triangles, members[i], members[j]);
-                    if (piece.has_value()) { pieces.push_back(*piece); }
+                    visit(members[i], members[j]);
                 }
             }
             first = firstEnd;
         }
     }
+    return true;
+}
+}
+
+// Every crossing between different surfaces' triangles, in runs: pieces end
+// to end as the triangles they lie on are, so each run draws as one line.
+// `triangles` comes surface by surface. Only triangles where another surface
+// overlaps them on screen and in depth can cross it; those are paired through
+// a grid over the screen sized to them, and only across surfaces, never
+// within one. `focalLength` projects eye space onto the screen; nothing past
+// what the Scope shows (`reach`) is ever seen.
+// None, once `cancel` is set partway (a bake stopping, the app closing).
+inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangles, double focalLength, Reach reach = {}, const std::atomic<bool>* cancel = nullptr) {
+    const auto paired = detail::pairing(triangles, focalLength, reach);
+    if (!paired.has_value()) { return {}; }
+    std::vector<Piece> pieces;
+    const auto finished = detail::eachPair(triangles, *paired, cancel, [&](std::uint32_t a, std::uint32_t b) {
+        const auto piece = between(triangles, a, b);
+        if (piece.has_value()) { pieces.push_back(*piece); }
+    });
+    if (!finished) { return {}; }
     return detail::joined(pieces, triangles);
 }
 

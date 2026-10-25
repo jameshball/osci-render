@@ -50,8 +50,8 @@ struct Device::Impl {
     bool software = false;
     // A kernel's pipeline, by its source.
     std::map<juce::String, WGPUComputePipeline> pipelines;
-    // The last error the device reported (a kernel that failed to compile or
-    // validate), cleared by each run.
+    // What the device reported wrong since the last run began (a kernel that
+    // failed to compile or validate).
     std::atomic<bool> failed {false};
     juce::String error;
     // Runs wait on the GPU for their results, far longer than a spin is for.
@@ -100,6 +100,7 @@ Device::~Device() = default;
 
 juce::String Device::describe() const { return impl->name; }
 bool Device::software() const { return impl->software; }
+juce::String Device::lastError() const { return impl->error; }
 
 namespace {
 // Makes the device, or says why there is none.
@@ -153,7 +154,7 @@ Made make() {
     if (knowsLimits) { deviceDescriptor.requiredLimits = &limits; }
     deviceDescriptor.uncapturedErrorCallbackInfo.callback = [](WGPUDevice const*, WGPUErrorType, WGPUStringView message, void* owner, void*) {
         auto* into = static_cast<Device::Impl*>(owner);
-        into->error = text(message);
+        into->error += text(message) + "\n";
         into->failed.store(true);
         DBG("WebGPU error: " << into->error);
     };
@@ -207,6 +208,7 @@ juce::String Device::unavailableReason() { return process().device != nullptr ? 
 std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std::span<const Input> inputs, std::span<const std::byte> uniforms, std::size_t outputBytes, std::uint32_t invocations) {
     const std::lock_guard lock(impl->running);
     impl->failed.store(false);
+    impl->error.clear();
     const auto pipeline = impl->pipelineFor(wgsl);
     if (pipeline == nullptr) { return std::nullopt; }
     std::vector<WGPUBuffer> buffers;

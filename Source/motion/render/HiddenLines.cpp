@@ -1,4 +1,5 @@
 #include "HiddenLines.h"
+#include "gpu/GpuCrossings.h"
 #include "gpu/GpuLighting.h"
 
 namespace motion::hidden {
@@ -329,10 +330,23 @@ private:
         if (!drawSurfaces(items, world, workspace.bent, cameraEye, cameraProjection, reach, depth, gather, [this] { return cancelled(); }, true)) { return false; }
         if (!depth.isEmpty()) {
             dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
-            crossings = crossing::runs(surfaceTriangles, view->focalLength, reach, cancel);
+            crossings = crossingRuns(surfaceTriangles);
             if (cancelled()) { return false; }
         }
         return true;
+    }
+
+    // Where surfaces cut through each other (see crossing::runs): on the GPU,
+    // when there is one, the pairs that may cross are found there and only
+    // they are tested exactly, here, in the order crossing::runs tests them,
+    // so the runs are just as crossing::runs makes them.
+    std::vector<std::vector<crossing::Piece>> crossingRuns(const std::vector<crossing::Triangle>& triangles) {
+        auto* device = workspace.gpu ? gpu::Device::shared() : nullptr;
+        if (device != nullptr) {
+            auto runs = gpu::crossingRuns(*device, triangles, view->focalLength, reach);
+            if (runs.has_value()) { return std::move(*runs); }
+        }
+        return crossing::runs(triangles, view->focalLength, reach, cancel);
     }
 
     // The camera's hatching (see HiddenLineHatching.h) on each surface it sees:

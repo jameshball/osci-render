@@ -3,6 +3,7 @@
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/gpu/GpuChain.h"
 #include "../Source/motion/render/HiddenLines.h"
+#include "../Source/motion/render/gpu/GpuCrossings.h"
 #include <cstring>
 #include <random>
 
@@ -70,6 +71,50 @@ public:
                 logMessage(juce::String(definition.name) + " at " + juce::String(time) + " s: " + juce::String(static_cast<int>(sources.size())) + " points, " + juce::String(differ) + " differ, worst by " + juce::String(worst, 7));
                 expect(differ <= allowed, juce::String(differ) + " of " + juce::String(static_cast<int>(sources.size())) + " points differ at " + juce::String(time) + " s (worst by " + juce::String(worst, 6) + ")");
             }
+        }
+
+        beginTest("Surfaces cut through each other on the GPU just as on the CPU");
+        {
+            // Random triangles of several surfaces in front of the eye, some
+            // copied exactly onto another surface (lying in each other's
+            // planes, which single precision can't tell from crossing), some
+            // copied mirrored. The GPU only finds the pairs that may cross;
+            // tested exactly, they make the very runs the CPU makes.
+            std::mt19937 random(11);
+            std::uniform_real_distribution<double> spread(-1, 1), depth(3, 6), small(-.15, .15);
+            std::vector<motion::hidden::crossing::Triangle> triangles;
+            for (std::uint32_t surface = 0; surface < 6; ++surface) {
+                for (int index = 0; index < 400; ++index) {
+                    const motion::Vec3 centre {spread(random), spread(random), depth(random)};
+                    motion::hidden::crossing::Triangle triangle;
+                    triangle.surface = surface;
+                    for (auto& corner : triangle.eye) { corner = centre + motion::Vec3 {small(random), small(random), small(random)}; }
+                    triangles.push_back(triangle);
+                }
+                if (surface > 0) {
+                    // Some of the last surface's, exactly, and mirrored in x.
+                    for (int index = 0; index < 60; ++index) {
+                        auto copy = triangles[(surface - 1) * 520 + static_cast<std::size_t>(index)];
+                        copy.surface = surface;
+                        triangles.push_back(copy);
+                        for (auto& corner : copy.eye) { corner.x = -corner.x; }
+                        triangles.push_back(copy);
+                    }
+                }
+                while (triangles.size() < (surface + 1) * 520) { triangles.push_back(triangles.back()); triangles.back().surface = surface; }
+            }
+            const auto cpu = motion::hidden::crossing::runs(triangles, 1, {});
+            const auto gpu = motion::gpu::crossingRuns(*device, triangles, 1, {});
+            expect(gpu.has_value(), "the GPU finds pairs");
+            const auto flat = [](const std::vector<std::vector<motion::hidden::crossing::Piece>>& runs) {
+                std::vector<std::array<double, 7>> pieces;
+                for (const auto& run : runs) {
+                    for (const auto& piece : run) { pieces.push_back({static_cast<double>(piece.triangle), piece.eyeFrom.x, piece.eyeFrom.y, piece.eyeFrom.z, piece.eyeTo.x, piece.eyeTo.y, piece.eyeTo.z}); }
+                }
+                return pieces;
+            };
+            expect(!cpu.empty(), "the surfaces cross");
+            expect(gpu.has_value() && flat(*gpu) == flat(cpu), "into the same runs, piece for piece (" + juce::String(static_cast<int>(flat(cpu).size())) + " pieces on the CPU, " + juce::String(gpu.has_value() ? static_cast<int>(flat(*gpu).size()) : -1) + " on the GPU)");
         }
 
         beginTest("Lines are lit on the GPU as on the CPU");

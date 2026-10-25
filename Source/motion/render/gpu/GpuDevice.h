@@ -38,6 +38,10 @@ public:
     juce::String describe() const;
     bool software() const;
 
+    // What the device last reported wrong (a kernel that failed to compile
+    // or validate), for diagnostics.
+    juce::String lastError() const;
+
     // A buffer the kernel reads, at its binding (in order from 0).
     using Input = std::span<const std::byte>;
     // Runs `wgsl`'s `main` (workgroups of 64) over `invocations`, with

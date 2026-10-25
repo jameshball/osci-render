@@ -112,6 +112,8 @@
             file="Source/motion/render/gpu/GpuChain.cpp"/>
       <FILE id="MotrenderGpuLightingcpp" name="GpuLighting.cpp" compile="1"
             resource="0" file="Source/motion/render/gpu/GpuLighting.cpp"/>
+      <FILE id="MotrenderGpuCrossingscpp" name="GpuCrossings.cpp" compile="1"
+            resource="0" file="Source/motion/render/gpu/GpuCrossings.cpp"/>
       <FILE id="MotionSrcDec" name="SourceDecoding.cpp" compile="1" resource="0"
             file="Source/motion/import/SourceDecoding.cpp"/>
       <FILE id="MotionRasterDecoderCpp" name="RasterDecoder.cpp" compile="1"

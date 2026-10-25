@@ -357,6 +357,9 @@ void diff(const juce::ArgumentList& args) {
 // Every project and recipe under a folder against the stats kept beside it
 // (<name>.stats.json): what changed, frame by frame. --update keeps the new
 // stats instead.
+// Whether --gpu was given, for a command whose default differs.
+bool gpuChosen = false;
+
 // The GPU hidden lines bake on, or why none is used.
 void gpu(const juce::ArgumentList&) {
     const auto* device = motion::gpu::Device::shared();
@@ -365,6 +368,10 @@ void gpu(const juce::ArgumentList&) {
 }
 
 void check(const juce::ArgumentList& args) {
+    // The stats kept were drawn on the CPU, which lights lines a little
+    // differently (more sparsely along them) than the GPU: unless asked,
+    // projects are checked as they were drawn.
+    if (!gpuChosen) { motion::gpu::setMode(motion::gpu::Mode::off); }
     const auto folders = positional(args);
     if (folders.size() != 1) { juce::ConsoleApplication::fail("check takes one folder of projects."); }
     const auto folder = fileArgument(folders[0]);
@@ -437,6 +444,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         motion::gpu::setMode(*mode);
+        gpuChosen = true;
     }
     juce::ConsoleApplication app;
     app.addHelpCommand("--help|-h", "osci-motion-cli: draws osci-motion projects offline, as Export draws them.\n"
@@ -458,7 +466,7 @@ int main(int argc, char* argv[]) {
     app.addCommand({"frame", "frame <project> [--frames=N | --at=t1,t2] [--rate=Hz]",
         "What a baked frame is made of: each clip's drawing and what each mirror shows, with length and pieces.", {}, frame});
     app.addCommand({"gpu", "gpu [--gpu=auto|off|force]", "Says which GPU hidden lines bake on, or why none is used.", {}, gpu});
-    app.addCommand({"check", "check <folder> [--update] [--frames=N] [--rate=Hz]",
-        "Draws every project and recipe under a folder and compares each with the stats kept beside it.", {}, check});
+    app.addCommand({"check", "check <folder> [--update] [--frames=N] [--rate=Hz] [--gpu=off|auto|force]",
+        "Draws every project and recipe under a folder and compares each with the stats kept beside it (on the CPU, as they were made, unless --gpu says).", {}, check});
     return app.findAndRunCommand(argc, argv);
 }
