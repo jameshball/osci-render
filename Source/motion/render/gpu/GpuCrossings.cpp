@@ -118,7 +118,7 @@ fn mayCross(first: Triangle, second: Triangle) -> bool {
     let size = max(max(length(abA), length(acA)), max(length(abB), length(acB)));
     let unitA = first.normal.xyz;
     let unitB = second.normal.xyz;
-    let tolerance = size * 1.0e-6;
+    let tolerance = size * 1.0e-5;
     let offsetsA = array<vec3<f32>, 3>(less(second, 0u, first, 0u), less(second, 1u, first, 0u), less(second, 2u, first, 0u));
     let offsetsB = array<vec3<f32>, 3>(less(first, 0u, second, 0u), less(first, 1u, second, 0u), less(first, 2u, second, 0u));
     let toA = vec3<f32>(dot(unitA, offsetsA[0]), dot(unitA, offsetsA[1]), dot(unitA, offsetsA[2]));

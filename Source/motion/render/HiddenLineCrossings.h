@@ -81,9 +81,11 @@ inline std::optional<Piece> between(const std::vector<Triangle>& triangles, std:
     const auto unitA = (first.eye[1] - first.eye[0]).cross(first.eye[2] - first.eye[0]).normalized(1.0e-300);
     const auto unitB = (second.eye[1] - second.eye[0]).cross(second.eye[2] - second.eye[0]).normalized(1.0e-300);
     if (!unitA.has_value() || !unitB.has_value()) { return std::nullopt; }
-    // Distances count as zero within a millionth of the triangles' size.
+    // Distances count as zero within a hundred-thousandth of the triangles'
+    // size: surfaces lying on each other are that far apart only by the
+    // rounding of their points, and touch rather than cross.
     const auto size = std::max({(first.eye[1] - first.eye[0]).length(), (first.eye[2] - first.eye[0]).length(), (second.eye[1] - second.eye[0]).length(), (second.eye[2] - second.eye[0]).length()});
-    const auto tolerance = size * 1.0e-6;
+    const auto tolerance = size * 1.0e-5;
     std::array<double, 3> toA {}, toB {};
     for (std::size_t corner = 0; corner < 3; ++corner) {
         toA[corner] = unitA->dot(second.eye[corner] - first.eye[0]);
