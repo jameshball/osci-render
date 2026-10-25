@@ -19,6 +19,10 @@
 #include <span>
 #include <unordered_map>
 
+namespace motion::gpu {
+struct Shadows;
+}
+
 namespace motion::hidden {
 // Whether an effect can bend straight lines: one that only colours points,
 // or moves them all alike (turning, scaling, sliding or skewing), keeps a
@@ -272,6 +276,8 @@ struct Workspace {
     Dicer dicer;
     BentMesh bent;
     ShadowBuffers shadows;
+    // The lights' shadows when they were drawn on the GPU (and are read there).
+    std::shared_ptr<const gpu::Shadows> shadowsOnGpu;
     // What stands between mirrors and what they show.
     SceneRays rays;
     // Patterns laid on surfaces, and the frame's drawings of surfaces that
@@ -300,7 +306,7 @@ struct Workspace {
     // never another's) and corners. While none changes, nor bends, the
     // shadows are the same and are kept.
     struct ShadowsDrawnFrom {
-        bool valid = false;
+        bool valid = false, onGpu = false;
         std::vector<LightState> lights;
         std::vector<std::shared_ptr<const PreparedSource>> sources;
         std::vector<const PreparedDrawing*> drawings;

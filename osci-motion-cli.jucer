@@ -42,6 +42,10 @@
             resource="0" file="Source/motion/render/gpu/GpuLighting.cpp"/>
       <FILE id="MotrenderGpuCrossingscpp" name="GpuCrossings.cpp" compile="1"
             resource="0" file="Source/motion/render/gpu/GpuCrossings.cpp"/>
+      <FILE id="MotrenderGpuTessellationcpp" name="GpuTessellation.cpp" compile="1"
+            resource="0" file="Source/motion/render/gpu/GpuTessellation.cpp"/>
+      <FILE id="MotrenderGpuScenecpp" name="GpuScene.cpp" compile="1"
+            resource="0" file="Source/motion/render/gpu/GpuScene.cpp"/>
       <FILE id="MotionSrcDec" name="SourceDecoding.cpp" compile="1" resource="0"
             file="Source/motion/import/SourceDecoding.cpp"/>
       <FILE id="MoCliRasterDecoder" name="RasterDecoder.cpp" compile="1"

@@ -4,6 +4,7 @@
 #include "../Source/motion/render/gpu/GpuChain.h"
 #include "../Source/motion/render/HiddenLines.h"
 #include "../Source/motion/render/gpu/GpuCrossings.h"
+#include "../Source/motion/render/gpu/GpuScene.h"
 #include <cstring>
 #include <random>
 
@@ -118,6 +119,94 @@ public:
             expect(gpu.has_value() && flat(*gpu) == flat(cpu), "into the same runs, piece for piece (" + juce::String(static_cast<int>(flat(cpu).size())) + " pieces on the CPU, " + juce::String(gpu.has_value() ? static_cast<int>(flat(*gpu).size()) : -1) + " on the GPU)");
         }
 
+        beginTest("Surfaces are drawn into depth on the GPU as on the CPU, and the solid ones that show found");
+        {
+            // Two hundred triangles of four surfaces, crossing and hiding each
+            // other in front of an eye, some of a vast floor cut by its near plane.
+            std::mt19937 random(11);
+            std::uniform_real_distribution<double> across(-2.5, 2.5), deep(-0.5, 6), size(-0.6, 0.6);
+            const motion::hidden::Eye eye {{0, 0, -1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+            const motion::hidden::Projection projection {1.2};
+            std::vector<motion::gpu::Scene::Triangle> flat;
+            std::vector<std::array<motion::Vec3, 3>> placed;
+            for (std::uint32_t index = 0; index < 200; ++index) {
+                // Every tenth a vast floor's, just under the eye and through
+                // its near plane, reaching far past the frame once cut there.
+                const motion::Vec3 centre {across(random), across(random), deep(random)};
+                const auto offset = [&] { return motion::Vec3 {size(random), size(random), size(random)}; };
+                const auto floor = index % 10 == 0;
+                const auto side = across(random) * 40;
+                const std::array<motion::Vec3, 3> corners = floor ? std::array<motion::Vec3, 3> {motion::Vec3 {side, -0.3 + size(random) * .1, -0.99}, motion::Vec3 {side + 80, -0.3, 60}, motion::Vec3 {side - 80, -0.3, 60}} : std::array<motion::Vec3, 3> {centre + offset(), centre + offset(), centre + offset()};
+                const std::array<osci::Point, 3> sources {osci::Point(0, 0, 0), osci::Point(1, 0, 0), osci::Point(0, 1, 0)};
+                flat.push_back(motion::gpu::Scene::triangle(corners, sources, index % 4, index, motion::gpu::Scene::solid));
+                placed.push_back(corners);
+            }
+            // On the CPU: drawn a triangle at a time, those that show gathered.
+            motion::hidden::DepthBuffer cpuDepth;
+            cpuDepth.cover({});
+            std::vector<motion::hidden::crossing::Triangle> cpuTriangles;
+            std::vector<std::array<osci::Point, 3>> cpuSources;
+            for (std::uint32_t index = 0; index < placed.size(); ++index) {
+                cpuDepth.tagNext(std::uint64_t {index % 4} << 32 | index);
+                const auto& c = placed[index];
+                motion::hidden::drawFlat(projection, {}, cpuDepth, {eye.see(c[0]), eye.see(c[1]), eye.see(c[2])}, {osci::Point(0, 0, 0), osci::Point(1, 0, 0), osci::Point(0, 1, 0)}, false, [&](const std::array<motion::Vec3, 3>& corners, const std::array<osci::Point, 3>& from) {
+                    cpuTriangles.push_back({corners, index % 4});
+                    cpuSources.push_back(from);
+                });
+            }
+            motion::hidden::dropUnseen(cpuTriangles, cpuSources, cpuDepth, projection.focalLength);
+            // On the GPU, all at once.
+            motion::hidden::DepthBuffer gpuDepth;
+            gpuDepth.cover({});
+            const motion::gpu::Scene::View camera {eye, projection, {}, &gpuDepth, true};
+            motion::gpu::Scene::Frame frame;
+            frame.flat = &flat;
+            frame.camera = &camera;
+            frame.gather = true;
+            const auto drawn = motion::gpu::Scene::draw(*device, frame);
+            expect(drawn.has_value(), "the GPU draws them");
+            if (drawn.has_value()) {
+                // Whether points all over the frame, at all depths, are hidden.
+                std::uniform_real_distribution<double> onScreen(-1.05, 1.05), inverse(0.05, 1.5);
+                int differ = 0, hidden = 0;
+                constexpr int points = 20000;
+                for (int index = 0; index < points; ++index) {
+                    const motion::hidden::Screen point {onScreen(random), onScreen(random), inverse(random)};
+                    const auto onCpu = cpuDepth.hiddenBy(point).has_value(), onGpu = gpuDepth.hiddenBy(point).has_value();
+                    differ += onCpu != onGpu;
+                    hidden += onCpu;
+                }
+                logMessage("Depth: " + juce::String(differ) + " of " + juce::String(points) + " points differ (" + juce::String(hidden) + " hidden)");
+                // Points on the floor itself, as lines drawn on it are: none is
+                // hidden by the floor, on either.
+                std::uniform_real_distribution<double> share(0.0, 1.0);
+                int onFloor = 0, floorDiffer = 0;
+                for (std::uint32_t index = 0; index < placed.size(); index += 10) {
+                    const auto& c = placed[index];
+                    for (int sample = 0; sample < 400; ++sample) {
+                        auto s = share(random), t = share(random);
+                        if (s + t > 1) {
+                            s = 1 - s;
+                            t = 1 - t;
+                        }
+                        const auto at = projection(eye.see(c[0] + (c[1] - c[0]) * s + (c[2] - c[0]) * t));
+                        if (!at.has_value() || std::abs(at->x) > 1 || std::abs(at->y) > 1) { continue; }
+                        ++onFloor;
+                        const auto onCpu = cpuDepth.hiddenBy(*at), onGpu = gpuDepth.hiddenBy(*at);
+                        floorDiffer += onCpu.has_value() != onGpu.has_value();
+                    }
+                }
+                logMessage("On the floor: " + juce::String(floorDiffer) + " of " + juce::String(onFloor) + " points differ");
+                expect(onFloor > 200 && floorDiffer <= onFloor / 200, "points on a vast floor cut at the near plane are hidden alike (" + juce::String(floorDiffer) + " differ)");
+                expect(hidden > points / 10, "much of the frame is hidden");
+                expect(differ <= points / 200, "points are hidden alike, but for a few at edges (" + juce::String(differ) + " differ)");
+                const auto cpuCount = static_cast<double>(cpuTriangles.size()), gpuCount = static_cast<double>(drawn->triangles.size());
+                logMessage("Gathered: " + juce::String(cpuTriangles.size()) + " on the CPU, " + juce::String(drawn->triangles.size()) + " on the GPU");
+                expect(cpuCount > 50 && std::abs(gpuCount - cpuCount) <= .01 * cpuCount + 1, "the same solid triangles show");
+                expect(drawn->triangles.size() == drawn->sources.size(), "each with its points before the chain");
+            }
+        }
+
         beginTest("Lines are lit on the GPU as on the CPU");
         {
             // A solid box, twisted so its faces are diced, over a solid grid,
@@ -147,7 +236,9 @@ public:
                 for (std::size_t index = 0; index < std::min(cpu->drawings.size(), gpu->drawings.size()); ++index) {
                     const auto [cpuLength, cpuLight] = measure(*cpu->drawings[index].drawing);
                     const auto [gpuLength, gpuLight] = measure(*gpu->drawings[index].drawing);
-                    expectWithinAbsoluteError(gpuLength, cpuLength, .01 * cpuLength + 1.0e-6, "a clip's lines are as long at " + juce::String(time) + " s");
+                    // The GPU cuts and draws the surfaces itself (see
+                    // gpu::Tessellation), a little differently: as long within 2%.
+                    expectWithinAbsoluteError(gpuLength, cpuLength, .02 * cpuLength + 1.0e-6, "a clip's lines are as long at " + juce::String(time) + " s");
                     expectWithinAbsoluteError(gpuLight, cpuLight, .02 * cpuLight + 1.0e-3, "and as bright");
                 }
             }

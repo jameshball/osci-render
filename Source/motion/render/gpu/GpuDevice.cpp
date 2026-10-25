@@ -2,11 +2,15 @@
 
 #include <webgpu/webgpu.h>
 #include <webgpu/wgpu.h>
+#include <algorithm>
 #include <array>
+#include <cstdio>
 #include <atomic>
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <condition_variable>
+#include <thread>
 
 namespace motion::gpu {
 namespace {
@@ -63,8 +67,18 @@ struct Device::Impl {
     juce::String error;
     // Lost (a driver reset, a GPU unplugged): never used again.
     std::atomic<bool> lost {false};
+    // With OSCI_MOTION_GPU_PROFILE set (and the GPU able to), each kernel of
+    // a piece of work is timed and the times shown.
+    bool profiling = false;
 
     ~Impl() {
+        stopping.store(true);
+        pollWake.notify_all();
+        if (poller.joinable()) { poller.join(); }
+        for (auto& each : pool) {
+            wgpuBufferDestroy(each.buffer);
+            wgpuBufferRelease(each.buffer);
+        }
         for (auto& [source, pipeline] : pipelines) {
             if (pipeline != nullptr) { wgpuComputePipelineRelease(pipeline); }
         }
@@ -95,6 +109,100 @@ struct Device::Impl {
             return pipelines.emplace(wgsl, nullptr).first->second;
         }
         return pipelines.emplace(wgsl, pipeline).first->second;
+    }
+
+    // Waits until `done()`, which a callback makes true. One thread polls
+    // the device for everyone waiting, often: a blocking poll wakes only
+    // every millisecond and a half or so, far longer than most kernels take,
+    // and every thread polling at once would keep the device's lock from a
+    // thread submitting work.
+    std::atomic<int> waiters {0};
+    std::atomic<bool> stopping {false};
+    std::mutex pollMutex;
+    std::condition_variable pollWake;
+    std::thread poller;
+    template <typename Done>
+    void waitUntil(Done&& done) {
+        if (done()) { return; }
+        startPolling();
+        waiters.fetch_add(1);
+        pollWake.notify_one();
+        for (int spins = 0; !done(); ++spins) {
+            if (spins < 2000) {
+                std::this_thread::yield();
+            } else {
+                std::this_thread::sleep_for(std::chrono::microseconds(50));
+            }
+        }
+        waiters.fetch_sub(1);
+    }
+    void startPolling() {
+        std::call_once(pollerStarted, [this] {
+            poller = std::thread([this] {
+                while (!stopping.load()) {
+                    if (waiters.load() == 0) {
+                        std::unique_lock lock(pollMutex);
+                        pollWake.wait_for(lock, std::chrono::milliseconds(10), [this] { return waiters.load() > 0 || stopping.load(); });
+                        continue;
+                    }
+                    wgpuDevicePoll(device, false, nullptr);
+                    std::this_thread::sleep_for(std::chrono::microseconds(20));
+                }
+            });
+        });
+    }
+    std::once_flag pollerStarted;
+
+    // Buffers work is done with, kept to be used again: made and freed
+    // every frame, buffers cost more than the kernels that use them (each
+    // made one is filled with zeros first).
+    struct Pooled {
+        WGPUBuffer buffer;
+        std::size_t size;
+        WGPUBufferUsage usage;
+    };
+    juce::SpinLock poolLock;
+    std::vector<Pooled> pool;
+    std::size_t pooledBytes = 0;
+    static constexpr std::size_t mostPooled = std::size_t {3} << 30;
+    // Sizes come in steps of an eighth (and of four kilobytes), so a buffer
+    // fits the next request nearly its size.
+    static std::size_t pooledSize(std::size_t size) {
+        size = std::max<std::size_t>(16, (size + 3) & ~std::size_t {3});
+        std::size_t step = 4096;
+        while (step * 16 <= size) { step *= 2; }
+        return (size + step - 1) / step * step;
+    }
+    WGPUBuffer acquire(std::size_t size, WGPUBufferUsage usage) {
+        {
+            const juce::SpinLock::ScopedLockType lock(poolLock);
+            auto best = pool.end();
+            for (auto each = pool.begin(); each != pool.end(); ++each) {
+                if (each->usage == usage && each->size == size) {
+                    best = each;
+                    break;
+                }
+            }
+            if (best != pool.end()) {
+                const auto found = best->buffer;
+                pooledBytes -= best->size;
+                pool.erase(best);
+                return found;
+            }
+        }
+        return buffer(size, usage);
+    }
+    void release(WGPUBuffer buffer, std::size_t size, WGPUBufferUsage usage) {
+        {
+            const juce::SpinLock::ScopedLockType lock(poolLock);
+            if (pooledBytes + size <= mostPooled) {
+                pool.push_back({buffer, size, usage});
+                pooledBytes += size;
+                return;
+            }
+        }
+        wgpuBufferDestroy(buffer);
+        wgpuBufferRelease(buffer);
     }
 
     WGPUBuffer buffer(std::size_t size, WGPUBufferUsage usage) {
@@ -166,6 +274,12 @@ Made make() {
     const auto knowsLimits = wgpuAdapterGetLimits(impl->adapter, &limits) == WGPUStatus_Success;
     WGPUDeviceDescriptor deviceDescriptor = WGPU_DEVICE_DESCRIPTOR_INIT;
     if (knowsLimits) { deviceDescriptor.requiredLimits = &limits; }
+    const WGPUFeatureName timestamps = WGPUFeatureName_TimestampQuery;
+    if (juce::SystemStats::getEnvironmentVariable("OSCI_MOTION_GPU_PROFILE", {}).isNotEmpty() && wgpuAdapterHasFeature(impl->adapter, timestamps)) {
+        deviceDescriptor.requiredFeatureCount = 1;
+        deviceDescriptor.requiredFeatures = &timestamps;
+        impl->profiling = true;
+    }
     deviceDescriptor.uncapturedErrorCallbackInfo.callback = [](WGPUDevice const*, WGPUErrorType, WGPUStringView message, void* owner, void*) {
         auto* into = static_cast<Device::Impl*>(owner);
         {
@@ -173,6 +287,9 @@ Made make() {
             into->error = text(message);
         }
         into->errors.fetch_add(1);
+        // Shown with OSCI_MOTION_GPU_DEBUG set, for a kernel that fails to compile.
+        static const auto shown = juce::SystemStats::getEnvironmentVariable("OSCI_MOTION_GPU_DEBUG", {}).isNotEmpty();
+        if (shown) { std::fprintf(stderr, "WebGPU error: %s\n", text(message).toRawUTF8()); }
         DBG("WebGPU error: " << text(message));
     };
     deviceDescriptor.uncapturedErrorCallbackInfo.userdata1 = impl.get();
@@ -249,6 +366,14 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
     const auto pipeline = impl->pipelineFor(wgsl);
     if (pipeline == nullptr) { return std::nullopt; }
     std::vector<WGPUBuffer> buffers;
+    std::vector<std::pair<std::size_t, WGPUBufferUsage>> pooled;
+    // Buffers come from the pool and go back to it.
+    const auto acquire = [&](std::size_t bytes, WGPUBufferUsage usage) {
+        const auto size = Impl::pooledSize(bytes);
+        buffers.push_back(impl->acquire(size, usage));
+        pooled.push_back({size, usage});
+        return buffers.back();
+    };
     std::vector<WGPUBindGroupEntry> entries;
     const auto bind = [&](WGPUBuffer buffer, std::size_t size) {
         WGPUBindGroupEntry entry = WGPU_BIND_GROUP_ENTRY_INIT;
@@ -256,10 +381,9 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
         entry.buffer = buffer;
         entry.size = std::max<std::size_t>(16, (size + 3) & ~std::size_t {3});
         entries.push_back(entry);
-        buffers.push_back(buffer);
     };
     for (const auto& input : inputs) {
-        const auto buffer = impl->buffer(input.size(), WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst);
+        const auto buffer = acquire(input.size(), WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst);
         if (!input.empty()) { wgpuQueueWriteBuffer(impl->queue, buffer, 0, input.data(), (input.size() + 3) & ~std::size_t {3}); }
         bind(buffer, input.size());
     }
@@ -267,14 +391,13 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
         // Uniform blocks are padded to sixteen bytes.
         std::vector<std::byte> padded(uniforms.begin(), uniforms.end());
         padded.resize((padded.size() + 15) & ~std::size_t {15});
-        const auto buffer = impl->buffer(padded.size(), WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst);
+        const auto buffer = acquire(padded.size(), WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst);
         wgpuQueueWriteBuffer(impl->queue, buffer, 0, padded.data(), padded.size());
         bind(buffer, padded.size());
     }
-    const auto output = impl->buffer(outputBytes, WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
+    const auto output = acquire(outputBytes, WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst);
     bind(output, outputBytes);
-    const auto readBack = impl->buffer(outputBytes, WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst);
-    buffers.push_back(readBack);
+    const auto readBack = acquire(outputBytes, WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst);
     const auto layout = wgpuComputePipelineGetBindGroupLayout(pipeline, 0);
     WGPUBindGroupDescriptor groupDescriptor = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
     groupDescriptor.layout = layout;
@@ -284,10 +407,7 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
     wgpuBindGroupLayoutRelease(layout);
     const auto release = [&] {
         wgpuBindGroupRelease(group);
-        for (auto buffer : buffers) {
-            wgpuBufferDestroy(buffer);
-            wgpuBufferRelease(buffer);
-        }
+        for (std::size_t index = 0; index < buffers.size(); ++index) { impl->release(buffers[index], pooled[index].first, pooled[index].second); }
     };
     // Anything wrong so far (a buffer too big, a binding that doesn't fit)
     // must not be submitted: wgpu-native ends the process on a submission
@@ -299,6 +419,8 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
     WGPUCommandEncoderDescriptor encoderDescriptor = WGPU_COMMAND_ENCODER_DESCRIPTOR_INIT;
     const auto encoder = wgpuDeviceCreateCommandEncoder(impl->device, &encoderDescriptor);
     WGPUComputePassDescriptor passDescriptor = WGPU_COMPUTE_PASS_DESCRIPTOR_INIT;
+    // A pooled output may hold anything: it starts at zero, as a made one does.
+    wgpuCommandEncoderClearBuffer(encoder, output, 0, Impl::pooledSize(outputBytes));
     const auto pass = wgpuCommandEncoderBeginComputePass(encoder, &passDescriptor);
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, nullptr);
@@ -325,7 +447,7 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
     mapCallback.callback = [](WGPUMapAsyncStatus status, WGPUStringView, void* into, void*) { static_cast<std::atomic<int>*>(into)->store(status == WGPUMapAsyncStatus_Success ? 1 : -1); };
     mapCallback.userdata1 = &mapped;
     wgpuBufferMapAsync(readBack, WGPUMapMode_Read, 0, copied, mapCallback);
-    while (mapped.load() == 0) { wgpuDevicePoll(impl->device, true, nullptr); }
+    impl->waitUntil([&] { return mapped.load() != 0; });
     std::optional<std::vector<std::byte>> result;
     if (mapped.load() > 0 && impl->errors.load() == errorsBefore) {
         const auto* data = static_cast<const std::byte*>(wgpuBufferGetConstMappedRange(readBack, 0, copied));
@@ -334,5 +456,265 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
     }
     release();
     return result;
+}
+}
+
+namespace motion::gpu {
+struct Device::Work::State {
+    Device& device;
+    std::uint64_t errorsBefore;
+    std::vector<WGPUBuffer> buffers;
+    // Each buffer's size as bound, and as made (pooled), and its use.
+    std::vector<std::size_t> sizes, made;
+    std::vector<WGPUBufferUsage> usages;
+    // Buffers not the work's to free: kept from earlier work, or for later.
+    std::vector<bool> borrowed;
+    std::vector<std::shared_ptr<Kept>> held;
+    std::vector<WGPUBindGroup> groups;
+    struct Read {
+        WGPUBuffer buffer;
+        std::size_t size, made;
+    };
+    std::vector<Read> reads;
+    WGPUCommandEncoder encoder = nullptr;
+    // Kernels run one after another in one pass, while nothing else comes
+    // between them (a pass costs far more than a kernel's dispatch).
+    WGPUComputePassEncoder pass = nullptr;
+    bool failed = false;
+    void endPass() {
+        if (pass == nullptr) { return; }
+        wgpuComputePassEncoderEnd(pass);
+        wgpuComputePassEncoderRelease(pass);
+        pass = nullptr;
+    }
+    // Profiling: each kernel's timestamps, and what it binds (to name it).
+    static constexpr std::uint32_t mostTimed = 256;
+    WGPUQuerySet timestamps = nullptr;
+    std::vector<juce::String> timed;
+
+    explicit State(Device& device) : device(device), errorsBefore(device.impl->errors.load()) {
+        WGPUCommandEncoderDescriptor descriptor = WGPU_COMMAND_ENCODER_DESCRIPTOR_INIT;
+        encoder = wgpuDeviceCreateCommandEncoder(device.impl->device, &descriptor);
+        failed = device.impl->lost.load() || encoder == nullptr;
+    }
+    ~State() {
+        if (pass != nullptr) { wgpuComputePassEncoderRelease(pass); }
+        if (encoder != nullptr) { wgpuCommandEncoderRelease(encoder); }
+        if (timestamps != nullptr) { wgpuQuerySetRelease(timestamps); }
+        for (auto group : groups) { wgpuBindGroupRelease(group); }
+        for (std::size_t index = 0; index < buffers.size(); ++index) {
+            if (!borrowed[index]) { device.impl->release(buffers[index], made[index], usages[index]); }
+        }
+        for (const auto& read : reads) { device.impl->release(read.buffer, read.made, WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst); }
+    }
+    std::size_t add(std::size_t bytes, WGPUBufferUsage usage) {
+        const auto size = Impl::pooledSize(bytes);
+        buffers.push_back(device.impl->acquire(size, usage));
+        sizes.push_back(std::max<std::size_t>(16, (bytes + 3) & ~std::size_t {3}));
+        made.push_back(size);
+        usages.push_back(usage);
+        borrowed.push_back(false);
+        return buffers.size() - 1;
+    }
+};
+
+Device::Work::Work(Device& device) : state(std::make_unique<State>(device)) {}
+Device::Work::~Work() = default;
+
+std::size_t Device::Work::buffer(std::size_t bytes) {
+    const auto index = scratch(bytes);
+    clear(index);
+    return index;
+}
+
+std::size_t Device::Work::scratch(std::size_t bytes) { return state->add(bytes, WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst); }
+
+std::size_t Device::Work::upload(std::span<const std::byte> data) {
+    const auto index = scratch(data.size());
+    if (!data.empty()) {
+        // Writes keep to four bytes.
+        std::vector<std::byte> padded(data.begin(), data.end());
+        padded.resize((padded.size() + 3) & ~std::size_t {3});
+        wgpuQueueWriteBuffer(state->device.impl->queue, state->buffers[index], 0, padded.data(), padded.size());
+    }
+    return index;
+}
+
+Device::Kept::~Kept() {
+    auto* buffer = static_cast<WGPUBuffer>(handle);
+    wgpuBufferDestroy(buffer);
+    wgpuBufferRelease(buffer);
+}
+
+void Device::Work::clear(std::size_t buffer) {
+    state->endPass();
+    if (!state->failed) { wgpuCommandEncoderClearBuffer(state->encoder, state->buffers[buffer], 0, state->made[buffer]); }
+}
+
+std::size_t Device::Work::bind(std::shared_ptr<Kept> kept) {
+    state->buffers.push_back(static_cast<WGPUBuffer>(kept->handle));
+    state->sizes.push_back(kept->size());
+    state->made.push_back(kept->size());
+    state->usages.push_back(WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst);
+    state->borrowed.push_back(true);
+    state->held.push_back(std::move(kept));
+    return state->buffers.size() - 1;
+}
+
+std::shared_ptr<Device::Kept> Device::Work::keep(std::size_t buffer) {
+    state->borrowed[buffer] = true;
+    return std::shared_ptr<Kept>(new Kept(state->buffers[buffer], state->sizes[buffer]));
+}
+
+std::size_t Device::Work::uniform(std::span<const std::byte> data) {
+    std::vector<std::byte> padded(data.begin(), data.end());
+    padded.resize(std::max<std::size_t>(16, (padded.size() + 15) & ~std::size_t {15}));
+    const auto index = state->add(padded.size(), WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst);
+    wgpuQueueWriteBuffer(state->device.impl->queue, state->buffers[index], 0, padded.data(), padded.size());
+    return index;
+}
+
+void Device::Work::run(const juce::String& wgsl, std::initializer_list<std::size_t> bindings, std::uint32_t invocations) {
+    if (state->failed) { return; }
+    const auto pipeline = state->device.impl->pipelineFor(wgsl);
+    if (pipeline == nullptr) {
+        state->failed = true;
+        return;
+    }
+    std::vector<WGPUBindGroupEntry> entries;
+    for (const auto index : bindings) {
+        WGPUBindGroupEntry entry = WGPU_BIND_GROUP_ENTRY_INIT;
+        entry.binding = static_cast<std::uint32_t>(entries.size());
+        entry.buffer = state->buffers[index];
+        entry.size = state->sizes[index];
+        entries.push_back(entry);
+    }
+    const auto layout = wgpuComputePipelineGetBindGroupLayout(pipeline, 0);
+    WGPUBindGroupDescriptor groupDescriptor = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
+    groupDescriptor.layout = layout;
+    groupDescriptor.entryCount = entries.size();
+    groupDescriptor.entries = entries.data();
+    const auto group = wgpuDeviceCreateBindGroup(state->device.impl->device, &groupDescriptor);
+    wgpuBindGroupLayoutRelease(layout);
+    state->groups.push_back(group);
+    if (state->device.impl->errors.load() != state->errorsBefore) {
+        state->failed = true;
+        return;
+    }
+    if (invocations == 0) { return; }
+    WGPUComputePassDescriptor passDescriptor = WGPU_COMPUTE_PASS_DESCRIPTOR_INIT;
+    WGPUPassTimestampWrites writes = WGPU_PASS_TIMESTAMP_WRITES_INIT;
+    // Timed, a kernel has a pass of its own.
+    const auto timing = state->device.impl->profiling && state->timed.size() < State::mostTimed;
+    if (timing) {
+        state->endPass();
+        if (state->timestamps == nullptr) {
+            WGPUQuerySetDescriptor descriptor = WGPU_QUERY_SET_DESCRIPTOR_INIT;
+            descriptor.type = WGPUQueryType_Timestamp;
+            descriptor.count = 2 * State::mostTimed;
+            state->timestamps = wgpuDeviceCreateQuerySet(state->device.impl->device, &descriptor);
+        }
+        writes.querySet = state->timestamps;
+        writes.beginningOfPassWriteIndex = static_cast<std::uint32_t>(2 * state->timed.size());
+        writes.endOfPassWriteIndex = writes.beginningOfPassWriteIndex + 1;
+        passDescriptor.timestampWrites = &writes;
+        // Named by what it binds.
+        juce::StringArray names;
+        for (const auto& line : juce::StringArray::fromLines(wgsl)) {
+            if (line.contains("@binding(")) { names.add(line.fromFirstOccurrenceOf(">", false, false).upToFirstOccurrenceOf(":", false, false).trim()); }
+        }
+        state->timed.push_back(juce::String(invocations) + " over " + names.joinIntoString(","));
+    }
+    if (state->pass == nullptr) { state->pass = wgpuCommandEncoderBeginComputePass(state->encoder, &passDescriptor); }
+    wgpuComputePassEncoderSetPipeline(state->pass, pipeline);
+    wgpuComputePassEncoderSetBindGroup(state->pass, 0, group, 0, nullptr);
+    // A dispatch may have at most 65535 workgroups along a side: more go along y.
+    const auto groups = (invocations + 63) / 64;
+    const auto across = std::min<std::uint32_t>(groups, 65535);
+    wgpuComputePassEncoderDispatchWorkgroups(state->pass, across, (groups + across - 1) / across, 1);
+    if (timing) { state->endPass(); }
+}
+
+std::size_t Device::Work::read(std::size_t buffer) { return read(buffer, state->sizes[buffer]); }
+
+std::size_t Device::Work::read(std::size_t buffer, std::size_t bytes) {
+    const auto size = std::clamp<std::size_t>((bytes + 3) & ~std::size_t {3}, 4, state->sizes[buffer]);
+    const auto made = Impl::pooledSize(size);
+    const auto readBack = state->device.impl->acquire(made, WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst);
+    state->endPass();
+    if (!state->failed) { wgpuCommandEncoderCopyBufferToBuffer(state->encoder, state->buffers[buffer], 0, readBack, 0, size); }
+    state->reads.push_back({readBack, size, made});
+    return state->reads.size() - 1;
+}
+
+std::optional<std::vector<std::vector<std::byte>>> Device::Work::finish() {
+    auto& impl = *state->device.impl;
+    state->endPass();
+    if (state->failed || impl.lost.load() || impl.errors.load() != state->errorsBefore) { return std::nullopt; }
+    const auto timedCount = state->timed.size();
+    if (timedCount > 0 && state->timestamps != nullptr) {
+        const auto bytes = 2 * timedCount * sizeof(std::uint64_t);
+        const auto resolved = impl.acquire(Impl::pooledSize(bytes), WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc);
+        state->buffers.push_back(resolved);
+        state->sizes.push_back(bytes);
+        state->made.push_back(Impl::pooledSize(bytes));
+        state->usages.push_back(WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc);
+        state->borrowed.push_back(false);
+        wgpuCommandEncoderResolveQuerySet(state->encoder, state->timestamps, 0, static_cast<std::uint32_t>(2 * timedCount), resolved, 0);
+        read(state->buffers.size() - 1, bytes);
+    }
+    const auto commands = wgpuCommandEncoderFinish(state->encoder, nullptr);
+    wgpuCommandEncoderRelease(state->encoder);
+    state->encoder = nullptr;
+    if (commands == nullptr || impl.errors.load() != state->errorsBefore) {
+        if (commands != nullptr) { wgpuCommandBufferRelease(commands); }
+        return std::nullopt;
+    }
+    wgpuQueueSubmit(impl.queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    std::vector<std::atomic<int>> mapped(state->reads.size());
+    for (std::size_t index = 0; index < state->reads.size(); ++index) {
+        mapped[index].store(0);
+        WGPUBufferMapCallbackInfo callback = WGPU_BUFFER_MAP_CALLBACK_INFO_INIT;
+        callback.mode = WGPUCallbackMode_AllowSpontaneous;
+        callback.callback = [](WGPUMapAsyncStatus status, WGPUStringView, void* into, void*) { static_cast<std::atomic<int>*>(into)->store(status == WGPUMapAsyncStatus_Success ? 1 : -1); };
+        callback.userdata1 = &mapped[index];
+        wgpuBufferMapAsync(state->reads[index].buffer, WGPUMapMode_Read, 0, state->reads[index].size, callback);
+    }
+    // Every kernel done, so its buffers can be used again, whatever is read.
+    std::atomic<int> done {0};
+    WGPUQueueWorkDoneCallbackInfo doneCallback = WGPU_QUEUE_WORK_DONE_CALLBACK_INFO_INIT;
+    doneCallback.mode = WGPUCallbackMode_AllowSpontaneous;
+    doneCallback.callback = [](WGPUQueueWorkDoneStatus, WGPUStringView, void* into, void*) { static_cast<std::atomic<int>*>(into)->store(1); };
+    doneCallback.userdata1 = &done;
+    wgpuQueueOnSubmittedWorkDone(impl.queue, doneCallback);
+    impl.waitUntil([&] { return done.load() != 0 && std::all_of(mapped.begin(), mapped.end(), [](const auto& each) { return each.load() != 0; }); });
+    if (impl.errors.load() != state->errorsBefore) { return std::nullopt; }
+    std::vector<std::vector<std::byte>> results;
+    for (std::size_t index = 0; index < state->reads.size(); ++index) {
+        if (mapped[index].load() < 0) { return std::nullopt; }
+        const auto& read = state->reads[index];
+        const auto* data = static_cast<const std::byte*>(wgpuBufferGetConstMappedRange(read.buffer, 0, read.size));
+        if (data == nullptr) { return std::nullopt; }
+        results.emplace_back(data, data + read.size);
+        wgpuBufferUnmap(read.buffer);
+    }
+    if (timedCount > 0 && state->timestamps != nullptr) {
+        // The last read is the timestamps.
+        const auto& ticks = results.back();
+        double total = 0;
+        juce::String report;
+        for (std::size_t index = 0; index < timedCount; ++index) {
+            std::uint64_t begin = 0, end = 0;
+            std::memcpy(&begin, ticks.data() + 16 * index, 8);
+            std::memcpy(&end, ticks.data() + 16 * index + 8, 8);
+            const auto milliseconds = static_cast<double>(end - begin) / 1.0e6;
+            total += milliseconds;
+            report << "    " << juce::String(milliseconds, 3) << " ms  " << state->timed[index] << "\n";
+        }
+        std::fprintf(stderr, "GPU work, %.3f ms in kernels:\n%s", total, report.toRawUTF8());
+        results.pop_back();
+    }
+    return results;
 }
 }

@@ -9,7 +9,7 @@ namespace motion::gpu {
 namespace {
 constexpr const char* kernel = R"(
 struct Triangle { corners: array<vec4<i32>, 3>, rests: array<vec4<i32>, 3>, normal: vec4<f32>, surface: u32, padding0: u32, padding1: u32, padding2: u32 }
-struct Box { left: f32, right: f32, bottom: f32, top: f32, nearby: f32, farthest: f32, surface: u32, padding: u32 }
+struct Box { left: f32, right: f32, bottom: f32, top: f32, nearby: f32, farthest: f32, surface: u32, start: u32 }
 struct Cover { x0: i32, x1: i32, y0: i32, y1: i32 }
 struct Grid { cells: u32, unit: f32, fine: f32, padding: u32 }
 struct Found { count: atomic<u32>, padding0: u32, padding1: u32, padding2: u32, pairs: array<vec4<u32>> }
@@ -169,10 +169,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) g
     // known to meet another's.
     for (var k = cellOf[entry].y; k < starts[cell + 1u]; k++) {
         let j = members[k];
-        // Each pair once: in the cell where their boxes' overlap starts.
-        let other = covers[j];
-        if (max(cover.x0, other.x0) != x || max(cover.y0, other.y0) != y) { continue; }
-        if (!overlaps(box, boxes[j]) || !mayCross(triangles[i], triangles[j])) { continue; }
+        // Each pair once: in the cell where their boxes' overlap starts
+        // (each box's first column and row are packed in its start).
+        let theirs = boxes[j];
+        if (max(cover.x0, i32(theirs.start & 0xffffu)) != x || max(cover.y0, i32(theirs.start >> 16u)) != y) { continue; }
+        if (!overlaps(box, theirs) || !mayCross(triangles[i], triangles[j])) { continue; }
         let at = atomicAdd(&found.count, 1u);
         if (at < arrayLength(&found.pairs)) { found.pairs[at] = vec4<u32>(entry, i, j, 0u); }
     }
@@ -186,7 +187,7 @@ struct Triangle {
 };
 struct Box {
     float left, right, bottom, top, nearby, farthest;
-    std::uint32_t surface, padding;
+    std::uint32_t surface, start;
 };
 }
 
@@ -220,8 +221,8 @@ std::optional<std::vector<std::array<std::uint32_t, 2>>> mayCross(Device& device
         const std::array<std::array<std::int32_t, 4>, 3> wholes {whole(triangle.eye[0]), whole(triangle.eye[1]), whole(triangle.eye[2])};
         corners.push_back({wholes, {rest(triangle.eye[0], wholes[0]), rest(triangle.eye[1], wholes[1]), rest(triangle.eye[2], wholes[2])}, planar, triangle.surface, {}});
         const auto& box = pairing.boxes[index];
-        boxes.push_back({static_cast<float>(box.left), static_cast<float>(box.right), static_cast<float>(box.bottom), static_cast<float>(box.top), static_cast<float>(box.nearby), static_cast<float>(box.farthest), triangle.surface, 0});
         const auto range = grid.range(box);
+        boxes.push_back({static_cast<float>(box.left), static_cast<float>(box.right), static_cast<float>(box.bottom), static_cast<float>(box.top), static_cast<float>(box.nearby), static_cast<float>(box.farthest), triangle.surface, static_cast<std::uint32_t>(range[0]) | static_cast<std::uint32_t>(range[2]) << 16});
         covers.push_back({range[0], range[1], range[2], range[3]});
     }
     std::vector<std::uint32_t> starts(grid.starts().begin(), grid.starts().end());
@@ -243,7 +244,18 @@ std::optional<std::vector<std::array<std::uint32_t, 2>>> mayCross(Device& device
     // Room for a few pairs a candidate; when more are found, again with room for all.
     auto capacity = pairing.candidates.size() * 6 + 1024;
     for (int attempt = 0; attempt < 2; ++attempt) {
-        const auto output = device.run(kernel, inputs, std::as_bytes(std::span(uniforms)), 16 + capacity * 16, static_cast<std::uint32_t>(members.size()));
+        std::optional<std::vector<std::byte>> output;
+        {
+            Device::Work work(device);
+            std::vector<std::size_t> bound;
+            for (const auto& input : inputs) { bound.push_back(work.upload(input)); }
+            const auto uniform = work.uniform(std::as_bytes(std::span(uniforms)));
+            const auto found = work.buffer(16 + capacity * 16);
+            work.run(kernel, {bound[0], bound[1], bound[2], bound[3], bound[4], bound[5], uniform, found}, static_cast<std::uint32_t>(members.size()));
+            work.read(found);
+            auto results = work.finish();
+            if (results.has_value()) { output = std::move(results->front()); }
+        }
         if (!output.has_value()) { return std::nullopt; }
         std::uint32_t count = 0;
         std::memcpy(&count, output->data(), sizeof(count));

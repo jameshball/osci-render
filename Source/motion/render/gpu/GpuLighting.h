@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GpuChain.h"
+#include "GpuScene.h"
 #include "../Lighting.h"
 #include <array>
 #include <cstdint>
@@ -17,8 +18,9 @@ public:
     // `chain` holds the programs samples are bent through, and outlives this.
     explicit LightingBatch(const ChainBatch& chain) : chain(chain) {}
 
-    // The frame's lights, with their shadow views (whose buffers are copied).
-    void setLights(const std::vector<hidden::LightView>& lights);
+    // The frame's lights, with their shadow views: their buffers copied, or
+    // where `resident` has them (drawn on the GPU), read there.
+    void setLights(const std::vector<hidden::LightView>& lights, std::shared_ptr<const Shadows> resident = nullptr);
     // A piece: the faces it runs along, and its clip's response to light.
     std::uint32_t piece(const hidden::LineNormals& normals, float response);
     // A point of a piece, `t` along it, through a program of the chain.
@@ -66,6 +68,7 @@ public:
 
 private:
     const ChainBatch& chain;
+    std::shared_ptr<const Shadows> resident;
     std::vector<Light> lights;
     std::vector<View> views;
     std::vector<Buffer> buffers;

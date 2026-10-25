@@ -201,7 +201,8 @@ const juce::String& kernel() {
 std::array<float, 4> four(Vec3 value, double w) { return {static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z), static_cast<float>(w)}; }
 }
 
-void LightingBatch::setLights(const std::vector<hidden::LightView>& frameLights) {
+void LightingBatch::setLights(const std::vector<hidden::LightView>& frameLights, std::shared_ptr<const Shadows> drawnOnGpu) {
+    resident = std::move(drawnOnGpu);
     lights.clear();
     views.clear();
     buffers.clear();
@@ -219,6 +220,12 @@ void LightingBatch::setLights(const std::vector<hidden::LightView>& frameLights)
         made.firstView = static_cast<std::uint32_t>(views.size());
         for (const auto& view : light.views) {
             auto found = copied.find(view.depth);
+            const auto onGpu = resident != nullptr ? resident->layouts.find(view.depth) : decltype(resident->layouts.end()) {};
+            if (found == copied.end() && resident != nullptr && onGpu != resident->layouts.end()) {
+                const auto layout = view.depth->layout();
+                buffers.push_back({static_cast<float>(layout.originX), static_cast<float>(layout.originY), static_cast<float>(layout.size), onGpu->second.empty ? 1u : 0u, layout.width, layout.height, onGpu->second.firstPixel, onGpu->second.firstPlane});
+                found = copied.emplace(view.depth, static_cast<std::uint32_t>(buffers.size() - 1)).first;
+            }
             if (found == copied.end()) {
                 const auto layout = view.depth->layout();
                 Buffer buffer {static_cast<float>(layout.originX), static_cast<float>(layout.originY), static_cast<float>(layout.size), layout.empty ? 1u : 0u, layout.width, layout.height, static_cast<std::uint32_t>(pixels.size()), static_cast<std::uint32_t>(planes.size())};
@@ -274,9 +281,26 @@ std::optional<std::vector<std::array<float, 4>>> LightingBatch::run(Device& devi
     const std::vector<ChainBatch::Range> noPrograms(1);
     const auto steps = chain.stepData();
     const auto programs = chain.programData();
-    const std::array<Device::Input, 9> inputs {steps.empty() ? std::as_bytes(std::span(noSteps)) : std::as_bytes(steps), programs.empty() ? std::as_bytes(std::span(noPrograms)) : std::as_bytes(programs), bytes(samples), bytes(pieces), bytes(lights), bytes(views), bytes(buffers), bytes(pixels), bytes(planes)};
-    const auto output = device.run(kernel(), inputs, {}, samples.size() * sizeof(std::array<float, 4>), static_cast<std::uint32_t>(samples.size()));
-    if (!output.has_value()) { return std::nullopt; }
+    const auto outputBytes = samples.size() * sizeof(std::array<float, 4>);
+    std::optional<std::vector<std::byte>> output;
+    if (resident != nullptr) {
+        // The shadows drawn on the GPU are read where they are.
+        Device::Work work(device);
+        const auto stepBuffer = work.upload(steps.empty() ? std::as_bytes(std::span(noSteps)) : std::as_bytes(steps));
+        const auto programBuffer = work.upload(programs.empty() ? std::as_bytes(std::span(noPrograms)) : std::as_bytes(programs));
+        const auto sampleBuffer = work.upload(bytes(samples)), pieceBuffer = work.upload(bytes(pieces)), lightBuffer = work.upload(bytes(lights)), viewBuffer = work.upload(bytes(views)), bufferBuffer = work.upload(bytes(buffers));
+        const auto pixelBuffer = resident->pixels != nullptr ? work.bind(resident->pixels) : work.upload(bytes(pixels));
+        const auto planeBuffer = resident->planes != nullptr ? work.bind(resident->planes) : work.upload(bytes(planes));
+        const auto litBuffer = work.scratch(outputBytes);
+        work.run(kernel(), {stepBuffer, programBuffer, sampleBuffer, pieceBuffer, lightBuffer, viewBuffer, bufferBuffer, pixelBuffer, planeBuffer, litBuffer}, static_cast<std::uint32_t>(samples.size()));
+        work.read(litBuffer);
+        auto results = work.finish();
+        if (results.has_value()) { output = std::move(results->front()); }
+    } else {
+        const std::array<Device::Input, 9> inputs {steps.empty() ? std::as_bytes(std::span(noSteps)) : std::as_bytes(steps), programs.empty() ? std::as_bytes(std::span(noPrograms)) : std::as_bytes(programs), bytes(samples), bytes(pieces), bytes(lights), bytes(views), bytes(buffers), bytes(pixels), bytes(planes)};
+        output = device.run(kernel(), inputs, {}, outputBytes, static_cast<std::uint32_t>(samples.size()));
+    }
+    if (!output.has_value() || output->size() < outputBytes) { return std::nullopt; }
     result.resize(samples.size());
     std::memcpy(result.data(), output->data(), result.size() * sizeof(std::array<float, 4>));
     return result;

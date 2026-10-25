@@ -639,6 +639,10 @@
               file="Source/motion/render/gpu/GpuLighting.cpp"/>
         <FILE id="MotrenderGpuCrossingscpp" name="GpuCrossings.cpp" compile="1" resource="0"
               file="Source/motion/render/gpu/GpuCrossings.cpp"/>
+        <FILE id="MotrenderGpuScenecpp" name="GpuScene.cpp" compile="1" resource="0"
+              file="Source/motion/render/gpu/GpuScene.cpp"/>
+        <FILE id="MotrenderGpuTessellationcpp" name="GpuTessellation.cpp" compile="1" resource="0"
+              file="Source/motion/render/gpu/GpuTessellation.cpp"/>
         <FILE id="MotrenderHiddenLineBakerh" name="HiddenLineBaker.h" compile="0"
               resource="0" file="Source/motion/render/HiddenLineBaker.h"/>
         <FILE id="MotrenderHiddenLineShapesh" name="HiddenLineShapes.h" compile="0"
