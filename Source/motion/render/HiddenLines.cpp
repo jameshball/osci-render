@@ -733,6 +733,12 @@ private:
 
     // Where surfaces cut through each other: straight on the pieces they were
     // drawn from, so interpolated between their ends. False when cancelled.
+    // A normal the camera sees, in the scene. The camera only turns the
+    // scene, and may mirror it, which turns a normal round as well.
+    Vec3 sceneNormal(const Vec3& seen) const {
+        const auto turned = cameraEye.right * seen.x + cameraEye.up * seen.y + cameraEye.forward * seen.z;
+        return cameraEye.right.dot(cameraEye.up.cross(cameraEye.forward)) < 0 ? turned * -1.0 : turned;
+    }
     bool keepCrossings() {
         const auto& surfaceTriangles = workspace.triangles;
         const auto& surfaceSources = workspace.sources;
@@ -748,11 +754,13 @@ private:
                 const auto from = weighted(corners[0], corners[1], corners[2], piece.from), to = weighted(corners[0], corners[1], corners[2], piece.to);
                 visibleRuns([&](double t) { return screen(piece.eyeFrom + (piece.eyeTo - piece.eyeFrom) * t); }, std::hypot(sb->x - sa->x, sb->y - sa->y));
                 commitDrawn();
-                // It lies on the face it was found on.
+                // It lies on the face it was found on: that triangle's normal
+                // as the camera sees it, turned back into the scene.
                 LineNormals normals;
                 if (lit) {
-                    const auto a = place(items[surface], corners[0]), b = place(items[surface], corners[1]), c = place(items[surface], corners[2]);
-                    if (a.has_value() && b.has_value() && c.has_value()) { normals.add(normalOf(*a, *b, *c)); }
+                    const auto& eye = surfaceTriangles[piece.triangle].eye;
+                    const auto seen = normalOf(eye[0], eye[1], eye[2]);
+                    if (seen.has_value()) { normals.add(sceneNormal(*seen)); }
                 }
                 for (const auto& [a, b] : runs) {
                     lostBy[surface] = 1;
