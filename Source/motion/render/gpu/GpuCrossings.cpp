@@ -9,7 +9,7 @@ namespace motion::gpu {
 namespace {
 constexpr const char* kernel = R"(
 struct Triangle { corners: array<vec4<i32>, 3>, rests: array<vec4<i32>, 3>, normal: vec4<f32>, surface: u32, padding0: u32, padding1: u32, padding2: u32 }
-struct Box { left: f32, right: f32, bottom: f32, top: f32, nearby: f32, farthest: f32, padding0: f32, padding1: f32 }
+struct Box { left: f32, right: f32, bottom: f32, top: f32, nearby: f32, farthest: f32, surface: u32, padding: u32 }
 struct Cover { x0: i32, x1: i32, y0: i32, y1: i32 }
 struct Grid { cells: u32, unit: f32, fine: f32, padding: u32 }
 struct Found { count: atomic<u32>, padding0: u32, padding1: u32, padding2: u32, pairs: array<vec4<u32>> }
@@ -17,7 +17,7 @@ struct Found { count: atomic<u32>, padding0: u32, padding1: u32, padding2: u32, 
 @group(0) @binding(0) var<storage, read> triangles: array<Triangle>;
 @group(0) @binding(1) var<storage, read> boxes: array<Box>;
 @group(0) @binding(2) var<storage, read> covers: array<Cover>;
-@group(0) @binding(3) var<storage, read> cellOf: array<u32>;
+@group(0) @binding(3) var<storage, read> cellOf: array<vec2<u32>>;
 @group(0) @binding(4) var<storage, read> starts: array<u32>;
 @group(0) @binding(5) var<storage, read> members: array<u32>;
 @group(0) @binding(6) var<uniform> grid: Grid;
@@ -158,21 +158,21 @@ fn mayCross(first: Triangle, second: Triangle) -> bool {
 fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
     let entry = id.x + id.y * groups.x * 64u;
     if (entry >= arrayLength(&members)) { return; }
-    let cell = cellOf[entry];
+    let cell = cellOf[entry].x;
     let x = i32(cell % grid.cells);
     let y = i32(cell / grid.cells);
     let i = members[entry];
-    let mine = triangles[i];
     let box = boxes[i];
     let cover = covers[i];
-    for (var k = entry + 1u; k < starts[cell + 1u]; k++) {
+    // A cell's members come surface by surface: those of later surfaces
+    // start at cellOf[entry].y. A triangle is only read once its box is
+    // known to meet another's.
+    for (var k = cellOf[entry].y; k < starts[cell + 1u]; k++) {
         let j = members[k];
-        let theirs = triangles[j];
-        if (theirs.surface <= mine.surface) { continue; }
         // Each pair once: in the cell where their boxes' overlap starts.
         let other = covers[j];
         if (max(cover.x0, other.x0) != x || max(cover.y0, other.y0) != y) { continue; }
-        if (!overlaps(box, boxes[j]) || !mayCross(mine, theirs)) { continue; }
+        if (!overlaps(box, boxes[j]) || !mayCross(triangles[i], triangles[j])) { continue; }
         let at = atomicAdd(&found.count, 1u);
         if (at < arrayLength(&found.pairs)) { found.pairs[at] = vec4<u32>(entry, i, j, 0u); }
     }
@@ -185,7 +185,8 @@ struct Triangle {
     std::uint32_t surface, padding[3];
 };
 struct Box {
-    float left, right, bottom, top, nearby, farthest, padding[2];
+    float left, right, bottom, top, nearby, farthest;
+    std::uint32_t surface, padding;
 };
 }
 
@@ -219,15 +220,23 @@ std::optional<std::vector<std::array<std::uint32_t, 2>>> mayCross(Device& device
         const std::array<std::array<std::int32_t, 4>, 3> wholes {whole(triangle.eye[0]), whole(triangle.eye[1]), whole(triangle.eye[2])};
         corners.push_back({wholes, {rest(triangle.eye[0], wholes[0]), rest(triangle.eye[1], wholes[1]), rest(triangle.eye[2], wholes[2])}, planar, triangle.surface, {}});
         const auto& box = pairing.boxes[index];
-        boxes.push_back({static_cast<float>(box.left), static_cast<float>(box.right), static_cast<float>(box.bottom), static_cast<float>(box.top), static_cast<float>(box.nearby), static_cast<float>(box.farthest), {}});
+        boxes.push_back({static_cast<float>(box.left), static_cast<float>(box.right), static_cast<float>(box.bottom), static_cast<float>(box.top), static_cast<float>(box.nearby), static_cast<float>(box.farthest), triangle.surface, 0});
         const auto range = grid.range(box);
         covers.push_back({range[0], range[1], range[2], range[3]});
     }
     std::vector<std::uint32_t> starts(grid.starts().begin(), grid.starts().end());
     const auto members = grid.members();
-    // Each entry's cell, for a kernel run once an entry.
-    std::vector<std::uint32_t> cellOf(members.size());
-    for (std::size_t cell = 0; cell + 1 < starts.size(); ++cell) { std::fill(cellOf.begin() + starts[cell], cellOf.begin() + starts[cell + 1], static_cast<std::uint32_t>(cell)); }
+    // Each entry's cell, for a kernel run once an entry, and where in it the members of later surfaces start.
+    std::vector<std::array<std::uint32_t, 2>> cellOf(members.size());
+    for (std::size_t cell = 0; cell + 1 < starts.size(); ++cell) {
+        auto later = starts[cell];
+        for (auto entry = starts[cell]; entry < starts[cell + 1]; ++entry) {
+            const auto surface = triangles[members[entry]].surface;
+            later = std::max(later, entry + 1);
+            while (later < starts[cell + 1] && triangles[members[later]].surface <= surface) { ++later; }
+            cellOf[entry] = {static_cast<std::uint32_t>(cell), later};
+        }
+    }
     const auto unitBits = std::bit_cast<std::uint32_t>(static_cast<float>(unit));
     const std::array<std::uint32_t, 4> uniforms {static_cast<std::uint32_t>(grid.across()), unitBits, std::bit_cast<std::uint32_t>(static_cast<float>(fine)), 0};
     const std::array<Device::Input, 6> inputs {std::as_bytes(std::span(corners)), std::as_bytes(std::span(boxes)), std::as_bytes(std::span(covers)), std::as_bytes(std::span(cellOf)), std::as_bytes(std::span(starts)), std::as_bytes(members)};
