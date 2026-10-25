@@ -16,6 +16,7 @@
 #include "../model/Vec3.h"
 #include <map>
 #include <numbers>
+#include <span>
 #include <unordered_map>
 
 namespace motion::hidden {
@@ -108,24 +109,118 @@ inline std::vector<std::array<std::int32_t, 2>> facesAlong(const PreparedDrawing
     return along;
 }
 
+// A frame's bent surfaces, diced once in the scene for every view that
+// draws them (see Dicer): each surface's pieces, face by face.
+struct BentMesh {
+    struct Piece {
+        std::array<Vec3, 3> at;
+        std::array<osci::Point, 3> source;
+    };
+    struct Surface {
+        std::vector<Piece> pieces;
+        // Where each face's pieces start, and where the last ends.
+        std::vector<std::uint32_t> starts;
+    };
+    std::vector<Surface> surfaces;
+
+    std::span<const Piece> of(std::size_t surface, std::size_t face) const {
+        if (surface >= surfaces.size() || face + 1 >= surfaces[surface].starts.size()) { return {}; }
+        const auto& starts = surfaces[surface].starts;
+        return std::span<const Piece>(surfaces[surface].pieces).subspan(starts[face], starts[face + 1] - starts[face]);
+    }
+};
+
+// Dices every bent surface's faces once, for `views`: `world` holds each
+// item's mesh corners in the scene, and `place(item, point)` puts any point
+// of an item there. False when cancelled partway.
+template <typename Place, typename Cancelled>
+bool diceBent(const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world, Place&& place, std::span<const DiceView> views, Dicer& dicer, BentMesh& bent, Cancelled&& cancelled) {
+    bent.surfaces.resize(std::max(bent.surfaces.size(), items.size()));
+    for (auto& surface : bent.surfaces) {
+        surface.pieces.clear();
+        surface.starts.clear();
+    }
+    dicer.begin(views);
+    for (std::size_t surface = 0; surface < items.size(); ++surface) {
+        const auto& item = items[surface];
+        if (!item.bent || item.drawing == nullptr || item.drawing->faces().empty() || views.empty()) { continue; }
+        const auto& mesh = item.drawing->faces();
+        const auto& corners = world[surface];
+        auto& into = bent.surfaces[surface];
+        dicer.nextSurface();
+        for (const auto& triangle : mesh.triangles) {
+            if (cancelled()) { return false; }
+            into.starts.push_back(static_cast<std::uint32_t>(into.pieces.size()));
+            const auto& a = corners[triangle[0]], & b = corners[triangle[1]], & c = corners[triangle[2]];
+            if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
+            const auto diced = dicer.dice({mesh.vertices[triangle[0]], *a}, {mesh.vertices[triangle[1]], *b}, {mesh.vertices[triangle[2]], *c},
+                [&](const osci::Point& point) { return place(item, point); },
+                [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r) { into.pieces.push_back({{p.at, q.at, r.at}, {p.source, q.source, r.source}}); }, cancelled);
+            if (!diced) { return false; }
+        }
+        into.starts.push_back(static_cast<std::uint32_t>(into.pieces.size()));
+    }
+    return true;
+}
+
+// A flat triangle in an eye's space into a depth buffer: whole, cut (in
+// perspective) a hair in front of the near plane, so every corner kept, the
+// cut's own included, is in front of it. A cut point is as far along its
+// edge before the chain as after: the triangle is flat. `whole(eye, sources)`
+// is told of each piece drawn. `dropOffFrame`: left out when wholly past one
+// side of the view (a bent surface's many small pieces).
+template <typename Whole>
+void drawFlat(const Projection& projection, Reach reach, DepthBuffer& depth, const std::array<Vec3, 3>& around, const std::array<osci::Point, 3>& sources, bool dropOffFrame, Whole&& whole) {
+    std::array<Vec3, 4> kept {};
+    std::array<osci::Point, 4> keptSources {};
+    std::size_t count = 0;
+    constexpr auto cut = nearPlane * (1 + 1.0e-6);
+    for (std::size_t index = 0; index < 3; ++index) {
+        const auto& current = around[index];
+        const auto& next = around[(index + 1) % 3];
+        if (projection.keeps(current.z)) {
+            keptSources[count] = sources[index];
+            kept[count++] = current;
+        }
+        if (projection.keeps(current.z) != projection.keeps(next.z)) {
+            const auto along = (cut - current.z) / (next.z - current.z);
+            const auto& from = sources[index];
+            const auto& to = sources[(index + 1) % 3];
+            keptSources[count] = osci::Point(static_cast<float>(from.x + (to.x - from.x) * along), static_cast<float>(from.y + (to.y - from.y) * along), static_cast<float>(from.z + (to.z - from.z) * along));
+            kept[count++] = current + (next - current) * along;
+        }
+    }
+    if (count < 3) { return; }
+    std::array<Screen, 4> at {};
+    for (std::size_t index = 0; index < count; ++index) {
+        const auto point = projection(kept[index]);
+        if (!point.has_value()) { return; }
+        at[index] = *point;
+    }
+    if (dropOffFrame) {
+        const auto x = reach.x * DepthBuffer::overscan, y = reach.y * DepthBuffer::overscan;
+        const auto past = [&](auto&& test) { return std::all_of(at.begin(), at.begin() + static_cast<std::ptrdiff_t>(count), test); };
+        if (past([x](const Screen& s) { return s.x < -x; }) || past([x](const Screen& s) { return s.x > x; }) || past([y](const Screen& s) { return s.y < -y; }) || past([y](const Screen& s) { return s.y > y; })) { return; }
+    }
+    depth.triangle(at[0], at[1], at[2]);
+    if (count == 4) { depth.triangle(at[0], at[2], at[3]); }
+    for (std::size_t piece = 2; piece < count; ++piece) { whole(std::array<Vec3, 3> {kept[0], kept[piece - 1], kept[piece]}, std::array<osci::Point, 3> {keptSources[0], keptSources[piece - 1], keptSources[piece]}); }
+}
+
 // Every surface's faces (meshes', and flat drawings' fills) drawn into a
 // depth buffer as an eye sees them: a camera, to hide lines, or a light, to
 // find its shadows. `world` holds each item's mesh corners in the scene;
-// `place(item, point)` puts any point of an item there, for the faces
-// something bends, which are diced so they follow it. `whole(surface, eye,
-// sources)` is told of every face, or part of one cut where it comes into
-// view, drawn flat: its corners in the eye's space and before the chain.
-// `solidOnly`: only the faces of what is solid (see SceneItem::solid), for
-// what hides lines; a light's shadows fall from every surface. False when
-// cancelled partway.
-template <typename Place, typename Whole, typename Cancelled>
-bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world, Place&& place, const Eye& eye, const Projection& projection,
-    Reach reach, DepthBuffer& depth, Dicer& dicer, Whole&& whole, Cancelled&& cancelled, bool solidOnly = false) {
+// the faces something bends are drawn as `bent` diced them, so they follow
+// it. `whole(surface, eye, sources)` is told of every face, or part of one
+// cut where it comes into view, drawn flat: its corners in the eye's space
+// and before the chain. `solidOnly`: only the faces of what is solid (see
+// SceneItem::solid), for what hides lines. False when cancelled partway.
+template <typename Whole, typename Cancelled>
+bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::vector<std::optional<Vec3>>>& world, const BentMesh& bent, const Eye& eye, const Projection& projection,
+    Reach reach, DepthBuffer& depth, Whole&& whole, Cancelled&& cancelled, bool solidOnly = false) {
     depth.cover(reach);
-    dicer.begin(reach);
-    const auto seen = [&](const std::optional<Vec3>& point) -> std::optional<Vec3> {
-        if (!point.has_value()) { return std::nullopt; }
-        return eye.see(*point);
+    const auto draw = [&](std::uint32_t surface, const std::array<Vec3, 3>& around, const std::array<osci::Point, 3>& sources, bool dropOffFrame) {
+        drawFlat(projection, reach, depth, around, sources, dropOffFrame, [&](const std::array<Vec3, 3>& corners, const std::array<osci::Point, 3>& from) { whole(surface, corners, from); });
     };
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
@@ -133,62 +228,16 @@ bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::ve
         const auto& mesh = item.drawing->faces();
         const auto& corners = world[surface];
         for (std::uint32_t face = 0; face < mesh.triangles.size(); ++face) {
-            const auto& triangle = mesh.triangles[face];
             if (cancelled()) { return false; }
             depth.tagNext(std::uint64_t {surface} << 32 | face);
-            const auto a = seen(corners[triangle[0]]), b = seen(corners[triangle[1]]), c = seen(corners[triangle[2]]);
-            if (!item.bent) {
-                // Exact through the eye: whole, cut (in perspective) a hair in
-                // front of the near plane, so every corner kept, the cut's own
-                // included, is in front of it.
-                if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
-                // What each corner kept was before the chain, to place what
-                // crosses it: nothing bends the face, so a cut point is as far
-                // along its edge before it as after.
-                std::array<Vec3, 4> kept {};
-                std::array<osci::Point, 4> keptSources {};
-                std::size_t count = 0;
-                const std::array<Vec3, 3> around {*a, *b, *c};
-                const std::array<osci::Point, 3> sources {mesh.vertices[triangle[0]], mesh.vertices[triangle[1]], mesh.vertices[triangle[2]]};
-                constexpr auto cut = nearPlane * (1 + 1.0e-6);
-                for (std::size_t index = 0; index < 3; ++index) {
-                    const auto& current = around[index];
-                    const auto& next = around[(index + 1) % 3];
-                    if (projection.keeps(current.z)) {
-                        keptSources[count] = sources[index];
-                        kept[count++] = current;
-                    }
-                    if (projection.keeps(current.z) != projection.keeps(next.z)) {
-                        const auto along = (cut - current.z) / (next.z - current.z);
-                        const auto& from = sources[index];
-                        const auto& to = sources[(index + 1) % 3];
-                        keptSources[count] = osci::Point(static_cast<float>(from.x + (to.x - from.x) * along), static_cast<float>(from.y + (to.y - from.y) * along), static_cast<float>(from.z + (to.z - from.z) * along));
-                        kept[count++] = current + (next - current) * along;
-                    }
-                }
-                std::array<Screen, 4> at {};
-                bool drawn = count >= 3;
-                for (std::size_t index = 0; index < count && drawn; ++index) {
-                    const auto point = projection(kept[index]);
-                    drawn = point.has_value();
-                    if (drawn) { at[index] = *point; }
-                }
-                if (!drawn) { continue; }
-                depth.triangle(at[0], at[1], at[2]);
-                if (count == 4) { depth.triangle(at[0], at[2], at[3]); }
-                for (std::size_t piece = 2; piece < count; ++piece) { whole(surface, std::array<Vec3, 3> {kept[0], kept[piece - 1], kept[piece]}, std::array<osci::Point, 3> {keptSources[0], keptSources[piece - 1], keptSources[piece]}); }
+            if (item.bent) {
+                for (const auto& piece : bent.of(surface, face)) { draw(surface, {eye.see(piece.at[0]), eye.see(piece.at[1]), eye.see(piece.at[2])}, piece.source, true); }
                 continue;
             }
-            // Diced point by point into pieces flat enough, once bent, to draw.
-            const auto diced = dicer.dice({mesh.vertices[triangle[0]], projection(a)}, {mesh.vertices[triangle[1]], projection(b)}, {mesh.vertices[triangle[2]], projection(c)},
-                [&](const osci::Point& point) { return projection(seen(place(item, point))); },
-                [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, bool flat) {
-                    depth.triangle(*p.at, *q.at, *r.at);
-                    // A piece cut at the near plane reaches far off the
-                    // screen: only whole pieces are told of.
-                    if (flat) { whole(surface, std::array<Vec3, 3> {projection.unproject(*p.at), projection.unproject(*q.at), projection.unproject(*r.at)}, std::array<osci::Point, 3> {p.source, q.source, r.source}); }
-                }, cancelled);
-            if (!diced) { return false; }
+            const auto& triangle = mesh.triangles[face];
+            const auto& a = corners[triangle[0]], & b = corners[triangle[1]], & c = corners[triangle[2]];
+            if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
+            draw(surface, {eye.see(*a), eye.see(*b), eye.see(*c)}, {mesh.vertices[triangle[0]], mesh.vertices[triangle[1]], mesh.vertices[triangle[2]]}, false);
         }
     }
     return true;
@@ -218,6 +267,7 @@ struct Workspace {
     };
     std::vector<HiddenRun> hiddenRuns;
     Dicer dicer;
+    BentMesh bent;
     ShadowBuffers shadows;
     // What stands between mirrors and what they show.
     SceneRays rays;

@@ -329,21 +329,32 @@ public:
             }
         }
 
+        // An eye at the origin looking down +Z, as the dicing tests see faces.
+        const auto lookingAlongZ = [] {
+            motion::hidden::Eye eye;
+            eye.right = {1, 0, 0};
+            eye.up = {0, 1, 0};
+            eye.forward = {0, 0, 1};
+            return motion::hidden::DiceView {eye, motion::hidden::Projection {1}, {}, motion::hidden::DepthBuffer::pixel};
+        };
+        const auto inScene = [](const osci::Point& point) { return std::optional(motion::Vec3 {point.x, point.y, point.z}); };
+
         beginTest("A bent surface passing behind the eye still hides what it covers at the edge of the view");
         {
             // A wall beside the eye, x = 0.25, running from behind it to far in
             // front: seen nearly edge on, the part just in front of the eye
-            // fills the frame's right edge. Diced as a bent surface is.
-            const auto bend = [](const osci::Point& point) -> std::optional<motion::hidden::Screen> {
-                if (!(point.z > motion::hidden::nearPlane)) { return std::nullopt; }
-                return motion::hidden::Screen {point.x / point.z, point.y / point.z, 1.0 / point.z};
-            };
-            const auto corner = [&](float x, float y, float z) { const osci::Point point(x, y, z); return motion::hidden::DiceCorner {point, bend(point)}; };
+            // fills the frame's right edge. Diced as a bent surface is, then
+            // drawn piece by piece, cut where each comes into view.
+            const std::array views {lookingAlongZ()};
+            const auto corner = [&](float x, float y, float z) { const osci::Point point(x, y, z); return motion::hidden::DiceCorner {point, *inScene(point)}; };
             motion::hidden::DepthBuffer depth;
             motion::hidden::Dicer dicer;
-            const auto draw = [&](const motion::hidden::DiceCorner& a, const motion::hidden::DiceCorner& b, const motion::hidden::DiceCorner& c, bool) { depth.triangle(*a.at, *b.at, *c.at); };
-            dicer.dice(corner(.25f, -2, -3), corner(.25f, -2, 12), corner(.25f, 2, 12), bend, draw);
-            dicer.dice(corner(.25f, -2, -3), corner(.25f, 2, 12), corner(.25f, 2, -3), bend, draw);
+            dicer.begin(views);
+            const auto draw = [&](const motion::hidden::DiceCorner& a, const motion::hidden::DiceCorner& b, const motion::hidden::DiceCorner& c) {
+                motion::hidden::drawFlat(views[0].projection, {}, depth, {views[0].eye.see(a.at), views[0].eye.see(b.at), views[0].eye.see(c.at)}, {a.source, b.source, c.source}, true, [](const auto&, const auto&) {});
+            };
+            dicer.dice(corner(.25f, -2, -3), corner(.25f, -2, 12), corner(.25f, 2, 12), inScene, draw);
+            dicer.dice(corner(.25f, -2, -3), corner(.25f, 2, 12), corner(.25f, 2, -3), inScene, draw);
             int shown = 0, total = 0;
             for (double x = .8; x < 1.0; x += .01) {
                 for (double y = -.5; y <= .5; y += .25) {
@@ -359,34 +370,33 @@ public:
         beginTest("A bend cuts a face as finely as it curves it, and a step in it ends the cutting");
         {
             // A face filling much of the frame, a little in front of the eye.
-            const auto through = [](const osci::Point& point) -> std::optional<motion::hidden::Screen> {
-                if (!(point.z > motion::hidden::nearPlane)) { return std::nullopt; }
-                return motion::hidden::Screen {point.x / point.z, point.y / point.z, 1.0 / point.z};
-            };
+            const std::array views {lookingAlongZ()};
             const auto dice = [&](auto&& bend) {
-                const auto corner = [&](float x, float y) { const osci::Point point(x, y, 2); return motion::hidden::DiceCorner {point, bend(point)}; };
+                const auto corner = [&](float x, float y) { const osci::Point point(x, y, 2); return motion::hidden::DiceCorner {point, *bend(point)}; };
                 motion::hidden::Dicer dicer;
+                dicer.begin(views);
                 std::size_t pieces = 0;
-                dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), bend, [&](const auto&, const auto&, const auto&, bool) { ++pieces; });
+                dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), bend, [&](const auto&, const auto&, const auto&) { ++pieces; });
                 return pieces;
             };
-            // Seen through the eye alone it stays flat: halved only until small
-            // enough to grid, not into cells a few pixels across (thousands).
-            const auto flat = dice(through);
+            // Unbent it stays flat: halved only until small enough to grid,
+            // not into cells a few pixels across (thousands).
+            const auto flat = dice(inScene);
             expect(flat > 0 && flat < 1024, "a flat face is cut into few pieces (" + juce::String(static_cast<int>(flat)) + ")");
             // Bulged, it curves, and is cut finer.
-            const auto bulged = dice([&](const osci::Point& point) { return through(osci::Point(point.x, point.y, point.z - .3f * (1 - point.x * point.x) * (1 - point.y * point.y))); });
+            const auto bulge = [&](const osci::Point& point) { return inScene(osci::Point(point.x, point.y, point.z - .3f * (1 - point.x * point.x) * (1 - point.y * point.y))); };
+            const auto bulged = dice(bulge);
             expect(bulged > flat, "a curved face is cut finer than a flat one (" + juce::String(static_cast<int>(bulged)) + ")");
             // Crushed into steps, as Bit crush does: an edge across a step stays
             // as long however often it is halved, so halving it stops there.
-            const auto crushed = dice([&](const osci::Point& point) { return through(osci::Point(std::round(point.x * 8) / 8, std::round(point.y * 8) / 8, point.z)); });
+            const auto crushed = dice([&](const osci::Point& point) { return inScene(osci::Point(std::round(point.x * 8) / 8, std::round(point.y * 8) / 8, point.z)); });
             expect(crushed > 0 && crushed < 100000, "a stepped face is cut into a bounded number of pieces (" + juce::String(static_cast<int>(crushed)) + ")");
             // A bake that stops partway through a face stops its dicing too.
-            const auto bulge = [&](const osci::Point& point) { return through(osci::Point(point.x, point.y, point.z - .3f * (1 - point.x * point.x) * (1 - point.y * point.y))); };
-            const auto corner = [&](float x, float y) { const osci::Point point(x, y, 2); return motion::hidden::DiceCorner {point, bulge(point)}; };
+            const auto corner = [&](float x, float y) { const osci::Point point(x, y, 2); return motion::hidden::DiceCorner {point, *bulge(point)}; };
             motion::hidden::Dicer dicer;
+            dicer.begin(views);
             std::size_t pieces = 0;
-            const auto finished = dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), bulge, [&](const auto&, const auto&, const auto&, bool) { ++pieces; }, [] { return true; });
+            const auto finished = dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), bulge, [&](const auto&, const auto&, const auto&) { ++pieces; }, [] { return true; });
             expect(!finished && pieces < 1024, "a cancelled face stops being diced (" + juce::String(static_cast<int>(pieces)) + " pieces)");
         }
 
@@ -395,16 +405,42 @@ public:
             // A fine ripple, as a camera close to a rippled surface sees it:
             // every fold throws the face across the whole view, so halving
             // alone would go on to its deepest (minutes, and gigabytes).
-            const auto folded = [](const osci::Point& point) -> std::optional<motion::hidden::Screen> {
-                const auto x = point.x + 2 * std::sin(500 * point.y);
-                return motion::hidden::Screen {x / point.z, point.y / point.z, 1.0 / point.z};
-            };
-            const auto corner = [&](float x, float y) { const osci::Point point(x, y, 1); return motion::hidden::DiceCorner {point, folded(point)}; };
+            const std::array views {lookingAlongZ()};
+            const auto folded = [&](const osci::Point& point) { return inScene(osci::Point(point.x + 2 * std::sin(500 * point.y), point.y, point.z)); };
+            const auto corner = [&](float x, float y) { const osci::Point point(x, y, 1); return motion::hidden::DiceCorner {point, *folded(point)}; };
             motion::hidden::Dicer dicer;
-            dicer.begin({});
+            dicer.begin(views);
             std::size_t pieces = 0;
-            const auto finished = dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), folded, [&](const auto&, const auto&, const auto&, bool) { ++pieces; }, [] { return false; });
-            expect(finished && pieces > 0 && pieces <= 2 * motion::hidden::Dicer::budget, "a folded face is cut into a bounded number of pieces (" + juce::String(static_cast<juce::int64>(pieces)) + ")");
+            const auto finished = dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), folded, [&](const auto&, const auto&, const auto&) { ++pieces; }, [] { return false; });
+            expect(finished && pieces > 0 && pieces <= motion::hidden::Dicer::budget + 1, "a folded face is cut into a bounded number of pieces (" + juce::String(static_cast<juce::int64>(pieces)) + ")");
+        }
+
+        beginTest("A face is diced once as finely as the finest view that sees it needs");
+        {
+            // The same bulged face, seen from twice as far, needs half the
+            // detail; seen by both, it is cut as the nearer needs; seen by
+            // neither (both looking away), it is dropped.
+            const auto near = lookingAlongZ();
+            auto far = near;
+            far.eye.position = {0, 0, -2};
+            auto away = near;
+            away.eye.forward = {0, 0, -1};
+            away.eye.right = {-1, 0, 0};
+            const auto bulge = [&](const osci::Point& point) { return inScene(osci::Point(point.x, point.y, point.z - .3f * (1 - point.x * point.x) * (1 - point.y * point.y))); };
+            const auto dice = [&](std::span<const motion::hidden::DiceView> views) {
+                const auto corner = [&](float x, float y) { const osci::Point point(x, y, 2); return motion::hidden::DiceCorner {point, *bulge(point)}; };
+                motion::hidden::Dicer dicer;
+                dicer.begin(views);
+                std::size_t pieces = 0;
+                dicer.dice(corner(-1, -1), corner(1, -1), corner(-1, 1), bulge, [&](const auto&, const auto&, const auto&) { ++pieces; });
+                return pieces;
+            };
+            const std::array nearOnly {near}, farOnly {far}, neither {away};
+            const std::array both {far, near};
+            const auto nearPieces = dice(nearOnly), farPieces = dice(farOnly), bothPieces = dice(both);
+            expect(farPieces < nearPieces, "a farther view needs fewer pieces (" + juce::String(static_cast<int>(farPieces)) + " against " + juce::String(static_cast<int>(nearPieces)) + ")");
+            expectEquals(static_cast<int>(bothPieces), static_cast<int>(nearPieces), "seen by both, it is cut as the nearer needs");
+            expectEquals(static_cast<int>(dice(neither)), 0, "a face no view sees is dropped");
         }
 
         beginTest("A bake reuses a frame for a time that depends on just the same");
