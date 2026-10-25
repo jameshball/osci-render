@@ -7,21 +7,31 @@
 
 namespace motion::gpu {
 namespace {
-constexpr const char* kernel = R"(
+// What both passes share: a triangle as the GPU holds it, its box, the
+// cells it covers, the grid, and the pairs found.
+constexpr const char* shared = R"(
 struct Triangle { corners: array<vec4<i32>, 3>, rests: array<vec4<i32>, 3>, normal: vec4<f32>, surface: u32, padding0: u32, padding1: u32, padding2: u32 }
 struct Box { left: f32, right: f32, bottom: f32, top: f32, nearby: f32, farthest: f32, surface: u32, start: u32 }
 struct Cover { x0: i32, x1: i32, y0: i32, y1: i32 }
 struct Grid { cells: u32, unit: f32, fine: f32, padding: u32 }
 struct Found { count: atomic<u32>, padding0: u32, padding1: u32, padding2: u32, pairs: array<vec4<u32>> }
+struct Candidates { count: atomic<u32>, padding0: u32, padding1: u32, padding2: u32, pairs: array<vec2<u32>> }
+struct Listed { count: u32, padding0: u32, padding1: u32, padding2: u32, pairs: array<vec2<u32>> }
 
-@group(0) @binding(0) var<storage, read> triangles: array<Triangle>;
-@group(0) @binding(1) var<storage, read> boxes: array<Box>;
-@group(0) @binding(2) var<storage, read> covers: array<Cover>;
-@group(0) @binding(3) var<storage, read> cellOf: array<vec2<u32>>;
-@group(0) @binding(4) var<storage, read> starts: array<u32>;
-@group(0) @binding(5) var<storage, read> members: array<u32>;
-@group(0) @binding(6) var<uniform> grid: Grid;
-@group(0) @binding(7) var<storage, read_write> found: Found;
+)";
+
+// Pass one: each entry of a cell against the later members there, as
+// crossing::detail::eachPair pairs them, listing those whose boxes meet (a
+// cheap test most pairs fail, so the dearer one that follows has a thread
+// for every pair it tests, not a long, uneven run of them).
+constexpr const char* listing = R"(
+@group(0) @binding(0) var<storage, read> boxes: array<Box>;
+@group(0) @binding(1) var<storage, read> covers: array<Cover>;
+@group(0) @binding(2) var<storage, read> cellOf: array<vec2<u32>>;
+@group(0) @binding(3) var<storage, read> starts: array<u32>;
+@group(0) @binding(4) var<storage, read> members: array<u32>;
+@group(0) @binding(5) var<uniform> grid: Grid;
+@group(0) @binding(6) var<storage, read_write> candidates: Candidates;
 
 // Boxes overlap, widened a little so single precision never parts two that do.
 fn overlaps(p: Box, q: Box) -> bool {
@@ -29,6 +39,36 @@ fn overlaps(p: Box, q: Box) -> bool {
     let depth = 1.0e-5 * max(max(abs(p.nearby), abs(p.farthest)), 1.0);
     return !(p.right + slack < q.left || q.right + slack < p.left || p.top + slack < q.bottom || q.top + slack < p.bottom || p.farthest + depth < q.nearby || q.farthest + depth < p.nearby);
 }
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
+    let entry = id.x + id.y * groups.x * 64u;
+    if (entry >= arrayLength(&members)) { return; }
+    let cell = cellOf[entry].x;
+    let x = i32(cell % grid.cells);
+    let y = i32(cell / grid.cells);
+    let box = boxes[members[entry]];
+    let cover = covers[members[entry]];
+    // A cell's members come surface by surface: those of later surfaces
+    // start at cellOf[entry].y.
+    for (var k = cellOf[entry].y; k < starts[cell + 1u]; k++) {
+        // Each pair once: in the cell where their boxes' overlap starts
+        // (each box's first column and row are packed in its start).
+        let theirs = boxes[members[k]];
+        if (max(cover.x0, i32(theirs.start & 0xffffu)) != x || max(cover.y0, i32(theirs.start >> 16u)) != y || !overlaps(box, theirs)) { continue; }
+        let at = atomicAdd(&candidates.count, 1u);
+        if (at < arrayLength(&candidates.pairs)) { candidates.pairs[at] = vec2<u32>(entry, k); }
+    }
+}
+)";
+
+// Pass two: each listed pair tested as crossing::between tests it.
+constexpr const char* testing = R"(
+@group(0) @binding(0) var<storage, read> triangles: array<Triangle>;
+@group(0) @binding(1) var<storage, read> members: array<u32>;
+@group(0) @binding(2) var<uniform> grid: Grid;
+@group(0) @binding(3) var<storage, read> listed: Listed;
+@group(0) @binding(4) var<storage, read_write> found: Found;
 
 // Corner `k` less corner `m` of the same or another triangle. Corners are
 // held as whole numbers of `grid.unit` (the frame's triangles fit in 2^29 of
@@ -152,31 +192,16 @@ fn mayCross(first: Triangle, second: Triangle) -> bool {
     return high - low > needed - margin;
 }
 
-// One entry of a cell: its triangle against the later members there, as
-// crossing::detail::eachPair pairs them.
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
-    let entry = id.x + id.y * groups.x * 64u;
-    if (entry >= arrayLength(&members)) { return; }
-    let cell = cellOf[entry].x;
-    let x = i32(cell % grid.cells);
-    let y = i32(cell / grid.cells);
-    let i = members[entry];
-    let box = boxes[i];
-    let cover = covers[i];
-    // A cell's members come surface by surface: those of later surfaces
-    // start at cellOf[entry].y. A triangle is only read once its box is
-    // known to meet another's.
-    for (var k = cellOf[entry].y; k < starts[cell + 1u]; k++) {
-        let j = members[k];
-        // Each pair once: in the cell where their boxes' overlap starts
-        // (each box's first column and row are packed in its start).
-        let theirs = boxes[j];
-        if (max(cover.x0, i32(theirs.start & 0xffffu)) != x || max(cover.y0, i32(theirs.start >> 16u)) != y) { continue; }
-        if (!overlaps(box, theirs) || !mayCross(triangles[i], triangles[j])) { continue; }
-        let at = atomicAdd(&found.count, 1u);
-        if (at < arrayLength(&found.pairs)) { found.pairs[at] = vec4<u32>(entry, i, j, 0u); }
-    }
+    let index = id.x + id.y * groups.x * 64u;
+    if (index >= min(listed.count, arrayLength(&listed.pairs))) { return; }
+    let pair = listed.pairs[index];
+    let i = members[pair.x];
+    let j = members[pair.y];
+    if (!mayCross(triangles[i], triangles[j])) { return; }
+    let at = atomicAdd(&found.count, 1u);
+    if (at < arrayLength(&found.pairs)) { found.pairs[at] = vec4<u32>(pair.x, i, j, pair.y); }
 }
 )";
 
@@ -242,36 +267,62 @@ std::optional<std::vector<std::array<std::uint32_t, 2>>> mayCross(Device& device
     const std::array<std::uint32_t, 4> uniforms {static_cast<std::uint32_t>(grid.across()), unitBits, std::bit_cast<std::uint32_t>(static_cast<float>(fine)), 0};
     const std::array<Device::Input, 6> inputs {std::as_bytes(std::span(corners)), std::as_bytes(std::span(boxes)), std::as_bytes(std::span(covers)), std::as_bytes(std::span(cellOf)), std::as_bytes(std::span(starts)), std::as_bytes(members)};
     // Room for a few pairs a candidate; when more are found, again with room for all.
+    static const juce::String listKernel = juce::String(shared) + listing, testKernel = juce::String(shared) + testing;
+    // Room for some pairs a candidate whose boxes meet, and a few that may
+    // cross; when more are found, again with room for all.
+    auto listCapacity = members.size() * 16 + (std::size_t {1} << 20);
     auto capacity = pairing.candidates.size() * 6 + 1024;
-    for (int attempt = 0; attempt < 2; ++attempt) {
-        std::optional<std::vector<std::byte>> output;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        // Only the counts start at zero, and only what was found comes back.
+        std::uint32_t listedCount = 0, count = 0;
+        std::shared_ptr<Device::Kept> kept;
         {
             Device::Work work(device);
-            std::vector<std::size_t> bound;
-            for (const auto& input : inputs) { bound.push_back(work.upload(input)); }
+            const auto triangleBuffer = work.upload(inputs[0]), boxBuffer = work.upload(inputs[1]), coverBuffer = work.upload(inputs[2]), cellBuffer = work.upload(inputs[3]), startBuffer = work.upload(inputs[4]), memberBuffer = work.upload(inputs[5]);
             const auto uniform = work.uniform(std::as_bytes(std::span(uniforms)));
-            const auto found = work.buffer(16 + capacity * 16);
-            work.run(kernel, {bound[0], bound[1], bound[2], bound[3], bound[4], bound[5], uniform, found}, static_cast<std::uint32_t>(members.size()));
-            work.read(found);
-            auto results = work.finish();
-            if (results.has_value()) { output = std::move(results->front()); }
+            const auto listed = work.scratch(16 + listCapacity * 8);
+            const auto found = work.scratch(16 + capacity * 16);
+            work.clear(listed, 16);
+            work.clear(found, 16);
+            work.run(listKernel, {boxBuffer, coverBuffer, cellBuffer, startBuffer, memberBuffer, uniform, listed}, static_cast<std::uint32_t>(members.size()));
+            work.run(testKernel, {triangleBuffer, memberBuffer, uniform, listed, found}, static_cast<std::uint32_t>(listCapacity));
+            work.read(listed, 16);
+            work.read(found, 16);
+            kept = work.keep(found);
+            const auto results = work.finish();
+            if (!results.has_value()) { return std::nullopt; }
+            std::memcpy(&listedCount, (*results)[0].data(), sizeof(listedCount));
+            std::memcpy(&count, (*results)[1].data(), sizeof(count));
         }
-        if (!output.has_value()) { return std::nullopt; }
-        std::uint32_t count = 0;
-        std::memcpy(&count, output->data(), sizeof(count));
-        if (count > capacity) {
-            capacity = count;
+        if (listedCount > listCapacity || count > capacity) {
+            listCapacity = std::max<std::size_t>(listCapacity, listedCount);
+            capacity = std::max<std::size_t>(capacity, count);
             continue;
         }
         std::vector<std::array<std::uint32_t, 4>> found(count);
-        std::memcpy(found.data(), output->data() + 16, count * 16);
-        // In order of the entry that found them: eachPair's order, as an
-        // entry's own pairs, counted up one at a time, come back in order.
+        if (count > 0) {
+            Device::Work work(device);
+            work.read(work.bind(kept), 16 + static_cast<std::size_t>(count) * 16);
+            const auto results = work.finish();
+            if (!results.has_value()) { return std::nullopt; }
+            std::memcpy(found.data(), results->front().data() + 16, static_cast<std::size_t>(count) * 16);
+        }
+        // In eachPair's order: by the entry that found them, then the member
+        // they were found with (pairs, tested in any order, sorted).
         std::vector<std::uint32_t> firsts(members.size() + 1, 0);
         for (const auto& pair : found) { ++firsts[pair[0] + 1]; }
         for (std::size_t entry = 0; entry < members.size(); ++entry) { firsts[entry + 1] += firsts[entry]; }
-        std::vector<std::array<std::uint32_t, 2>> pairs(found.size());
-        for (const auto& pair : found) { pairs[firsts[pair[0]]++] = {pair[1], pair[2]}; }
+        std::vector<std::array<std::uint32_t, 4>> ordered(found.size());
+        {
+            auto next = firsts;
+            for (const auto& pair : found) { ordered[next[pair[0]]++] = pair; }
+        }
+        for (std::size_t entry = 0; entry < members.size(); ++entry) {
+            const auto from = ordered.begin() + firsts[entry], to = ordered.begin() + firsts[entry + 1];
+            if (to - from > 1) { std::sort(from, to, [](const auto& a, const auto& b) { return a[3] < b[3]; }); }
+        }
+        std::vector<std::array<std::uint32_t, 2>> pairs(ordered.size());
+        for (std::size_t index = 0; index < ordered.size(); ++index) { pairs[index] = {ordered[index][1], ordered[index][2]}; }
         return pairs;
     }
     return std::nullopt;

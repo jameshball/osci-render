@@ -546,9 +546,12 @@ Device::Kept::~Kept() {
     wgpuBufferRelease(buffer);
 }
 
-void Device::Work::clear(std::size_t buffer) {
+void Device::Work::clear(std::size_t buffer) { clear(buffer, state->made[buffer]); }
+
+void Device::Work::clear(std::size_t buffer, std::size_t bytes) {
     state->endPass();
-    if (!state->failed) { wgpuCommandEncoderClearBuffer(state->encoder, state->buffers[buffer], 0, state->made[buffer]); }
+    const auto size = std::min(state->made[buffer], (bytes + 3) & ~std::size_t {3});
+    if (!state->failed && size > 0) { wgpuCommandEncoderClearBuffer(state->encoder, state->buffers[buffer], 0, size); }
 }
 
 std::size_t Device::Work::bind(std::shared_ptr<Kept> kept) {

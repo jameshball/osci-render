@@ -91,8 +91,10 @@ public:
         std::size_t upload(std::span<const std::byte> data);
         template <typename T>
         std::size_t upload(const std::vector<T>& values) { return upload(std::as_bytes(std::span(values))); }
-        // Zeroes a buffer between kernels (to use it again).
+        // Zeroes a buffer between kernels (to use it again), or just its
+        // first `bytes` (a count before what is counted).
         void clear(std::size_t buffer);
+        void clear(std::size_t buffer, std::size_t bytes);
         // A buffer kept from earlier work, bound like the work's own.
         std::size_t bind(std::shared_ptr<Kept> kept);
         // One of the work's buffers kept once it is done.

@@ -167,9 +167,10 @@ fn slotOf(view: View, a: vec3<f32>, b: vec3<f32>, c: vec3<f32>, surface: u32, fa
 }
 )";
 
-// Each triangle cut into every view's slots, kept in a row of those drawn
-// (a workgroup's together, view by view), counted into the tiles their boxes
-// reach.
+// Each triangle cut into every view's slots, each kept in the row of those
+// drawn as it is made (in no set order: a pixel takes the first drawn by its
+// order, and planes are only told apart), counted into the tiles its box
+// reaches.
 constexpr const char* transforming = R"(
 @group(0) @binding(0) var<storage, read> triangles: array<Triangle>;
 @group(0) @binding(1) var<storage, read> views: array<View>;
@@ -177,63 +178,51 @@ constexpr const char* transforming = R"(
 @group(0) @binding(3) var<storage, read_write> slots: array<Slot>;
 @group(0) @binding(4) var<storage, read_write> tileCounts: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read_write> stats: array<atomic<u32>>;
-var<workgroup> groupCount: atomic<u32>;
-var<workgroup> groupFirst: u32;
+
+// Whether every corner is within the guard band already.
+fn inBand(view: View, polygon: Polygon) -> bool {
+    let band = f32(max(view.width, view.height));
+    var input = polygon;
+    for (var k = 0u; k < input.count; k++) {
+        let at = input.at[k];
+        if (at.x < -band || at.y < -band || at.x > f32(view.width) + band || at.y > f32(view.height) + band) { return false; }
+    }
+    return true;
+}
 
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>, @builtin(local_invocation_index) local: u32) {
+fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
     let t = id.x + id.y * groups.x * 64u;
-    let has = t < frame.triangles;
-    var triangle: Triangle;
-    if (has) { triangle = triangles[t]; }
+    if (t >= frame.triangles) { return; }
+    let triangle = triangles[t];
     for (var v = 0u; v < frame.views; v++) {
         let view = views[v];
-        var made: array<Slot, 6>;
-        var count = 0u;
-        if (has && (view.solidOnly == 0u || (triangle.flags & 1u) != 0u)) {
-            var clipped = clip(view, triangle);
-            if (clipped.count >= 3u) {
-                var at: array<vec3<f32>, 4>;
-                for (var k = 0u; k < clipped.count; k++) { at[k] = project(view, clipped.eye[k]); }
-                if ((triangle.flags & 2u) == 0u || !offFrame(view, at, clipped.count)) {
-                    var polygon: Polygon;
-                    polygon.count = clipped.count;
-                    for (var k = 0u; k < clipped.count; k++) { polygon.at[k] = vec3<f32>(toPixel(view, at[k]), at[k].z); }
-                    polygon = guard(view, polygon);
-                    for (var piece = 0u; piece + 2u < polygon.count; piece++) {
-                        var slot = slotOf(view, polygon.at[0], polygon.at[piece + 1u], polygon.at[piece + 2u], triangle.surface, triangle.face);
-                        if (slot.left > slot.right) { continue; }
-                        slot.order = 8u * t + piece;
-                        slot.view = v;
-                        made[count] = slot;
-                        count++;
-                    }
-                }
-            }
-        }
-        if (local == 0u) { atomicStore(&groupCount, 0u); }
-        workgroupBarrier();
-        let offset = atomicAdd(&groupCount, count);
-        workgroupBarrier();
-        if (local == 0u) {
-            let total = atomicLoad(&groupCount);
-            groupFirst = atomicAdd(&stats[0], total);
-            atomicAdd(&stats[8u + v], total);
-        }
-        workgroupBarrier();
-        let first = groupFirst + offset;
-        for (var k = 0u; k < count; k++) {
-            if (first + k >= frame.slotCapacity) {
+        if (view.solidOnly != 0u && (triangle.flags & 1u) == 0u) { continue; }
+        var clipped = clip(view, triangle);
+        if (clipped.count < 3u) { continue; }
+        var at: array<vec3<f32>, 4>;
+        for (var k = 0u; k < clipped.count; k++) { at[k] = project(view, clipped.eye[k]); }
+        if ((triangle.flags & 2u) != 0u && offFrame(view, at, clipped.count)) { continue; }
+        var polygon: Polygon;
+        polygon.count = clipped.count;
+        for (var k = 0u; k < clipped.count; k++) { polygon.at[k] = vec3<f32>(toPixel(view, at[k]), at[k].z); }
+        if (!inBand(view, polygon)) { polygon = guard(view, polygon); }
+        for (var piece = 0u; piece + 2u < polygon.count; piece++) {
+            var slot = slotOf(view, polygon.at[0], polygon.at[piece + 1u], polygon.at[piece + 2u], triangle.surface, triangle.face);
+            if (slot.left > slot.right) { continue; }
+            slot.order = 8u * t + piece;
+            slot.view = v;
+            let index = atomicAdd(&stats[0], 1u);
+            if (index >= frame.slotCapacity) {
                 atomicStore(&stats[1], 1u);
                 continue;
             }
-            let slot = made[k];
-            slots[first + k] = slot;
+            slots[index] = slot;
+            if (atomicLoad(&stats[8u + v]) == 0u) { atomicStore(&stats[8u + v], 1u); }
             for (var y = slot.bottom / tileSize; y <= slot.top / tileSize; y++) {
                 for (var x = slot.left / tileSize; x <= slot.right / tileSize; x++) { atomicAdd(&tileCounts[view.tileBase + u32(y) * view.tilesAcross + u32(x)], 1u); }
             }
         }
-        workgroupBarrier();
     }
 }
 )";
