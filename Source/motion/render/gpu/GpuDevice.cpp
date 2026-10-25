@@ -282,6 +282,20 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
     groupDescriptor.entries = entries.data();
     const auto group = wgpuDeviceCreateBindGroup(impl->device, &groupDescriptor);
     wgpuBindGroupLayoutRelease(layout);
+    const auto release = [&] {
+        wgpuBindGroupRelease(group);
+        for (auto buffer : buffers) {
+            wgpuBufferDestroy(buffer);
+            wgpuBufferRelease(buffer);
+        }
+    };
+    // Anything wrong so far (a buffer too big, a binding that doesn't fit)
+    // must not be submitted: wgpu-native ends the process on a submission
+    // that fails validation.
+    if (impl->errors.load() != errorsBefore) {
+        release();
+        return std::nullopt;
+    }
     WGPUCommandEncoderDescriptor encoderDescriptor = WGPU_COMMAND_ENCODER_DESCRIPTOR_INIT;
     const auto encoder = wgpuDeviceCreateCommandEncoder(impl->device, &encoderDescriptor);
     WGPUComputePassDescriptor passDescriptor = WGPU_COMPUTE_PASS_DESCRIPTOR_INIT;
@@ -298,6 +312,11 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
     wgpuCommandEncoderCopyBufferToBuffer(encoder, output, 0, readBack, 0, copied);
     const auto commands = wgpuCommandEncoderFinish(encoder, nullptr);
     wgpuCommandEncoderRelease(encoder);
+    if (impl->errors.load() != errorsBefore) {
+        wgpuCommandBufferRelease(commands);
+        release();
+        return std::nullopt;
+    }
     wgpuQueueSubmit(impl->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
     std::atomic<int> mapped {0};
@@ -313,11 +332,7 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
         if (data != nullptr) { result.emplace(data, data + outputBytes); }
         wgpuBufferUnmap(readBack);
     }
-    wgpuBindGroupRelease(group);
-    for (auto buffer : buffers) {
-        wgpuBufferDestroy(buffer);
-        wgpuBufferRelease(buffer);
-    }
+    release();
     return result;
 }
 }
