@@ -1,15 +1,17 @@
 #include "GpuCrossings.h"
 
 #include <algorithm>
+#include <bit>
+#include <cmath>
 #include <cstring>
 
 namespace motion::gpu {
 namespace {
 constexpr const char* kernel = R"(
-struct Triangle { corners: array<vec4<f32>, 6>, surface: u32, padding0: u32, padding1: u32, padding2: u32 }
+struct Triangle { corners: array<vec4<i32>, 3>, surface: u32, padding0: u32, padding1: u32, padding2: u32 }
 struct Box { left: f32, right: f32, bottom: f32, top: f32, nearby: f32, farthest: f32, padding0: f32, padding1: f32 }
 struct Cover { x0: i32, x1: i32, y0: i32, y1: i32 }
-struct Grid { cells: u32, padding0: u32, padding1: u32, padding2: u32 }
+struct Grid { cells: u32, unit: f32, padding1: u32, padding2: u32 }
 struct Found { count: atomic<u32>, padding0: u32, padding1: u32, padding2: u32, pairs: array<vec4<u32>> }
 
 @group(0) @binding(0) var<storage, read> triangles: array<Triangle>;
@@ -28,11 +30,13 @@ fn overlaps(p: Box, q: Box) -> bool {
     return !(p.right + slack < q.left || q.right + slack < p.left || p.top + slack < q.bottom || q.top + slack < p.bottom || p.farthest + depth < q.nearby || q.farthest + depth < p.nearby);
 }
 
-// Corner `k` less corner `m` of the same or another triangle: each corner is
-// held as a high and a low part (its double split in two), so a difference
-// keeps the precision of the triangles' size, not of their distance.
+// Corner `k` less corner `m` of the same or another triangle. Corners are
+// held as whole numbers of `grid.unit` (the frame's triangles fit in 2^30 of
+// them), so a difference is exact however far the triangles are from the
+// eye, and has the precision of their size (no compiler's rearranging of
+// arithmetic can lose it, as it can a float's split in two).
 fn less(t: Triangle, k: u32, u: Triangle, m: u32) -> vec3<f32> {
-    return (t.corners[k].xyz - u.corners[m].xyz) + (t.corners[k + 3u].xyz - u.corners[m + 3u].xyz);
+    return vec3<f32>(t.corners[k].xyz - u.corners[m].xyz) * grid.unit;
 }
 
 // crossing::through, from a triangle's corners' distances to a plane, as
@@ -100,13 +104,18 @@ fn mayCross(first: Triangle, second: Triangle) -> bool {
     let acB = less(second, 2u, second, 0u);
     let normalA = cross(abA, acA);
     let normalB = cross(abB, acB);
-    if (!(length(normalA) > 0.0) || !(length(normalB) > 0.0)) { return true; }
+    let size = max(max(length(abA), length(acA)), max(length(abB), length(acB)));
+    // How far from a sliver each is: a normal's error grows as its edges
+    // fall in line, and one nearly in line is too rough to trust at all.
+    let shapeA = length(normalA) / (dot(abA, abA) + dot(acA, acA));
+    let shapeB = length(normalB) / (dot(abB, abB) + dot(acB, acB));
+    if (!(min(shapeA, shapeB) > 1.0e-3)) { return true; }
     let unitA = normalize(normalA);
     let unitB = normalize(normalB);
-    let size = max(max(length(abA), length(acA)), max(length(abB), length(acB)));
     let tolerance = size * 1.0e-6;
-    // Single precision's error in a distance, at the triangles' size.
-    let band = size * 2.0e-6;
+    // The error in a distance, with room to spare: single precision's and a
+    // unit's in each corner, made worse by a rough normal.
+    let band = max(size * 1.0e-5, (grid.unit + size * 1.2e-7) * 8.0 / min(shapeA, shapeB));
     let toA = vec3<f32>(dot(unitA, less(second, 0u, first, 0u)), dot(unitA, less(second, 1u, first, 0u)), dot(unitA, less(second, 2u, first, 0u)));
     let toB = vec3<f32>(dot(unitB, less(first, 0u, second, 0u)), dot(unitB, less(first, 1u, second, 0u)), dot(unitB, less(first, 2u, second, 0u)));
     let cutA = through(toB, tolerance, band);
@@ -119,13 +128,15 @@ fn mayCross(first: Triangle, second: Triangle) -> bool {
     // it, the triangles cross. Positions are taken from the first
     // triangle's first corner.
     let direction = cross(unitA, unitB);
+    // Nearly parallel, the line the planes meet on is too rough to trust.
+    if (!(length(direction) > 1.0e-2)) { return true; }
     let offsetB = less(second, 0u, first, 0u);
     let atA = vec2<f32>(dot(direction, cutA.first.y * abA + cutA.first.z * acA), dot(direction, cutA.second.y * abA + cutA.second.z * acA));
     let atB = vec2<f32>(dot(direction, offsetB + cutB.first.y * abB + cutB.first.z * acB), dot(direction, offsetB + cutB.second.y * abB + cutB.second.z * acB));
     let low = max(min(atA.x, atA.y), min(atB.x, atB.y));
     let high = min(max(atA.x, atA.y), max(atB.x, atB.y));
     let needed = tolerance * length(direction);
-    return high - low > needed - band * 4.0;
+    return high - low > needed - max(size * 1.0e-4, band * 8.0 / length(direction));
 }
 
 // One entry of a cell: its triangle against the later members there, as
@@ -156,7 +167,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) g
 )";
 
 struct Triangle {
-    std::array<std::array<float, 4>, 6> corners;
+    std::array<std::array<std::int32_t, 4>, 3> corners;
     std::uint32_t surface, padding[3];
 };
 struct Box {
@@ -172,13 +183,16 @@ std::optional<std::vector<std::array<std::uint32_t, 2>>> mayCross(Device& device
     corners.reserve(triangles.size());
     boxes.reserve(triangles.size());
     covers.reserve(triangles.size());
-    // A double as two floats, high and low, whose sum is it to about twice
-    // single precision.
-    const auto high = [](const Vec3& value) { return std::array<float, 4> {static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z), 0}; };
-    const auto low = [](const Vec3& value) { return std::array<float, 4> {static_cast<float>(value.x - static_cast<float>(value.x)), static_cast<float>(value.y - static_cast<float>(value.y)), static_cast<float>(value.z - static_cast<float>(value.z)), 0}; };
+    // Corners as whole numbers of a unit that fits every corner in 2^30.
+    double farthest = 1.0e-9;
+    for (const auto& triangle : triangles) {
+        for (const auto& corner : triangle.eye) { farthest = std::max({farthest, std::abs(corner.x), std::abs(corner.y), std::abs(corner.z)}); }
+    }
+    const auto unit = farthest / static_cast<double>(1 << 30);
+    const auto whole = [unit](const Vec3& value) { return std::array<std::int32_t, 4> {static_cast<std::int32_t>(std::llround(value.x / unit)), static_cast<std::int32_t>(std::llround(value.y / unit)), static_cast<std::int32_t>(std::llround(value.z / unit)), 0}; };
     for (std::size_t index = 0; index < triangles.size(); ++index) {
         const auto& triangle = triangles[index];
-        corners.push_back({{high(triangle.eye[0]), high(triangle.eye[1]), high(triangle.eye[2]), low(triangle.eye[0]), low(triangle.eye[1]), low(triangle.eye[2])}, triangle.surface, {}});
+        corners.push_back({{whole(triangle.eye[0]), whole(triangle.eye[1]), whole(triangle.eye[2])}, triangle.surface, {}});
         const auto& box = pairing.boxes[index];
         boxes.push_back({static_cast<float>(box.left), static_cast<float>(box.right), static_cast<float>(box.bottom), static_cast<float>(box.top), static_cast<float>(box.nearby), static_cast<float>(box.farthest), {}});
         const auto range = grid.range(box);
@@ -189,7 +203,8 @@ std::optional<std::vector<std::array<std::uint32_t, 2>>> mayCross(Device& device
     // Each entry's cell, for a kernel run once an entry.
     std::vector<std::uint32_t> cellOf(members.size());
     for (std::size_t cell = 0; cell + 1 < starts.size(); ++cell) { std::fill(cellOf.begin() + starts[cell], cellOf.begin() + starts[cell + 1], static_cast<std::uint32_t>(cell)); }
-    const std::array<std::uint32_t, 4> uniforms {static_cast<std::uint32_t>(grid.across()), 0, 0, 0};
+    const auto unitBits = std::bit_cast<std::uint32_t>(static_cast<float>(unit));
+    const std::array<std::uint32_t, 4> uniforms {static_cast<std::uint32_t>(grid.across()), unitBits, 0, 0};
     const std::array<Device::Input, 6> inputs {std::as_bytes(std::span(corners)), std::as_bytes(std::span(boxes)), std::as_bytes(std::span(covers)), std::as_bytes(std::span(cellOf)), std::as_bytes(std::span(starts)), std::as_bytes(members)};
     // Room for a few pairs a candidate; when more are found, again with room for all.
     auto capacity = pairing.candidates.size() * 6 + 1024;

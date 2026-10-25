@@ -995,13 +995,92 @@ private:
                 }
                 lostBy[surface] = 1;
             }
+        }
+        const auto probes = probeCutPieces();
+        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
             if (lostBy[surface] == 0) { continue; }
-            auto shown = keep(keptBy[surface], *items[surface].clip);
+            auto shown = keep(keptBy[surface], *items[surface].clip, probes[surface]);
             const auto whole = wholeBy[surface];
             const auto fraction = whole < 0 ? 1.0 : whole > 0 ? shown->length() / whole : 0.0;
             drawings.push_back({items[surface].index, std::move(shown), fraction});
         }
         return drawings;
+    }
+
+    // A kept piece's points on the frame, a quarter of the way apart (its
+    // ends first and last), when it is in a cut run (see keep).
+    using Probes = std::array<std::optional<Screen>, 5>;
+    // Pieces that follow each other end to end, as one run, and whether
+    // culling cut any of them.
+    struct Run {
+        std::size_t first, last;
+        bool cut;
+    };
+    static std::vector<Run> runsOf(const std::vector<Kept>& pieces) {
+        std::vector<Run> found;
+        std::size_t first = 0;
+        while (first < pieces.size()) {
+            auto last = first + 1;
+            while (last < pieces.size()) {
+                const auto a = pieces[last - 1].shape->nextVector(1), b = pieces[last].shape->nextVector(0);
+                if (std::abs(a.x - b.x) > 1.0e-6f || std::abs(a.y - b.y) > 1.0e-6f || std::abs(a.z - b.z) > 1.0e-6f) { break; }
+                ++last;
+            }
+            found.push_back({first, last, std::any_of(pieces.begin() + static_cast<std::ptrdiff_t>(first), pieces.begin() + static_cast<std::ptrdiff_t>(last), [](const auto& piece) { return piece.cut; })});
+            first = last;
+        }
+        return found;
+    }
+    // Every cut run's pieces' probes, of every clip drawn: on the GPU in one
+    // batch when there is one (and a camera or another eye frames the
+    // lines), else here.
+    std::vector<std::vector<Probes>> probeCutPieces() {
+        std::vector<std::vector<Probes>> probes(items.size());
+        const auto eachCutPiece = [&](auto&& visit) {
+            for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+                if (lostBy[surface] == 0) { continue; }
+                probes[surface].resize(keptBy[surface].size());
+                for (const auto& run : runsOf(keptBy[surface])) {
+                    if (!run.cut) { continue; }
+                    for (auto index = run.first; index < run.last; ++index) { visit(surface, index); }
+                }
+            }
+        };
+        auto* device = workspace.gpu ? gpu::Device::shared() : nullptr;
+        if (device != nullptr && (other != nullptr || view.has_value())) {
+            gpu::ChainBatch chain;
+            std::vector<std::uint32_t> programs(items.size());
+            std::vector<std::pair<std::uint32_t, std::size_t>> order;
+            eachCutPiece([&](std::uint32_t surface, std::size_t index) {
+                if (order.empty() || order.back().first != surface) { programs[surface] = chain.program(composition, *items[surface].clip, time); }
+                for (int probe = 0; probe <= 4; ++probe) { chain.add(programs[surface], keptBy[surface][index].shape->nextVector(static_cast<float>(probe) / 4)); }
+                order.emplace_back(surface, index);
+            });
+            const auto placed = chain.run(*device);
+            if (placed.has_value()) {
+                for (std::size_t piece = 0; piece < order.size(); ++piece) {
+                    auto& into = probes[order[piece].first][order[piece].second];
+                    for (std::size_t probe = 0; probe < into.size(); ++probe) {
+                        const auto& at = (*placed)[piece * into.size() + probe];
+                        into[probe] = at.has_value() ? (other != nullptr ? otherProjection(otherEye.see(*at)) : cameraProjection(cameraEye.see(*at))) : std::nullopt;
+                    }
+                }
+                return probes;
+            }
+        }
+        eachCutPiece([&](std::uint32_t surface, std::size_t index) {
+            auto& into = probes[surface][index];
+            for (std::size_t probe = 0; probe < into.size(); ++probe) { into[probe] = onFrame(*items[surface].clip, keptBy[surface][index].shape->nextVector(static_cast<float>(probe) / 4)); }
+        });
+        return probes;
+    }
+    // A piece's length on the frame, from its probes.
+    static double lengthOf(const Probes& probes) {
+        double length = 0;
+        for (std::size_t probe = 1; probe < probes.size(); ++probe) {
+            if (probes[probe - 1].has_value() && probes[probe].has_value()) { length += std::hypot(probes[probe]->x - probes[probe - 1]->x, probes[probe]->y - probes[probe - 1]->y); }
+        }
+        return length;
     }
 
     // What mirrors show, seen from where the frame is. None when cancelled.
@@ -1015,43 +1094,49 @@ private:
     // as they are. The beam spends a sample on every piece, so in a cut run
     // slivers at its ends are trimmed and straight pieces that bend by less
     // than a pixel are joined: otherwise it lingers on them and draws a bead.
-    std::shared_ptr<const PreparedDrawing> keep(std::vector<Kept>& pieces, const PreparedClip& clip) const {
+    std::shared_ptr<const PreparedDrawing> keep(std::vector<Kept>& pieces, const PreparedClip& clip, const std::vector<Probes>& probes) const {
         std::vector<Stroke> strokes;
-        std::size_t first = 0;
-        while (first < pieces.size()) {
-            auto last = first + 1;
-            while (last < pieces.size()) {
-                const auto a = pieces[last - 1].shape->nextVector(1), b = pieces[last].shape->nextVector(0);
-                if (std::abs(a.x - b.x) > 1.0e-6f || std::abs(a.y - b.y) > 1.0e-6f || std::abs(a.z - b.z) > 1.0e-6f) { break; }
-                ++last;
-            }
-            std::vector<Kept> run;
-            for (auto index = first; index < last; ++index) { run.push_back(std::move(pieces[index])); }
-            first = last;
-            const auto cut = std::any_of(run.begin(), run.end(), [](const auto& piece) { return piece.cut; });
-            if (!cut) {
+        for (const auto& found : runsOf(pieces)) {
+            if (!found.cut) {
                 auto& stroke = strokes.emplace_back();
-                for (auto& piece : run) {
-                    stroke.shapes.push_back(std::move(piece.shape));
-                    stroke.weights.push_back(litWeight(piece.brightness, xyOnly));
+                for (auto index = found.first; index < found.last; ++index) {
+                    stroke.shapes.push_back(std::move(pieces[index].shape));
+                    stroke.weights.push_back(litWeight(pieces[index].brightness, xyOnly));
                 }
                 continue;
             }
-            while (run.size() > 1 && onScreen(*run.front().shape, clip) < sliver) { run.erase(run.begin()); }
-            while (run.size() > 1 && onScreen(*run.back().shape, clip) < sliver) { run.pop_back(); }
-            std::vector<std::unique_ptr<osci::Shape>> joined;
+            auto first = found.first, last = found.last;
+            while (last - first > 1 && lengthOf(probes[first]) < sliver) { ++first; }
+            while (last - first > 1 && lengthOf(probes[last - 1]) < sliver) { --last; }
+            // Joined pieces keep where they start and end on the frame; a
+            // joined line, whose middle is new, is measured again.
+            struct Joined {
+                std::unique_ptr<osci::Shape> shape;
+                std::optional<Screen> start, end;
+                double length;
+                bool remeasure = false;
+            };
+            std::vector<Joined> joined;
             std::vector<double> joinedWeights;
-            for (auto& piece : run) {
-                if (!joined.empty() && joinable(*joined.back(), *piece.shape, clip)) {
-                    joined.back() = std::make_unique<osci::Line>(joined.back()->nextVector(0), piece.shape->nextVector(1));
+            for (auto index = first; index < last; ++index) {
+                auto& piece = pieces[index];
+                const auto& at = probes[index];
+                if (!joined.empty() && joinable(*joined.back().shape, joined.back().start, joined.back().end, *piece.shape, at.back())) {
+                    auto& previous = joined.back();
+                    previous.shape = std::make_unique<osci::Line>(previous.shape->nextVector(0), piece.shape->nextVector(1));
+                    previous.end = at.back();
+                    previous.remeasure = true;
                 } else {
-                    joined.push_back(std::move(piece.shape));
+                    joined.push_back({std::move(piece.shape), at.front(), at.back(), lengthOf(at)});
                     joinedWeights.push_back(litWeight(piece.brightness, xyOnly));
                 }
             }
             double length = 0;
-            for (auto& shape : joined) { length += onScreen(*shape, clip); }
-            if (length >= shortestOnScreen) { strokes.push_back({std::move(joined), std::move(joinedWeights)}); }
+            for (auto& shape : joined) { length += shape.remeasure ? onScreen(*shape.shape, clip) : shape.length; }
+            if (length < shortestOnScreen) { continue; }
+            auto& stroke = strokes.emplace_back();
+            for (auto& shape : joined) { stroke.shapes.push_back(std::move(shape.shape)); }
+            stroke.weights = std::move(joinedWeights);
         }
         if (xyOnly && strokes.size() > 2) { orderStrokes(strokes, clip); }
         std::vector<std::unique_ptr<osci::Shape>> shapes;
@@ -1094,10 +1179,10 @@ private:
         return screenLength(shape, 4, [&](const osci::Point& point) { return onFrame(clip, point); });
     }
     // Two straight pieces drawn as one when where they meet is within a pixel
-    // of the line joining their far ends, on screen.
-    bool joinable(osci::Shape& a, osci::Shape& b, const PreparedClip& clip) const {
+    // of the line joining their far ends, on screen: `a` from `p` to `q`,
+    // `b` on to `r`.
+    static bool joinable(osci::Shape& a, const std::optional<Screen>& p, const std::optional<Screen>& q, osci::Shape& b, const std::optional<Screen>& r) {
         if (dynamic_cast<osci::Line*>(&a) == nullptr || dynamic_cast<osci::Line*>(&b) == nullptr) { return false; }
-        const auto p = onFrame(clip, a.nextVector(0)), q = onFrame(clip, a.nextVector(1)), r = onFrame(clip, b.nextVector(1));
         if (!p.has_value() || !q.has_value() || !r.has_value()) { return false; }
         const auto dx = r->x - p->x, dy = r->y - p->y;
         const auto span = dx * dx + dy * dy;

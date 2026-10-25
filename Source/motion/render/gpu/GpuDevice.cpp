@@ -50,19 +50,24 @@ struct Device::Impl {
     WGPUQueue queue = nullptr;
     juce::String name;
     bool software = false;
-    // A kernel's pipeline, by its source.
+    // A kernel's pipeline, by its source (none for one that failed).
     std::map<juce::String, WGPUComputePipeline> pipelines;
-    // What the device reported wrong since the last run began (a kernel that
-    // failed to compile or validate).
-    std::atomic<bool> failed {false};
+    // Compiling a kernel takes far longer than a spin is for.
+    std::mutex compiling;
+    // How many errors the device has reported (a kernel that failed to
+    // compile or validate), and the last. Runs go on at once on any thread,
+    // and an error can't be told apart by which run it came from: a run
+    // during which any error came fails, and its frame bakes on the CPU.
+    std::atomic<std::uint64_t> errors {0};
+    juce::SpinLock errorLock;
+    juce::String error;
     // Lost (a driver reset, a GPU unplugged): never used again.
     std::atomic<bool> lost {false};
-    juce::String error;
-    // Runs wait on the GPU for their results, far longer than a spin is for.
-    std::mutex running;
 
     ~Impl() {
-        for (auto& [source, pipeline] : pipelines) { wgpuComputePipelineRelease(pipeline); }
+        for (auto& [source, pipeline] : pipelines) {
+            if (pipeline != nullptr) { wgpuComputePipelineRelease(pipeline); }
+        }
         if (queue != nullptr) { wgpuQueueRelease(queue); }
         if (device != nullptr) { wgpuDeviceRelease(device); }
         if (adapter != nullptr) { wgpuAdapterRelease(adapter); }
@@ -70,22 +75,24 @@ struct Device::Impl {
     }
 
     WGPUComputePipeline pipelineFor(const juce::String& wgsl) {
+        const std::lock_guard lock(compiling);
         const auto found = pipelines.find(wgsl);
         if (found != pipelines.end()) { return found->second; }
+        const auto before = errors.load();
         WGPUShaderSourceWGSL source = WGPU_SHADER_SOURCE_WGSL_INIT;
         source.code = view(wgsl.toRawUTF8());
         WGPUShaderModuleDescriptor moduleDescriptor = WGPU_SHADER_MODULE_DESCRIPTOR_INIT;
         moduleDescriptor.nextInChain = &source.chain;
         const auto module = wgpuDeviceCreateShaderModule(device, &moduleDescriptor);
-        if (module == nullptr) { return nullptr; }
+        if (module == nullptr) { return pipelines.emplace(wgsl, nullptr).first->second; }
         WGPUComputePipelineDescriptor descriptor = WGPU_COMPUTE_PIPELINE_DESCRIPTOR_INIT;
         descriptor.compute.module = module;
         descriptor.compute.entryPoint = view("main");
         const auto pipeline = wgpuDeviceCreateComputePipeline(device, &descriptor);
         wgpuShaderModuleRelease(module);
-        if (pipeline == nullptr || failed.load()) {
+        if (pipeline == nullptr || errors.load() != before) {
             if (pipeline != nullptr) { wgpuComputePipelineRelease(pipeline); }
-            return nullptr;
+            return pipelines.emplace(wgsl, nullptr).first->second;
         }
         return pipelines.emplace(wgsl, pipeline).first->second;
     }
@@ -104,7 +111,10 @@ Device::~Device() = default;
 
 juce::String Device::describe() const { return impl->name; }
 bool Device::software() const { return impl->software; }
-juce::String Device::lastError() const { return impl->error; }
+juce::String Device::lastError() const {
+    const juce::SpinLock::ScopedLockType lock(impl->errorLock);
+    return impl->error;
+}
 
 namespace {
 // Makes the device, or says why there is none.
@@ -158,9 +168,12 @@ Made make() {
     if (knowsLimits) { deviceDescriptor.requiredLimits = &limits; }
     deviceDescriptor.uncapturedErrorCallbackInfo.callback = [](WGPUDevice const*, WGPUErrorType, WGPUStringView message, void* owner, void*) {
         auto* into = static_cast<Device::Impl*>(owner);
-        into->error += text(message) + "\n";
-        into->failed.store(true);
-        DBG("WebGPU error: " << into->error);
+        {
+            const juce::SpinLock::ScopedLockType lock(into->errorLock);
+            into->error = text(message);
+        }
+        into->errors.fetch_add(1);
+        DBG("WebGPU error: " << text(message));
     };
     deviceDescriptor.uncapturedErrorCallbackInfo.userdata1 = impl.get();
     deviceDescriptor.deviceLostCallbackInfo.mode = WGPUCallbackMode_AllowSpontaneous;
@@ -231,10 +244,8 @@ juce::String Device::unavailableReason() {
 }
 
 std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std::span<const Input> inputs, std::span<const std::byte> uniforms, std::size_t outputBytes, std::uint32_t invocations) {
-    const std::lock_guard lock(impl->running);
     if (impl->lost.load()) { return std::nullopt; }
-    impl->failed.store(false);
-    impl->error.clear();
+    const auto errorsBefore = impl->errors.load();
     const auto pipeline = impl->pipelineFor(wgsl);
     if (pipeline == nullptr) { return std::nullopt; }
     std::vector<WGPUBuffer> buffers;
@@ -297,7 +308,7 @@ std::optional<std::vector<std::byte>> Device::run(const juce::String& wgsl, std:
     wgpuBufferMapAsync(readBack, WGPUMapMode_Read, 0, copied, mapCallback);
     while (mapped.load() == 0) { wgpuDevicePoll(impl->device, true, nullptr); }
     std::optional<std::vector<std::byte>> result;
-    if (mapped.load() > 0 && !impl->failed.load()) {
+    if (mapped.load() > 0 && impl->errors.load() == errorsBefore) {
         const auto* data = static_cast<const std::byte*>(wgpuBufferGetConstMappedRange(readBack, 0, copied));
         if (data != nullptr) { result.emplace(data, data + outputBytes); }
         wgpuBufferUnmap(readBack);

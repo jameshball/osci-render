@@ -20,8 +20,8 @@ Mode mode();
 
 // The process's WebGPU device (through wgpu-native), made on first use and
 // kept: Metal on macOS, D3D12 or Vulkan on Windows, Vulkan or GL on Linux.
-// Kernels are WGSL compute shaders run over storage buffers; any thread may
-// run one, one at a time (each waits for its results).
+// Kernels are WGSL compute shaders run over storage buffers; any number of
+// threads may run them at once, each waiting for its own results.
 class Device {
 public:
     ~Device();
