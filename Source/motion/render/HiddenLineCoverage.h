@@ -45,7 +45,7 @@ public:
     // already drawn.
     bool covers(const Screen& point, double dx, double dy) const {
         if (segments.empty()) { return false; }
-        const auto heading = std::hypot(dx, dy);
+        const auto heading = std::sqrt(dx * dx + dy * dy);
         if (!(heading > 0)) { return false; }
         const auto column = columnOf(point.x), row = rowOf(point.y);
         for (auto y = std::max(0, row - 1); y <= std::min(rows - 1, row + 1); ++y) {
@@ -77,10 +77,10 @@ public:
     }
 
 private:
+    // A drawn segment from its start along its unit direction, covering
+    // points from `from` to `to` along it.
     struct Segment {
-        double ax, ay, bx, by;
-        // Whether its ends are the drawn line's.
-        bool first, last;
+        double ax, ay, ux, uy, from, to;
     };
     struct Entry {
         std::uint32_t segment;
@@ -95,27 +95,27 @@ private:
         return std::abs(dx * (p.y - a.y) - dy * (p.x - a.x)) / length;
     }
     static bool lies(const Segment& segment, const Screen& point, double ux, double uy) {
-        const auto vx = segment.bx - segment.ax, vy = segment.by - segment.ay;
-        const auto length = std::hypot(vx, vy);
-        // Inside a drawn line's ends; past a join between its segments, as
-        // far as a point beside it can be.
-        const auto from = segment.first ? inset : -nearby, to = segment.last ? length - inset : length + nearby;
-        if (!(to > from)) { return false; }
         // Along it either way, beside it, and away from its ends.
-        if (std::abs(vx * uy - vy * ux) > along * length) { return false; }
+        if (std::abs(segment.ux * uy - segment.uy * ux) > along) { return false; }
         const auto px = point.x - segment.ax, py = point.y - segment.ay;
-        if (std::abs(vx * py - vy * px) > nearby * length) { return false; }
-        const auto t = (px * vx + py * vy) / length;
-        return t >= from && t <= to;
+        if (std::abs(segment.ux * py - segment.uy * px) > nearby) { return false; }
+        const auto t = px * segment.ux + py * segment.uy;
+        return t >= segment.from && t <= segment.to;
     }
     int columnOf(double x) const { return static_cast<int>(std::floor((x + originX) / cell)); }
     int rowOf(double y) const { return static_cast<int>(std::floor((y + originY) / cell)); }
     // Into every cell the segment passes through, stepping half a cell at a
     // time; a point is looked up in its own cell and those around it.
     void insert(const Screen& a, const Screen& b, bool first, bool last) {
+        const auto length = std::hypot(b.x - a.x, b.y - a.y);
+        // Inside a drawn line's ends; past a join between its segments, as
+        // far as a point beside it can be. One too short to have an inside
+        // covers nothing.
+        const auto from = first ? inset : -nearby, to = last ? length - inset : length + nearby;
+        if (!(to > from) || !(length > 0)) { return; }
         const auto index = static_cast<std::uint32_t>(segments.size());
-        segments.push_back({a.x, a.y, b.x, b.y, first, last});
-        const auto steps = std::max(1, static_cast<int>(std::ceil(std::hypot(b.x - a.x, b.y - a.y) / (cell * .5))));
+        segments.push_back({a.x, a.y, (b.x - a.x) / length, (b.y - a.y) / length, from, to});
+        const auto steps = std::max(1, static_cast<int>(std::ceil(length / (cell * .5))));
         auto previous = -1;
         for (int step = 0; step <= steps; ++step) {
             const auto t = static_cast<double>(step) / steps;
