@@ -18,8 +18,8 @@
             resource="0" file="tests/MotionBeamRendererTest.cpp"/>
       <FILE id="MotionClipboardT" name="MotionClipboardTest.cpp" compile="1"
             resource="0" file="tests/MotionClipboardTest.cpp"/>
-      <FILE id="MotionSearchT" name="MotionSearchTest.cpp" compile="1" resource="0"
-            file="tests/MotionSearchTest.cpp"/>
+      <FILE id="MotionSearchT" name="MotionSearchTest.cpp" compile="1"
+            resource="0" file="tests/MotionSearchTest.cpp"/>
       <FILE id="MotionModulatorsT" name="MotionModulatorsTest.cpp" compile="1"
             resource="0" file="tests/MotionModulatorsTest.cpp"/>
       <FILE id="MotionSpatialT" name="MotionSpatialTest.cpp" compile="1"
@@ -98,16 +98,16 @@
             resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
       <FILE id="MotionDocClips" name="DocumentClips.cpp" compile="1" resource="0"
             file="Source/motion/model/DocumentClips.cpp"/>
-      <FILE id="MotionDocSources" name="DocumentSources.cpp" compile="1"
-            resource="0" file="Source/motion/model/DocumentSources.cpp"/>
+      <FILE id="MotionDocSources" name="DocumentSources.cpp" compile="1" resource="0"
+            file="Source/motion/model/DocumentSources.cpp"/>
       <FILE id="MotionDocRig" name="DocumentRig.cpp" compile="1" resource="0"
             file="Source/motion/model/DocumentRig.cpp"/>
       <FILE id="MotrenderHiddenLinescpp" name="HiddenLines.cpp" compile="1"
             resource="0" file="Source/motion/render/HiddenLines.cpp"/>
       <FILE id="MotionSrcDec" name="SourceDecoding.cpp" compile="1" resource="0"
             file="Source/motion/import/SourceDecoding.cpp"/>
-      <FILE id="MotionRasterDecoderCpp" name="RasterDecoder.cpp" compile="1"
-            resource="0" file="Source/motion/import/RasterDecoder.cpp"/>
+      <FILE id="MotionRasterDecoderCpp" name="RasterDecoder.cpp" compile="1" resource="0"
+            file="Source/motion/import/RasterDecoder.cpp"/>
     </GROUP>
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
       <GROUP id="{F3A16E09-874D-45F4-A045-20839A1CDB88}" name="video">

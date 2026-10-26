@@ -415,6 +415,24 @@ public:
             expect(finished && pieces > 0 && pieces <= motion::hidden::Dicer::budget + 1, "a folded face is cut into a bounded number of pieces (" + juce::String(static_cast<juce::int64>(pieces)) + ")");
         }
 
+        beginTest("A bent face passing through the eye's near plane is cut only so far there");
+        {
+            // A wide floor just under the eye, gently rippled, running from
+            // behind it to well in front: where a piece crosses the near
+            // plane its nearest corner in front shrinks towards it as the
+            // piece does, so its size in pixels never would (uncapped, some
+            // 64,000 pieces).
+            const std::array views {lookingAlongZ()};
+            const auto rippled = [&](const osci::Point& point) { return inScene(osci::Point(point.x, point.y + .02f * std::sin(3 * point.x), point.z)); };
+            const auto corner = [&](float x, float z) { const osci::Point point(x, -.01f, z); return motion::hidden::DiceCorner {point, *rippled(point)}; };
+            motion::hidden::Dicer dicer;
+            dicer.begin(views);
+            std::size_t pieces = 0;
+            dicer.dice(corner(-20, -1), corner(20, -1), corner(0, 6), rippled, [&](const auto&, const auto&, const auto&) { ++pieces; });
+            logMessage("A face through the near plane: " + juce::String(static_cast<juce::int64>(pieces)) + " pieces");
+            expect(pieces > 0 && pieces < 10000, "cut into a modest number of pieces (" + juce::String(static_cast<juce::int64>(pieces)) + ")");
+        }
+
         beginTest("A face is diced once as finely as the finest view that sees it needs");
         {
             // The same bulged face, seen from twice as far, needs half the
@@ -675,6 +693,84 @@ public:
             juce::MemoryBlock a, b;
             expect(fresh.getFile().loadFileAsData(a) && reused.getFile().loadFileAsData(b));
             expect(a.getSize() > 0 && a == b, "the signal is the same sample for sample");
+        }
+
+        beginTest("Where surfaces cross, every piece is joined end to end into whole runs");
+        {
+            using motion::hidden::crossing::Triangle;
+            using motion::Vec3;
+            // A plane facing the eye, cut into a grid of triangles.
+            const auto sheet = [](std::uint32_t surface, int across, auto&& at) {
+                std::vector<Triangle> made;
+                for (int y = 0; y < across; ++y) {
+                    for (int x = 0; x < across; ++x) {
+                        const auto u0 = -1 + 2.0 * x / across, u1 = -1 + 2.0 * (x + 1) / across, v0 = -1 + 2.0 * y / across, v1 = -1 + 2.0 * (y + 1) / across;
+                        made.push_back({{at(u0, v0), at(u1, v0), at(u1, v1)}, surface});
+                        made.push_back({{at(u0, v0), at(u1, v1), at(u0, v1)}, surface});
+                    }
+                }
+                return made;
+            };
+            const auto flat = [](double u, double v) { return Vec3 {u, v, 3}; };
+            // Every piece where `triangles` cross, as testing each pair finds them.
+            const auto everyPiece = [](const std::vector<Triangle>& triangles) {
+                std::size_t count = 0;
+                for (std::uint32_t a = 0; a < triangles.size(); ++a) {
+                    for (std::uint32_t b = a + 1; b < triangles.size(); ++b) {
+                        if (triangles[a].surface != triangles[b].surface && motion::hidden::crossing::between(triangles, a, b).has_value()) { ++count; }
+                    }
+                }
+                return count;
+            };
+            // Runs found, each piece once, each following the one before end to end.
+            const auto check = [&](const std::vector<Triangle>& triangles, const juce::String& what) {
+                const auto runs = motion::hidden::crossing::runs(triangles, 1.2);
+                std::size_t pieces = 0;
+                bool joined = true;
+                for (const auto& run : runs) {
+                    pieces += run.size();
+                    for (std::size_t index = 1; index < run.size(); ++index) { joined = joined && (run[index].eyeFrom - run[index - 1].eyeTo).length() <= 1.0e-6; }
+                }
+                expectEquals(static_cast<int>(pieces), static_cast<int>(everyPiece(triangles)), what + ": every piece, once");
+                expect(joined, what + ": each piece starts where the one before it ends");
+                return runs;
+            };
+            {
+                // A ball sunk through the plane, off its middle: one closed ring.
+                auto triangles = sheet(0, 20, flat);
+                constexpr int rings = 24, around = 48;
+                const auto ball = [&](int ring, int step) {
+                    const auto polar = std::numbers::pi * ring / rings, turn = 2 * std::numbers::pi * step / around;
+                    return Vec3 {.5 * std::sin(polar) * std::cos(turn) + .013, .5 * std::sin(polar) * std::sin(turn) - .021, 3.07 + .5 * std::cos(polar)};
+                };
+                for (int ring = 0; ring < rings; ++ring) {
+                    for (int step = 0; step < around; ++step) {
+                        triangles.push_back({{ball(ring, step), ball(ring + 1, step), ball(ring + 1, step + 1)}, 1});
+                        triangles.push_back({{ball(ring, step), ball(ring + 1, step + 1), ball(ring, step + 1)}, 1});
+                    }
+                }
+                const auto runs = check(triangles, "a ball through a plane");
+                expectEquals(static_cast<int>(runs.size()), 1, "one ring");
+                if (runs.size() == 1) { expect((runs[0].front().eyeFrom - runs[0].back().eyeTo).length() <= 1.0e-6, "closed"); }
+            }
+            {
+                // A tilted plane across it: one open line.
+                auto triangles = sheet(0, 20, flat);
+                const auto tilted = sheet(1, 17, [](double u, double v) { return Vec3 {u * .9 + .031, v * .9 - .017, 3 + .37 * u + .11 * v + .0123}; });
+                triangles.insert(triangles.end(), tilted.begin(), tilted.end());
+                const auto runs = check(triangles, "two planes");
+                expectEquals(static_cast<int>(runs.size()), 1, "one line");
+            }
+            {
+                // Three planes through one line of it, their ends crowding there.
+                auto triangles = sheet(0, 20, flat);
+                for (std::uint32_t surface = 1; surface <= 3; ++surface) {
+                    const auto slope = .2 * surface + .07;
+                    const auto through = sheet(surface, 13 + static_cast<int>(surface), [slope](double u, double v) { return Vec3 {u * .8 + .019, v * .8 + .043, 3 + slope * (u * .8 + .019 - .1)}; });
+                    triangles.insert(triangles.end(), through.begin(), through.end());
+                }
+                check(triangles, "three planes through one line");
+            }
         }
 
         beginTest("On an XY-only scope a line cut in two is not joined again across its gap");

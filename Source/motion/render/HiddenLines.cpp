@@ -797,9 +797,9 @@ private:
         auto& shades = lighting.shades;
         std::shared_ptr<osci::Shape> shape = std::move(piece.shape);
         // Its length in the frame, from a few points of it; from its ends and
-        // middle alone when it is a few pixels long and straight between
-        // them (as most pieces of a crossing are), which is all the steps
-        // it is lit in need.
+        // middle alone when it is a few pixels long and its middle is on the
+        // line between its ends (as most pieces of a crossing are): the
+        // steps it is lit in, one every couple of pixels, need no more.
         const auto length = [&] {
             const auto at = [&](float t) { return onFrame(*item.clip, shape->nextVector(t)); };
             const auto a = at(0), m = at(.5f), b = at(1);
@@ -966,8 +966,11 @@ private:
     // Every cut run's pieces' probes, of every clip drawn. A piece starts
     // where the one before it in its run ends, so its first probe is that
     // one's last. A piece a few pixels long whose middle is within a fraction
-    // of a pixel of the line between its ends is that straight: its quarter
-    // probes are found along that line rather than through the chain.
+    // of a pixel of the line between its ends is taken as straight: its
+    // quarter probes are found along that line rather than through the chain
+    // (a piece that short bending both ways about its middle would be
+    // measured a little short, which only the pixel-sized limits of keep
+    // read).
     std::vector<std::vector<Probes>> probeCutPieces() {
         constexpr double straightWithin = DepthBuffer::pixel / 8, shortPiece = 4 * DepthBuffer::pixel;
         std::vector<std::vector<Probes>> probes(items.size());

@@ -57,7 +57,8 @@ public:
     // its deepest; past this, pieces are drawn as they are.
     static constexpr std::size_t budget = std::size_t {1} << 19;
 
-    // A frame's dicing, for these views (kept until it is done).
+    // A frame's dicing, for these views (borrowed: they must outlast every
+    // dice until the next begin).
     void begin(std::span<const DiceView> seenBy) {
         views = seenBy;
         spent = 0;
@@ -84,14 +85,16 @@ public:
         dice(a, b, c, bend, emit, [] { return false; });
     }
 
+private:
     // A piece as the views that see it need it: the size of a pixel where
     // it is in the view that sees it most finely (in perspective its nearest
     // corner's depth over the focal length; toward a view's edge a length
     // can land up to half as long again, which the cells' margin allows),
-    // and which views see it.
+    // which views see it, and whether any sees it partly behind its eye.
     struct Measure {
         double pixel = std::numeric_limits<double>::infinity();
         std::uint64_t seenBy = 0;
+        bool straddles = false;
     };
     // None when no view sees it.
     std::optional<Measure> measure(const Vec3& p, const Vec3& q, const Vec3& r) const {
@@ -120,6 +123,7 @@ public:
             // Partly behind the eye, it may come into view anywhere.
             if (behind == 3 || (behind == 0 && (left == 3 || right == 3 || below == 3 || above == 3))) { continue; }
             any = true;
+            measured.straddles = measured.straddles || behind > 0;
             if (index < 64) { measured.seenBy |= std::uint64_t {1} << index; }
             const auto depth = projection.parallel ? 1.0 : std::max(nearest, nearPlane);
             measured.pixel = std::min(measured.pixel, view.pixel * depth / projection.focalLength);
@@ -127,7 +131,6 @@ public:
         return any ? std::optional(measured) : std::nullopt;
     }
 
-private:
     // How many times a face may be halved, and after how many halvings a
     // continuous bend has cut every piece far smaller than its face.
     static constexpr int deepest = 40, deepAfter = deepest - 12;
@@ -167,6 +170,10 @@ private:
         if (stopped) { return; }
         const auto measured = measure(p.at, q.at, r.at);
         if (!measured.has_value()) { return; }
+        // Partly behind an eye, a piece is halved only so far, then drawn
+        // cut at the near plane: its corner nearest in front shrinks towards
+        // that plane as it does, so it would never measure small enough.
+        if (measured->straddles) { depthLeft = std::min(depthLeft, 12); }
         const auto pq = lengthSquared(p.at, q.at, measured->pixel), qr = lengthSquared(q.at, r.at, measured->pixel), rp = lengthSquared(r.at, p.at, measured->pixel);
         const auto longest = std::max({pq, qr, rp});
         if (longest <= limit || depthLeft <= 0 || ++spent > budget) {
@@ -219,8 +226,9 @@ private:
 
     // How far the bend takes a piece off the flat triangle between its
     // corners, at a few points of it (see probes, kept bent for the grid
-    // after: where one of its points is a probe, the probe is that point), in units of what may be drawn flat, in
-    // the worst of the views that see it (`seenBy`): a piece under 1 is flat
+    // after: where one of its points is a probe, the probe is that point),
+    // in units of what may be drawn flat, in the worst of the views that
+    // see it (`seenBy`): a piece under 1 is flat
     // enough to draw whole, and as the error shrinks with the square of a
     // piece's size, one over 1 is flat enough cut into its square root as many
     // pieces along each edge. Inverse depth is linear over a view's screen
