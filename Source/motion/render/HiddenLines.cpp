@@ -796,8 +796,19 @@ private:
         auto& light = lighting.light;
         auto& shades = lighting.shades;
         std::shared_ptr<osci::Shape> shape = std::move(piece.shape);
-        // Its length in the frame, from a few points of it.
-        const auto length = screenLength(*shape, 8, [&](const osci::Point& point) { return onFrame(*item.clip, point); });
+        // Its length in the frame, from a few points of it; from its ends and
+        // middle alone when it is a few pixels long and straight between
+        // them (as most pieces of a crossing are), which is all the steps
+        // it is lit in need.
+        const auto length = [&] {
+            const auto at = [&](float t) { return onFrame(*item.clip, shape->nextVector(t)); };
+            const auto a = at(0), m = at(.5f), b = at(1);
+            if (a.has_value() && m.has_value() && b.has_value() && std::hypot(b->x - a->x, b->y - a->y) < 4 * DepthBuffer::pixel
+                && std::hypot(m->x - (a->x + b->x) * .5, m->y - (a->y + b->y) * .5) <= DepthBuffer::pixel / 8) {
+                return std::hypot(m->x - a->x, m->y - a->y) + std::hypot(b->x - m->x, b->y - m->y);
+            }
+            return screenLength(*shape, 8, [&](const osci::Point& point) { return onFrame(*item.clip, point); });
+        }();
         const auto steps = lightSteps(length);
         ts.resize(static_cast<std::size_t>(steps) + 1);
         light.resize(static_cast<std::size_t>(steps) + 1);
@@ -952,17 +963,39 @@ private:
         }
         return found;
     }
-    // Every cut run's pieces' probes, of every clip drawn.
+    // Every cut run's pieces' probes, of every clip drawn. A piece starts
+    // where the one before it in its run ends, so its first probe is that
+    // one's last. A piece a few pixels long whose middle is within a fraction
+    // of a pixel of the line between its ends is that straight: its quarter
+    // probes are found along that line rather than through the chain.
     std::vector<std::vector<Probes>> probeCutPieces() {
+        constexpr double straightWithin = DepthBuffer::pixel / 8, shortPiece = 4 * DepthBuffer::pixel;
         std::vector<std::vector<Probes>> probes(items.size());
         for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
             if (lostBy[surface] == 0) { continue; }
             probes[surface].resize(keptBy[surface].size());
+            const auto& clip = *items[surface].clip;
             for (const auto& run : runsOf(keptBy[surface])) {
                 if (!run.cut) { continue; }
                 for (auto index = run.first; index < run.last; ++index) {
                     auto& into = probes[surface][index];
-                    for (std::size_t probe = 0; probe < into.size(); ++probe) { into[probe] = onFrame(*items[surface].clip, keptBy[surface][index].shape->nextVector(static_cast<float>(probe) / 4)); }
+                    auto& shape = *keptBy[surface][index].shape;
+                    const auto at = [&](std::size_t probe) { return onFrame(clip, shape.nextVector(static_cast<float>(probe) / 4)); };
+                    into[0] = index > run.first ? probes[surface][index - 1][4] : at(0);
+                    into[4] = at(4);
+                    into[2] = at(2);
+                    const auto& a = into[0];
+                    const auto& m = into[2];
+                    const auto& b = into[4];
+                    const auto straight = a.has_value() && m.has_value() && b.has_value() && std::hypot(b->x - a->x, b->y - a->y) < shortPiece
+                        && std::hypot(m->x - (a->x + b->x) * .5, m->y - (a->y + b->y) * .5) <= straightWithin;
+                    if (straight) {
+                        into[1] = Screen {(a->x + m->x) * .5, (a->y + m->y) * .5, (a->w + m->w) * .5};
+                        into[3] = Screen {(m->x + b->x) * .5, (m->y + b->y) * .5, (m->w + b->w) * .5};
+                    } else {
+                        into[1] = at(1);
+                        into[3] = at(3);
+                    }
                 }
             }
         }
