@@ -14,6 +14,7 @@
 #include <vector>
 
 namespace motion::hidden {
+
 // A point of a face being diced: where it is in its source, and in the scene
 // once bent.
 struct DiceCorner {
@@ -208,8 +209,17 @@ private:
         emit(p, q, r);
     }
 
+    // Each edge's middle, the middle of the piece, and halfway from there
+    // to each corner; an edge's middle is measured from its line too.
+    struct Probe {
+        double s, t;
+        int from, to;
+    };
+    static constexpr std::array<Probe, 7> probes {{{.5, 0, 0, 1}, {.5, .5, 1, 2}, {0, .5, 2, 0}, {1.0 / 3, 1.0 / 3, -1, -1}, {1.0 / 6, 1.0 / 6, -1, -1}, {2.0 / 3, 1.0 / 6, -1, -1}, {1.0 / 6, 2.0 / 3, -1, -1}}};
+
     // How far the bend takes a piece off the flat triangle between its
-    // corners, at a few points of it, in units of what may be drawn flat, in
+    // corners, at a few points of it (see probes, kept bent for the grid
+    // after: where one of its points is a probe, the probe is that point), in units of what may be drawn flat, in
     // the worst of the views that see it (`seenBy`): a piece under 1 is flat
     // enough to draw whole, and as the error shrinks with the square of a
     // piece's size, one over 1 is flat enough cut into its square root as many
@@ -221,20 +231,15 @@ private:
     // hides with. A view that sees the piece partly behind its eye measures
     // nothing (the piece is cut where it comes into view).
     template <typename Bend>
-    double curving(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, std::uint64_t seenBy, Bend& bend) const {
+    double curving(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, std::uint64_t seenBy, Bend& bend) {
         constexpr auto endless = std::numeric_limits<double>::infinity();
-        // Each edge's middle, the middle of the piece, and halfway from there
-        // to each corner; an edge's middle is measured from its line too.
-        struct Probe {
-            double s, t;
-            int from, to;
-        };
-        constexpr std::array<Probe, 7> probes {{{.5, 0, 0, 1}, {.5, .5, 1, 2}, {0, .5, 2, 0}, {1.0 / 3, 1.0 / 3, -1, -1}, {1.0 / 6, 1.0 / 6, -1, -1}, {2.0 / 3, 1.0 / 6, -1, -1}, {1.0 / 6, 2.0 / 3, -1, -1}}};
-        std::array<Vec3, 7> bent {};
+        probesBent = 0;
+        auto& bent = probed;
         for (std::size_t index = 0; index < probes.size(); ++index) {
             const auto point = bend(mix(p.source, q.source, r.source, probes[index].s, probes[index].t));
             if (!point.has_value()) { return endless; }
             bent[index] = *point;
+            probesBent = index + 1;
         }
         double worst = 0;
         for (std::size_t index = 0; index < views.size(); ++index) {
@@ -294,7 +299,13 @@ private:
                 } else {
                     const auto s = static_cast<double>(i) / n, t = static_cast<double>(j) / n;
                     point.source = mix(p.source, q.source, r.source, s, t);
-                    point.at = bend(point.source).value_or(mix(p.at, q.at, r.at, s, t));
+                    const auto bentProbes = probes.begin() + static_cast<std::ptrdiff_t>(probesBent);
+                    const auto probe = std::find_if(probes.begin(), bentProbes, [&](const Probe& each) { return each.s == s && each.t == t; });
+                    if (probe != bentProbes) {
+                        point.at = probed[static_cast<std::size_t>(probe - probes.begin())];
+                    } else {
+                        point.at = bend(point.source).value_or(mix(p.at, q.at, r.at, s, t));
+                    }
                 }
             }
         }
@@ -313,5 +324,7 @@ private:
     bool stopped = false;
     std::size_t spent = 0;
     std::vector<DiceCorner> points;
+    std::array<Vec3, probes.size()> probed {};
+    std::size_t probesBent = 0;
 };
 }

@@ -16,24 +16,43 @@ inline osci::Point clipToPlane(osci::Point input, osci::Point normal) {
     return input + (std::max<double>(0.0, distance) - distance) * normal;
 }
 
-// Segment `copy` of `segments` (osci-render's Kaleidoscope, one segment a
-// copy rather than one a pass): the shape stood on the +X radius, spread out
-// along it, every other one mirrored, kept within its wedge, then turned to
-// its place (and all turned by `turn` turns).
-inline osci::Point kaleidoscope(osci::Point input, int copy, double segments, double mirror, double spread, double clip, double turn) {
+// Where segment `copy` of `segments` sits, the same for every point at a
+// time: its wedge's sides (outward), whether the wedge is under a half turn,
+// and the turn to its place (and all turned by `turn` turns).
+struct Segment {
+    osci::Point upper, lower;
+    bool narrow = true;
+    float cosine = 1, sine = 0;
+};
+inline Segment segment(int copy, double segments, double turn) {
     const auto twoPi = 2 * std::numbers::pi;
+    const auto size = twoPi / segments;
+    Segment made;
+    made.upper = osci::Point(std::sin(0.5 * size), -std::cos(0.5 * size), 0);
+    made.lower = osci::Point(made.upper.x, -made.upper.y, 0);
+    made.narrow = size < std::numbers::pi;
+    const auto angle = static_cast<float>((copy / segments + turn) * twoPi);
+    made.cosine = std::cos(angle);
+    made.sine = std::sin(angle);
+    return made;
+}
+
+// Segment `copy` (osci-render's Kaleidoscope, one segment a copy rather than
+// one a pass; see segment): the shape stood on the +X radius, spread out
+// along it, every other one mirrored, kept within its wedge, then turned to
+// its place.
+inline osci::Point kaleidoscope(osci::Point input, int copy, const Segment& placed, double mirror, double spread, double clip) {
     auto output = (1 - spread) * osci::Point(input.y, -input.x, input.z);
     output.x += spread;
     if (copy % 2 == 1) { output.y *= 1 - 2 * mirror; }
-    const auto size = twoPi / segments;
-    const osci::Point upper(std::sin(0.5 * size), -std::cos(0.5 * size), 0);
-    const osci::Point lower(upper.x, -upper.y, 0);
+    const auto& upper = placed.upper;
+    const auto& lower = placed.lower;
     osci::Point clipped;
     // What falls outside the wedge on its far side is folded to the middle,
     // where every segment meets: drawn dark there, or the beam would rest
     // on one bright spot.
     auto light = 1.0;
-    if (size < std::numbers::pi) {
+    if (placed.narrow) {
         clipped = clipToPlane(clipToPlane(output, upper), lower);
         if (clipped.x < 0) {
             clipped.x = 0;
@@ -44,15 +63,22 @@ inline osci::Point kaleidoscope(osci::Point input, int copy, double segments, do
         clipped = clipToPlane(output, output.y > 0 ? upper : lower);
     }
     output = (1 - clip) * output + clip * clipped;
-    output.rotate(0, 0, (copy / segments + turn) * twoPi);
+    const auto x = output.x, y = output.y;
+    output.x = placed.cosine * x - placed.sine * y;
+    output.y = placed.sine * x + placed.cosine * y;
     return output.withColour(static_cast<float>(input.r * light), static_cast<float>(input.g * light), static_cast<float>(input.b * light));
 }
 
-// Copy `copy` of `count` (osci-render's Duplicator): smaller by `spread`
-// and pushed out that far towards its place on a circle.
-inline osci::Point duplicate(osci::Point input, int copy, double count, double spread, double turn) {
+// Where copy `copy` of `count` (osci-render's Duplicator) is pushed
+// towards: its place on a circle, the same for every point at a time.
+inline osci::Point duplicatePlace(int copy, double count, double turn) {
     const auto theta = (copy / count + turn) * 2 * std::numbers::pi;
-    return ((1 - spread) * input + spread * osci::Point(std::cos(theta), std::sin(theta), 0.0)).withColour(input.r, input.g, input.b);
+    return osci::Point(std::cos(theta), std::sin(theta), 0.0);
+}
+// A copy (see duplicatePlace): smaller by `spread` and pushed out that far
+// towards its place.
+inline osci::Point duplicate(osci::Point input, const osci::Point& place, double spread) {
+    return ((1 - spread) * input + spread * place).withColour(input.r, input.g, input.b);
 }
 }
 
@@ -86,10 +112,13 @@ struct PreparedEffect {
     }
 
     // The parameters at a time, or nothing when the effect does not act then
-    // (bypassed, outside its range, at zero strength or not finite).
+    // (bypassed, outside its range, at zero strength or not finite); and for
+    // an effect that makes copies, where this one goes then.
     struct Parameters {
         bool active = false;
         std::array<double, maximumParameters> values {};
+        copies::Segment segment;
+        osci::Point place;
     };
     Parameters parametersAt(double time) const {
         Parameters result;
@@ -104,6 +133,8 @@ struct PreparedEffect {
             result.values[index] = std::clamp(value, minimum[index], maximum[index]);
         }
         result.active = result.values[0] > 0;
+        if (kind == Kind::kaleidoscope) { result.segment = copies::segment(copy, std::round(result.values[1]), result.values[5]); }
+        if (kind == Kind::duplicator) { result.place = copies::duplicatePlace(copy, std::round(result.values[1]), result.values[3]); }
         return result;
     }
 
@@ -128,8 +159,8 @@ struct PreparedEffect {
             case Kind::twist: output = twist(input, values[1]); break;
             case Kind::polygon: output = polygon(input, values[1], values[2], values[3], values[4]); break;
             case Kind::spiralCrush: output = spiralCrush(input, values[1], values[2], values[3], values[4]); break;
-            case Kind::kaleidoscope: output = copies::kaleidoscope(input, copy, std::round(values[1]), values[2], values[3], values[4], values[5]); break;
-            case Kind::duplicator: output = copies::duplicate(input, copy, std::round(values[1]), values[2], values[3]); break;
+            case Kind::kaleidoscope: output = copies::kaleidoscope(input, copy, parameters.segment, values[2], values[3], values[4]); break;
+            case Kind::duplicator: output = copies::duplicate(input, parameters.place, values[2]); break;
         }
         output = ((1 - strength) * input + strength * output).withColour(
             input.r + strength * (output.r - input.r), input.g + strength * (output.g - input.g), input.b + strength * (output.b - input.b));
