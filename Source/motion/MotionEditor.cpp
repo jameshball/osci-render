@@ -1,5 +1,4 @@
 #include "MotionEditor.h"
-#include "render/gpu/GpuDevice.h"
 #include "OutputChannels.h"
 #include "ui/BeamOverload.h"
 #include "ui/MenuIcons.h"
@@ -640,9 +639,7 @@ void MotionEditor::timerCallback() {
         if (!baked.isEmpty()) {
             if (remaining.has_value()) {
                 line.add("baking");
-                // Where it bakes: the GPU once a frame has asked for it.
-                const auto* gpu = motion::gpu::Device::existing();
-                details.add("Baking " + juce::String(static_cast<juce::int64>(*remaining)) + (*remaining == 1 ? " frame" : " frames") + " (" + baked.joinIntoString(", ") + ") " + (gpu != nullptr ? "with the GPU (" + gpu->describe() + ")" : juce::String("on the CPU")) + ", from the playhead on; a frame not yet baked draws every line");
+                details.add("Baking " + juce::String(static_cast<juce::int64>(*remaining)) + (*remaining == 1 ? " frame" : " frames") + " (" + baked.joinIntoString(", ") + "), from the playhead on; a frame not yet baked draws every line");
             } else {
                 details.add("Every frame baked: " + baked.joinIntoString(", "));
             }

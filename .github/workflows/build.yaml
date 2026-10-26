@@ -663,16 +663,6 @@ jobs:
           source ./ci/setup-env.sh
           source ./ci/test.sh Motion MotionLive MotionBake MotionRaster MotionVideo
 
-      # The GPU's kernels on Mesa's software Vulkan (lavapipe): hosted runners
-      # have no GPU, so this is where CI runs hidden lines' GPU path, against
-      # the CPU's.
-      - name: Run Motion GPU tests on a software GPU (Linux)
-        if: steps.ci_flags.outputs.skip_validation != 'true' && runner.os == 'Linux'
-        shell: bash
-        run: |
-          sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers
-          OSCI_MOTION_GPU=force Builds/Test/LinuxMakefile/build/osci-render-test --test "Motion GPU"
-
       # An unpublished run hands its Windows binaries over for testing on
       # other Windows machines: the CLI is built here, after the tests.
       - name: Build osci-motion-cli (Windows)

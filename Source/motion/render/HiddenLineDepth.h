@@ -1,12 +1,9 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
-#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <optional>
-#include <span>
 #include <vector>
 
 namespace motion::hidden {
@@ -113,41 +110,6 @@ public:
         planes.clear();
     }
     bool isEmpty() const { return empty; }
-
-    // The inverse depth nearest at a pixel's centre (0 where nothing is
-    // drawn), and the plane (by index) whose it is.
-    struct Pixel {
-        float w = 0;
-        std::int32_t owner = 0;
-    };
-    // A plane as drawn elsewhere (on the GPU): its inverse depth at the
-    // origin pushed back, its slopes across and up, how far it is pushed
-    // back for each pixel a point is outside it, and its edges (each a
-    // distance from it in pixels, x, y and offset, and in the fourth its tag:
-    // the face's, then the surface's bits).
-    struct DrawnPlane {
-        float w, dwdx, dwdy, slope;
-        std::array<std::array<float, 4>, 3> edges;
-    };
-    // Takes every pixel (row by row from the bottom) and plane as drawn
-    // elsewhere: as triangles drawn here would leave them, `any` when any
-    // was drawn.
-    void adopt(std::span<const Pixel> drawn, std::span<const DrawnPlane> drawnPlanes, bool any) {
-        if (drawn.size() != pixels.size()) { return; }
-        std::copy(drawn.begin(), drawn.end(), pixels.begin());
-        planes.clear();
-        planes.reserve(drawnPlanes.size());
-        for (const auto& plane : drawnPlanes) {
-            const auto edge = [&](std::size_t index) { return Edge {plane.edges[index][0], plane.edges[index][1], plane.edges[index][2]}; };
-            const auto bits = [&](std::size_t index) { return static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(plane.edges[index][3])); };
-            planes.push_back({plane.w, plane.dwdx, plane.dwdy, plane.slope, {edge(0), edge(1), edge(2)}, bits(1) << 32 | bits(0)});
-        }
-        drawnLeft = 0;
-        drawnRight = width - 1;
-        drawnBottom = 0;
-        drawnTop = height - 1;
-        empty = !any;
-    }
 
     // Draws a triangle of surface; corners must be in front of the eye.
     void triangle(Screen a, Screen b, Screen c) {
@@ -305,23 +267,6 @@ public:
         return total > 0 ? shown / total : 1;
     }
 
-    // Its contents, for a GPU's copy: where it is and how it is divided (in
-    // pixels of `size`, `originX` and `originY` from the middle), each pixel's
-    // nearest inverse depth (0 where nothing is drawn) and the plane that is
-    // nearest there, and each plane's inverse depth at the origin and its
-    // slopes across pixels.
-    struct Layout {
-        double originX, originY, size;
-        int width, height;
-        bool empty;
-    };
-    Layout layout() const { return {originX, originY, size, width, height, empty}; }
-    template <typename Pixels, typename Planes>
-    void copyInto(Pixels&& pixel, Planes&& plane) const {
-        for (const auto& here : pixels) { pixel(here.w, here.owner); }
-        for (const auto& each : planes) { plane(each.w, each.dwdx, each.dwdy); }
-    }
-
 private:
     // Whether a point is in front of a surface at `w` there, or on it: within
     // a small part of its own depth, so a surface reaching far nearer the eye
@@ -392,6 +337,11 @@ private:
         }
     };
 
+    // The inverse depth nearest at a pixel's centre, and whose it is.
+    struct Pixel {
+        float w = 0;
+        std::int32_t owner = 0;
+    };
     double size = pixel;
     Reach covered;
     double originX = 0, originY = 0;

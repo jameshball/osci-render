@@ -631,18 +631,6 @@
               resource="0" file="Source/motion/render/PreparedCamera.h"/>
         <FILE id="MotrenderHiddenLinescpp" name="HiddenLines.cpp" compile="1"
               resource="0" file="Source/motion/render/HiddenLines.cpp"/>
-        <FILE id="MotrenderGpuDevicecpp" name="GpuDevice.cpp" compile="1" resource="0"
-              file="Source/motion/render/gpu/GpuDevice.cpp"/>
-        <FILE id="MotrenderGpuChaincpp" name="GpuChain.cpp" compile="1" resource="0"
-              file="Source/motion/render/gpu/GpuChain.cpp"/>
-        <FILE id="MotrenderGpuLightingcpp" name="GpuLighting.cpp" compile="1" resource="0"
-              file="Source/motion/render/gpu/GpuLighting.cpp"/>
-        <FILE id="MotrenderGpuCrossingscpp" name="GpuCrossings.cpp" compile="1" resource="0"
-              file="Source/motion/render/gpu/GpuCrossings.cpp"/>
-        <FILE id="MotrenderGpuScenecpp" name="GpuScene.cpp" compile="1" resource="0"
-              file="Source/motion/render/gpu/GpuScene.cpp"/>
-        <FILE id="MotrenderGpuTessellationcpp" name="GpuTessellation.cpp" compile="1" resource="0"
-              file="Source/motion/render/gpu/GpuTessellation.cpp"/>
         <FILE id="MotrenderHiddenLineBakerh" name="HiddenLineBaker.h" compile="0"
               resource="0" file="Source/motion/render/HiddenLineBaker.h"/>
         <FILE id="MotrenderHiddenLineShapesh" name="HiddenLineShapes.h" compile="0"
@@ -842,13 +830,13 @@
                JUCE_ASIO="1" JUCE_USE_XRENDER="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-motion/LinuxMakefile" smallIcon="MotionSmallIcon"
-                bigIcon="MotionIcon" externalLibraries="luajit&#10;X11&#10;Xext&#10;Xrender&#10;wgpu_native&#10;dl&#10;m"
+                bigIcon="MotionIcon" externalLibraries="luajit&#10;X11&#10;Xext&#10;Xrender"
                 extraLinkerFlags="-Wl,--wrap=eglChooseConfig,--wrap=eglInitialize,--wrap=eglTerminate">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include&#10;../../../External/wgpu-native/include"
-                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../External/wgpu-native/lib"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-motion" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include&#10;../../../External/wgpu-native/include"
-                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../External/wgpu-native/lib"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-motion" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -890,14 +878,14 @@
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-motion/VisualStudio2022" smallIcon="MotionSmallIcon"
             bigIcon="MotionIcon" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX /bigobj /utf-8"
-            externalLibraries="luajit51.lib&#10;wgpu_native.lib&#10;d3dcompiler.lib&#10;ws2_32.lib&#10;userenv.lib&#10;bcrypt.lib&#10;ntdll.lib&#10;opengl32.lib&#10;Propsys.lib&#10;RuntimeObject.lib" extraLinkerFlags="/IGNORE:4006">
+            externalLibraries="luajit51.lib" extraLinkerFlags="/IGNORE:4006">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include&#10;..\..\..\External\wgpu-native\include"
-                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\External\wgpu-native\lib"
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
+                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
                        prebuildCommand="call ..\..\..\luajit_win.bat"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-motion" alwaysGenerateDebugSymbols="1"
-                       debugInformationFormat="ProgramDatabase" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include&#10;..\..\..\External\wgpu-native\include"
-                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\External\wgpu-native\lib"
+                       debugInformationFormat="ProgramDatabase" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
+                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
                        prebuildCommand="call ..\..\..\luajit_win.bat"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
@@ -938,26 +926,26 @@
         <MODULEPATH id="osci_scripting" path="modules"/>
       </MODULEPATHS>
     </VS2022>
-    <XCODE_MAC targetFolder="Builds/osci-motion/MacOSX" extraLinkerFlags="-Wl,-rpath,@executable_path/../Frameworks -Wl,-weak_reference_mismatches,weak -framework IOSurface"
+    <XCODE_MAC targetFolder="Builds/osci-motion/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak -framework IOSurface"
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="MotionSmallIcon"
                bigIcon="MotionIcon" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
                iosDevelopmentTeamID="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-motion needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-motion needs Bluetooth access to connect to Bluetooth MIDI devices.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;"
-               externalLibraries="luajit&#10;wgpu_native" postbuildCommand="# wgpu-native, into the app's Frameworks (signed as the app is)&#10;WGPU=&quot;$PROJECT_DIR/../../../External/wgpu-native/lib/libwgpu_native.dylib&quot;&#10;if [ &quot;$WRAPPER_EXTENSION&quot; = &quot;app&quot; ] &amp;&amp; [ -f &quot;$WGPU&quot; ]; then&#10;  mkdir -p &quot;$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH&quot;&#10;  cp -f &quot;$WGPU&quot; &quot;$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/&quot;&#10;  if [ -n &quot;$EXPANDED_CODE_SIGN_IDENTITY&quot; ] &amp;&amp; [ &quot;$EXPANDED_CODE_SIGN_IDENTITY&quot; != &quot;-&quot; ]; then&#10;    codesign --force --timestamp --options runtime --sign &quot;$EXPANDED_CODE_SIGN_IDENTITY&quot; &quot;$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/libwgpu_native.dylib&quot;&#10;  fi&#10;fi">
+               externalLibraries="luajit">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        usePrecompiledHeaderFile="1" precompiledHeaderFile="Source/pch.h"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
-                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include&#10;../../../External/wgpu-native/include"
-                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../External/wgpu-native/lib"/>
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
         <CONFIGURATION name="Release" targetName="osci-motion" customXcodeFlags="CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
-                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include&#10;../../../External/wgpu-native/include"
-                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../External/wgpu-native/lib"/>
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
         <CONFIGURATION name="Release (Development)" targetName="osci-motion" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
-                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include&#10;../../../External/wgpu-native/include"
-                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../External/wgpu-native/lib"/>
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>

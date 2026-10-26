@@ -1,7 +1,4 @@
 #include "HiddenLines.h"
-#include "gpu/GpuCrossings.h"
-#include "gpu/GpuLighting.h"
-#include "gpu/GpuScene.h"
 
 namespace motion::hidden {
 namespace {
@@ -13,13 +10,10 @@ namespace {
 // kept, the frame made of it, and what mirrors show. One per frame.
 class Culler {
 public:
-    Culler(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel, const OtherEye* other, bool allowGpu)
-        : composition(composition), time(time), workspace(workspace), cancel(cancel), other(other), allowGpu(allowGpu), depth(workspace.depth), world(workspace.world), lights(workspace.lights), runs(workspace.runs), hiddenRuns(workspace.hiddenRuns), reach(composition.hiddenLineReach) {}
+    Culler(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel, const OtherEye* other)
+        : composition(composition), time(time), workspace(workspace), cancel(cancel), other(other), depth(workspace.depth), world(workspace.world), lights(workspace.lights), runs(workspace.runs), hiddenRuns(workspace.hiddenRuns), reach(composition.hiddenLineReach) {}
 
-    // Whether the GPU failed partway through the frame (see run).
-    bool failed() const { return failedOnGpu; }
-
-    // The frame, or none when `cancel` is set partway or the GPU failed.
+    // The frame, or none when `cancel` is set partway.
     std::unique_ptr<Frame> run() {
         workspace.laid.nextFrame();
         auto frame = std::make_unique<Frame>();
@@ -27,17 +21,9 @@ public:
         if (!hides && !lit && !reflecting && !restyling && !(frameHatching > 0)) { return frame; }
         gather();
         placeCorners();
-        onGpu = allowGpu && sceneSuitsGpu();
-        // Mirrors and hatching light what they show through shadows read on
-        // the CPU.
-        shadowsOnCpu = !onGpu || reflecting || frameHatching > 0;
         keepShadows = lit && sameShadows();
         if (!diceBentSurfaces()) { return nullptr; }
         if (!shine()) { return nullptr; }
-        if (onGpu && !drawOnGpu()) {
-            failedOnGpu = true;
-            return nullptr;
-        }
         restyleSurfaces();
         if (!findWhatHides()) { return nullptr; }
         if (frameHatching > 0 && hatchSees != nullptr && !hatchSees->isEmpty()) {
@@ -172,8 +158,6 @@ private:
             if (!drawsShadows(*state)) { continue; }
             if (!drawShadows(*state, lights.back())) { return false; }
         }
-        drawnFrom.onGpu = onGpu;
-        drawnFrom.onCpu = shadowsOnCpu;
         drawnFrom.lights.clear();
         for (const auto& light : lights) { drawnFrom.lights.push_back(light.state); }
         drawnFrom.sources.clear();
@@ -192,8 +176,6 @@ private:
     bool sameShadows() const {
         const auto& drawnFrom = workspace.shadowsDrawnFrom;
         if (!drawnFrom.valid || drawnFrom.drawings.size() != items.size() || drawnFrom.world != world) { return false; }
-        // Drawn where this frame reads them.
-        if (drawnFrom.onGpu != onGpu || (onGpu && workspace.shadowsOnGpu == nullptr) || (shadowsOnCpu && !drawnFrom.onCpu)) { return false; }
         for (std::size_t surface = 0; surface < items.size(); ++surface) {
             const auto& item = items[surface];
             if (drawnFrom.drawings[surface] != item.drawing || (item.bent && item.drawing != nullptr && !item.drawing->faces().empty())) { return false; }
@@ -258,7 +240,7 @@ private:
     // camera's, to hide lines or hatch, and each light's that draws shadows.
     // False when cancelled.
     bool diceBentSurfaces() {
-        if (!anyBent() && !onGpu) { return true; }
+        if (!anyBent()) { return true; }
         std::vector<DiceView> views;
         if (view.has_value() && other == nullptr && (hides || frameHatching > 0)) { views.push_back({cameraEye, cameraProjection, reach, DepthBuffer::pixel}); }
         for (const auto& light : composition.lights) {
@@ -267,32 +249,11 @@ private:
             const auto cubePixel = 2 * DepthBuffer::overscan / ShadowBuffers::cubeAcross, singlePixel = 2 * DepthBuffer::overscan / ShadowBuffers::singleAcross;
             for (const auto& seen : lightEyes(*state)) { views.push_back({seen.eye, seen.projection, Reach {}, seen.cube ? cubePixel : singlePixel}); }
         }
-        if (onGpu) {
-            gatherFaces(views);
-            return true;
-        }
         return diceBent(items, world, placing(), views, workspace.dicer, workspace.bent, [this] { return cancelled(); });
     }
-
-    // Whether the frame is culled with its surfaces on the GPU (see
-    // gpu::Scene): when there is one, and the camera's view has something
-    // to draw there; unless it is forced, only when something bends. Cutting
-    // what bends is what takes the CPU long: surfaces as placed, however
-    // many, it draws sooner than the GPU's round trips allow.
-    bool sceneSuitsGpu() const {
-        if (!workspace.gpu || other != nullptr || !view.has_value() || !(hides || lit || frameHatching > 0)) { return false; }
-        if (!anyBent() && gpu::mode() != gpu::Mode::force) { return false; }
-        return gpu::Device::shared() != nullptr;
-    }
+    // Whether something bends any surface of the frame.
     bool anyBent() const {
         return std::any_of(items.begin(), items.end(), [](const SceneItem& item) { return item.bent && item.drawing != nullptr && !item.drawing->faces().empty(); });
-    }
-    // The GPU to help with what is done on the CPU (crossings, sampling and
-    // lighting lines), as for culling there: unless forced, only when
-    // something bends.
-    gpu::Device* helpingDevice() const {
-        if (!workspace.gpu || !(onGpu || anyBent() || gpu::mode() == gpu::Mode::force)) { return nullptr; }
-        return gpu::Device::shared();
     }
     // Hatching shades every surface the camera sees, solid or not; only what
     // is solid hides lines. When those differ, hatching is drawn its own
@@ -302,65 +263,6 @@ private:
         const auto everySurfaceSolid = std::all_of(items.begin(), items.end(), [](const SceneItem& item) { return item.drawing == nullptr || item.drawing->faces().empty() || item.solid > 0; });
         return !(hides && everySurfaceSolid);
     }
-    // Every surface's faces for the GPU scene (see drawOnGpu): those
-    // something bends to be cut there for `views`, the rest as placed.
-    void gatherFaces(std::span<const DiceView> views) {
-        diceViews.assign(views.begin(), views.end());
-        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
-            const auto& item = items[surface];
-            if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
-            const auto program = item.bent ? chain.program(composition, *item.clip, time) : 0;
-            const auto& mesh = item.drawing->faces();
-            const auto& corners = world[surface];
-            const auto solid = item.solid > 0;
-            for (std::uint32_t face = 0; face < mesh.triangles.size(); ++face) {
-                const auto& triangle = mesh.triangles[face];
-                const auto& a = corners[triangle[0]], & b = corners[triangle[1]], & c = corners[triangle[2]];
-                if (!a.has_value() || !b.has_value() || !c.has_value()) { continue; }
-                const std::array<osci::Point, 3> sources {mesh.vertices[triangle[0]], mesh.vertices[triangle[1]], mesh.vertices[triangle[2]]};
-                if (item.bent) {
-                    bentFaces.push_back({sources, program, {*a, *b, *c}, surface, face, solid});
-                } else {
-                    flatFaces.push_back(gpu::Scene::triangle({*a, *b, *c}, sources, surface, face, solid ? gpu::Scene::solid : 0u));
-                }
-            }
-        }
-    }
-    // The frame's surfaces drawn on the GPU, all at once: cut, then into the
-    // camera's view (read back into `depth`, with the solid triangles it
-    // shows found there for crossings), hatching's own when it has one (read
-    // back), and every light's view drawing shadows (kept there for
-    // lighting, and read back when mirrors or hatching light by them too).
-    // False when the device fails.
-    bool drawOnGpu() {
-        auto* device = gpu::Device::shared();
-        if (device == nullptr) { return false; }
-        const auto solidSurfaces = std::count_if(items.begin(), items.end(), [](const SceneItem& item) { return item.drawing != nullptr && !item.drawing->faces().empty() && item.solid > 0; });
-        if (hides) { depth.cover(reach); }
-        const gpu::Scene::View camera {cameraEye, cameraProjection, reach, &depth, true};
-        gpu::Scene::Frame frame;
-        frame.chain = &chain;
-        frame.bent = bentFaces;
-        frame.flat = &flatFaces;
-        frame.diceViews = diceViews;
-        frame.camera = hides ? &camera : nullptr;
-        frame.gather = solidSurfaces >= 2;
-        std::vector<gpu::Scene::View> also;
-        if (hatchesApart()) {
-            workspace.hatchDepth.cover(reach);
-            also.push_back({cameraEye, cameraProjection, reach, &workspace.hatchDepth, false});
-        }
-        frame.also = also;
-        frame.shadows = shadowViews;
-        frame.readShadows = shadowsOnCpu;
-        auto drawn = gpu::Scene::draw(*device, frame);
-        if (!drawn.has_value()) { return false; }
-        if (!shadowViews.empty()) { workspace.shadowsOnGpu = std::move(drawn->shadows); }
-        gathered = std::move(drawn->triangles);
-        gatheredSources = std::move(drawn->sources);
-        return true;
-    }
-
     // What a light casting shadows sees of every surface, into `shining`'s
     // views. False when cancelled.
     bool drawShadows(const LightState& state, LightView& shining) {
@@ -368,10 +270,6 @@ private:
         for (const auto& seen : lightEyes(state)) {
             auto& buffer = workspace.shadows.next(seen.cube);
             shining.views.push_back({seen.eye, seen.projection, &buffer});
-            if (onGpu) {
-                shadowViews.push_back({seen.eye, seen.projection, Reach {}, &buffer, false});
-                continue;
-            }
             if (!drawSurfaces(items, world, workspace.bent, seen.eye, seen.projection, Reach {}, buffer, noCrossings, [this] { return cancelled(); })) { return false; }
         }
         return true;
@@ -422,25 +320,12 @@ private:
         const auto faced = [](const SceneItem& item) { return item.drawing != nullptr && !item.drawing->faces().empty(); };
         hatchSees = &depth;
         if (hatchesApart()) {
-            // Drawn there already on the GPU (see drawOnGpu).
             const auto noCrossings = [](std::uint32_t, const std::array<Vec3, 3>&, const std::array<osci::Point, 3>&) {};
-            if (!onGpu && !drawSurfaces(items, world, workspace.bent, cameraEye, cameraProjection, reach, workspace.hatchDepth, noCrossings, [this] { return cancelled(); })) { return false; }
+            if (!drawSurfaces(items, world, workspace.bent, cameraEye, cameraProjection, reach, workspace.hatchDepth, noCrossings, [this] { return cancelled(); })) { return false; }
             hatchSees = &workspace.hatchDepth;
         }
         if (!hides) { return true; }
         const auto solidSurfaces = std::count_if(items.begin(), items.end(), [&](const SceneItem& item) { return faced(item) && item.solid > 0; });
-        if (onGpu) {
-            // Drawn there already (see drawOnGpu), with the solid triangles
-            // it shows found there for crossings.
-            surfaceTriangles = std::move(gathered);
-            surfaceSources = std::move(gatheredSources);
-            for (auto& triangle : surfaceTriangles) { triangle.mirrors = static_cast<float>(items[triangle.surface].mirrors); }
-            if (!depth.isEmpty()) {
-                crossings = crossingRuns(surfaceTriangles);
-                if (cancelled()) { return false; }
-            }
-            return true;
-        }
         const auto gather = [&](std::uint32_t surface, const std::array<Vec3, 3>& corners, const std::array<osci::Point, 3>& sources) {
             if (solidSurfaces < 2) { return; }
             surfaceTriangles.push_back({corners, surface, static_cast<float>(items[surface].mirrors)});
@@ -449,23 +334,10 @@ private:
         if (!drawSurfaces(items, world, workspace.bent, cameraEye, cameraProjection, reach, depth, gather, [this] { return cancelled(); }, true)) { return false; }
         if (!depth.isEmpty()) {
             dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
-            crossings = crossingRuns(surfaceTriangles);
+            crossings = crossing::runs(surfaceTriangles, view->focalLength, reach, cancel);
             if (cancelled()) { return false; }
         }
         return true;
-    }
-
-    // Where surfaces cut through each other (see crossing::runs): on the GPU,
-    // when there is one, the pairs that may cross are found there and only
-    // they are tested exactly, here, in the order crossing::runs tests them,
-    // so the runs are just as crossing::runs makes them.
-    std::vector<std::vector<crossing::Piece>> crossingRuns(const std::vector<crossing::Triangle>& triangles) {
-        auto* device = helpingDevice();
-        if (device != nullptr) {
-            auto runs = gpu::crossingRuns(*device, triangles, view->focalLength, reach);
-            if (runs.has_value()) { return std::move(*runs); }
-        }
-        return crossing::runs(triangles, view->focalLength, reach, cancel);
     }
 
     // The camera's hatching (see HiddenLineHatching.h) on each surface it sees:
@@ -896,12 +768,6 @@ private:
     // it within a little of what it is all along. False when cancelled.
     bool lightKept() {
         if (!lit) { return true; }
-        if (lightKeptOnGpu()) { return !cancelled(); }
-        // The shadows are on the GPU: the frame is culled again on the CPU.
-        if (onGpu) {
-            failedOnGpu = true;
-            return false;
-        }
         for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
             if (cancelled()) { return false; }
             const auto& item = items[surface];
@@ -921,83 +787,6 @@ private:
     static bool straightPiece(osci::Shape& shape) {
         auto* part = dynamic_cast<ShapePart*>(&shape);
         return dynamic_cast<ColouredLine*>(&shape) != nullptr || isStraight(part != nullptr ? part->whole() : shape);
-    }
-
-    // lightKept on the GPU, when there is one: every kept piece's points bent
-    // and lit there in one batch, each a couple of pixels apart, then its lit
-    // parts made as on the CPU. Each piece's length on the frame is found
-    // first, also there: from its ends where it is a straight line nothing
-    // bends (it stays straight through the camera), else from eight steps
-    // along it. False, with nothing changed, when it can't: no device, no
-    // camera framing the lines, or the device failing.
-    bool lightKeptOnGpu() {
-        auto* device = helpingDevice();
-        if (device == nullptr || (other == nullptr && !view.has_value())) { return false; }
-        gpu::ChainBatch chain;
-        std::vector<std::uint32_t> programs(items.size(), 0);
-        std::vector<int> probesOf;
-        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
-            if (keptBy[surface].empty()) { continue; }
-            programs[surface] = chain.program(composition, *items[surface].clip, time);
-            for (auto& piece : keptBy[surface]) {
-                const auto probes = !items[surface].bent && straightPiece(*piece.shape) ? 1 : 8;
-                for (int probe = 0; probe <= probes; ++probe) { chain.add(programs[surface], piece.shape->nextVector(static_cast<float>(probe) / static_cast<float>(probes))); }
-                probesOf.push_back(probes);
-            }
-        }
-        if (probesOf.empty()) {
-            std::fill(lostBy.begin(), lostBy.end(), 1);
-            return true;
-        }
-        const auto placed = chain.run(*device);
-        if (!placed.has_value() || cancelled()) { return false; }
-        const auto onFrame = [&](const std::optional<Vec3>& at) -> std::optional<Screen> {
-            if (!at.has_value()) { return std::nullopt; }
-            return other != nullptr ? otherProjection(otherEye.see(*at)) : cameraProjection(cameraEye.see(*at));
-        };
-        gpu::LightingBatch batch(chain);
-        batch.setLights(lights, onGpu ? workspace.shadowsOnGpu : nullptr);
-        std::vector<std::pair<std::size_t, std::size_t>> samplesOf;
-        std::size_t probe = 0, index = 0;
-        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
-            const auto response = static_cast<float>(items[surface].response);
-            for (auto& piece : keptBy[surface]) {
-                const auto probes = probesOf[index++];
-                double length = 0;
-                for (int step = 1; step <= probes; ++step) {
-                    const auto from = onFrame((*placed)[probe + static_cast<std::size_t>(step) - 1]), to = onFrame((*placed)[probe + static_cast<std::size_t>(step)]);
-                    if (from.has_value() && to.has_value()) { length += std::hypot(to->x - from->x, to->y - from->y); }
-                }
-                probe += static_cast<std::size_t>(probes) + 1;
-                const auto steps = lightSteps(length);
-                const auto made = batch.piece(piece.normals, response);
-                samplesOf.emplace_back(batch.size(), static_cast<std::size_t>(steps) + 1);
-                for (int step = 0; step <= steps; ++step) {
-                    const auto t = static_cast<float>(step) / static_cast<float>(steps);
-                    batch.sample(programs[surface], made, piece.shape->nextVector(t), t);
-                }
-            }
-        }
-        const auto litSamples = batch.run(*device);
-        if (!litSamples.has_value() || cancelled()) { return false; }
-        index = 0;
-        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
-            std::vector<Kept> litPieces;
-            for (auto& piece : keptBy[surface]) {
-                const auto [first, count] = samplesOf[index++];
-                lighting.ts.resize(count);
-                lighting.light.resize(count);
-                for (std::size_t sample = 0; sample < count; ++sample) {
-                    const auto& value = (*litSamples)[first + sample];
-                    lighting.ts[sample] = static_cast<double>(sample) / static_cast<double>(count - 1);
-                    lighting.light[sample] = {value[0], value[1], value[2]};
-                }
-                litRuns(piece, std::shared_ptr<osci::Shape>(std::move(piece.shape)), litPieces);
-            }
-            keptBy[surface] = std::move(litPieces);
-            lostBy[surface] = 1;
-        }
-        return true;
     }
 
     // One piece kept, lit, into `litPieces`.
@@ -1163,47 +952,20 @@ private:
         }
         return found;
     }
-    // Every cut run's pieces' probes, of every clip drawn: on the GPU in one
-    // batch when there is one (and a camera or another eye frames the
-    // lines), else here.
+    // Every cut run's pieces' probes, of every clip drawn.
     std::vector<std::vector<Probes>> probeCutPieces() {
         std::vector<std::vector<Probes>> probes(items.size());
-        const auto eachCutPiece = [&](auto&& visit) {
-            for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
-                if (lostBy[surface] == 0) { continue; }
-                probes[surface].resize(keptBy[surface].size());
-                for (const auto& run : runsOf(keptBy[surface])) {
-                    if (!run.cut) { continue; }
-                    for (auto index = run.first; index < run.last; ++index) { visit(surface, index); }
+        for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
+            if (lostBy[surface] == 0) { continue; }
+            probes[surface].resize(keptBy[surface].size());
+            for (const auto& run : runsOf(keptBy[surface])) {
+                if (!run.cut) { continue; }
+                for (auto index = run.first; index < run.last; ++index) {
+                    auto& into = probes[surface][index];
+                    for (std::size_t probe = 0; probe < into.size(); ++probe) { into[probe] = onFrame(*items[surface].clip, keptBy[surface][index].shape->nextVector(static_cast<float>(probe) / 4)); }
                 }
-            }
-        };
-        auto* device = helpingDevice();
-        if (device != nullptr && (other != nullptr || view.has_value())) {
-            gpu::ChainBatch chain;
-            std::vector<std::uint32_t> programs(items.size());
-            std::vector<std::pair<std::uint32_t, std::size_t>> order;
-            eachCutPiece([&](std::uint32_t surface, std::size_t index) {
-                if (order.empty() || order.back().first != surface) { programs[surface] = chain.program(composition, *items[surface].clip, time); }
-                for (int probe = 0; probe <= 4; ++probe) { chain.add(programs[surface], keptBy[surface][index].shape->nextVector(static_cast<float>(probe) / 4)); }
-                order.emplace_back(surface, index);
-            });
-            const auto placed = chain.run(*device);
-            if (placed.has_value()) {
-                for (std::size_t piece = 0; piece < order.size(); ++piece) {
-                    auto& into = probes[order[piece].first][order[piece].second];
-                    for (std::size_t probe = 0; probe < into.size(); ++probe) {
-                        const auto& at = (*placed)[piece * into.size() + probe];
-                        into[probe] = at.has_value() ? (other != nullptr ? otherProjection(otherEye.see(*at)) : cameraProjection(cameraEye.see(*at))) : std::nullopt;
-                    }
-                }
-                return probes;
             }
         }
-        eachCutPiece([&](std::uint32_t surface, std::size_t index) {
-            auto& into = probes[surface][index];
-            for (std::size_t probe = 0; probe < into.size(); ++probe) { into[probe] = onFrame(*items[surface].clip, keptBy[surface][index].shape->nextVector(static_cast<float>(probe) / 4)); }
-        });
         return probes;
     }
     // A piece's length on the frame, from its probes.
@@ -1327,20 +1089,6 @@ private:
     Workspace& workspace;
     const std::atomic<bool>* const cancel;
     const OtherEye* const other;
-    // Whether the frame may be culled on the GPU, whether it is (see
-    // sceneSuitsGpu), and whether that failed partway (so it is culled again
-    // on the CPU); the scene there, and the lights' views drawn in it.
-    const bool allowGpu;
-    bool onGpu = false, failedOnGpu = false, shadowsOnCpu = true;
-    // What the GPU draws: the faces, the views bent faces are cut for, the
-    // lights' views, and the camera's solid triangles that show.
-    gpu::ChainBatch chain;
-    std::vector<gpu::Tessellation::Face> bentFaces;
-    std::vector<gpu::Scene::Triangle> flatFaces;
-    std::vector<DiceView> diceViews;
-    std::vector<gpu::Scene::View> shadowViews;
-    std::vector<crossing::Triangle> gathered;
-    std::vector<std::array<osci::Point, 3>> gatheredSources;
     DepthBuffer& depth;
     std::vector<std::vector<std::optional<Vec3>>>& world;
     std::vector<LightView>& lights;
@@ -1396,12 +1144,6 @@ private:
 }
 
 std::unique_ptr<Frame> cull(const PreparedComposition& composition, double time, Workspace& workspace, const std::atomic<bool>* cancel, const OtherEye* other) {
-    Culler culler(composition, time, workspace, cancel, other, true);
-    auto frame = culler.run();
-    if (!culler.failed()) { return frame; }
-    // The GPU failed partway: the frame again, on the CPU.
-    workspace.shadowsDrawnFrom.valid = false;
-    workspace.shadowsOnGpu.reset();
-    return Culler(composition, time, workspace, cancel, other, false).run();
+    return Culler(composition, time, workspace, cancel, other).run();
 }
 }

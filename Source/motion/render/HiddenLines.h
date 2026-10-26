@@ -19,10 +19,6 @@
 #include <span>
 #include <unordered_map>
 
-namespace motion::gpu {
-struct Shadows;
-}
-
 namespace motion::hidden {
 // Whether an effect can bend straight lines: one that only colours points,
 // or moves them all alike (turning, scaling, sliding or skewing), keeps a
@@ -252,9 +248,6 @@ bool drawSurfaces(const std::vector<SceneItem>& items, const std::vector<std::ve
 // drawn, the surfaces gathered for crossings, the lights' shadows, and the
 // scratch lists of points and runs. One per thread.
 struct Workspace {
-    // Whether culling may light lines on the GPU, when there is one (see
-    // gpu::Device); off, it lights them on the CPU, as with none.
-    bool gpu = true;
     DepthBuffer depth;
     // Every surface the camera sees, for its hatching, when that is more
     // than what is solid (which alone is in `depth`).
@@ -276,8 +269,6 @@ struct Workspace {
     Dicer dicer;
     BentMesh bent;
     ShadowBuffers shadows;
-    // The lights' shadows when they were drawn on the GPU (and are read there).
-    std::shared_ptr<const gpu::Shadows> shadowsOnGpu;
     // What stands between mirrors and what they show.
     SceneRays rays;
     // Patterns laid on surfaces, and the frame's drawings of surfaces that
@@ -304,10 +295,9 @@ struct Workspace {
     // What the lights' shadows were last drawn from: each light's place, and
     // every surface's drawing (its source kept alive, so its address is
     // never another's) and corners. While none changes, nor bends, the
-    // shadows are the same and are kept; and where they were drawn: kept on
-    // the GPU, and read on the CPU (drawn there, or read back).
+    // shadows are the same and are kept.
     struct ShadowsDrawnFrom {
-        bool valid = false, onGpu = false, onCpu = false;
+        bool valid = false;
         std::vector<LightState> lights;
         std::vector<std::shared_ptr<const PreparedSource>> sources;
         std::vector<const PreparedDrawing*> drawings;
