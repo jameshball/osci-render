@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <unordered_map>
@@ -28,11 +29,16 @@ struct Triangle {
 };
 
 // One piece of a crossing, on the triangle it belongs to: the one of the
-// surface that mirrors less, or of the earlier surface.
+// surface that mirrors less, or of the earlier surface; the triangle it
+// crosses; and at which ends it leaves its own triangle (bit 0 its start,
+// bit 1 its end) rather than the other, where it goes on into the next of
+// its own surface's triangles.
 struct Piece {
     std::uint32_t triangle;
     Weights from, to;
     Vec3 eyeFrom, eyeTo;
+    std::uint32_t other = 0;
+    std::uint8_t leaves = 0;
 };
 
 // Where a triangle passes through a plane, from its corners' signed distances
@@ -113,7 +119,9 @@ inline std::optional<Piece> between(const std::vector<Triangle>& triangles, std:
         return mixed(cut[0], cut[1], t);
     };
     const auto from = weightsAt(low), to = weightsAt(high);
-    return Piece {ownedByA ? a : b, from, to, weighted(owner.eye, from), weighted(owner.eye, to)};
+    const auto& across = ownedByA ? alongB : alongA;
+    const auto leavesFrom = std::min(range[0], range[1]) >= std::min(across[0], across[1]), leavesTo = std::max(range[0], range[1]) <= std::max(across[0], across[1]);
+    return Piece {ownedByA ? a : b, from, to, weighted(owner.eye, from), weighted(owner.eye, to), ownedByA ? b : a, static_cast<std::uint8_t>((leavesFrom ? 1 : 0) | (leavesTo ? 2 : 0))};
 }
 
 namespace detail {
@@ -183,94 +191,111 @@ private:
 };
 
 // Pieces end to end as runs: a piece follows another of the same surface
-// that ends where it starts (turned round if need be). Ends meet within a
-// millionth of a unit, found through a hash of the cells they fall in: cells
-// twice that across, so an end that meets a point is in the point's cell or
-// a neighbour on the side of it the point is nearer (eight in all).
+// that ends where it starts (turned round if need be), within a millionth of
+// a unit. Where a crossing leaves one of its triangles it goes on in the one
+// across that edge, still crossing the other, so each end is first joined to
+// an end of a piece sharing that other triangle; what is left (where it
+// leaves both at once) to any of its surface. Ends are found through a hash
+// of their tag and the cells they fall in, a few times the reach across: an
+// end that meets a point is in the point's cell, or a neighbour where the
+// point is within reach of its side. Each end takes the first free end it
+// meets, in order, so where many meet (as where copies of a surface turned
+// about an axis cross on it) they are joined in pairs.
 inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const std::vector<Triangle>& triangles) {
     constexpr double reach = 1.0e-6;
     using Cell = std::array<std::int64_t, 3>;
-    constexpr double size = 2 * reach;
-    const auto cellOf = [](const Vec3& point) { return Cell {static_cast<std::int64_t>(std::floor(point.x / size)), static_cast<std::int64_t>(std::floor(point.y / size)), static_cast<std::int64_t>(std::floor(point.z / size))}; };
+    constexpr double size = 8 * reach;
+    constexpr auto none = std::numeric_limits<std::size_t>::max();
+    // Ends by number: a piece's start, then its end.
+    const auto endAt = [&](std::size_t end) -> const Vec3& { return end % 2 == 0 ? pieces[end / 2].eyeFrom : pieces[end / 2].eyeTo; };
+    const auto surfaceOf = [&](std::size_t end) { return triangles[pieces[end / 2].triangle].surface; };
+    const auto meets = [](const Vec3& p, const Vec3& q) { return (p - q).length() <= reach; };
     // Unsigned, so the multiplies wrap rather than overflow.
-    const auto hash = [](const Cell& cell) { return static_cast<std::size_t>((static_cast<std::uint64_t>(cell[0]) * 73856093u) ^ (static_cast<std::uint64_t>(cell[1]) * 19349663u) ^ (static_cast<std::uint64_t>(cell[2]) * 83492791u)); };
-    // Each end by its cell's hash, sorted, and each hash's run of ends found
-    // through a table of them, open addressed (a table of nodes would
-    // allocate one an end).
-    std::vector<std::pair<std::size_t, std::size_t>> ends;
-    ends.reserve(pieces.size() * 2);
-    for (std::size_t index = 0; index < pieces.size(); ++index) {
-        ends.emplace_back(hash(cellOf(pieces[index].eyeFrom)), index);
-        ends.emplace_back(hash(cellOf(pieces[index].eyeTo)), index);
-    }
-    std::sort(ends.begin(), ends.end());
-    struct Slot {
-        std::size_t key = 0, first = 0, last = 0;
+    const auto hash = [](std::uint64_t tag, const Cell& cell) { return static_cast<std::size_t>((static_cast<std::uint64_t>(cell[0]) * 73856093u) ^ (static_cast<std::uint64_t>(cell[1]) * 19349663u) ^ (static_cast<std::uint64_t>(cell[2]) * 83492791u) ^ (tag * 0x9e3779b97f4a7c15ull)); };
+    std::vector<std::size_t> links(2 * pieces.size(), none);
+    // Each end's point, surface and tag together, as they are read many
+    // times.
+    struct End {
+        Vec3 point;
+        std::uint32_t surface;
+        std::uint64_t tag = 0;
     };
+    std::vector<End> ends(links.size());
+    for (std::size_t end = 0; end < ends.size(); ++end) { ends[end] = {endAt(end), surfaceOf(end)}; }
+    // Each hash's ends in a list (newest first) from a table of heads, one
+    // past each (none, zero).
     std::size_t slots = 16;
     while (slots < ends.size() * 2) { slots *= 2; }
-    std::vector<Slot> table(slots);
-    const auto slotOf = [&](std::size_t key) { return static_cast<std::size_t>((static_cast<std::uint64_t>(key) * 0x9e3779b97f4a7c15ull) >> 20) & (slots - 1); };
-    for (std::size_t first = 0; first < ends.size();) {
-        auto last = first + 1;
-        while (last < ends.size() && ends[last].first == ends[first].first) { ++last; }
-        auto slot = slotOf(ends[first].first);
-        while (table[slot].last != 0) { slot = (slot + 1) & (slots - 1); }
-        table[slot] = {ends[first].first, first, last};
-        first = last;
-    }
-    // The ends whose cell has hash `key`.
-    const auto endsOf = [&](std::size_t key) -> std::pair<std::size_t, std::size_t> {
-        for (auto slot = slotOf(key); table[slot].last != 0; slot = (slot + 1) & (slots - 1)) {
-            if (table[slot].key == key) { return {table[slot].first, table[slot].last}; }
+    std::vector<std::uint32_t> heads, next(ends.size());
+    const auto slotOf = [&](std::uint64_t tag, const Cell& cell) { return static_cast<std::size_t>((static_cast<std::uint64_t>(hash(tag, cell)) * 0x9e3779b97f4a7c15ull) >> 20) & (slots - 1); };
+    const auto cellOf = [](const Vec3& point) { return Cell {static_cast<std::int64_t>(std::floor(point.x / size)), static_cast<std::int64_t>(std::floor(point.y / size)), static_cast<std::int64_t>(std::floor(point.z / size))}; };
+    // Joins each free end with a tag to the first free end with its tag and
+    // surface it meets.
+    const auto join = [&](auto&& tagOf) {
+        heads.assign(slots, 0);
+        for (std::size_t end = 0; end < ends.size(); ++end) {
+            if (links[end] != none) { continue; }
+            ends[end].tag = tagOf(end);
+            const auto slot = slotOf(ends[end].tag, cellOf(ends[end].point));
+            next[end] = heads[slot];
+            heads[slot] = static_cast<std::uint32_t>(end + 1);
         }
-        return {0, 0};
-    };
-    const auto meets = [](const Vec3& p, const Vec3& q) { return (p - q).length() <= reach; };
-    std::vector<bool> used(pieces.size(), false);
-    // An unused piece of `surface` with an end at `point`.
-    const auto nextAt = [&](const Vec3& point, std::uint32_t surface) -> std::optional<std::size_t> {
-        const auto centre = cellOf(point);
-        // Toward the nearer side of its cell, on each axis.
-        const auto side = [](double value, std::int64_t cell) { return value / size - static_cast<double>(cell) < .5 ? std::int64_t {-1} : std::int64_t {1}; };
-        const std::array<std::int64_t, 2> xs {0, side(point.x, centre[0])}, ys {0, side(point.y, centre[1])}, zs {0, side(point.z, centre[2])};
-        for (const auto dx : xs) {
-            for (const auto dy : ys) {
-                for (const auto dz : zs) {
-                    const auto [first, last] = endsOf(hash({centre[0] + dx, centre[1] + dy, centre[2] + dz}));
-                    for (auto end = first; end < last; ++end) {
-                        const auto index = ends[end].second;
-                        const auto& candidate = pieces[index];
-                        if (!used[index] && triangles[candidate.triangle].surface == surface && (meets(candidate.eyeFrom, point) || meets(candidate.eyeTo, point))) { return index; }
-                    }
+        for (std::size_t end = 0; end < ends.size(); ++end) {
+            if (links[end] != none) { continue; }
+            const auto& here = ends[end];
+            const auto centre = cellOf(here.point);
+            // A neighbour too on each axis where the end is within reach of
+            // its cell's side.
+            const auto toward = [](double value, std::int64_t cell) {
+                const auto within = value - static_cast<double>(cell) * size;
+                return within < reach ? -1 : within > size - reach ? 1 : 0;
+            };
+            const std::array<int, 3> side {toward(here.point.x, centre[0]), toward(here.point.y, centre[1]), toward(here.point.z, centre[2])};
+            auto found = none;
+            for (int k = 0; k < 8; ++k) {
+                if (((k & 1) != 0 && side[0] == 0) || ((k & 2) != 0 && side[1] == 0) || ((k & 4) != 0 && side[2] == 0)) { continue; }
+                const Cell cell {centre[0] + (k & 1) * side[0], centre[1] + ((k >> 1) & 1) * side[1], centre[2] + ((k >> 2) & 1) * side[2]};
+                for (auto at = heads[slotOf(here.tag, cell)]; at != 0; at = next[at - 1]) {
+                    const auto other = static_cast<std::size_t>(at - 1);
+                    const auto& there = ends[other];
+                    if (other / 2 == end / 2 || links[other] != none || there.tag != here.tag || there.surface != here.surface || !meets(there.point, here.point)) { continue; }
+                    // The first in order: lists run newest first.
+                    if (found == none || other < found) { found = other; }
                 }
             }
+            if (found != none) {
+                links[end] = found;
+                links[found] = end;
+            }
         }
-        return std::nullopt;
     };
-    const auto reversed = [](Piece piece) {
-        std::swap(piece.from, piece.to);
-        std::swap(piece.eyeFrom, piece.eyeTo);
-        return piece;
-    };
+    join([&](std::size_t end) { return static_cast<std::uint64_t>((pieces[end / 2].leaves >> (end % 2)) & 1 ? pieces[end / 2].other : pieces[end / 2].triangle); });
+    join([&](std::size_t end) { return static_cast<std::uint64_t>(surfaceOf(end)); });
+    // Each chain from its end joined to nothing (a loop from its first
+    // piece), in the order of their first pieces.
+    std::vector<char> used(pieces.size(), 0);
     std::vector<std::vector<Piece>> runs;
+    const auto walk = [&](std::size_t entry) {
+        auto& run = runs.emplace_back();
+        while (true) {
+            auto piece = pieces[entry / 2];
+            used[entry / 2] = 1;
+            if (entry % 2 == 1) {
+                std::swap(piece.from, piece.to);
+                std::swap(piece.eyeFrom, piece.eyeTo);
+            }
+            run.push_back(piece);
+            const auto onward = links[entry ^ 1];
+            if (onward == none || used[onward / 2]) { break; }
+            entry = onward;
+        }
+    };
     for (std::size_t start = 0; start < pieces.size(); ++start) {
         if (used[start]) { continue; }
-        used[start] = true;
-        const auto surface = triangles[pieces[start].triangle].surface;
-        std::vector<Piece> forward {pieces[start]}, backward;
-        for (auto next = nextAt(forward.back().eyeTo, surface); next.has_value(); next = nextAt(forward.back().eyeTo, surface)) {
-            used[*next] = true;
-            forward.push_back(meets(pieces[*next].eyeFrom, forward.back().eyeTo) ? pieces[*next] : reversed(pieces[*next]));
-        }
-        for (auto next = nextAt(pieces[start].eyeFrom, surface); next.has_value(); next = nextAt(backward.back().eyeFrom, surface)) {
-            used[*next] = true;
-            const auto& head = backward.empty() ? pieces[start] : backward.back();
-            backward.push_back(meets(pieces[*next].eyeTo, head.eyeFrom) ? pieces[*next] : reversed(pieces[*next]));
-        }
-        std::vector<Piece> run(backward.rbegin(), backward.rend());
-        run.insert(run.end(), forward.begin(), forward.end());
-        runs.push_back(std::move(run));
+        // Back to the chain's free end, if it has one.
+        auto entry = 2 * start;
+        while (links[entry] != none && links[entry] / 2 != start) { entry = links[entry] ^ 1; }
+        walk(links[entry] == none ? entry : 2 * start);
     }
     return runs;
 }
