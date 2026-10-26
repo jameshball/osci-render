@@ -745,10 +745,15 @@ Scene::Triangle Scene::triangle(const std::array<Vec3, 3>& corners, const std::a
 
 std::optional<Scene::Drawn> Scene::draw(Device& device, const Frame& frame) {
     Drawn drawn;
-    // The views, the camera's first: its pixels start the row.
+    // The views, the camera's first (its pixels start the row), then those
+    // read back, then the lights'.
     std::vector<const View*> views;
     if (frame.camera != nullptr) { views.push_back(frame.camera); }
+    for (const auto& view : frame.also) { views.push_back(&view); }
+    const auto firstShadow = views.size();
     for (const auto& view : frame.shadows) { views.push_back(&view); }
+    // Those read back: their pixels are a row from the first.
+    const auto readCount = frame.readShadows ? views.size() : firstShadow;
     if (views.empty()) { return drawn; }
     std::optional<Tessellation::Plan> plan;
     if (!frame.bent.empty() && !frame.diceViews.empty() && frame.chain != nullptr) {
@@ -765,13 +770,14 @@ std::optional<Scene::Drawn> Scene::draw(Device& device, const Frame& frame) {
         tileTotal += made.back().tiles;
         pixelTotal += made.back().width * made.back().height;
     }
-    const auto cameraPixels = frame.camera != nullptr ? static_cast<std::size_t>(made.front().width) * made.front().height : 0;
+    const auto pixelsOf = [&](std::size_t index) { return static_cast<std::size_t>(made[index].width) * made[index].height; };
+    const auto readPixels = readCount < views.size() ? static_cast<std::size_t>(made[readCount].firstPixel) : static_cast<std::size_t>(pixelTotal);
     // Nothing to draw: every buffer empty.
     if (count == 0) {
-        if (frame.camera != nullptr) { frame.camera->depth->adopt(std::vector<hidden::DepthBuffer::Pixel>(cameraPixels), {}, false); }
+        for (std::size_t index = 0; index < readCount; ++index) { views[index]->depth->adopt(std::vector<hidden::DepthBuffer::Pixel>(pixelsOf(index)), {}, false); }
         if (!frame.shadows.empty()) {
             auto shadows = std::make_shared<Shadows>();
-            for (std::size_t index = frame.camera != nullptr ? 1 : 0; index < views.size(); ++index) { shadows->layouts[views[index]->depth] = {made[index].firstPixel, 0, true}; }
+            for (auto index = firstShadow; index < views.size(); ++index) { shadows->layouts[views[index]->depth] = {made[index].firstPixel, 0, true}; }
             drawn.shadows = std::move(shadows);
         }
         return drawn;
@@ -829,8 +835,8 @@ std::optional<Scene::Drawn> Scene::draw(Device& device, const Frame& frame) {
                 sceneKept = work.keep(scene);
             }
             work.read(statsBuffer);
-            if (frame.camera != nullptr) {
-                work.read(pixelBuffer, cameraPixels * 8);
+            if (readCount > 0) {
+                work.read(pixelBuffer, readPixels * 8);
                 planesKept = work.keep(planeBuffer);
             }
             if (!frame.shadows.empty()) {
@@ -840,10 +846,10 @@ std::optional<Scene::Drawn> Scene::draw(Device& device, const Frame& frame) {
             const auto results = work.finish();
             if (!results.has_value()) { return std::nullopt; }
             stats = valuesOf<std::uint32_t>((*results)[0], 8 + views.size());
-            if (frame.camera != nullptr) { pixels = valuesOf<hidden::DepthBuffer::Pixel>((*results)[1], cameraPixels); }
+            if (readCount > 0) { pixels = valuesOf<hidden::DepthBuffer::Pixel>((*results)[1], readPixels); }
         }
         if (stats[1] != 0) { continue; }
-        if (frame.camera != nullptr) {
+        if (readCount > 0) {
             const auto planeCount = std::min(stats[2], planeCapacity);
             const auto gatheredCount = gather ? stats[3] : 0u;
             std::vector<hidden::DepthBuffer::DrawnPlane> planes;
@@ -866,7 +872,29 @@ std::optional<Scene::Drawn> Scene::draw(Device& device, const Frame& frame) {
                 planes = valuesOf<hidden::DepthBuffer::DrawnPlane>((*results)[0], planeCount);
                 if (gatheredCount > 0) { gathered = valuesOf<Triangle>((*results)[1], gatheredCount); }
             }
-            frame.camera->depth->adopt(pixels, planes, stats[8] > 0);
+            // Each view read back with just the planes its pixels take.
+            std::vector<std::int32_t> remap(planes.size(), -1);
+            for (std::size_t index = 0; index < readCount; ++index) {
+                const auto first = static_cast<std::size_t>(made[index].firstPixel);
+                std::vector<hidden::DepthBuffer::Pixel> own(pixels.begin() + static_cast<std::ptrdiff_t>(first), pixels.begin() + static_cast<std::ptrdiff_t>(first + pixelsOf(index)));
+                std::vector<hidden::DepthBuffer::DrawnPlane> used;
+                std::vector<std::size_t> taken;
+                for (auto& pixel : own) {
+                    const auto owner = static_cast<std::size_t>(pixel.owner);
+                    if (!(pixel.w > 0) || owner >= planes.size()) {
+                        pixel = {};
+                        continue;
+                    }
+                    if (remap[owner] < 0) {
+                        remap[owner] = static_cast<std::int32_t>(used.size());
+                        used.push_back(planes[owner]);
+                        taken.push_back(owner);
+                    }
+                    pixel.owner = remap[owner];
+                }
+                for (const auto owner : taken) { remap[owner] = -1; }
+                views[index]->depth->adopt(own, used, stats[8 + index] > 0);
+            }
             drawn.triangles.reserve(gathered.size());
             drawn.sources.reserve(gathered.size());
             for (const auto& each : gathered) {
@@ -879,7 +907,7 @@ std::optional<Scene::Drawn> Scene::draw(Device& device, const Frame& frame) {
             auto shadows = std::make_shared<Shadows>();
             shadows->pixels = std::move(pixelsKept);
             shadows->planes = std::move(lightKept);
-            for (std::size_t index = frame.camera != nullptr ? 1 : 0; index < views.size(); ++index) { shadows->layouts[views[index]->depth] = {made[index].firstPixel, 0, stats[8 + index] == 0}; }
+            for (auto index = firstShadow; index < views.size(); ++index) { shadows->layouts[views[index]->depth] = {made[index].firstPixel, 0, stats[8 + index] == 0}; }
             drawn.shadows = std::move(shadows);
         }
         return drawn;

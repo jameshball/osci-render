@@ -26,8 +26,9 @@ struct Shadows {
 // (cut at the near plane, a pixel taking the nearest triangle at its centre,
 // the first drawn where two are as near), and kept with only the planes its
 // pixels take. The camera's buffer is read back for what reads it on the
-// CPU, with the solid triangles it sees for crossings found there; lights'
-// buffers stay for lighting there.
+// CPU, with the solid triangles it sees for crossings found there, as are
+// any others asked for; lights' buffers stay for lighting there (and are
+// read back too when the CPU lights by them as well).
 class Scene {
 public:
     // A triangle as the kernels read it: its corners (in the scene, or an
@@ -54,8 +55,9 @@ public:
     // What a frame draws: its faces (`flat` as placed; `bent` cut for
     // `diceViews`, through `chain`), and its views, all drawn together: the
     // camera's (none, or one), read back into its depth buffer, with the
-    // solid triangles that show at all (see dropUnseen) when `gather`; and
-    // lights' views, kept on the GPU.
+    // solid triangles that show at all (see dropUnseen) when `gather`; `also`
+    // others read back into theirs; and lights' views, kept on the GPU, and
+    // read back into theirs too when `readShadows`.
     struct Frame {
         const ChainBatch* chain = nullptr;
         std::span<const Tessellation::Face> bent;
@@ -63,7 +65,9 @@ public:
         std::span<const hidden::DiceView> diceViews;
         const View* camera = nullptr;
         bool gather = false;
+        std::span<const View> also;
         std::span<const View> shadows;
+        bool readShadows = false;
     };
     // What the camera's view gathered: each solid triangle that shows, in
     // its eye space, with its points before the chain; and the lights'

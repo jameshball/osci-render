@@ -304,9 +304,10 @@ struct Workspace {
     // What the lights' shadows were last drawn from: each light's place, and
     // every surface's drawing (its source kept alive, so its address is
     // never another's) and corners. While none changes, nor bends, the
-    // shadows are the same and are kept.
+    // shadows are the same and are kept; and where they were drawn: kept on
+    // the GPU, and read on the CPU (drawn there, or read back).
     struct ShadowsDrawnFrom {
-        bool valid = false, onGpu = false;
+        bool valid = false, onGpu = false, onCpu = false;
         std::vector<LightState> lights;
         std::vector<std::shared_ptr<const PreparedSource>> sources;
         std::vector<const PreparedDrawing*> drawings;
