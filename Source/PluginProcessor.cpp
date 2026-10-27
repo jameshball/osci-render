@@ -68,6 +68,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     premiumEffects.push_back(VortexEffect().withIcon(BinaryData::vortex_svg).build());
     premiumEffects.push_back(GodRayEffect().withIcon(BinaryData::god_ray_svg).build());
     premiumEffects.push_back(SpiralBitCrushEffect().withIcon(BinaryData::spiral_bitcrush_svg).build());
+    premiumEffects.push_back(PhaseModEffect().withIcon(BinaryData::bicycle_svg).build());
 
     for (auto& premiumEffect : premiumEffects) {
         premiumEffect->setPremiumOnly(true);
