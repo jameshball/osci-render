@@ -1,0 +1,217 @@
+#pragma once
+
+#include "MotionStyle.h"
+#include "BakeSettingsPanel.h"
+#include <osci_scripting/osci_scripting.h>
+
+// Writes a Lua source inside the Scene, like the text and drawing editors:
+// the code fills the page edge to edge, a problem shows on its line and in a
+// strip under the code (a click goes to it), and the bake settings sit at
+// the foot. Applying (the header's button or Cmd+Return) bakes and closes.
+class MotionLuaSourceEditor final : public juce::Component, private juce::CodeDocument::Listener {
+public:
+    MotionLuaSourceEditor(const juce::String& code, const juce::String& title, motion::BakeSettings settings, bool editing, const juce::String& preparationError)
+        : model("motion-source-draft", "Lua source", code), editor(model, editorOptions()), baking(settings), original(code), originalSettings(settings), sourceName(title), mode(editing ? "Editing" : "New Lua source") {
+        setName("Lua source editor");
+        setWantsKeyboardFocus(true);
+        cancelButton.setButtonText("Cancel");
+        cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
+        addAndMakeVisible(cancelButton);
+        auto& bake = baking.bakeButton();
+        bake.setButtonText(editing ? "Apply" : "Add");
+        bake.setTitle("Bake source");
+        bake.setTooltip((editing ? "Bake the source with these changes (" : "Bake the source and add it (") + motion::style::shortcutText("Cmd+Return") + ")");
+        motion::style::makePrimary(bake);
+        addAndMakeVisible(bake);
+        baking.onBake = [this](motion::BakeSettings values) {
+            // The code as it stands already failed: say so here, at its line,
+            // rather than bake it all to fail again.
+            if (problem.isVisible() && !stale) {
+                refuse();
+                return;
+            }
+            if (onDone) { onDone(values, model.getCode()); }
+        };
+        baking.onChanged = [this] { if (onChanged) { onChanged(); } };
+        addAndMakeVisible(baking);
+        // The code sits on the Scene's dark page. The shared editor's frame
+        // and button row fall outside the clip, leaving only the code.
+        auto& codeView = editor.getEditor();
+        codeView.setFont(motion::style::mono());
+        codeView.setColour(juce::CodeEditorComponent::backgroundColourId, osci::Colours::veryDark());
+        // Line numbers sit on the page itself, so the code's top margin is
+        // one continuous surface.
+        codeView.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, osci::Colours::veryDark());
+        codeView.setColour(juce::CodeEditorComponent::lineNumberTextId, osci::Colours::textMuted().withAlpha(.4f));
+        codeView.setColour(juce::CodeEditorComponent::highlightColourId, motion::style::accent().withAlpha(.3f));
+        codeView.setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.09f));
+        codeView.setScrollbarThickness(5);
+        codeView.setColour(juce::ScrollBar::trackColourId, juce::Colours::transparentBlack);
+        codeFrame.addAndMakeVisible(editor);
+        addAndMakeVisible(codeFrame);
+        problem.setName("Source preparation error");
+        problem.setFont(motion::style::body());
+        problem.setColour(juce::Label::textColourId, osci::Colours::text());
+        problem.setBorderSize({});
+        problem.setText(preparationError, juce::dontSendNotification);
+        problem.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        problem.addMouseListener(this, false);
+        addChildComponent(problem);
+        problem.setVisible(preparationError.isNotEmpty());
+        // A runtime error names its line ("Line 12: attempt to..."); mark it
+        // in the code as a syntax error would be.
+        problemLine = errorLine(preparationError);
+        if (problemLine > 0) { static_cast<ErrorListener&>(model).onError(problemLine, preparationError.fromFirstOccurrenceOf(":", false, false).trim()); }
+        codeView.getDocument().addListener(this);
+    }
+    ~MotionLuaSourceEditor() override { editor.getEditor().getDocument().removeListener(this); }
+
+    std::function<void(motion::BakeSettings, const juce::String&)> onDone;
+    std::function<void()> onCancel;
+    // The code or its settings changed: the Scope shows them as they bake.
+    std::function<void()> onChanged;
+    void focusCode() { editor.getEditor().grabKeyboardFocus(); }
+    juce::String code() const { return model.getCode(); }
+    motion::BakeSettings settings() const { return baking.currentSettings(); }
+    // What baking the code as it stands said: its problem, on its line and
+    // in the strip, or none.
+    void showLiveProblem(const juce::String& message) {
+        stale = false;
+        problemLine = errorLine(message);
+        model.clearDiagnostic();
+        if (problemLine > 0) { static_cast<ErrorListener&>(model).onError(problemLine, message.fromFirstOccurrenceOf(":", false, false).trim()); }
+        problem.setColour(juce::Label::textColourId, osci::Colours::text());
+        // Refused for this problem, it still says so while the code is unchanged.
+        problem.setText(refused && message.isNotEmpty() ? refusal + message : message, juce::dontSendNotification);
+        motion::style::tooltipWhenCut(problem);
+        if (problem.isVisible() != message.isNotEmpty()) {
+            problem.setVisible(message.isNotEmpty());
+            resized();
+        }
+        repaint();
+    }
+
+    void resized() override {
+        titleArea = motion::style::sceneEditor::layoutHeader(getLocalBounds(), baking.bakeButton(), cancelButton);
+        auto page = motion::style::sceneEditor::page(getLocalBounds());
+        constexpr auto inset = motion::style::sceneEditor::inset;
+        footer = page.removeFromBottom(MotionBakeSettingsPanel::preferredHeight + motion::style::padding);
+        baking.setBounds(footer.reduced(inset, 0).withTrimmedBottom(motion::style::padding));
+        strip = problem.isVisible() ? page.removeFromBottom(problemHeight) : juce::Rectangle<int>();
+        problem.setBounds(strip.withTrimmedLeft(inset + 14).withTrimmedRight(inset));
+        motion::style::tooltipWhenCut(problem);
+        // The first line breathes below the header.
+        codeFrame.setBounds(page.withTrimmedTop(motion::style::padding));
+        page = codeFrame.getLocalBounds();
+        // The shared editor draws a frame and a button row around its code;
+        // place it so only the code shows, filling the page.
+        constexpr int frame = 5, header = 28;
+        editor.setBounds(-frame, -header, page.getWidth() + 2 * frame, page.getHeight() + header + frame);
+    }
+
+    void paint(juce::Graphics& g) override {
+        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".lua", mode, problem.isVisible() && !stale);
+        // The bake settings: a rule above, on the page's colour.
+        g.setColour(osci::Colours::surface());
+        g.fillRect(footer);
+        g.setColour(motion::style::hairline());
+        g.fillRect(footer.removeFromTop(1));
+        if (problem.isVisible()) {
+            // Once the code changes the problem is the last bake's, dimmed.
+            g.setColour(motion::style::error().withAlpha(stale ? .04f : .1f));
+            g.fillRect(strip);
+            g.setColour(motion::style::error().withAlpha(stale ? .45f : 1.0f));
+            g.fillRect(strip.withHeight(1));
+            g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(strip.getX() + motion::style::sceneEditor::inset) + 3.0f, static_cast<float>(strip.getCentreY())}));
+        }
+    }
+
+    void mouseUp(const juce::MouseEvent& event) override {
+        // The problem strip goes to the line it names.
+        if (event.eventComponent == &problem) { goToProblem(); }
+    }
+
+    bool keyPressed(const juce::KeyPress& key) override {
+        const auto command = key.getModifiers().isCommandDown();
+        if (command && key.getKeyCode() == juce::KeyPress::returnKey) {
+            baking.bakeButton().triggerClick();
+            return true;
+        }
+        // Escape leaves untouched code; edits need Cancel, so work is never lost.
+        if (key == juce::KeyPress::escapeKey) {
+            if (model.getCode() == original && baking.currentSettings() == originalSettings && onCancel) { onCancel(); }
+            return true;
+        }
+        // Other shortcuts would act on the timeline behind the editor.
+        const auto letter = osci::shortcutKey(key);
+        return command && letter != 'S' && letter != 'Z' && letter != 'C' && letter != 'V' && letter != 'X' && letter != 'A';
+    }
+
+private:
+    void codeDocumentTextInserted(const juce::String&, int) override { codeChanged(); }
+    void codeDocumentTextDeleted(int, int) override { codeChanged(); }
+    void codeChanged() {
+        refused = false;
+        markStale();
+        if (onChanged) { onChanged(); }
+    }
+    void goToProblem() {
+        if (problemLine <= 0) { return; }
+        auto& codeView = editor.getEditor();
+        const juce::CodeDocument::Position position(codeView.getDocument(), problemLine - 1, 0);
+        codeView.moveCaretTo(position, false);
+        codeView.scrollToKeepCaretOnScreen();
+        codeView.grabKeyboardFocus();
+    }
+    // Add or Apply pressed while the code has a problem.
+    void refuse() {
+        refused = true;
+        const auto text = problem.getText();
+        if (!text.startsWith(refusal)) {
+            problem.setText(refusal + text, juce::dontSendNotification);
+            motion::style::tooltipWhenCut(problem);
+        }
+        // The panel turns its button off as it asks to bake.
+        baking.bakeButton().setEnabled(true);
+        goToProblem();
+        repaint();
+    }
+    bool refused = false;
+    static constexpr const char* refusal = "Fix this first: ";
+    void markStale() {
+        if (stale || !problem.isVisible()) { return; }
+        stale = true;
+        problem.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+        const auto text = problem.getText();
+        const auto bare = text.startsWith(refusal) ? text.substring(juce::String(refusal).length()) : text;
+        problem.setText(bare + "  (last bake)", juce::dontSendNotification);
+        motion::style::tooltipWhenCut(problem);
+        repaint();
+    }
+    static constexpr int problemHeight = 28;
+    // "Line 12: ..." from a bake, or "...]:12: ..." from Lua itself.
+    static int errorLine(const juce::String& message) {
+        if (message.startsWith("Line ")) { return message.substring(5).getIntValue(); }
+        const auto at = message.indexOf("]:");
+        if (at < 0) { return 0; }
+        return message.substring(at + 2).getIntValue();
+    }
+    static osci::LuaScriptEditorComponent::Options editorOptions() {
+        osci::LuaScriptEditorComponent::Options options;
+        options.showTitle = false;
+        options.showConsole = false;
+        return options;
+    }
+    osci::LuaScriptEditorModel model;
+    osci::LuaScriptEditorComponent editor;
+    MotionBakeSettingsPanel baking;
+    const juce::String original;
+    const motion::BakeSettings originalSettings;
+    const juce::String sourceName, mode;
+    juce::Rectangle<int> titleArea, footer, strip;
+    juce::Component codeFrame;
+    juce::Label problem;
+    int problemLine = 0;
+    bool stale = false;
+    juce::TextButton cancelButton;
+};

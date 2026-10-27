@@ -1,0 +1,159 @@
+#pragma once
+
+#include "Sheet.h"
+#include "TypedNumber.h"
+
+#include "../model/TimeGrid.h"
+
+// Names a marker and places it, in the ruler's notation: Add for a new one,
+// Apply for one that's `existing`.
+class MotionMarkerPanel final : public motion::ui::Popover {
+public:
+    MotionMarkerPanel(juce::String initialName, double seconds, motion::TimeGrid grid, double duration, bool existing)
+        : Popover("Marker", existing ? "Apply" : "Add", existing ? "Apply marker" : "Add marker"), grid(grid), duration(duration), originalTime(seconds) {
+        name.setName("Marker name");
+        position.setName("Marker position");
+        name.setText(initialName, false);
+        initialPosition = juce::String(grid.positionLabel(seconds));
+        position.setText(initialPosition, false);
+        position.setTooltip("Type a time as the ruler shows it, or add s for seconds or f for frames.");
+        // Positions read like the other number fields: right-aligned.
+        position.setJustification(juce::Justification::centredRight);
+        name.setJustification(juce::Justification::centredLeft);
+        for (auto* field : {&name, &position}) {
+            field->setFont(motion::style::body());
+            field->setSelectAllWhenFocused(true);
+            field->onTextChange = [this] { refresh(); };
+            field->onReturnKey = [this] { primary.triggerClick(); };
+            addAndMakeVisible(*field);
+        }
+        nameLabel.setText("Name", juce::dontSendNotification);
+        positionLabel.setText("Position", juce::dontSendNotification);
+        motion::ui::Sheet::styleCaption(nameLabel);
+        motion::ui::Sheet::styleCaption(positionLabel);
+        primary.onClick = [this] { if (time.has_value() && primary.isEnabled() && onApply) { onApply(name.getText().trim(), *time); } };
+        addAndMakeVisible(nameLabel);
+        addAndMakeVisible(positionLabel);
+        setSize(widthFor(256), heightFor(2));
+        refresh();
+    }
+    std::function<void(juce::String, double)> onApply;
+
+protected:
+    void layoutBody(juce::Rectangle<int> area) override {
+        formRow(area, nameLabel, name);
+        formRow(area, positionLabel, position, number);
+    }
+
+private:
+    void refresh() {
+        time = position.getText() == initialPosition ? std::optional<double>(originalTime) : grid.parsePosition(position.getText().toStdString());
+        const bool validName = motion::Marker::validName(name.getText().trim());
+        const bool validTime = time.has_value() && *time >= 0 && *time <= duration;
+        primary.setEnabled(validName && validTime);
+        setError(!validName ? juce::String::fromUTF8("Name: 1\xe2\x80\x93") + juce::String(motion::Marker::longestName) + " characters" : !validTime ? "Outside the composition" : "");
+    }
+    motion::TimeGrid grid;
+    double duration, originalTime;
+    juce::String initialPosition;
+    std::optional<double> time;
+    juce::TextEditor name, position;
+    juce::Label nameLabel, positionLabel;
+};
+
+// Adds or edits one tempo change: the tempo from a beat onwards (Add for a
+// new one, Apply for one that's `existing`).
+class MotionTempoPanel final : public motion::ui::Popover {
+public:
+    MotionTempoPanel(double beat, double bpm, int beatsPerBar, bool existing, bool ramped = false)
+        : Popover("Tempo change", existing ? "Apply" : "Add", existing ? "Apply tempo" : "Add tempo") {
+        const auto bar = std::max(1, beatsPerBar);
+        detail = "Bar " + juce::String(static_cast<int>(std::floor(beat / bar)) + 1) + ", beat " + juce::String(beat - bar * std::floor(beat / bar) + 1, beat == std::round(beat) ? 0 : 2);
+        ramp.setToggleState(ramped, juce::dontSendNotification);
+        ramp.setTooltip("Off, the tempo jumps here; on, it changes smoothly from the previous tempo point");
+        tempo.setName("Tempo change BPM");
+        tempo.setTitle("Tempo change BPM");
+        tempo.setText(juce::String(bpm, bpm == std::round(bpm) ? 0 : 2), false);
+        tempo.setFont(motion::style::body());
+        tempo.setJustification(juce::Justification::centredRight);
+        // The unit sits inside the field, after the number.
+        tempo.setBorder({1, 1, 1, unitWidth});
+        tempo.setSelectAllWhenFocused(true);
+        tempo.setInputRestrictions(8, "0123456789.");
+        tempo.onTextChange = [this] { refresh(); };
+        tempo.onReturnKey = [this] { primary.triggerClick(); };
+        tempoLabel.setText("Tempo", juce::dontSendNotification);
+        rampLabel.setText("Glide in", juce::dontSendNotification);
+        unit.setText("BPM", juce::dontSendNotification);
+        for (auto* label : {&tempoLabel, &rampLabel, &unit}) { motion::ui::Sheet::styleCaption(*label); }
+        unit.setInterceptsMouseClicks(false, false);
+        primary.onClick = [this] {
+            const auto value = motion::ui::parseNumber(tempo.getText());
+            if (primary.isEnabled() && value.has_value() && onApply) { onApply(*value, ramp.getToggleState()); }
+        };
+        for (auto* component : std::initializer_list<juce::Component*>{&tempo, &tempoLabel, &unit, &rampLabel, &ramp}) { addAndMakeVisible(component); }
+        setSize(widthFor(256), heightFor(2));
+        refresh();
+    }
+    std::function<void(double, bool)> onApply;
+
+protected:
+    void layoutBody(juce::Rectangle<int> area) override {
+        auto line = area.removeFromTop(row);
+        tempoLabel.setBounds(line.removeFromLeft(caption));
+        tempo.setBounds(line.removeFromLeft(number));
+        unit.setBounds(tempo.getBounds().removeFromRight(unitWidth - 2));
+        area.removeFromTop(rowGap);
+        line = area.removeFromTop(row);
+        rampLabel.setBounds(line.removeFromLeft(caption));
+        ramp.setBounds(line.removeFromLeft(motion::ui::Switch::width + 4));
+    }
+
+private:
+    void refresh() {
+        const auto value = motion::ui::parseNumber(tempo.getText()).value_or(0);
+        const bool valid = value >= 1 && value <= 1000;
+        primary.setEnabled(valid);
+        setError(valid ? juce::String() : juce::String::fromUTF8("Tempo: 1\xe2\x80\x93" "1000 BPM"));
+    }
+    static constexpr int unitWidth = 36;
+    juce::TextEditor tempo;
+    juce::Label tempoLabel, rampLabel, unit;
+    motion::ui::Switch ramp {"Glide into tempo"};
+};
+
+// Names the part being extracted; the rest keeps its source's name.
+class MotionExtractPanel final : public motion::ui::Popover {
+public:
+    explicit MotionExtractPanel(juce::String initialName) : Popover("Extract parts", "Extract", "Extract with this name") {
+        name.setName("Part name");
+        name.setTitle("Part name");
+        name.setText(initialName, false);
+        name.setJustification(juce::Justification::centredLeft);
+        name.setFont(motion::style::body());
+        name.setSelectAllWhenFocused(true);
+        name.onTextChange = [this] { refresh(); };
+        name.onReturnKey = [this] { primary.triggerClick(); };
+        addAndMakeVisible(name);
+        nameLabel.setText("Name", juce::dontSendNotification);
+        motion::ui::Sheet::styleCaption(nameLabel);
+        addAndMakeVisible(nameLabel);
+        primary.onClick = [this] { if (primary.isEnabled() && onApply) { onApply(name.getText().trim()); } };
+        setSize(widthFor(256), heightFor(1));
+        refresh();
+    }
+    std::function<void(juce::String)> onApply;
+
+protected:
+    void layoutBody(juce::Rectangle<int> area) override { formRow(area, nameLabel, name); }
+
+private:
+    void refresh() {
+        const auto text = name.getText().trim();
+        const auto valid = text.isNotEmpty() && text.length() <= 200;
+        primary.setEnabled(valid);
+        setError(valid ? juce::String() : juce::String::fromUTF8("Name: 1\xe2\x80\x93" "200 characters"));
+    }
+    juce::TextEditor name;
+    juce::Label nameLabel;
+};

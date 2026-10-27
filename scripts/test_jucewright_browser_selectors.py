@@ -48,6 +48,27 @@ class BrowserSelectorTests(unittest.TestCase):
             rows = ControlDiscoveryMixin().discover_visible_controls(path, 0)
         self.assertEqual(rows, [("toggle", "button", "set-checked", "true", "Diagnostic log")])
 
+    def test_dynamic_control_refresh_resolves_recreated_control(self):
+        original = {"ref": "old", "role": "slider", "name": "Smoothing", "class": "juce::Slider"}
+        replacement = {"ref": "new", "role": "slider", "name": "Smoothing", "class": "juce::Slider"}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "snapshot.json"
+            path.write_text(json.dumps({"tree": {"class": "SettingsWindow", "name": "Visualiser Settings", "children": [replacement]}}))
+            mixin = ControlDiscoveryMixin()
+            identity = mixin.control_identity(original, ({"class": "SettingsWindow", "name": "Visualiser Settings"}, original))
+            self.assertEqual(mixin.resolve_control_ref(path, identity), "new")
+
+    def test_dynamic_control_refresh_skips_ambiguous_controls(self):
+        first = {"ref": "first", "role": "slider", "name": "Slider", "class": "juce::Slider"}
+        second = {"ref": "second", "role": "slider", "name": "Slider", "class": "juce::Slider"}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "snapshot.json"
+            root = {"class": "SettingsWindow", "name": "Visualiser Settings", "children": [first, second]}
+            path.write_text(json.dumps({"tree": root}))
+            mixin = ControlDiscoveryMixin()
+            identity = mixin.control_identity(first, (root, first))
+            self.assertIsNone(mixin.resolve_control_ref(path, identity))
+
     def test_switch_waits_for_actionability_before_snapshot(self):
         run = object.__new__(OsciRenderBrowserRun)
         commands = []

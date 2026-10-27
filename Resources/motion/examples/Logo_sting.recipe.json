@@ -1,0 +1,201 @@
+{
+  "name": "Logo sting",
+  "description": "A logo unwinds out of a vortex, lands with a pulse and a shockwave, and the name rises beneath it. Replace the logo with your own SVG to make it yours.",
+  "picture": 3.4,
+  "duration": 6,
+  "fps": 60,
+  "export": {
+    "width": 1920,
+    "height": 1080
+  },
+  "beam": {
+    "intensity": 6,
+    "persistence": 0.5,
+    "glow": 0.4
+  },
+  "objects": [
+    {
+      "name": "Logo",
+      "file": "Logo_sting_mark.svg",
+      "properties": {
+        "position.y": 0.2,
+        "scale.x": 0.85,
+        "scale.y": 0.85
+      },
+      "keys": {
+        "rotation.z": [
+          [
+            0,
+            -180
+          ],
+          [
+            1.6,
+            0
+          ]
+        ],
+        "opacity": [
+          [
+            0,
+            100
+          ],
+          [
+            5,
+            100
+          ],
+          [
+            5.8,
+            0
+          ]
+        ],
+        "scale.x": [
+          [
+            0,
+            0.85
+          ],
+          [
+            5,
+            0.85
+          ],
+          [
+            5.8,
+            1.0
+          ]
+        ],
+        "scale.y": [
+          [
+            0,
+            0.85
+          ],
+          [
+            5,
+            0.85
+          ],
+          [
+            5.8,
+            1.0
+          ]
+        ]
+      },
+      "effects": [
+        {
+          "type": "vortex",
+          "name": "Unwind",
+          "properties": {
+            "vortexAmount": 3
+          },
+          "keys": {
+            "strength": [
+              [
+                0,
+                1
+              ],
+              [
+                1.6,
+                0
+              ]
+            ]
+          }
+        },
+        {
+          "type": "bulge",
+          "name": "Land",
+          "keys": {
+            "strength": [
+              [
+                1.55,
+                0
+              ],
+              [
+                1.75,
+                0.45
+              ],
+              [
+                2.2,
+                0
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shockwave",
+      "generator": "ellipse",
+      "start": 1.6,
+      "duration": 0.5,
+      "properties": {
+        "position.y": 0.2,
+        "generator.width": 1.56,
+        "generator.height": 1.56
+      },
+      "keys": {
+        "scale.x": [
+          [
+            0,
+            1
+          ],
+          [
+            0.5,
+            1.7
+          ]
+        ],
+        "scale.y": [
+          [
+            0,
+            1
+          ],
+          [
+            0.5,
+            1.7
+          ]
+        ],
+        "opacity": [
+          [
+            0,
+            70
+          ],
+          [
+            0.5,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Name",
+      "text": "YOUR NAME",
+      "start": 2.1,
+      "typography": {
+        "bold": true,
+        "align": "centre",
+        "tracking": 0.2,
+        "animation": "rise",
+        "characterDelay": 0.05,
+        "characterDuration": 0.45,
+        "amount": 0.5,
+        "hold": 30
+      },
+      "properties": {
+        "position.y": -0.78,
+        "scale.x": 0.5,
+        "scale.y": 0.5
+      },
+      "keys": {
+        "opacity": [
+          [
+            0,
+            100
+          ],
+          [
+            2.9,
+            100
+          ],
+          [
+            3.7,
+            0
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -2,8 +2,11 @@
 
 juce::Point<int> AboutComponent::preferredSize(const Info& info) {
     float h = kPad + kLogoH + 6.0f + 24.0f + 18.0f + 16.0f + kGap;
-    h += kCardPad + 20.0f + (float)info.credits.size() * kRowH + 18.0f + kCardPad;
-    h += kGap;
+    // A product without credits yet shows no contributors card.
+    if (!info.credits.empty()) {
+        h += kCardPad + 20.0f + (float)info.credits.size() * kRowH + 18.0f + kCardPad;
+        h += kGap;
+    }
     h += kCardPad + 16.0f + (info.blenderPort > 0 ? 16.0f : 0.0f) + kCardPad;
     h += kGap + kBtnH + kPad;
     return { 520, (int)std::ceil(h) };
@@ -81,7 +84,7 @@ void AboutComponent::paint(juce::Graphics& g) {
     area.removeFromTop(kGap);
 
     // --- Credits card ---
-    {
+    if (!info.credits.empty()) {
         float cardH = kCardPad + 20.0f + (float)info.credits.size() * kRowH + 18.0f + kCardPad;
         auto card = area.removeFromTop(cardH);
         paintCard(g, card);
@@ -108,9 +111,8 @@ void AboutComponent::paint(juce::Graphics& g) {
         g.setFont(juce::FontOptions(11.0f, juce::Font::italic));
         g.setColour(juce::Colours::white.withAlpha(0.6f));
         g.drawText("...and all the community!", inner.removeFromTop(18.0f), juce::Justification::centredLeft);
+        area.removeFromTop(kGap);
     }
-
-    area.removeFromTop(kGap);
 
     // --- System info card ---
     {

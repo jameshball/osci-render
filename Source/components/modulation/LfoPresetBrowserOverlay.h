@@ -50,7 +50,7 @@ private:
         void paint(juce::Graphics& g) override;
         void resized() override;
 
-        juce::Viewport viewport;
+        osci::ScrollFadeViewport viewport;
         juce::Component contentComp;
         osci::TextEditor saveEditor;
         juce::TextButton saveButton;
@@ -58,7 +58,7 @@ private:
     };
 
     BrowserPanel browserPanel;
-    juce::Viewport& viewport = browserPanel.viewport;
+    osci::ScrollFadeViewport& viewport = browserPanel.viewport;
     juce::Component& content = browserPanel.contentComp;
     osci::TextEditor& saveEditor = browserPanel.saveEditor;
     juce::TextButton& saveButton = browserPanel.saveButton;

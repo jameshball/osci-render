@@ -4,7 +4,7 @@
 #include <osci_gui/osci_gui.h>
 #include "../ModulationState.h"
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 class OscirenderAudioProcessor;
 #endif
 
@@ -74,7 +74,7 @@ public:
 
     void mouseDown(const juce::MouseEvent& event) override;
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     // Wire standard modulation callbacks (LFO + envelope drop, query) to the processor.
     // Call this after construction to enable modulation for this slider.
     void wireModulation(OscirenderAudioProcessor& processor);

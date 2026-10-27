@@ -1,0 +1,611 @@
+#include "EffectStack.h"
+#include "../model/KeyEdit.h"
+
+namespace {
+// The nearest key after (or before) a time, never the key at it.
+std::optional<double> neighbourKey(const motion::Curve& curve, double time, bool forward) {
+    const auto& keys = curve.keyframes();
+    const auto apart = [time](const auto& key) { return !motion::sameTime(key.time, time); };
+    if (forward) {
+        const auto found = std::find_if(keys.begin(), keys.end(), [&](const auto& key) { return key.time > time && apart(key); });
+        return found == keys.end() ? std::nullopt : std::optional<double>(found->time);
+    }
+    const auto found = std::find_if(keys.rbegin(), keys.rend(), [&](const auto& key) { return key.time < time && apart(key); });
+    return found == keys.rend() ? std::nullopt : std::optional<double>(found->time);
+}
+}
+
+void MotionEffectStack::setOwner(std::optional<motion::Id> value, motion::Id clip) {
+    if (value != owner || clip != context) {
+        cancelGesture();
+        cancelledGesture = false;
+        owner = value;
+        context = clip;
+    }
+    refresh();
+}
+
+void MotionEffectStack::setDragActive(bool active) {
+    if (dragActive == active) { return; }
+    dragActive = active;
+    resized();
+    if (onHeightChanged) { onHeightChanged(); }
+    repaint();
+}
+
+int MotionEffectStack::preferredHeight() const {
+    if (!owner.has_value()) { return 0; }
+    int height = 0;
+    for (const auto& card : cards) { height += card->preferredHeight() + Card::spacing; }
+    // With none, the hint sits beside the heading, so nothing is left here
+    // but the drop zone while an effect is dragged.
+    if (cards.empty() && dragActive) { height += dropZoneHeight; }
+    if (!stages.empty()) { height += chipHeight + (height > 0 ? motion::style::padding : 0); }
+    return height;
+}
+
+void MotionEffectStack::refresh() {
+    const auto& project = processor.document.project();
+    const auto* effects = owner.has_value() ? motion::findEffectOwner(project, *owner) : nullptr;
+    std::vector<motion::Id> ids;
+    if (effects != nullptr) {
+        for (const auto& effect : *effects) { ids.push_back(effect.id); }
+    }
+    std::optional<motion::Id> added;
+    if (owner == listedOwner && ids.size() == listed.size() + 1) {
+        for (const auto id : ids) {
+            if (std::find(listed.begin(), listed.end(), id) == listed.end()) { added = id; }
+        }
+    }
+    if (ids != listed || owner != listedOwner) {
+        cancelGesture();
+        cancelledGesture = false;
+        listed = ids;
+        listedOwner = owner;
+        cards.clear();
+        cardShift.clear();
+        // A hover over the old cards no longer names a card here.
+        dragged = gapIndex = -1;
+        for (const auto id : ids) {
+            auto card = std::make_unique<Card>(*this, id);
+            addAndMakeVisible(*card);
+            cards.push_back(std::move(card));
+        }
+    }
+    for (auto& card : cards) { card->update(); }
+    refreshStages();
+    resized();
+    if (onHeightChanged) { onHeightChanged(); }
+    if (added.has_value() && onReveal) {
+        for (auto& card : cards) {
+            if (card->getEffectId() == *added) { onReveal(*card); }
+        }
+    }
+    repaint();
+}
+
+void MotionEffectStack::resized() {
+    auto area = getLocalBounds();
+    for (std::size_t index = 0; index < cards.size(); ++index) {
+        cards[index]->setBounds(area.removeFromTop(cards[index]->preferredHeight()));
+        area.removeFromTop(Card::spacing);
+    }
+    dropZone = dragActive && cards.empty() ? area.removeFromTop(dropZoneHeight) : juce::Rectangle<int>();
+    // Where effects come from, said beside the heading while there are none.
+    getProperties().set(motion::style::headingNote, owner.has_value() && !dragActive && cards.empty() ? juce::String("drag from the Effects tab") : juce::String());
+    if (!stages.empty()) {
+        if (area.getY() > 0) { area.removeFromTop(motion::style::padding); }
+        auto row = area.removeFromTop(chipHeight);
+        stagesCaption = row.removeFromLeft(72);
+        for (auto& chip : stages) {
+            const auto width = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), chip->getButtonText()) + 16;
+            chip->setBounds(row.removeFromLeft(std::min(width, row.getWidth())));
+            row.removeFromLeft(motion::style::gap);
+        }
+    }
+}
+
+void MotionEffectStack::paint(juce::Graphics& g) {
+    if (!stages.empty()) {
+        g.setColour(osci::Colours::textMuted().withAlpha(.6f));
+        g.setFont(motion::style::caption());
+        g.drawText("Also applied", stagesCaption, juce::Justification::centredLeft, false);
+    }
+    if (!dropZone.isEmpty()) {
+        g.setColour(motion::style::accent().withAlpha(dropHover ? .18f : .07f));
+        g.fillRoundedRectangle(dropZone.toFloat(), motion::style::radiusControl);
+        const float dashes[] {4.0f, 3.0f};
+        juce::Path outline, dashed;
+        outline.addRoundedRectangle(dropZone.toFloat().reduced(.5f), motion::style::radiusControl);
+        juce::PathStrokeType(1.0f).createDashedStroke(dashed, outline, dashes, 2);
+        g.setColour(motion::style::accent().withAlpha(dropHover ? .9f : .45f));
+        g.fillPath(dashed);
+    }
+}
+
+bool MotionEffectStack::locked(motion::Id id) const {
+    const auto target = motion::findPropertyTarget(processor.document.project(), id);
+    return target.has_value() && target->locked;
+}
+
+bool MotionEffectStack::isInterestedInDragSource(const SourceDetails& details) {
+    const auto value = details.description.toString();
+    return owner.has_value() && !locked(*owner) && (value.startsWith("motion-effect:") || value.startsWith("motion-effect-instance:"));
+}
+
+void MotionEffectStack::itemDragMove(const SourceDetails& details) {
+    dropHover = true;
+    const auto value = details.description.toString();
+    const auto moving = value.startsWith("motion-effect-instance:") ? static_cast<motion::Id>(value.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()) : motion::Id();
+    const auto found = std::find(listed.begin(), listed.end(), moving);
+    dragged = found != listed.end() ? static_cast<int>(found - listed.begin()) : -1;
+    gapIndex = cards.empty() ? -1 : insertionIndex(details.localPosition.y);
+    gapHeight = dragged >= 0 ? cards[static_cast<std::size_t>(dragged)]->getHeight() + Card::spacing : 40;
+    // Restarting a running timer on every move would postpone its ticks.
+    if (!cardAnimation.isTimerRunning()) { cardAnimation.startTimerHz(60); }
+    repaint();
+}
+
+void MotionEffectStack::itemDragExit(const SourceDetails&) {
+    dropHover = false;
+    dragged = gapIndex = -1;
+    if (!cardAnimation.isTimerRunning()) { cardAnimation.startTimerHz(60); }
+    repaint();
+}
+
+void MotionEffectStack::itemDropped(const SourceDetails& details) {
+    dropHover = false;
+    dragged = gapIndex = -1;
+    settleCards();
+    const auto index = insertionIndex(details.localPosition.y);
+    const auto value = details.description.toString();
+    if (value.startsWith("motion-effect:")) {
+        addEffect(value.fromFirstOccurrenceOf(":", false, false).toStdString(), index);
+    } else {
+        move(static_cast<motion::Id>(value.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()), index);
+    }
+    repaint();
+}
+
+void MotionEffectStack::addEffect(const std::string& type, int index) {
+    if (!owner.has_value()) { return; }
+    const auto target = *owner;
+    if (locked(target)) { return; }
+    const auto* existing = motion::findEffectOwner(processor.document.project(), target);
+    const auto* definition = motion::effectDefinition(type);
+    if (existing == nullptr || definition == nullptr || existing->size() >= motion::maximumEffectsPerOwner) { return; }
+    const auto effect = motion::makeEffect(processor.document.newId(), *definition);
+    processor.document.edit("Add " + juce::String(definition->name), [target, effect, index](motion::Project& project) {
+        auto* effects = motion::findEffectOwner(project, target);
+        if (effects == nullptr) { return; }
+        const auto at = index < 0 ? effects->size() : std::min(static_cast<std::size_t>(index), effects->size());
+        effects->insert(effects->begin() + static_cast<std::ptrdiff_t>(at), effect);
+    });
+    refresh();
+}
+
+MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : stack(owner), id(effectId) {
+    const auto* effect = motion::findEffect(stack.processor.document.project(), id);
+    const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
+    name = effect == nullptr ? juce::String() : juce::String(effect->name);
+    setName(name + " effect");
+    setRepaintsOnMouseActivity(true);
+    close.iconSize = motion::style::iconSmall;
+    close.onClick = [this] { juce::MessageManager::callAsync([safe = juce::Component::SafePointer<Card>(this)] { if (safe != nullptr) { safe->stack.remove(safe->id); } }); };
+    // Out of sight until the effect is hovered (its menu removes it too).
+    close.setAlpha(0.0f);
+    addAndMakeVisible(close);
+    power.onClick = [this] { stack.setEnabled(id, power.getToggleState()); };
+    addAndMakeVisible(power);
+    addMouseListener(&hover, true);
+    if (definition == nullptr) { return; }
+    for (const auto& parameter : definition->parameters) {
+        auto row = std::make_unique<Row>();
+        row->id = parameter.id;
+        row->label = juce::String(parameter.name);
+        row->field.setSpec(motion::effectPropertySpec(parameter));
+        row->field.setName("Effect " + juce::String(parameter.id));
+        row->field.setTitle(juce::String(parameter.name));
+        row->field.getProperties().set("routeTarget", juce::String(static_cast<juce::int64>(id)));
+        row->field.getProperties().set("routeProperties", juce::String(parameter.id));
+        row->key.setName("Key effect " + juce::String(parameter.id));
+        row->key.setTitle(row->key.getName());
+        row->modulate.setName("Modulate effect " + juce::String(parameter.id));
+        row->modulate.setTooltip("Modulate " + juce::String(parameter.name).toLowerCase() + " in the Graph");
+        const auto property = parameter.id;
+        row->field.onBegin = [this, property] { stack.beginGesture(id, property); };
+        row->field.onChange = [this, property](double value) { stack.setValue(id, property, value); };
+        row->field.onEnd = [this] { stack.finishGesture(); };
+        row->field.onCancel = [this] { stack.cancelGesture(); update(); };
+        row->field.onCommit = [this, property](double value) { stack.commitValue(id, property, value); };
+        row->key.onClick = [this, property] { stack.toggleKey(id, property); };
+        row->modulate.onClick = [this, property] { if (stack.onModulate) { stack.onModulate(id, property); } };
+        row->previous.onClick = [this, property] { jump(property, false); };
+        row->next.onClick = [this, property] { jump(property, true); };
+        // Reset, from the diamond's menu or a right-click on the row.
+        const auto defaultValue = parameter.defaultValue;
+        const auto name = juce::String(parameter.name).toLowerCase();
+        // As a property's row has it: Reset (when there is anything to
+        // reset) and removing its keyframes.
+        const auto menu = [this, property, defaultValue, name, raw = row.get()](bool atPointer) {
+            const motion::Curve* curve = nullptr;
+            const auto* effect = motion::findEffect(stack.processor.document.project(), id);
+            if (effect != nullptr) {
+                const auto found = effect->properties.find(std::string(property));
+                if (found != effect->properties.end()) { curve = &found->second; }
+            }
+            const auto animated = curve != nullptr && curve->animated();
+            const auto changed = curve != nullptr && (animated || std::abs(curve->base - defaultValue) > 1.0e-9);
+            juce::PopupMenu items;
+            items.addItem(1, "Reset " + name, changed);
+            items.addItem(2, "Remove " + name + " keyframes", animated);
+            auto options = juce::PopupMenu::Options().withTargetComponent(&raw->key);
+            if (atPointer) { options = options.withMousePosition(); }
+            motion::ui::showDocumentMenu(items, raw->key, stack.processor.document, options, [this, property, defaultValue, name](int result) {
+                auto& document = stack.processor.document;
+                if (result == 1) { document.resetProperties(id, {{std::string(property), defaultValue}}, name); }
+                if (result == 2) { document.removeKeyframes(id, {std::string(property)}, stack.processor.position.load(), name); }
+            });
+        };
+        row->key.onPopupMenu = [menu] { menu(false); };
+        row->onContextMenu = [menu] { menu(true); };
+        row->addAndMakeVisible(row->field);
+        addAndMakeVisible(*row);
+        rows.push_back(std::move(row));
+    }
+}
+
+void MotionEffectStack::Card::showClose() {
+    const auto shown = isMouseOver(true);
+    if ((close.getAlpha() > 0.0f) == shown) { return; }
+    close.setAlpha(shown ? 1.0f : 0.0f);
+}
+
+void MotionEffectStack::Card::update() {
+    const auto& project = stack.processor.document.project();
+    const auto* effect = motion::findEffect(project, id);
+    // Fields and keys repaint themselves; the card only shows its switch.
+    const auto wasEnabled = std::exchange(enabled, effect != nullptr && effect->enabled);
+    power.setToggleState(enabled, juce::dontSendNotification);
+    if (enabled != wasEnabled) { repaint(); }
+    for (auto& row : rows) {
+        row->setVisible(!folded());
+        if (row->dimmed != !enabled) {
+            row->dimmed = !enabled;
+            row->repaint();
+        }
+    }
+    const auto target = motion::findPropertyTarget(project, id);
+    if (!target.has_value()) { return; }
+    // A locked track's effects show but do not edit.
+    for (auto* control : std::initializer_list<juce::Component*> {&power, &close}) { control->setEnabled(!target->locked); }
+    for (auto& row : rows) {
+        row->field.setEnabled(!target->locked);
+        row->key.setEnabled(!target->locked);
+    }
+    const auto local = target->localTime(stack.frameTime());
+    for (auto& row : rows) {
+        const auto* curve = target->curve(row->id);
+        if (curve == nullptr) { continue; }
+        if (!row->field.isEditing()) { row->field.setValue(curve->evaluateBase(local)); }
+        const bool keyed = curve->hasKeyAt(local);
+        row->showState(keyed ? motion::ui::KeyframeButton::State::keyed : (curve->animated() ? motion::ui::KeyframeButton::State::animated : motion::ui::KeyframeButton::State::unanimated), id);
+        const auto driven = stack.isDriven(id, row->id);
+        row->field.setAccent(driven ? std::optional<juce::Colour>(motion::style::result()) : std::nullopt);
+        row->modulate.setToggleState(driven, juce::dontSendNotification);
+        const auto animated = curve->animated();
+        row->previous.setVisible(animated);
+        row->next.setVisible(animated);
+        row->previous.setEnabled(neighbourKey(*curve, local, false).has_value());
+        row->next.setEnabled(neighbourKey(*curve, local, true).has_value());
+    }
+}
+
+void MotionEffectStack::Card::jump(const std::string& property, bool forward) {
+    const auto target = motion::findPropertyTarget(stack.processor.document.project(), id);
+    const auto* curve = target.has_value() ? target->curve(property) : nullptr;
+    if (curve == nullptr || target->rate == 0) { return; }
+    const auto best = neighbourKey(*curve, target->localTime(stack.frameTime()), forward);
+    if (best.has_value()) { stack.processor.seek(std::clamp(target->projectTime(*best), 0.0, stack.processor.document.project().duration)); }
+}
+
+void MotionEffectStack::Card::resized() {
+    auto area = getLocalBounds().reduced(inset, 0);
+    // The header starts where the rows' names do, as a section's heading.
+    auto header = area.removeFromTop(headerHeight);
+    fold = header.removeFromLeft(12).toFloat();
+    header.removeFromLeft(4);
+    power.setBounds(header.removeFromLeft(motion::ui::Switch::width).withSizeKeepingCentre(motion::ui::Switch::width, headerHeight));
+    // The remove button over the keys' gutter.
+    close.setBounds(header.removeFromRight(motion::style::PropertyGrid::keyButtons).withSizeKeepingCentre(22, 22));
+    // Rows sit on Properties' own grid, so fields and the keys' gutter line
+    // up with the rows above.
+    for (auto& row : rows) {
+        row->setBounds(area.removeFromTop(motion::style::controlHeight));
+        area.removeFromTop(motion::style::gap);
+    }
+}
+
+void MotionEffectStack::Card::paint(juce::Graphics& g) {
+    // Each effect is a card of its own, set off from the panel and the next.
+    const auto frame = getLocalBounds().toFloat();
+    g.setColour(osci::Colours::text().withAlpha(.025f));
+    g.fillRoundedRectangle(frame, motion::style::radiusPanel);
+    g.setColour(motion::style::hairline());
+    g.drawRoundedRectangle(frame.reduced(.5f), motion::style::radiusPanel, 1.0f);
+    const auto header = getLocalBounds().reduced(inset, 0).removeFromTop(headerHeight);
+    // Hovered, the header brightens: it folds at a click, and drags.
+    const auto hovered = isMouseOver(true) && getMouseXYRelative().y < headerHeight;
+    motion::style::drawFold(g, fold.withSizeKeepingCentre(8, 8), !folded(), hovered ? osci::Colours::text() : osci::Colours::textMuted());
+    g.setColour(osci::Colours::text().withAlpha(enabled ? (hovered ? 1.0f : .9f) : .45f));
+    g.setFont(motion::style::heading());
+    const auto nameArea = header.withLeft(power.getRight() + 8).withRight(close.getX() - 4);
+    g.drawText(name, nameArea, juce::Justification::centredLeft, true);
+}
+
+void MotionEffectStack::Card::Row::paint(juce::Graphics& g) {
+    const motion::style::PropertyGrid grid(getWidth());
+    g.setFont(motion::style::caption());
+    g.setColour(osci::Colours::textMuted().withMultipliedAlpha(dimmed ? .6f : 1.0f));
+    g.drawText(label, getLocalBounds().withRight(grid.value - motion::style::gap), juce::Justification::centredLeft, true);
+}
+
+void MotionEffectStack::Card::Row::resized() {
+    const motion::style::PropertyGrid grid(getWidth());
+    const auto line = getLocalBounds();
+    layoutGutter(line, grid);
+    field.setBounds(line.withX(grid.value).withWidth(grid.column));
+}
+
+void MotionEffectStack::Card::mouseDown(const juce::MouseEvent& event) {
+    if (event.y < headerHeight && event.mods.isPopupMenu()) { stack.showMenu(id); }
+}
+
+void MotionEffectStack::Card::mouseUp(const juce::MouseEvent& event) {
+    if (event.getMouseDownY() >= headerHeight || event.mods.isPopupMenu() || event.mouseWasDraggedSinceMouseDown()) { return; }
+    // A click on the header (not its switch or remove) folds the card.
+    if (event.x < power.getX() || (event.x > power.getRight() && event.x < close.getX())) {
+        if (folded()) { stack.folded.erase(id); } else { stack.folded.insert(id); }
+        update();
+        stack.resized();
+        if (stack.onHeightChanged) { stack.onHeightChanged(); }
+    }
+}
+
+void MotionEffectStack::Card::mouseDrag(const juce::MouseEvent& event) {
+    if (event.getMouseDownY() >= headerHeight || event.getDistanceFromDragStart() < 4) { return; }
+    auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
+    if (container != nullptr && !container->isDragAndDropActive()) { container->startDragging("motion-effect-instance:" + juce::String(id), this); }
+}
+
+bool MotionEffectStack::isDriven(motion::Id effect, const std::string& property) const {
+    const auto& project = processor.document.project();
+    if (std::any_of(project.routes.begin(), project.routes.end(), [&](const auto& route) { return route.target == effect && route.property == property; })) { return true; }
+    const auto* curve = motion::findPropertyCurve(project, effect, property);
+    return curve != nullptr && curve->link.has_value();
+}
+
+void MotionEffectStack::refreshStages() {
+    const auto& project = processor.document.project();
+    std::vector<std::pair<juce::String, motion::Id>> found;
+    const auto add = [&](const juce::String& label, motion::Id id) {
+        const auto* effects = motion::findEffectOwner(project, id);
+        if (effects != nullptr && !effects->empty() && (!owner.has_value() || *owner != id)) {
+            found.emplace_back(label + motion::style::dot() + juce::String(static_cast<int>(effects->size())), id);
+        }
+    };
+    motion::Id group = 0;
+    for (const auto& track : project.tracks) {
+        const auto holds = std::any_of(track.clips.begin(), track.clips.end(), [this](const auto& clip) { return clip.id == context; });
+        if ((!holds && track.id != context) || track.kind != motion::TrackKind::visual) { continue; }
+        if (holds) { add(juce::String("Clip"), context); }
+        add(juce::String(track.name), track.id);
+        group = track.group;
+    }
+    const auto* selectedGroup = motion::findGroup(project, context);
+    if (selectedGroup != nullptr) {
+        add(juce::String(selectedGroup->name), selectedGroup->id);
+        group = selectedGroup->parent;
+    }
+    for (std::size_t depth = 0; group != 0 && depth < motion::maximumGroupDepth; ++depth) {
+        const auto* value = motion::findGroup(project, group);
+        if (value == nullptr) { break; }
+        add(juce::String(value->name), value->id);
+        group = value->parent;
+    }
+    add("Composition", 0);
+    if (found == listedStages) { return; }
+    listedStages = found;
+    stages.clear();
+    for (const auto& [label, id] : found) {
+        auto chip = std::make_unique<motion::ui::Chip>(label);
+        chip->setClickingTogglesState(false);
+        chip->setName("Effects of " + label.upToFirstOccurrenceOf(motion::style::dot(), false, false));
+        chip->setTooltip("Show these effects");
+        // Showing another stage rebuilds these chips, so it waits.
+        chip->onClick = [this, id = id] {
+            juce::MessageManager::callAsync([safe = juce::Component::SafePointer<MotionEffectStack>(this), id] { if (safe != nullptr && safe->onShowOwner) { safe->onShowOwner(id); } });
+        };
+        addAndMakeVisible(*chip);
+        stages.push_back(std::move(chip));
+    }
+}
+
+float MotionEffectStack::cardTarget(int index) const {
+    if (gapIndex < 0) { return 0.0f; }
+    auto boundary = gapIndex;
+    if (dragged >= 0 && (boundary == dragged || boundary == dragged + 1)) { boundary = dragged; }
+    const auto removed = dragged >= 0 && index > dragged ? -gapHeight : 0;
+    return static_cast<float>(removed + (index >= boundary && index != dragged ? gapHeight : 0));
+}
+
+void MotionEffectStack::stepCards() {
+    cardShift.resize(cards.size(), 0.0f);
+    bool moving = false;
+    for (std::size_t index = 0; index < cards.size(); ++index) {
+        const auto target = cardTarget(static_cast<int>(index));
+        auto& shift = cardShift[index];
+        shift += (target - shift) * .3f;
+        if (std::abs(target - shift) < .5f) { shift = target; } else { moving = true; }
+        cards[index]->setTransform(juce::AffineTransform::translation(0.0f, static_cast<float>(juce::roundToInt(shift))));
+        cards[index]->setAlpha(static_cast<int>(index) == dragged ? 0.0f : 1.0f);
+    }
+    if (!moving && gapIndex < 0) { cardAnimation.stopTimer(); }
+}
+
+void MotionEffectStack::settleCards() {
+    cardAnimation.stopTimer();
+    cardShift.clear();
+    for (auto& card : cards) {
+        card->setTransform({});
+        card->setAlpha(1.0f);
+    }
+}
+
+int MotionEffectStack::insertionIndex(int y) const {
+    int index = 0;
+    for (const auto& card : cards) {
+        if (y < card->getBounds().getCentreY()) { break; }
+        ++index;
+    }
+    return index;
+}
+
+void MotionEffectStack::setEnabled(motion::Id id, bool value) {
+    if (locked(id)) { return; }
+    processor.document.edit(value ? "Turn effect on" : "Turn effect off", [id, value](motion::Project& project) {
+        auto* effect = motion::findEffect(project, id);
+        if (effect != nullptr) { effect->enabled = value; }
+    });
+    refresh();
+}
+
+void MotionEffectStack::showMenu(motion::Id id) {
+    const auto found = std::find(listed.begin(), listed.end(), id);
+    if (found == listed.end()) { return; }
+    const auto index = static_cast<int>(found - listed.begin());
+    juce::PopupMenu menu;
+    menu.addItem(2, "Move up", index > 0);
+    menu.addItem(3, "Move down", index + 1 < static_cast<int>(listed.size()));
+    menu.addSeparator();
+    menu.addItem(4, "Remove effect");
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, index](int result) {
+        if (result == 2) { move(id, index - 1); }
+        if (result == 3) { move(id, index + 2); }
+        if (result == 4) { remove(id); }
+    });
+}
+
+void MotionEffectStack::remove(motion::Id id) {
+    cancelGesture();
+    if (locked(id)) { return; }
+    processor.document.tryEdit("Remove effect", [id](motion::Project& project) {
+        auto* list = motion::findEffectList(project, id);
+        if (list == nullptr) { return false; }
+        std::erase_if(*list, [id](const auto& effect) { return effect.id == id; });
+        return true;
+    });
+    refresh();
+}
+
+void MotionEffectStack::move(motion::Id id, int index) {
+    if (!owner.has_value()) { return; }
+    const auto target = *owner;
+    cancelGesture();
+    if (locked(id) || locked(target)) { return; }
+    processor.document.tryEdit("Move effect", [id, target, index](motion::Project& project) {
+        auto* destination = motion::findEffectOwner(project, target);
+        if (destination == nullptr) { return false; }
+        // Both lookups copy at most their own track, and a track copied by
+        // the first is changed in place by the second, so both stay valid.
+        auto* list = motion::findEffectList(project, id);
+        if (list == nullptr) { return false; }
+        const auto found = std::find_if(list->begin(), list->end(), [id](const auto& item) { return item.id == id; });
+        const auto source = static_cast<int>(found - list->begin());
+        if (list == destination && (index == source || index == source + 1)) { return false; }
+        auto effect = std::move(*found);
+        list->erase(found);
+        // Removing it first shifts later positions in its own stage.
+        const auto at = std::clamp(list == destination && index > source ? index - 1 : index, 0, static_cast<int>(destination->size()));
+        destination->insert(destination->begin() + at, std::move(effect));
+        return true;
+    });
+    refresh();
+}
+
+void MotionEffectStack::toggleKey(motion::Id id, const std::string& property) {
+    cancelGesture();
+    if (locked(id)) { return; }
+    const auto target = motion::findPropertyTarget(processor.document.project(), id);
+    const auto* curve = target.has_value() ? target->curve(property) : nullptr;
+    if (curve == nullptr) { return; }
+    const auto local = target->localTime(frameTime());
+    const bool keyed = curve->hasKeyAt(local);
+    // Named for the parameter: "Key strength", "Remove strength key".
+    juce::String what(property);
+    const auto* effect = motion::findEffect(processor.document.project(), id);
+    const auto* definition = effect != nullptr ? motion::effectDefinition(effect->type) : nullptr;
+    if (definition != nullptr) {
+        for (const auto& parameter : definition->parameters) {
+            if (parameter.id == property) { what = juce::String(parameter.name).toLowerCase(); }
+        }
+    }
+    processor.document.edit(keyed ? "Remove " + what + " key" : "Key " + what, [id, property, local, keyed](motion::Project& project) {
+        auto* changed = motion::findPropertyCurve(project, id, property);
+        if (changed != nullptr) { motion::keyedit::setKeyed(*changed, local, !keyed); }
+    });
+    if (onPropertySelected) { onPropertySelected(id, property); }
+}
+
+void MotionEffectStack::beginGesture(motion::Id id, const std::string& property) {
+    cancelGesture();
+    cancelledGesture = false;
+    gesture.begin();
+    gestureTime = frameTime();
+    if (onPropertySelected) { onPropertySelected(id, property); }
+}
+
+void MotionEffectStack::setValue(motion::Id id, const std::string& property, double value) {
+    if (cancelledGesture || locked(id)) { return; }
+    if (gesture.stale()) { gesture.reset(); cancelledGesture = true; return; }
+    const auto time = gesture.active() ? gestureTime : frameTime();
+    const auto target = motion::findPropertyTarget(processor.document.project(), id);
+    const auto* curve = target.has_value() ? target->curve(property) : nullptr;
+    if (curve == nullptr) { return; }
+    const auto local = target->localTime(time);
+    const auto* effect = motion::findEffect(processor.document.project(), id);
+    const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
+    if (definition == nullptr || !std::isfinite(value)) { return; }
+    for (const auto& parameter : definition->parameters) {
+        if (parameter.id == property) { value = std::clamp(value, parameter.min, parameter.max); }
+    }
+    if (!gesture.active() && value == curve->evaluateBase(local)) { return; }
+    const auto operation = [id, property, value, local](motion::Project& project) {
+        auto* changed = motion::findPropertyCurve(project, id, property);
+        if (changed == nullptr) { return; }
+        motion::keyedit::setValue(*changed, local, value);
+    };
+    if (gesture.active()) {
+        const auto previous = motion::findPropertyTarget(gesture.start(), id);
+        const auto* original = previous.has_value() ? previous->curve(property) : nullptr;
+        gesture.preview(operation, original != nullptr && original->evaluateBase(local) != value);
+    } else {
+        processor.document.editCoalesced("Change effect parameter", "effect:" + juce::String(id) + ":" + juce::String(property), operation);
+    }
+}
+
+void MotionEffectStack::commitValue(motion::Id id, const std::string& property, double value) {
+    cancelledGesture = false;
+    setValue(id, property, value);
+}
+
+void MotionEffectStack::finishGesture() {
+    cancelledGesture = false;
+    gesture.commit("Change effect parameter");
+}
+
+void MotionEffectStack::cancelGesture() {
+    if (!gesture.active()) { return; }
+    cancelledGesture = true;
+    gesture.cancel();
+}

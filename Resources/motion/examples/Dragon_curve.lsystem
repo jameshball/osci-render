@@ -1,0 +1,14 @@
+{
+  "axiom": "FX",
+  "angle": 90,
+  "rules": [
+    {
+      "variable": "X",
+      "replacement": "X+YF+"
+    },
+    {
+      "variable": "Y",
+      "replacement": "-FX-Y"
+    }
+  ]
+}

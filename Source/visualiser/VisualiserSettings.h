@@ -7,7 +7,7 @@
 #include <osci_gui/osci_gui.h>
 #include <osci_gui/visualiser/osci_VisualiserParameters.h>
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 class OscirenderAudioProcessor;
 #endif
 class RecordingParameters;
@@ -35,7 +35,7 @@ public:
         }
     }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     void wireModulation(OscirenderAudioProcessor& processor) {
         for (auto& effect : effects)
             effect->wireModulation(processor);
@@ -71,10 +71,11 @@ public:
     VisualiserSettings(VisualiserParameters&, int numChannels, RecordingParameters& recordingParameters);
     ~VisualiserSettings();
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     void wireModulation(OscirenderAudioProcessor& processor);
 #endif
     void setTransparencyControlEnabled(bool enabled);
+    void setSurfaceColours(juce::Colour background, juce::Colour section);
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -90,6 +91,7 @@ public:
     std::function<void()> onUpgradeRequested;
 
 private:
+    juce::Colour backgroundColour = osci::Colours::darker();
     struct LayoutItem {
         juce::Component* component;
         int height;
@@ -219,13 +221,15 @@ public:
     }
 
 private:
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     VisualiserSettings& component;
 };
 
 class SettingsWindow : public juce::DialogWindow {
 public:
     SettingsWindow(juce::String name, VisualiserSettings& component, int windowWidth, int windowHeight, int maximumWindowWidth) : juce::DialogWindow(name, osci::Colours::darker(), true, true), component(component) {
+        // Its own window has no osci look to take the fade's colour from.
+        viewport.setColour(osci::scrollFadeOverlayBackgroundColourId, osci::Colours::darker());
         setContentNonOwned(&viewport, false);
         centreWithSize(windowWidth, windowHeight);
         setResizeLimits(windowWidth, windowHeight, maximumWindowWidth, juce::jmax(windowHeight, component.getPreferredHeight(windowWidth)));
@@ -246,6 +250,6 @@ public:
     }
 
 private:
-    juce::Viewport viewport;
+    osci::ScrollFadeViewport viewport;
     VisualiserSettings& component;
 };

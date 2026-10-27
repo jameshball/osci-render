@@ -3,29 +3,46 @@ on:
   push:
     branches:
       - develop
+      # Feature branches run only the jobs a commit's marker asks for
+      # ([trigger-ci:motion]); product releases stay on develop.
+      - 'feature/**'
     paths:
       - .github/workflows/build.yaml
       - ci/**
       - osci-render.jucer
       - sosci.jucer
       - osci-installer.jucer
+      - osci-motion.jucer
       - packaging/osci-render.iss
       - packaging/sosci.iss
       - packaging/osci-render.pkgproj
       - packaging/sosci.pkgproj
+      - packaging/osci-motion.iss
+      - packaging/osci-motion.pkgproj
   workflow_dispatch:
+    inputs:
+      products:
+        description: Which products to build and publish
+        type: choice
+        options: [all, osci-motion, osci-installer]
+        default: all
+      publish:
+        description: Publish the builds to release-plane (off builds and tests only; osci-motion uploads its builds as run artifacts)
+        type: boolean
+        default: true
 
 jobs:
   build:
     name: Build (${{ matrix.project }} ${{ matrix.version }} @ ${{ matrix.os }})
-    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]')
+    if: (github.event_name == 'workflow_dispatch' && (inputs.products == 'all' || inputs.products == 'osci-installer')) || (github.ref == 'refs/heads/develop' && contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]'))
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-2022]
-        project: [osci-render, sosci, osci-installer]
+        # A manual run for the installer builds it alone.
+        project: ${{ fromJSON(inputs.products == 'osci-installer' && '["osci-installer"]' || '["osci-render", "sosci", "osci-installer"]') }}
         version: [free, premium]
         exclude:
           - project: sosci
@@ -82,6 +99,7 @@ jobs:
           echo "Using project version: $PROJECT_VERSION"
 
       - name: Prepare release
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         env:
           PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
         run: |
@@ -436,6 +454,7 @@ jobs:
       # Every successful build publishes a signed alpha artifact to release-plane
       # so the updater can fetch it after admin promotion.
       - name: Publish release artifact
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         shell: bash
         env:
           PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
@@ -504,6 +523,283 @@ jobs:
             --semver "${{ steps.version.outputs.version }}" \
             --platform "${PLATFORM}" \
             --variant "${PUBLISH_VARIANT}" \
+            --release-track alpha \
+            --artifact-kind "${KIND}" \
+            --artifact "${ARTIFACT}" \
+            --notes "Auto-published by CI from $(git log -1 --format=%H)"
+
+  # osci-motion: a standalone-only app (no plugin formats, so no pluginval),
+  # premium only. Builds, tests, packages (.pkg / .exe / .zip, signed and
+  # notarized on macOS) and publishes an alpha to release-plane as the build
+  # job does. [skip-validation] skips the tests but still builds and publishes.
+  #
+  # NOTE: Windows and Linux are still being validated, so their failures
+  # don't fail the workflow.
+  motion:
+    name: Build (osci-motion @ ${{ matrix.os }})
+    if: (github.event_name == 'workflow_dispatch' && inputs.products != 'osci-installer') || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:motion]')
+    runs-on: ${{ matrix.os }}
+    # Windows and Linux builds of osci-motion have never been validated.
+    continue-on-error: ${{ matrix.os != 'macos-latest' }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-24.04, ubuntu-24.04-arm and windows-2022 are unvalidated for osci-motion (see note above).
+        os: [macos-latest, ubuntu-24.04, ubuntu-24.04-arm, windows-2022]
+    steps:
+      - name: Fix up git URLs
+        run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
+        shell: bash
+
+      - uses: actions/checkout@v1
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          submodules: recursive
+
+      - name: Set platform variables
+        shell: bash
+        run: |
+          echo "OUTPUT_NAME=osci-motion" >> $GITHUB_ENV
+          if [[ "${{ matrix.os }}" == ubuntu*-arm ]]; then
+            echo "OS=linux" >> $GITHUB_ENV
+            echo "RELEASE_PLATFORM=linux-arm64" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == ubuntu* ]]; then
+            echo "OS=linux" >> $GITHUB_ENV
+            echo "CFLAGS=-mavx" >> $GITHUB_ENV
+            echo "RELEASE_PLATFORM=linux-x86_64" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == macos* ]]; then
+            echo "OS=mac" >> $GITHUB_ENV
+            echo "RELEASE_PLATFORM=mac-universal" >> $GITHUB_ENV
+          else
+            echo "OS=win" >> $GITHUB_ENV
+            echo "RELEASE_PLATFORM=win-x86_64" >> $GITHUB_ENV
+          fi
+
+      - name: Extract project version
+        id: version
+        shell: bash
+        run: |
+          PROJECT_VERSION=$(python3 ci/extract_version.py osci-motion.jucer)
+          echo "version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
+          echo "osci-motion version: $PROJECT_VERSION"
+
+      # Soft, so a build still validates while osci-motion isn't yet set up on
+      # release-plane; publishing at the end fails loudly if it isn't.
+      - name: Prepare release
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
+        continue-on-error: true
+        env:
+          PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
+        run: |
+          python ci/publish_release.py --prepare-only --product osci-motion --semver "${{ steps.version.outputs.version }}" --release-manifest ci/release.json
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        if: matrix.os == 'macos-latest'
+        with:
+          xcode-version: latest
+
+      # The Release configuration signs with the Developer ID Application identity.
+      - name: Import application certificates
+        if: matrix.os == 'macos-latest'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          keychain: oscirender
+          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_APPLICATION_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
+
+      - name: Import installer certificates
+        if: matrix.os == 'macos-latest'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          keychain: oscirender
+          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_INSTALLER_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
+          create-keychain: false
+
+      - name: Setup NuGet.exe for use with actions
+        if: matrix.os == 'windows-2022'
+        uses: NuGet/setup-nuget@v1.0.5
+
+      - name: NuGet Sources
+        if: matrix.os == 'windows-2022'
+        run: nuget sources
+
+      - name: Check commit message for skip-validation marker
+        id: ci_flags
+        shell: bash
+        run: |
+          MSG=$(git log -1 --pretty=%B || true)
+          if [[ "$MSG" == *"[skip-validation]"* ]]; then
+            echo "skip_validation=true" >> "$GITHUB_OUTPUT"
+            echo "Commit requests skip-validation: Motion tests will be skipped."
+          else
+            echo "skip_validation=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Standalone C++20 Motion model/render/editor tests; needs clang++ or g++ on PATH.
+      # Ubuntu's clang++ 18 crashes compiling these tests; its g++ builds them.
+      - name: Run Motion portable tests
+        if: steps.ci_flags.outputs.skip_validation != 'true'
+        shell: bash
+        env:
+          CXX: ${{ runner.os == 'Linux' && 'g++' || '' }}
+        run: python3 scripts/test_motion_portable.py
+
+      # The visualiser's bundled resampler under ASan/UBSan; needs clang++.
+      - name: Run visualiser resampling tests
+        if: steps.ci_flags.outputs.skip_validation != 'true' && runner.os != 'Windows'
+        shell: bash
+        run: sh modules/osci_gui/tests/run_visualiser_resampling_tests.sh
+
+      - name: Run Motion unit tests
+        if: steps.ci_flags.outputs.skip_validation != 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ./ci/setup-env.sh
+          source ./ci/test.sh Motion MotionLive MotionBake MotionRaster MotionVideo
+
+      # An unpublished run hands its Windows binaries over for testing on
+      # other Windows machines: the CLI is built here, after the tests.
+      - name: Build osci-motion-cli (Windows)
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && !inputs.publish
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ./ci/setup-env.sh
+          eval "$PROJUCER_PATH --resave '$ROOT/osci-motion-cli.jucer'"
+          VS_WHERE="C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
+          cd "$ROOT/Builds/MotionCli/VisualStudio2022"
+          "$MSBUILD_EXE" "//m" "osci-motion-cli.sln" "//p:MultiProcessorCompilation=true" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
+          find . -name "osci-motion-cli.exe"
+
+      - name: Build osci-motion (Standalone)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ./ci/setup-env.sh
+          source ./ci/build.sh osci-motion premium
+
+      # macOS packaging & notarization
+      - name: Download Packages installer build tool
+        if: matrix.os == 'macos-latest'
+        run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
+
+      - name: Mount Packages image
+        if: matrix.os == 'macos-latest'
+        run: hdiutil attach Packages_1211_dev.dmg
+
+      - name: Install Packages
+        if: matrix.os == 'macos-latest'
+        run: sudo installer -pkg /Volumes/Packages\ 1.2.11/Install\ Packages.pkg -target /
+
+      - name: Build installer (macOS pkg)
+        if: matrix.os == 'macos-latest'
+        run: packagesbuild --project packaging/osci-motion.pkgproj
+
+      - name: Sign installer (macOS pkg)
+        if: matrix.os == 'macos-latest'
+        run: |
+          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/osci-motion.pkg" "bin/${{ env.OUTPUT_NAME }}.pkg"
+          pkgutil --check-signature "bin/${{ env.OUTPUT_NAME }}.pkg"
+
+      - name: Notarize installer (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: lando/notarize-action@v2
+        with:
+          product-path: "bin/${{ env.OUTPUT_NAME }}.pkg"
+          appstore-connect-username: ${{ secrets.APPLE_ID }}
+          appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
+          appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
+          primary-bundle-id: com.osci-motion.pkg
+          tool: notarytool
+          verbose: true
+
+      - name: Staple installer (macOS)
+        if: matrix.os == 'macos-latest'
+        run: xcrun stapler staple "bin/${{ env.OUTPUT_NAME }}.pkg"
+
+      - name: Check installer (macOS)
+        if: matrix.os == 'macos-latest'
+        run: spctl -a -vvv -t install "bin/${{ env.OUTPUT_NAME }}.pkg"
+
+      # Windows packaging (Inno Setup)
+      - name: Compile .ISS to .EXE Installer
+        if: matrix.os == 'windows-2022'
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: packaging/osci-motion.iss
+
+      - name: Stage Windows installer executable
+        if: matrix.os == 'windows-2022'
+        shell: bash
+        run: mv "packaging/build/osci-motion.exe" "bin/${OUTPUT_NAME}.exe"
+
+      - name: Upload Linux build
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: osci-motion-${{ env.RELEASE_PLATFORM }}
+          retention-days: 7
+          path: bin/${{ env.OUTPUT_NAME }}.zip
+
+      # The app itself too, to run as built on a test machine without
+      # installing it.
+      - name: Upload Windows test binaries
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: osci-motion-windows-test
+          retention-days: 7
+          path: |
+            bin/${{ env.OUTPUT_NAME }}.exe
+            Builds/osci-motion/VisualStudio2022/x64/Release/Standalone Plugin/osci-motion.exe
+            Builds/Test/VisualStudio2022/x64/Release/ConsoleApp/osci-render-test.exe
+            Builds/MotionCli/VisualStudio2022/x64/Release/ConsoleApp/osci-motion-cli.exe
+
+      # -- Release publish ----------------------------------------
+      # Every successful build publishes a signed alpha artifact to
+      # release-plane, for the updater to fetch once promoted.
+      - name: Publish release artifact
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
+        shell: bash
+        env:
+          PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
+          RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.RELEASE_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PUBLISH_API_TOKEN:-}" ]] || [[ -z "${RELEASE_SIGNING_PRIVATE_KEY:-}" ]]; then
+            echo "::error::PUBLISH_API_TOKEN or RELEASE_SIGNING_PRIVATE_KEY GitHub secrets are not set"
+            exit 1
+          fi
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            python3 -m pip install --quiet --user --break-system-packages pynacl
+            ARTIFACT="bin/${OUTPUT_NAME}.pkg"; KIND='pkg'
+          elif [[ "${{ matrix.os }}" == windows* ]]; then
+            python3 -m pip install --quiet pynacl
+            ARTIFACT="bin/${OUTPUT_NAME}.exe"; KIND='exe'
+          else
+            python3 -m pip install --quiet pynacl
+            ARTIFACT="bin/${OUTPUT_NAME}.zip"; KIND='zip'
+          fi
+          if [[ ! -f "${ARTIFACT}" ]]; then
+            echo "::error::expected artifact ${ARTIFACT} not found"
+            ls -la bin/ || true
+            exit 1
+          fi
+          python3 ci/publish_release.py \
+            --release-manifest ci/release.json \
+            --product osci-motion \
+            --semver "${{ steps.version.outputs.version }}" \
+            --platform "${RELEASE_PLATFORM}" \
+            --variant premium \
             --release-track alpha \
             --artifact-kind "${KIND}" \
             --artifact "${ARTIFACT}" \

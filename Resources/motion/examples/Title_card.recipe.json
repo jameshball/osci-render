@@ -1,0 +1,56 @@
+{
+  "name": "Title card",
+  "description": "An intro in three moves: the frame opens, the title rises in letter by letter, the subtitle types on, and all of it fades. Double-click a text to write your own.",
+  "picture": 4,
+  "duration": 8,
+  "fps": 60,
+  "export": {"width": 1920, "height": 1080},
+  "beam": {
+    "intensity": 6,
+    "persistence": 0.4,
+    "glow": 0.35
+  },
+  "objects": [
+    {
+      "name": "Frame",
+      "generator": "rectangle",
+      "properties": {
+        "generator.width": 3.1,
+        "generator.height": 1.5,
+        "generator.roundness": 10
+      },
+      "keys": {
+        "scale.x": [[0, 0], [0.7, 1]],
+        "opacity": [[0, 100], [7, 100], [7.8, 0]]
+      }
+    },
+    {
+      "name": "Title",
+      "text": "TITLE",
+      "start": 0.5,
+      "typography": {"bold": true, "align": "centre", "tracking": 0.12, "animation": "rise", "characterDelay": 0.08, "characterDuration": 0.5, "amount": 0.6, "hold": 30},
+      "properties": {
+        "position.y": 0.14,
+        "scale.x": 0.9,
+        "scale.y": 0.9
+      },
+      "keys": {
+        "opacity": [[0, 100], [6.5, 100], [7.3, 0]]
+      }
+    },
+    {
+      "name": "Subtitle",
+      "text": "Subtitle",
+      "start": 1.6,
+      "typography": {"align": "centre", "tracking": 0.08, "animation": "typewriter", "characterDelay": 0.06, "hold": 30},
+      "properties": {
+        "position.y": -0.36,
+        "scale.x": 0.34,
+        "scale.y": 0.34
+      },
+      "keys": {
+        "opacity": [[0, 100], [5.4, 100], [6.2, 0]]
+      }
+    }
+  ]
+}

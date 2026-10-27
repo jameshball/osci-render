@@ -13,8 +13,14 @@ public:
     void addStandardTopLevelMenus();
     void addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, const juce::String& shortcutKey = {});
     void addMenuSeparator(int topLevelMenuIndex);
+    // Items added between these go into a submenu named `name`, shown where it
+    // was begun; setMenuItemEnabled(name) greys the whole submenu out.
+    void beginSubMenu(int topLevelMenuIndex, const juce::String& name);
+    void endSubMenu(int topLevelMenuIndex);
     // Adds a toggle (ticked) menu item whose tick state is provided dynamically via isTicked()
     void addToggleMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, std::function<bool()> isTicked, const juce::String& shortcutKey = {});
+    // Greys an item out whenever isEnabled() is false; items are enabled without one.
+    void setMenuItemEnabled(int topLevelMenuIndex, const juce::String& name, std::function<bool()> isEnabled);
     // Adds the common "Open Log File", "Open App Settings File", "Open Global Settings File"
     // items shared across all apps.
     void addDiagnosticsMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor);
@@ -36,12 +42,16 @@ public:
 
     std::function<void(juce::PopupMenu&, int)> customMenuLogic;
     std::function<bool(int, int)> customMenuSelectedLogic;
+    // Like customMenuLogic, but adds to the menu after its registered items.
+    std::function<void(juce::PopupMenu&, int)> customMenuAfterLogic;
+    // The menu bar opening a menu (true) and closing again (false).
+    std::function<void(bool)> onActivated;
 
 private:
     juce::StringArray getMenuBarNames() override;
     juce::PopupMenu getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) override;
     void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
-    void menuBarActivated(bool isActive);
+    void menuBarActivated(bool isActive) override;
 
     struct MenuItem
     {
@@ -51,8 +61,16 @@ private:
         bool hasTick = false;
         juce::String shortcutKey;
         bool isSeparator = false;
+        std::function<bool()> isEnabled; // optional enabled state
+        bool isSubMenu = false;
+        int parent = -1; // the index of the submenu it is in, if any
     };
+
+    void addItemsTo(juce::PopupMenu& menu, int topLevelMenuIndex, int parent);
+    void addItem(int topLevelMenuIndex, MenuItem item);
 
     juce::StringArray topLevelMenuNames;
     std::vector<std::vector<MenuItem>> menuItems;
+    // The submenu each menu's items are being added to, or -1.
+    std::vector<int> openSubMenus;
 };

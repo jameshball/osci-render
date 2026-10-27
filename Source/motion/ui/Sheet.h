@@ -1,0 +1,379 @@
+#pragma once
+
+#include "MotionStyle.h"
+#include "FormControls.h"
+#include "MotionIcons.h"
+#include <osci_gui/osci_gui.h>
+
+namespace motion::ui {
+// The inside of a modal sheet: a title on the left (with the file it is
+// about, muted, beside it), a form, and a footer with Cancel and the one
+// action the sheet exists for. The overlay supplies the panel and the
+// dimmed window behind it. Cancel and Escape close a sheet; only a reference
+// (no footer) has a close button, a quiet one in line with the title.
+class Sheet : public juce::Component, private juce::KeyListener {
+public:
+    Sheet(const juce::String& heading, const juce::String& about, const juce::String& verb) : title(heading), subtitle(about) {
+        setName(heading);
+        getProperties().set(style::sheetProperty, true);
+        setWantsKeyboardFocus(true);
+        primary.setButtonText(verb);
+        nameAction(verb);
+        style::makePrimary(primary);
+        cancel.setButtonText("Cancel");
+        cancel.setName("Cancel");
+        cancel.onClick = [this] { close(); };
+        closeButton.setIconPadding(6);
+        closeButton.setColours(osci::Colours::textMuted(), osci::Colours::text());
+        closeButton.onClick = [this] { close(); };
+        addChildComponent(closeButton);
+        addAndMakeVisible(cancel);
+        addAndMakeVisible(primary);
+    }
+
+    static constexpr int headerHeight = 28, headerGap = 16, footerHeight = 28, footerGap = 20;
+    // A line of body text in a message.
+    static constexpr int lineHeight = 18;
+    // Choices take the control width; numbers a shorter, right-aligned field.
+    static constexpr int row = 28, rowGap = 8, caption = 120, control = 192, number = 96;
+
+    // Shows the sheet over `owner`; returns the overlay so callers can close
+    // it. `dismissed` runs as it is asked to close: it is set before showing,
+    // as the host wraps the overlay's dismissal then (setting it after would
+    // replace the host's and the overlay would stay).
+    static osci::ComponentOverlay* show(juce::Component& owner, std::unique_ptr<Sheet> sheet, std::function<void()> dismissed = {}) {
+        const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false);
+        if (dismissed) { overlay->onDismissRequested = std::move(dismissed); }
+        auto* raw = overlay.get();
+        osci::OverlayComponent::show(owner, std::move(overlay));
+        return raw;
+    }
+    // Asks the overlay around the sheet to close (Cancel, or after the action).
+    void close() {
+        auto* overlay = findParentComponentOfClass<osci::OverlayComponent>();
+        if (overlay != nullptr) { overlay->requestDismiss(); }
+    }
+    // The height a body of `rows` form rows (plus `extra` pixels) needs.
+    static int bodyHeight(int rows) { return rows * row + std::max(0, rows - 1) * rowGap; }
+    static int heightFor(int rows, int extra = 0) { return headerHeight + headerGap + bodyHeight(rows) + extra + footerGap + footerHeight; }
+    // A form of fixed-width controls, optionally beside a square preview.
+    static int widthFor(int preview = 0) { return (preview > 0 ? preview + 24 : 0) + caption + control; }
+
+    // The sheet closes itself (Cancel and Escape, or a reference's own
+    // close button), so the overlay's larger close button goes. A form keeps
+    // what's typed in it from a stray click outside; a reference (no footer)
+    // closes on one.
+    // The overlay holds the keyboard while it animates in, so the sheet
+    // listens to its keys too.
+    void parentHierarchyChanged() override {
+        auto* overlay = findParentComponentOfClass<osci::OverlayComponent>();
+        if (overlay == host) { return; }
+        if (host != nullptr) { host->removeKeyListener(this); }
+        host = overlay;
+        if (host == nullptr) { return; }
+        host->setDismissible(false);
+        host->setDismissedByClickOutside(!footer);
+        host->setDismissedByClickWhileTyping(!footer);
+        host->addKeyListener(this);
+    }
+    ~Sheet() override {
+        if (host != nullptr) { host->removeKeyListener(this); }
+    }
+
+    void paint(juce::Graphics& g) override {
+        auto header = getLocalBounds().removeFromTop(headerHeight).withTrimmedRight(closeButton.isVisible() ? 32 : 0);
+        g.setFont(style::title());
+        g.setColour(osci::Colours::text());
+        const auto titleWidth = juce::roundToInt(juce::TextLayout::getStringWidth(style::title(), title)) + 1;
+        g.drawText(title, header.removeFromLeft(titleWidth), juce::Justification::centredLeft, false);
+        if (subtitle.isNotEmpty()) {
+            header.removeFromLeft(8);
+            g.setFont(style::body());
+            g.setColour(osci::Colours::textMuted().withAlpha(.7f));
+            g.drawText(subtitle, header, juce::Justification::centredLeft, true);
+        }
+        if (!footer) { return; }
+        g.setColour(motion::style::hairline());
+        g.fillRect(0, getHeight() - footerHeight - footerGap / 2 - 1, getWidth(), 1);
+    }
+    void resized() override {
+        auto area = getLocalBounds();
+        closeButton.setBounds(area.withHeight(headerHeight).removeFromRight(24).withSizeKeepingCentre(24, 24));
+        if (footer) {
+            auto line = area.removeFromBottom(footerHeight);
+            primary.setBounds(line.removeFromRight(std::max(96, primary.getBestWidthForHeight(footerHeight) + 16)));
+            line.removeFromRight(8);
+            cancel.setBounds(line.removeFromRight(84));
+            // Room for buttons of its own, kept apart from Cancel.
+            line.removeFromRight(8);
+            footerLeft = line;
+            area.removeFromBottom(footerGap);
+        }
+        area.removeFromTop(headerHeight + headerGap);
+        layoutBody(area);
+    }
+    bool keyPressed(const juce::KeyPress& key, juce::Component*) override { return keyPressed(key); }
+    bool keyPressed(const juce::KeyPress& key) override {
+        if (key == juce::KeyPress::escapeKey) {
+            close();
+            return true;
+        }
+        if (key.getKeyCode() == juce::KeyPress::returnKey && primary.isEnabled() && returnConfirms) {
+            primary.triggerClick();
+            return true;
+        }
+        return false;
+    }
+
+    // A caption beside its control, both on one form row.
+    static void formRow(juce::Rectangle<int>& area, juce::Label& label, juce::Component& field, int width = control) {
+        auto line = area.removeFromTop(row);
+        label.setBounds(line.removeFromLeft(caption));
+        field.setBounds(width > 0 ? line.removeFromLeft(width) : line);
+        area.removeFromTop(rowGap);
+    }
+    static void styleCaption(juce::Label& label) {
+        label.setFont(style::body());
+        label.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+        label.setBorderSize({});
+        label.setJustificationType(juce::Justification::centredLeft);
+    }
+    // Fields recess into the sheet's darker panel.
+    static juce::Colour fieldFill() { return osci::Colours::surfaceSunken(); }
+
+protected:
+    virtual void layoutBody(juce::Rectangle<int> area) = 0;
+    // What automation and screen readers call the primary button.
+    void nameAction(const juce::String& name) {
+        primary.setName(name);
+        primary.setTitle(name);
+    }
+    juce::TextButton primary, cancel;
+    // Return clicks the action, unless it loses something.
+    bool returnConfirms = true;
+    // Sheets that only show something (a reference) have no footer, so
+    // they close with a button of their own.
+    void removeFooter() {
+        footer = false;
+        primary.setVisible(false);
+        cancel.setVisible(false);
+        closeButton.setVisible(true);
+    }
+    // The footer's free space left of the buttons, for a status line.
+    juce::Rectangle<int> footerLeft;
+    bool footer = true;
+    juce::Component::SafePointer<osci::OverlayComponent> host;
+
+private:
+    osci::CloseButton closeButton {"Close"};
+    juce::String title, subtitle;
+};
+}
+
+namespace motion::ui {
+// The inside of a popover that edits what it points at: a short muted title,
+// a compact form, and the one action bottom-right with any problem beside
+// it. Escape (or a click elsewhere) closes it without applying.
+class Popover : public juce::Component {
+public:
+    Popover(const juce::String& heading, const juce::String& verb, const juce::String& actionName) : title(heading) {
+        setName(heading);
+        primary.setButtonText(verb);
+        primary.setName(actionName);
+        primary.setTitle(actionName);
+        style::makePrimary(primary);
+        status.setFont(style::caption());
+        status.setColour(juce::Label::textColourId, style::error());
+        status.setBorderSize({});
+        status.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(primary);
+        addAndMakeVisible(status);
+    }
+
+    static constexpr int titleHeight = 18, titleGap = 12, row = 26, rowGap = 6, caption = 64, number = 96, footerHeight = 26, footerGap = 12;
+    // The call-out's bubble sits 4.5 px outside its content; this brings
+    // the content 12 px in from the bubble's edge.
+    static constexpr int inset = 8;
+    static int heightFor(int rows, int extra = 0) { return 2 * inset + titleHeight + titleGap + rows * row + std::max(0, rows - 1) * rowGap + extra + footerGap + footerHeight; }
+    static int widthFor(int content) { return 2 * inset + content; }
+
+    void setError(const juce::String& message) { status.setText(message, juce::dontSendNotification); }
+
+    void paint(juce::Graphics& g) override {
+        auto heading = getLocalBounds().reduced(inset).removeFromTop(titleHeight);
+        g.setFont(style::heading());
+        g.setColour(osci::Colours::text());
+        g.drawText(title, heading, juce::Justification::centredLeft, true);
+        if (detail.isNotEmpty()) {
+            g.setFont(style::caption());
+            g.setColour(osci::Colours::textMuted().withAlpha(.6f));
+            g.drawText(detail, heading, juce::Justification::centredRight, true);
+        }
+    }
+    void resized() override {
+        auto area = getLocalBounds().reduced(inset);
+        auto footer = area.removeFromBottom(footerHeight);
+        primary.setBounds(footer.removeFromRight(std::max(72, primary.getBestWidthForHeight(footerHeight) + 12)));
+        footer.removeFromRight(8);
+        status.setBounds(footer);
+        area.removeFromBottom(footerGap);
+        area.removeFromTop(titleHeight + titleGap);
+        layoutBody(area);
+    }
+    static void formRow(juce::Rectangle<int>& area, juce::Label& label, juce::Component& field, int width = 0) {
+        auto line = area.removeFromTop(row);
+        label.setBounds(line.removeFromLeft(caption));
+        field.setBounds(width > 0 ? line.removeFromLeft(width) : line);
+        area.removeFromTop(rowGap);
+    }
+
+protected:
+    virtual void layoutBody(juce::Rectangle<int> area) = 0;
+    juce::TextButton primary;
+    juce::Label status;
+    // Muted text at the title's right, such as where a tempo change sits.
+    juce::String detail;
+
+private:
+    juce::String title;
+};
+}
+
+namespace motion::ui {
+// A message that needs acknowledging (a project that did not open), or a
+// question with a destructive answer (Remove, beside Cancel).
+class MessageSheet final : public Sheet {
+public:
+    MessageSheet(const juce::String& heading, const juce::String& message, const juce::String& verb, std::function<void()> confirmed = {}, const juce::String& about = {}, bool destructive = false)
+        : Sheet(heading, about, verb), onConfirm(std::move(confirmed)) {
+        nameAction(verb);
+        if (destructive) {
+            style::makeDestructive(primary);
+            returnConfirms = false;
+        }
+        cancel.setVisible(onConfirm != nullptr);
+        text.setText(message, juce::dontSendNotification);
+        text.setFont(style::body());
+        text.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(.85f));
+        text.setJustificationType(juce::Justification::topLeft);
+        text.setBorderSize({});
+        addAndMakeVisible(text);
+        primary.onClick = [this] {
+            auto confirm = onConfirm;
+            close();
+            if (confirm) { confirm(); }
+        };
+        const auto width = 380;
+        // Each line of the message as many lines as it wraps to.
+        int lines = 0;
+        for (const auto& line : juce::StringArray::fromLines(message)) { lines += juce::jmax(1, juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(style::body(), line) / (width - 8.0f)))); }
+        setSize(width, headerHeight + headerGap + lines * lineHeight + footerGap + footerHeight);
+    }
+    // `about` names what the message is about (a file), muted beside the
+    // title; a `destructive` action is red.
+    static void show(juce::Component& owner, const juce::String& heading, const juce::String& message, const juce::String& verb = "OK", std::function<void()> confirmed = {}, const juce::String& about = {}, bool destructive = false) {
+        Sheet::show(owner, std::make_unique<MessageSheet>(heading, message, verb, std::move(confirmed), about, destructive));
+    }
+    // A second way on, quiet at the footer's left ("Export without it").
+    void addAlternative(const juce::String& verb, std::function<void()> chosen) {
+        alternative.setButtonText(verb);
+        alternative.setName(verb);
+        alternative.setTitle(verb);
+        style::makeQuiet(alternative);
+        alternative.onClick = [this, chosen = std::move(chosen)] {
+            auto choice = chosen;
+            close();
+            if (choice) { choice(); }
+        };
+        addAndMakeVisible(alternative);
+        resized();
+    }
+
+protected:
+    void layoutBody(juce::Rectangle<int> area) override {
+        text.setBounds(area);
+        if (alternative.isVisible()) { alternative.setBounds(footerLeft.withWidth(std::min(footerLeft.getWidth(), alternative.getBestWidthForHeight(footerHeight) + 16))); }
+    }
+
+private:
+    std::function<void()> onConfirm;
+    juce::TextButton alternative;
+    juce::Label text;
+};
+
+// Work the user waits on (opening a project, preparing a video): what is
+// happening, a slim progress bar, and Cancel.
+class ProgressSheet final : public Sheet, private juce::Timer {
+public:
+    ProgressSheet(const juce::String& heading, const juce::String& about, const juce::String& message, std::function<double()> readProgress, std::function<void()> cancelWork, const juce::String& cancelName)
+        : Sheet(heading, about, {}), progress(std::move(readProgress)), stop(std::move(cancelWork)) {
+        primary.setVisible(false);
+        cancel.setName(cancelName);
+        cancel.setTitle(cancelName);
+        cancel.onClick = [this] {
+            // Stopping may close the sheet, destroying this button.
+            const juce::Component::SafePointer<ProgressSheet> safe(this);
+            if (stop) { stop(); }
+            if (safe == nullptr) { return; }
+            cancel.setEnabled(false);
+            status.setText("Cancelling...", juce::dontSendNotification);
+        };
+        status.setText(message, juce::dontSendNotification);
+        status.setFont(style::body());
+        status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+        status.setBorderSize({});
+        status.setJustificationType(juce::Justification::topLeft);
+        addAndMakeVisible(status);
+        // A line of text as a message sheet sets it, and the bar only when
+        // there is a measure to show.
+        setSize(380, headerHeight + headerGap + lineHeight + (progress ? barGap + barHeight : 0) + footerGap + footerHeight);
+        if (progress) { startTimerHz(20); }
+    }
+
+    void paint(juce::Graphics& g) override {
+        Sheet::paint(g);
+        // A thin track that fills in the accent; without a measure it waits.
+        if (progress) {
+            g.setColour(motion::style::hairline());
+            g.fillRoundedRectangle(bar, bar.getHeight() * .5f);
+            g.setColour(motion::style::accent().withAlpha(.8f));
+            g.fillRoundedRectangle(bar.withWidth(bar.getWidth() * static_cast<float>(std::clamp(shown, 0.0, 1.0))), bar.getHeight() * .5f);
+        }
+    }
+    bool keyPressed(const juce::KeyPress& key) override {
+        if (key == juce::KeyPress::escapeKey) {
+            if (cancel.isEnabled()) { cancel.triggerClick(); }
+            return true;
+        }
+        return false;
+    }
+    void resized() override {
+        Sheet::resized();
+        // Cancel takes the primary's place on the right.
+        cancel.setBounds(cancel.getBounds().withX(getWidth() - cancel.getWidth()));
+    }
+
+protected:
+    void layoutBody(juce::Rectangle<int> area) override {
+        status.setBounds(area.removeFromTop(lineHeight));
+        area.removeFromTop(barGap);
+        bar = area.removeFromTop(barHeight).toFloat();
+    }
+
+private:
+    void timerCallback() override {
+        const auto next = progress();
+        if (std::abs(next - shown) > 1.0e-4) {
+            shown = next;
+            repaint();
+        }
+    }
+    static constexpr int barGap = 10, barHeight = 4;
+    std::function<double()> progress;
+    std::function<void()> stop;
+    double shown = 0;
+    juce::Rectangle<float> bar;
+    juce::Label status;
+};
+}

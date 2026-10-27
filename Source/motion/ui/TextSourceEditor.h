@@ -1,0 +1,252 @@
+#pragma once
+
+#include "MotionIcons.h"
+#include "ScrubField.h"
+#include "../model/TextSettings.h"
+
+// Edits a text source inside the Scene, like the drawing editor: a type bar
+// under the header (font, style, alignment, spacing), the words in their
+// font on the dark page, and the count or a problem in a strip at the foot.
+// The Scope shows the beam as you type. Per-character animation lives in the
+// clip's Properties.
+class MotionTextSourceEditor final : public juce::Component {
+public:
+    // `creating`: a new text, in the project from its first letter (as a
+    // drawing is from its first stroke); Done ends the typing.
+    MotionTextSourceEditor(const juce::String& initial, const juce::String& title, motion::TextSettings initialSettings, const juce::String& preparationError, bool creating = false)
+        : settings(initialSettings), original(initial), originalSettings(initialSettings), creating(creating) {
+        setName("Text editor");
+        setWantsKeyboardFocus(true);
+        cancelButton.setButtonText("Cancel");
+        cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
+        doneButton.setName(creating ? "Done" : "Apply text");
+        doneButton.setTitle(creating ? "Done" : "Apply text");
+        doneButton.setButtonText(creating ? "Done" : "Apply");
+        doneButton.setTooltip((creating ? "Finish the text (" : "Apply the text (") + motion::style::shortcutText("Cmd+Return") + ")");
+        motion::style::makePrimary(doneButton);
+        doneButton.onClick = [this] { finish(); };
+        for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
+
+        families = juce::Font::findAllTypefaceNames();
+        families.sort(true);
+        family.setName("Text font family");
+        family.addItem("Default font", 1);
+        for (int i = 0; i < families.size(); ++i) { family.addItem(families[i], i + 2); }
+        if (settings.family.isNotEmpty() && !families.contains(settings.family)) {
+            families.add(settings.family);
+            family.addItem(settings.family + " (not installed)", families.size() + 1);
+        }
+        family.setSelectedId(settings.family.isEmpty() ? 1 : families.indexOf(settings.family) + 2, juce::dontSendNotification);
+        family.setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
+        sourceName = title;
+        family.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+        family.onChange = [this] {
+            const auto index = family.getSelectedId() - 2;
+            settings.family = index >= 0 && index < families.size() ? families[index] : juce::String();
+            changed();
+        };
+        for (auto [button, flag] : {std::pair {&bold, motion::TextSettings::bold}, std::pair {&italic, motion::TextSettings::italic}}) {
+            button->setClickingTogglesState(true);
+            button->onClick = [this, button, flag] {
+                settings.style = button->getToggleState() ? (settings.style | flag) : (settings.style & ~flag);
+                changed();
+            };
+        }
+        for (auto [button, value] : {std::pair {&alignLeft, 0}, std::pair {&alignCentre, 1}, std::pair {&alignRight, 2}}) {
+            button->setRadioGroupId(71);
+            button->setClickingTogglesState(true);
+            button->onClick = [this, value] { settings.alignment = value; changed(); };
+        }
+        for (auto [field, spec, tip] : {std::tuple {&lineSpacing, &lineSpacingSpec, "Line spacing, in line heights"}, std::tuple {&tracking, &trackingSpec, "Extra space between letters"}}) {
+            field->setSpec(*spec);
+            field->setTooltip(tip);
+            field->onChange = [this](double) { readFields(); };
+            field->onCommit = [this](double) { readFields(); };
+            // Escape mid-drag has put the field back: so are the settings.
+            field->onCancel = [this] { readFields(); };
+            addAndMakeVisible(*field);
+        }
+        lineSpacing.setName("Text line spacing");
+        tracking.setName("Text tracking");
+        for (auto* caption : {&lineCaption, &trackingCaption}) {
+            caption->setFont(motion::style::caption());
+            caption->setColour(juce::Label::textColourId, osci::Colours::textMuted());
+            caption->setJustificationType(juce::Justification::centredRight);
+            addAndMakeVisible(*caption);
+        }
+        for (auto* button : std::initializer_list<juce::Component*> {&family, &bold, &italic, &alignLeft, &alignCentre, &alignRight}) { addAndMakeVisible(button); }
+
+        text.setName("Source text");
+        text.setMultiLine(true);
+        text.setReturnKeyStartsNewLine(true);
+        text.setScrollbarsShown(true);
+        text.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+        text.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        text.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
+        text.setColour(juce::TextEditor::textColourId, osci::Colours::text());
+        // The words start on the page's inset, like the type bar above.
+        text.setIndents(0, 4);
+        text.setText(initial, false);
+        if (creating) { text.setTextToShowWhenEmpty("Type your text", osci::Colours::textMuted()); }
+        text.onTextChange = [this] { changed(); };
+        addAndMakeVisible(text);
+        status.setName("Text status");
+        status.setFont(motion::style::caption());
+        status.setJustificationType(juce::Justification::centredRight);
+        addAndMakeVisible(status);
+        error = preparationError.contains("geometry budget") ? "Too detailed to prepare: try a simpler font or shorter text." : preparationError;
+        refreshControls();
+        changed(false);
+    }
+
+    std::function<void(const juce::String&, const motion::TextSettings&)> onDone;
+    std::function<void()> onCancel, onChanged;
+    juce::String currentText() const { return text.getText(); }
+    const motion::TextSettings& currentSettings() const { return settings; }
+    // The name the header shows (a new text's follows its first line).
+    void setSourceName(const juce::String& name) {
+        if (name == sourceName) { return; }
+        sourceName = name;
+        repaint();
+    }
+    void focusText() { text.grabKeyboardFocus(); text.moveCaretToEnd(); }
+
+
+    void resized() override {
+        titleArea = motion::style::sceneEditor::layoutHeader(getLocalBounds(), doneButton, cancelButton);
+        auto page = motion::style::sceneEditor::page(getLocalBounds());
+        // The type bar spans the page under the header: the font and its
+        // style, alignment, then spacing. A narrow Scene folds it onto two
+        // lines.
+        constexpr int cell = motion::icons::ToolStrip::cell, groupGap = motion::icons::ToolStrip::groupGap;
+        constexpr int fieldsWidth = 34 + 58 + 8 + 56 + 58, styleWidth = 2 * cell, alignWidth = 3 * cell;
+        constexpr int oneLine = 150 + groupGap + styleWidth + groupGap + alignWidth + groupGap + fieldsWidth;
+        const auto room = page.getWidth() - 2 * motion::style::sceneEditor::inset;
+        twoLines = room < oneLine;
+        bar = page.removeFromTop((twoLines ? 2 : 1) * cell + 2 * barInset);
+        separators.clear();
+        const auto separate = [&](juce::Rectangle<int>& line) {
+            separators.push_back(juce::Rectangle<float>(static_cast<float>(line.getX() + groupGap / 2), static_cast<float>(line.getY() + 5), 1.0f, static_cast<float>(cell - 10)));
+            line.removeFromLeft(groupGap);
+        };
+        const auto spacing = [&](juce::Rectangle<int>& line) {
+            lineCaption.setBounds(line.removeFromLeft(34).withTrimmedRight(4));
+            lineSpacing.setBounds(line.removeFromLeft(58).reduced(0, 3));
+            line.removeFromLeft(8);
+            trackingCaption.setBounds(line.removeFromLeft(56).withTrimmedRight(4));
+            tracking.setBounds(line.removeFromLeft(58).reduced(0, 3));
+        };
+        constexpr auto inset = motion::style::sceneEditor::inset;
+        auto inner = bar.reduced(inset, barInset);
+        auto first = inner.removeFromTop(cell);
+        family.setBounds(first.removeFromLeft(twoLines ? first.getWidth() - groupGap - styleWidth : std::min(200, room - (oneLine - 150))).reduced(0, 3));
+        separate(first);
+        bold.setBounds(first.removeFromLeft(cell));
+        italic.setBounds(first.removeFromLeft(cell));
+        auto second = twoLines ? inner.removeFromTop(cell) : first;
+        if (!twoLines) { separate(second); }
+        for (auto* button : {&alignLeft, &alignCentre, &alignRight}) { button->setBounds(second.removeFromLeft(cell)); }
+        separate(second);
+        spacing(second);
+        footer = page.removeFromBottom(footerHeight);
+        status.setBounds(footer.reduced(inset, 0));
+        text.setBounds(page.reduced(inset, motion::style::padding));
+    }
+
+    void paint(juce::Graphics& g) override {
+        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, creating && text.getText().trim().isEmpty() ? juce::String() : sourceName + ".txt", creating ? "New text" : "Editing", error.isNotEmpty());
+        // The type bar and the foot are bands of the panel's surface.
+        for (const auto& band : {bar, footer}) {
+            g.setColour(osci::Colours::surface());
+            g.fillRect(band);
+        }
+        g.setColour(motion::style::hairline());
+        g.fillRect(bar.withTop(bar.getBottom() - 1));
+        g.fillRect(footer.withHeight(1));
+        g.setColour(motion::style::hairline());
+        for (const auto& separator : separators) { g.fillRect(separator); }
+    }
+
+    bool keyPressed(const juce::KeyPress& key) override {
+        const auto command = key.getModifiers().isCommandDown();
+        if (command && key.getKeyCode() == juce::KeyPress::returnKey) { finish(); return true; }
+        // Escape leaves an untouched text; edits need Cancel, so typing is never
+        // lost. A new text is in the project already: Escape finishes it, as
+        // leaving a text box does elsewhere.
+        if (key == juce::KeyPress::escapeKey) {
+            if (creating && text.getText().trim().isNotEmpty()) {
+                finish();
+            } else if (text.getText() == original && settings == originalSettings && onCancel) {
+                onCancel();
+            }
+            return true;
+        }
+        // Other shortcuts would act on the timeline behind the editor.
+        const auto letter = osci::shortcutKey(key);
+        return command && letter != 'S' && letter != 'Z' && letter != 'C' && letter != 'V' && letter != 'X' && letter != 'A';
+    }
+
+private:
+    void readFields() {
+        settings.lineSpacing = std::round(std::clamp(lineSpacing.getValue(), lineSpacingSpec.minimum, lineSpacingSpec.maximum) * 20.0) / 20.0;
+        settings.tracking = std::round(std::clamp(tracking.getValue(), trackingSpec.minimum, trackingSpec.maximum) * 100.0) / 100.0;
+        changed();
+    }
+    void refreshControls() {
+        bold.setToggleState((settings.style & motion::TextSettings::bold) != 0, juce::dontSendNotification);
+        italic.setToggleState((settings.style & motion::TextSettings::italic) != 0, juce::dontSendNotification);
+        alignLeft.setToggleState(settings.alignment == 0, juce::dontSendNotification);
+        alignCentre.setToggleState(settings.alignment == 1, juce::dontSendNotification);
+        alignRight.setToggleState(settings.alignment == 2, juce::dontSendNotification);
+        lineSpacing.setValue(settings.lineSpacing);
+        tracking.setValue(std::abs(settings.tracking) < 1.0e-9 ? 0.0 : settings.tracking);
+    }
+    // The page shows the words in their font, aligned as they will be drawn.
+    void changed(bool notify = true) {
+        const auto horizontal = settings.alignment == 1 ? juce::Justification::horizontallyCentred : settings.alignment == 2 ? juce::Justification::right : juce::Justification::left;
+        text.setJustification(juce::Justification::top | horizontal);
+        text.setLineSpacing(static_cast<float>(std::max(1.0, settings.lineSpacing)));
+        text.applyFontToAllText(settings.font(28));
+        const auto content = text.getText();
+        const auto tooLong = content.length() > 16384;
+        // A new text is in the project already: Done keeps whatever is there.
+        doneButton.setEnabled(content.trim().isNotEmpty() && !tooLong && (creating || content != original || settings != originalSettings));
+        const auto message = tooLong ? juce::String("Maximum 16,384 characters") : error;
+        status.setColour(juce::Label::textColourId, message.isNotEmpty() ? osci::Colours::danger() : osci::Colours::textMuted());
+        status.setText(message.isNotEmpty() ? message : juce::String(content.length()) + (content.length() == 1 ? " character" : " characters"), juce::dontSendNotification);
+        if (notify) {
+            error.clear();
+            if (onChanged) { onChanged(); }
+        }
+    }
+    void finish() {
+        if (!doneButton.isEnabled()) {
+            if (text.getText() == original && settings == originalSettings && onCancel) { onCancel(); }
+            return;
+        }
+        if (onDone) { onDone(text.getText(), settings); }
+    }
+
+    static constexpr motion::PropertySpec lineSpacingSpec {"text.lineSpacing", "Line spacing", "Text", "", 0.5, 4.0, 1.2, .05, 2, "\u00d7"};
+    static constexpr motion::PropertySpec trackingSpec {"text.tracking", "Tracking", "Text", "", -0.2, 1.0, 0.0, .01, 2, " em"};
+
+    motion::TextSettings settings;
+    const juce::String original;
+    const motion::TextSettings originalSettings;
+    const bool creating;
+    juce::String error;
+    juce::StringArray families;
+    static constexpr int barInset = 2, footerHeight = 26;
+    juce::String sourceName;
+    juce::Rectangle<int> bar, footer, titleArea;
+    std::vector<juce::Rectangle<float>> separators;
+    bool twoLines = false;
+    juce::Label status, lineCaption {{}, "Line"}, trackingCaption {{}, "Tracking"};
+    juce::TextButton cancelButton, doneButton;
+    juce::ComboBox family;
+    using Tool = motion::icons::Button;
+    Tool bold {"Bold", motion::icons::Icon::bold}, italic {"Italic", motion::icons::Icon::italic};
+    Tool alignLeft {"Align left", motion::icons::Icon::alignLeft}, alignCentre {"Align centre", motion::icons::Icon::alignCentre}, alignRight {"Align right", motion::icons::Icon::alignRight};
+    motion::ui::ScrubField lineSpacing, tracking;
+    juce::TextEditor text;
+};

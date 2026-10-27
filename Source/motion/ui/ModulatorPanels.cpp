@@ -1,0 +1,570 @@
+#include "ModulatorPanels.h"
+
+namespace motion::ui {
+void LabelledScrub::setup(juce::Component& owner, const juce::String& text, const juce::String& name, const PropertySpec& spec) {
+    label.setText(text, juce::dontSendNotification);
+    label.setFont(style::caption());
+    label.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+    field.setName(name);
+    field.setTitle(name);
+    field.setSpec(spec);
+    owner.addAndMakeVisible(label);
+    owner.addAndMakeVisible(field);
+}
+
+void LabelledScrub::layout(juce::Rectangle<int>& area) {
+    auto row = area.removeFromTop(style::controlHeight);
+    area.removeFromTop(style::gap);
+    label.setBounds(row.removeFromLeft(62));
+    field.setBounds(row);
+}
+
+RouteRow::RouteRow(Document& document, std::function<void(const juce::Result&)> report) : document(document), report(std::move(report)) {
+    label.setFont(style::caption());
+    label.setColour(juce::Label::textColourId, osci::Colours::text());
+    amount.setSpec(amountSpec);
+    amount.onChange = [this](double value) { apply(value, route.mode); };
+    amount.onCommit = [this](double value) { apply(value, route.mode); };
+    // A drag is one undo step, and Escape takes it back.
+    amount.onBegin = [this] { this->document.beginHeld("route:" + juce::String(route.id)); };
+    amount.onEnd = [this] { this->document.endHeld(); };
+    amount.onCancel = [this] { this->document.cancelHeld(); };
+    mode.setTooltip(juce::String::fromUTF8("Add: amount \xc3\x97 modulator is added to the value. Scale: the value is multiplied by 1 + amount \xc3\x97 modulator."));
+    mode.compact = true;
+    mode.onChange = [this](int index) { apply(amount.getValue(), index == 1 ? ModulationMode::multiply : ModulationMode::add); };
+    // A quiet mark beside the mode toggle, not the heaviest thing in the column.
+    remove.setIconPadding(7);
+    remove.setColours(osci::Colours::textMuted().withAlpha(.8f), osci::Colours::text());
+    remove.onClick = [this] { this->report(this->document.removeRoute(route.id)); };
+    for (auto* component : std::initializer_list<juce::Component*> {&label, &amount, &mode, &remove}) { addAndMakeVisible(component); }
+}
+
+void RouteRow::show(const ModulationRoute& value, const juce::String& text) {
+    route = value;
+    if (label.getText() != text) {
+        label.setText(text, juce::dontSendNotification);
+        for (auto [component, name] : {std::pair<juce::Component*, const char*> {&amount, "Route amount "}, {&mode, "Route mode "}, {&remove, "Remove route "}}) {
+            component->setName(name + text);
+            component->setTitle(name + text);
+        }
+    }
+    amount.setValue(route.amount);
+    mode.setSelected(route.mode == ModulationMode::multiply ? 1 : 0);
+}
+
+void RouteRow::resized() {
+    auto area = getLocalBounds();
+    label.setBounds(area.removeFromTop(area.getHeight() / 2));
+    remove.setBounds(area.removeFromRight(24));
+    mode.setBounds(area.removeFromRight(mode.preferredWidth()).reduced(0, 1));
+    area.removeFromRight(4);
+    amount.setBounds(area.reduced(0, 1));
+}
+
+void RouteRow::showAll(std::vector<std::unique_ptr<RouteRow>>& rows, juce::Component& parent, const std::vector<std::pair<ModulationRoute, juce::String>>& routes, Document& document, const std::function<void(const juce::Result&)>& report) {
+    rows.resize(std::min(rows.size(), routes.size()));
+    while (rows.size() < routes.size()) {
+        rows.push_back(std::make_unique<RouteRow>(document, report));
+        parent.addAndMakeVisible(*rows.back());
+    }
+    for (std::size_t index = 0; index < routes.size(); ++index) { rows[index]->show(routes[index].first, routes[index].second); }
+}
+
+void RouteRow::apply(double value, ModulationMode next) {
+    auto edited = route;
+    edited.amount = value;
+    edited.mode = next;
+    report(document.setRoute(edited));
+}
+}
+
+MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : processor(owner) {
+    setName("Modulator library");
+    viewport.setViewedComponent(&content, false);
+    motion::style::fadeScrolling(viewport);
+    addAndMakeVisible(viewport);
+    addButton.setButtonText("Add modulator");
+    addButton.setName("Add modulator");
+    addButton.setTitle("Add modulator");
+    addButton.onClick = [this] { add(); };
+    content.addAndMakeVisible(addButton);
+    emptyHint.setText("Modulators move properties over time: waves, random and the audio's loudness. Add one, then drag it onto a property in Properties.", juce::dontSendNotification);
+    emptyHint.setFont(motion::style::body());
+    emptyHint.setJustificationType(juce::Justification::centredTop);
+    emptyHint.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(.6f));
+    content.addChildComponent(emptyHint);
+    name.setName("Modulator name");
+    name.setTitle("Modulator name");
+    name.setFont(motion::style::title());
+    name.setEditable(false, true);
+    name.setTooltip("Double-click to rename");
+    // An empty name leaves it as it was; one too long to save says so.
+    name.onTextChange = [this] {
+        const auto text = name.getText().trim();
+        const auto tooLong = text.getNumBytesAsUTF8() > motion::Modulator::longestName;
+        if (tooLong) { report(juce::Result::fail("A modulator's name can be at most " + juce::String(static_cast<int>(motion::Modulator::longestName)) + " characters.")); }
+        if (text.isEmpty() || tooLong) {
+            refresh();
+            return;
+        }
+        change([text](auto& modulator) { modulator.name = text.toStdString(); });
+    };
+    content.addAndMakeVisible(name);
+    remove.setName("Delete modulator");
+    remove.iconSize = motion::style::iconMedium;
+    remove.onClick = [this] {
+        if (selected == 0) { return; }
+        report(processor.document.removeModulator(selected));
+        selected = 0;
+        refresh();
+    };
+    content.addAndMakeVisible(remove);
+    // What kind of modulator, as pictures: wave shapes, random and the
+    // soundtrack's loudness.
+    for (std::size_t index = 0; index < kinds().size(); ++index) {
+        const auto& kind = kinds()[index];
+        auto& button = shapes[index];
+        button = std::make_unique<ShapeButton>(kind.name, kind.waveform);
+        button->onClick = [this, index] { setKind(index); };
+        content.addAndMakeVisible(*button);
+    }
+    more.onClick = [this] {
+        showMore = more.getToggleState();
+        refresh();
+    };
+    content.addAndMakeVisible(more);
+    for (auto [chip, beats] : {std::pair {&hertz, false}, std::pair {&beatsChip, true}}) {
+        chip->setClickingTogglesState(false);
+        chip->onClick = [this, beats = beats] { change([beats](auto& modulator) { modulator.shape.tempoSync = beats; }); };
+        content.addAndMakeVisible(chip);
+    }
+    beatsChip.setTooltip("Beats per cycle, following the tempo");
+    rate.setup(content, "Rate", "Modulator rate", motion::ui::rateHzSpec);
+    phase.setup(content, "Phase", "Modulator phase", motion::ui::phaseSpec);
+    seed.setup(content, "Seed", "Modulator seed", motion::ui::seedSpec);
+    bind(rate, [](auto& modulator, double value) {
+        if (modulator.shape.tempoSync) { modulator.shape.beatsPerCycle = value; } else { modulator.shape.rateHz = value; }
+    });
+    bind(phase, [](auto& modulator, double value) { modulator.shape.phase = value / 360.0; });
+    bind(seed, [](auto& modulator, double value) { modulator.shape.seed = static_cast<std::uint32_t>(value); });
+    routesTitle.setFont(motion::style::caption());
+    routesTitle.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+    routesTitle.setText("Drives", juce::dontSendNotification);
+    content.addAndMakeVisible(routesTitle);
+    routesHint.setText("Drag the card onto a property", juce::dontSendNotification);
+    routesHint.setFont(motion::style::caption());
+    routesHint.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+    routesHint.setJustificationType(juce::Justification::topLeft);
+    content.addAndMakeVisible(routesHint);
+    processor.document.addChangeListener(this);
+    refresh();
+}
+
+void MotionModulatorLibrary::refresh() {
+    const auto& project = processor.document.project();
+    const auto& modulators = project.modulators;
+    if (selected != 0 && std::none_of(modulators.begin(), modulators.end(), [this](const auto& item) { return item.id == selected; })) { selected = 0; }
+    if (selected == 0 && !modulators.empty()) { selected = modulators.front().id; }
+    // Cards are rebuilt only when the list changes, so a card being
+    // clicked or dragged survives selection.
+    std::vector<std::pair<motion::Modulator, int>> listing;
+    for (const auto& modulator : modulators) {
+        int routeCount = 0;
+        for (const auto& route : project.routes) { routeCount += route.modulator == modulator.id ? 1 : 0; }
+        listing.emplace_back(modulator, routeCount);
+    }
+    if (listing != listedCards) {
+        listedCards = listing;
+        cards.clear();
+        for (const auto& [modulator, routeCount] : listing) {
+            auto card = std::make_unique<Card>(*this, modulator, routeCount);
+            content.addAndMakeVisible(*card);
+            cards.push_back(std::move(card));
+        }
+    }
+    for (auto& card : cards) { card->setSelected(card->id() == selected); }
+    const auto* modulator = current();
+    const auto oscillator = modulator != nullptr && modulator->shape.waveform != motion::ModulationWaveform::soundtrack;
+    const auto noise = oscillator && (modulator->shape.waveform == motion::ModulationWaveform::noiseHold || modulator->shape.waveform == motion::ModulationWaveform::noiseSmooth);
+    name.setVisible(modulator != nullptr);
+    remove.setVisible(modulator != nullptr);
+    for (auto& button : shapes) { button->setVisible(modulator != nullptr); }
+    // The essentials show; phase and seed wait behind More.
+    more.setVisible(oscillator);
+    more.setToggleState(showMore, juce::dontSendNotification);
+    hertz.setVisible(oscillator);
+    beatsChip.setVisible(oscillator);
+    rate.setVisible(oscillator);
+    phase.setVisible(oscillator && showMore);
+    seed.setVisible(noise && showMore);
+    if (modulator != nullptr) {
+        if (!name.isBeingEdited()) { name.setText(juce::String(modulator->name), juce::dontSendNotification); }
+        for (std::size_t index = 0; index < shapes.size(); ++index) { shapes[index]->setToggleState(kindIndex(*modulator) == index, juce::dontSendNotification); }
+        hertz.setToggleState(!modulator->shape.tempoSync, juce::dontSendNotification);
+        beatsChip.setToggleState(modulator->shape.tempoSync, juce::dontSendNotification);
+        rate.field.setSpec(modulator->shape.tempoSync ? motion::ui::beatsSpec : motion::ui::rateHzSpec);
+        rate.field.setValue(modulator->shape.tempoSync ? modulator->shape.beatsPerCycle : modulator->shape.rateHz);
+        phase.field.setValue(modulator->shape.phase * 360.0);
+        seed.field.setValue(modulator->shape.seed);
+    }
+    showRoutes();
+    resized();
+    repaint();
+}
+
+void MotionModulatorLibrary::resized() {
+    viewport.setBounds(getLocalBounds());
+    const auto width = viewport.getMaximumVisibleWidth();
+    // The add button sits exactly where Sources' Add source does, and the
+    // cards line up with Sources' rows.
+    auto area = juce::Rectangle<int>(0, 0, width, 100000).reduced(motion::style::padding, 0).withTrimmedTop(6);
+    addButton.setBounds(area.removeFromTop(30));
+    area.removeFromTop(motion::style::gap);
+    emptyHint.setVisible(cards.empty());
+    if (cards.empty()) { emptyHint.setBounds(area.removeFromTop(120).withTrimmedTop(12)); }
+    for (auto& card : cards) { card->setBounds(area.removeFromTop(motion::ui::LibraryCard::pitch).reduced(0, motion::style::gap / 2)); }
+    const auto* modulator = current();
+    if (modulator != nullptr) {
+        area.removeFromTop(motion::style::padding * 2);
+        separatorY = area.getY() - motion::style::padding;
+        auto header = area.removeFromTop(motion::style::controlHeight);
+        remove.setBounds(header.removeFromRight(motion::style::controlHeight));
+        name.setBounds(header);
+        area.removeFromTop(motion::style::gap);
+        {
+            // Two rows of four kinds.
+            const auto each = (area.getWidth() + 2) / 4;
+            for (std::size_t index = 0; index < shapes.size(); ++index) {
+                const auto column = static_cast<int>(index % 4), line = static_cast<int>(index / 4);
+                shapes[index]->setBounds(area.getX() + column * each, area.getY() + line * 30, each - 2, 28);
+            }
+            area.removeFromTop(60);
+            area.removeFromTop(motion::style::gap);
+        }
+        previewArea = area.removeFromTop(44);
+        area.removeFromTop(motion::style::padding);
+        if (rate.field.isVisible()) {
+            // The clock's unit sits on the label line; the value gets the width.
+            auto heading = area.removeFromTop(18);
+            beatsChip.setBounds(heading.removeFromRight(46).reduced(0, 1));
+            heading.removeFromRight(motion::style::gap);
+            hertz.setBounds(heading.removeFromRight(32).reduced(0, 1));
+            rate.label.setBounds(heading);
+            area.removeFromTop(2);
+            rate.field.setBounds(area.removeFromTop(motion::style::controlHeight));
+            area.removeFromTop(motion::style::gap);
+        }
+        if (more.isVisible()) {
+            more.setBounds(area.removeFromTop(20).removeFromLeft(56));
+            area.removeFromTop(motion::style::gap);
+        }
+        for (auto* row : {&phase, &seed}) {
+            if (row->field.isVisible()) { row->layout(area); }
+        }
+        area.removeFromTop(motion::style::padding);
+        routesTitle.setBounds(area.removeFromTop(18));
+        if (routesHint.isVisible()) { routesHint.setBounds(area.removeFromTop(36)); }
+        for (auto& route : routes) {
+            route->setBounds(area.removeFromTop(motion::ui::RouteRow::height));
+            area.removeFromTop(motion::style::gap);
+        }
+    }
+    content.setSize(width, area.getY() + motion::style::padding);
+}
+
+// Like a Sources card: its wave in the picture, its name over what it drives.
+MotionModulatorLibrary::Card::Card(MotionModulatorLibrary& library, const motion::Modulator& value, int routeCount) : owner(library), modulator(value) {
+    setName(juce::String(modulator.name));
+    setTitle(juce::String(modulator.name) + " modulator");
+    const auto drives = routeCount == 0 ? juce::String("Drives nothing yet") : routeCount == 1 ? juce::String("Drives 1 property") : "Drives " + juce::String(routeCount) + " properties";
+    setText(juce::String(modulator.name), drives, routeCount == 0 ? osci::Colours::textMuted().withAlpha(.7f) : motion::style::result());
+    setSelected(modulator.id == owner.selected);
+}
+
+void MotionModulatorLibrary::Card::paintPicture(juce::Graphics& g, juce::Rectangle<float> well, float lit) {
+    motion::ui::paintModulatorShape(g, modulator, well.reduced(5, 9), motion::style::key().withAlpha(.6f + .4f * lit), 1.2f);
+}
+
+void MotionModulatorLibrary::Card::mouseDrag(const juce::MouseEvent& event) {
+    if (event.getDistanceFromDragStart() < 4) { return; }
+    auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
+    if (container != nullptr && !container->isDragAndDropActive()) { container->startDragging("motion-modulator:" + juce::String(static_cast<juce::int64>(modulator.id)), this); }
+}
+
+MotionModulatorLibrary::ShapeButton::ShapeButton(const juce::String& text, motion::ModulationWaveform waveform) : juce::Button("Shape " + text) {
+    setTitle(getName());
+    setTooltip(text);
+    setWantsKeyboardFocus(false);
+    shape.shape.waveform = waveform;
+    shape.shape.seed = 3;
+}
+
+void MotionModulatorLibrary::ShapeButton::paintButton(juce::Graphics& g, bool, bool down) {
+    const auto bounds = getLocalBounds().toFloat();
+    const auto on = getToggleState();
+    g.setColour(on ? motion::style::onFill().withMultipliedAlpha(down ? 1.3f : 1.0f) : down ? motion::style::pressFill() : motion::style::hoverFill().withMultipliedAlpha(1.0f + fade.value()));
+    g.fillRoundedRectangle(bounds, motion::style::radiusControl);
+    motion::ui::paintModulatorShape(g, shape, bounds.reduced(5, 8), on ? juce::Colours::white : osci::Colours::text().withAlpha(.6f + .4f * fade.value()), 1.3f);
+}
+
+const motion::Modulator* MotionModulatorLibrary::current() const {
+    const auto& modulators = processor.document.project().modulators;
+    const auto found = std::find_if(modulators.begin(), modulators.end(), [this](const auto& item) { return item.id == selected; });
+    return found == modulators.end() ? nullptr : &*found;
+}
+
+const std::array<MotionModulatorLibrary::Kind, 7>& MotionModulatorLibrary::kinds() {
+    using motion::ModulationWaveform;
+    static const std::array<Kind, 7> list {{
+        {"Sine", ModulationWaveform::sine}, {"Triangle", ModulationWaveform::triangle}, {"Saw", ModulationWaveform::saw}, {"Square", ModulationWaveform::square},
+        {"Smooth random", ModulationWaveform::noiseSmooth}, {"Random steps", ModulationWaveform::noiseHold}, {"Audio loudness", ModulationWaveform::soundtrack}}};
+    return list;
+}
+
+std::size_t MotionModulatorLibrary::kindIndex(const motion::Modulator& modulator) {
+    const auto& list = kinds();
+    const auto found = std::find_if(list.begin(), list.end(), [&](const Kind& kind) { return kind.waveform == modulator.shape.waveform; });
+    return found != list.end() ? static_cast<std::size_t>(found - list.begin()) : 0;
+}
+
+void MotionModulatorLibrary::setKind(std::size_t index) {
+    const auto* modulator = current();
+    if (modulator == nullptr) { return; }
+    const auto& kind = kinds()[index];
+    const auto oldBase = motion::ui::modulatorKindName(*modulator).toStdString();
+    change([&](auto& edited) {
+        edited.shape.waveform = kind.waveform;
+        if (edited.name.rfind(oldBase + " ", 0) == 0) { edited.name = motion::ui::modulatorKindName(edited).toStdString() + edited.name.substr(oldBase.size()); }
+    });
+}
+
+void MotionModulatorLibrary::add(motion::ModulationWaveform waveform) {
+    motion::Modulator modulator;
+    modulator.shape.waveform = waveform;
+    const auto base = motion::ui::modulatorKindName(modulator).toStdString();
+    const auto& existing = processor.document.project().modulators;
+    for (int number = 1;; ++number) {
+        modulator.name = base + " " + std::to_string(number);
+        if (std::none_of(existing.begin(), existing.end(), [&modulator](const auto& item) { return item.name == modulator.name; })) { break; }
+    }
+    motion::Id id = 0;
+    const auto result = processor.document.addModulator(modulator, id);
+    report(result);
+    if (result.wasOk()) { selected = id; }
+    refresh();
+}
+
+void MotionModulatorLibrary::change(const std::function<void(motion::Modulator&)>& update) {
+    const auto* modulator = current();
+    if (modulator == nullptr) { return; }
+    auto edited = *modulator;
+    update(edited);
+    report(processor.document.setModulator(edited));
+}
+
+void MotionModulatorLibrary::bind(motion::ui::LabelledScrub& row, std::function<void(motion::Modulator&, double)> apply) {
+    row.field.onChange = [this, apply](double value) { change([&](auto& modulator) { apply(modulator, value); }); };
+    row.field.onCommit = row.field.onChange;
+    // A drag is one undo step, and Escape takes it back.
+    row.field.onBegin = [this] { processor.document.beginHeld("modulator:" + juce::String(selected)); };
+    row.field.onEnd = [this] { processor.document.endHeld(); };
+    row.field.onCancel = [this] {
+        processor.document.cancelHeld();
+        refresh();
+    };
+}
+
+void MotionModulatorLibrary::showRoutes() {
+    const auto& project = processor.document.project();
+    std::vector<std::pair<motion::ModulationRoute, juce::String>> shown;
+    for (const auto& route : project.routes) {
+        if (route.modulator == selected) { shown.emplace_back(route, motion::describeProperty(project, route.target, route.property)); }
+    }
+    motion::ui::RouteRow::showAll(routes, content, shown, processor.document, [this](const juce::Result& result) { report(result); });
+    routesTitle.setVisible(current() != nullptr);
+    routesHint.setVisible(current() != nullptr && routes.empty());
+}
+
+void MotionModulatorLibrary::changeListenerCallback(juce::ChangeBroadcaster*) {
+    // Hidden, it refreshes when its tab is shown.
+    if (!isShowing()) { return; }
+    // A scrub in progress keeps its own value until release.
+    for (auto* row : {&rate, &phase, &seed}) {
+        if (row->field.isEditing()) { return; }
+    }
+    for (const auto& route : routes) { if (route->isEditing()) { return; } }
+    refresh();
+}
+
+void MotionModulatorLibrary::Content::paint(juce::Graphics& g) {
+    const auto* modulator = owner.current();
+    if (modulator == nullptr) { return; }
+    g.setColour(juce::Colours::black.withAlpha(.45f));
+    g.drawHorizontalLine(owner.separatorY, static_cast<float>(motion::style::padding), static_cast<float>(getWidth() - motion::style::padding));
+    const auto area = owner.previewArea.toFloat();
+    motion::style::fillWell(g, area);
+    g.setColour(osci::Colours::outlineSubtle().withAlpha(.4f));
+    g.drawHorizontalLine(juce::roundToInt(area.getCentreY()), area.getX() + 4, area.getRight() - 4);
+    motion::ui::paintModulatorShape(g, *modulator, area.reduced(8, 6), motion::style::key(), 1.6f);
+}
+
+MotionRoutingPanel::MotionRoutingPanel(MotionProcessor& owner) : processor(owner) {
+    setName("Property routing");
+    link.setButtonText("Link to...");
+    link.setName("Link property");
+    link.setTitle("Link property");
+    link.onClick = [this] { showLinkMenu(); };
+    unlink.setButtonText("Unlink");
+    unlink.setName("Unlink property");
+    unlink.setTitle("Unlink property");
+    unlink.onClick = [this] { report(processor.document.setLink(targetId, propertyName, std::nullopt)); };
+    linkSource.setFont(motion::style::caption());
+    linkSource.setName("Link source");
+    scale.setup(*this, "Scale", "Link scale", motion::ui::amountSpec);
+    offset.setup(*this, "Offset", "Link offset", motion::ui::amountSpec);
+    delay.setup(*this, "Delay", "Link delay", motion::ui::delaySpec);
+    const auto bindLink = [this](motion::ui::LabelledScrub& row, std::function<void(motion::PropertyLink&, double)> apply) {
+        row.field.onChange = [this, apply](double value) {
+            const auto* curve = motion::findPropertyCurve(processor.document.project(), targetId, propertyName);
+            if (curve == nullptr || !curve->link.has_value()) { return; }
+            auto edited = *curve->link;
+            apply(edited, value);
+            report(processor.document.setLink(targetId, propertyName, edited));
+        };
+        row.field.onCommit = row.field.onChange;
+        // A drag is one undo step, and Escape takes it back.
+        row.field.onBegin = [this] { processor.document.beginHeld("link:" + juce::String(targetId) + ":" + juce::String(propertyName)); };
+        row.field.onEnd = [this] { processor.document.endHeld(); };
+        row.field.onCancel = [this] {
+            processor.document.cancelHeld();
+            refresh();
+        };
+    };
+    bindLink(scale, [](auto& value, double number) { value.scale = number; });
+    bindLink(offset, [](auto& value, double number) { value.offset = number; });
+    bindLink(delay, [](auto& value, double number) { value.delay = number; });
+    for (auto* component : std::initializer_list<juce::Component*> {&link, &unlink, &linkSource}) { addAndMakeVisible(component); }
+    processor.document.addChangeListener(this);
+    refresh();
+}
+
+void MotionRoutingPanel::setTarget(motion::Id id, std::string property) {
+    targetId = id;
+    propertyName = std::move(property);
+    refresh();
+}
+
+void MotionRoutingPanel::refresh() {
+    const auto& project = processor.document.project();
+    const auto* curve = motion::findPropertyCurve(project, targetId, propertyName);
+    std::vector<std::pair<motion::ModulationRoute, juce::String>> shown;
+    for (const auto& item : project.routes) {
+        if (item.target != targetId || item.property != propertyName) { continue; }
+        const auto modulator = std::find_if(project.modulators.begin(), project.modulators.end(), [&](const auto& value) { return value.id == item.modulator; });
+        if (modulator != project.modulators.end()) { shown.emplace_back(item, juce::String(modulator->name)); }
+    }
+    motion::ui::RouteRow::showAll(rows, *this, shown, processor.document, [this](const juce::Result& result) { report(result); });
+    const auto drivable = motion::drivableProperty(project, targetId, propertyName);
+    link.setEnabled(drivable);
+    link.setVisible(targetId != 0);
+    const auto linked = curve != nullptr && curve->link.has_value();
+    unlink.setVisible(linked);
+    linkSource.setVisible(linked);
+    scale.setVisible(linked);
+    offset.setVisible(linked);
+    delay.setVisible(linked);
+    if (linked) {
+        linkSource.setText(juce::String(juce::CharPointer_UTF8("\xe2\x86\x90 ")) + motion::describeProperty(project, curve->link->source, curve->link->property), juce::dontSendNotification);
+        scale.field.setValue(curve->link->scale);
+        offset.field.setValue(curve->link->offset);
+        delay.field.setValue(curve->link->delay);
+    }
+    resized();
+    repaint();
+}
+
+int MotionRoutingPanel::preferredHeight() const {
+    auto height = headerHeight + motion::style::gap + static_cast<int>(rows.size()) * (motion::ui::RouteRow::height + motion::style::gap);
+    height += motion::style::controlHeight + motion::style::gap;
+    if (linkSource.isVisible()) { height += 20 + 3 * (motion::style::controlHeight + motion::style::gap); }
+    if (rows.empty() && !linkSource.isVisible()) { height += 48; }
+    return height + motion::style::padding;
+}
+
+void MotionRoutingPanel::resized() {
+    auto area = getLocalBounds().reduced(8, 0);
+    area.removeFromTop(headerHeight + motion::style::gap);
+    for (auto& row : rows) {
+        row->setBounds(area.removeFromTop(motion::ui::RouteRow::height));
+        area.removeFromTop(motion::style::gap);
+    }
+    auto header = area.removeFromTop(motion::style::controlHeight);
+    area.removeFromTop(motion::style::gap);
+    if (unlink.isVisible()) { unlink.setBounds(header.removeFromRight(64)); header.removeFromRight(motion::style::gap); }
+    link.setBounds(header);
+    if (linkSource.isVisible()) {
+        linkSource.setBounds(area.removeFromTop(20));
+        scale.layout(area);
+        offset.layout(area);
+        delay.layout(area);
+    }
+}
+
+// A column beside the Graph, headed like the channel list and the ruler.
+void MotionRoutingPanel::paint(juce::Graphics& g) {
+    g.fillAll(osci::Colours::surface());
+    auto header = getLocalBounds().removeFromTop(headerHeight);
+    g.setColour(osci::Colours::surfaceRaised());
+    g.fillRect(header);
+    g.setColour(osci::Colours::text());
+    g.setFont(motion::style::title());
+    g.drawText("Routing", header.reduced(10, 0), juce::Justification::centredLeft);
+    // Nothing drives the property yet: say how to, rather than leave a gap.
+    if (targetId != 0 && rows.empty() && !linkSource.isVisible()) {
+        g.setColour(osci::Colours::textMuted());
+        g.setFont(motion::style::caption());
+        g.drawFittedText("Drag a modulator onto this property in Properties to drive it, or link it to another property.",
+            getLocalBounds().withTrimmedTop(link.getBottom() + motion::style::gap).reduced(10, 0).removeFromTop(48), juce::Justification::topLeft, 3);
+    }
+}
+
+void MotionRoutingPanel::showLinkMenu() {
+    const auto& project = processor.document.project();
+    juce::PopupMenu menu;
+    choices.clear();
+    // Clips, groups and cameras, each under its heading, their properties in a submenu each.
+    std::optional<juce::String> heading;
+    const auto addOwner = [&](motion::Id owner, const juce::String& title, const motion::PropertyMap& properties) {
+        juce::PopupMenu sub;
+        for (const auto& [name, curve] : properties) {
+            if (owner == targetId && name == propertyName) { continue; }
+            choices.push_back({owner, name});
+            sub.addItem(static_cast<int>(choices.size()), motion::propertyLabel(project, owner, name));
+        }
+        if (sub.getNumItems() == 0) { return; }
+        if (heading.has_value()) { menu.addSectionHeader(*std::exchange(heading, std::nullopt)); }
+        menu.addSubMenu(title, sub);
+    };
+    heading = "Clips";
+    for (const auto& track : project.tracks) {
+        for (const auto& clip : track.clips) { addOwner(clip.id, juce::String(clip.name), clip.properties); }
+    }
+    heading = "Groups";
+    for (const auto& group : project.groups) { addOwner(group.id, juce::String(group.name), group.properties); }
+    heading = "Cameras";
+    for (const auto& camera : project.cameras) { addOwner(camera.id, juce::String(camera.name), camera.properties); }
+    const auto id = targetId;
+    const auto property = propertyName;
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(&link), [this, id, property](int result) {
+        if (result <= 0 || result > static_cast<int>(choices.size())) { return; }
+        const auto& choice = choices[static_cast<std::size_t>(result - 1)];
+        report(processor.document.setLink(id, property, motion::PropertyLink {choice.first, choice.second, 1, 0, 0}));
+    });
+}
+
+void MotionRoutingPanel::changeListenerCallback(juce::ChangeBroadcaster*) {
+    for (auto* row : {&scale, &offset, &delay}) { if (row->field.isEditing()) { return; } }
+    for (const auto& row : rows) { if (row->isEditing()) { return; } }
+    refresh();
+    if (onLayoutChanged) { onLayoutChanged(); }
+}

@@ -2,7 +2,7 @@
 #include <osci_gui/osci_gui.h>
 #include "ParameterSettingsComponent.h"
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 #include "../PluginProcessor.h"
 #include "modulation/ModulationHelper.h"
 #include "ModulationState.h"
@@ -11,7 +11,7 @@
 KnobContainerComponent::~KnobContainerComponent() {
     if (midiManager)
         midiManager->removeChangeListener(this);
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
 #endif
@@ -19,7 +19,7 @@ KnobContainerComponent::~KnobContainerComponent() {
         boundParam->removeListener(this);
 }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 
 void KnobContainerComponent::wireModulation(OscirenderAudioProcessor& processor) {
     modBindings.clear();
@@ -98,9 +98,5 @@ void KnobContainerComponent::showSettingsPopup() {
         }
     });
     settings->setSize(settings->getDesiredWidth(), settings->getDesiredHeight());
-    auto* parent = getTopLevelComponent();
-    const auto targetBounds = parent->getLocalArea(this, getLocalBounds());
-    auto& myBox = juce::CallOutBox::launchAsynchronously(
-        std::move(settings), targetBounds, parent);
-    juce::ignoreUnused(myBox);
+    osci::launchCallOut(std::move(settings), *this, getLocalBounds());
 }

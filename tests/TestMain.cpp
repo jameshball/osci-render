@@ -259,11 +259,26 @@ public:
 
 static VisualiserCanvasGeometryTest visualiserCanvasGeometryTest;
 
+// Test output goes to stdout on every platform: JUCE's default logger uses
+// OutputDebugString on Windows, which a console never shows.
+struct ConsoleLogger final : juce::Logger {
+    void logMessage(const juce::String& message) override { std::cout << message << std::endl; }
+};
+
 int main(int argc, char* argv[]) {
+    ConsoleLogger logger;
+    juce::Logger::setCurrentLogger(&logger);
     juce::UnitTestRunner runner;
     runner.setAssertOnFailure(false);
     
-    if (argc > 1) {
+    if (argc > 2 && juce::String(argv[1]) == "--test") {
+        // Only the tests with this name, e.g. "Motion hidden lines"
+        juce::Array<juce::UnitTest*> named;
+        for (auto* test : juce::UnitTest::getAllTests()) {
+            if (test->getName() == juce::String(argv[2])) { named.add(test); }
+        }
+        runner.runTests(named);
+    } else if (argc > 1) {
         // Run only tests matching the given category
         juce::String category(argv[1]);
         runner.runTestsInCategory(category);
@@ -285,6 +300,7 @@ int main(int argc, char* argv[]) {
 	if (juce::MessageManager::getInstanceWithoutCreating() != nullptr) {
 		juce::MessageManager::deleteInstance();
     }
-    
+    juce::Logger::setCurrentLogger(nullptr);
+
 	return exitCode;
 }

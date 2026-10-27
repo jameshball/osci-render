@@ -7,21 +7,88 @@
 */
 
 #include "CommonPluginProcessor.h"
+#include "ProductIdentity.h"
 #include "CommonPluginEditor.h"
 #include "JucewrightAutomation.h"
 #include "audio/OutputClip.h"
 #include "components/OverlayDialogHelpers.h"
 
+#include <atomic>
 #include <cmath>
+#include <mutex>
+
+#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
+ #include <execinfo.h>
+ #include <fcntl.h>
+ #include <signal.h>
+ #include <unistd.h>
+#endif
 
 namespace
 {
     osci::LicenseManager::Config makeLicenseManagerConfig() {
         osci::LicenseManager::Config config;
-        const juce::String pluginName (JucePlugin_Name);
-        config.productSlug = pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+        config.productSlug = osci::currentProductSlug();
         return config;
     }
+
+#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
+    // The log, opened before any crash: a signal handler may not allocate or
+    // open files, as the heap may be what broke. Atomic, as a new processor
+    // re-points it at the log its FileLogger may just have replaced.
+    std::atomic<int> crashLogDescriptor { -1 };
+    static_assert(std::atomic<int>::is_always_lock_free, "the signal handler reads the descriptor");
+
+    void writeToCrashLog(int descriptor, const char* text, size_t length) {
+        if (::write(descriptor, text, length) < 0) {
+            return;
+        }
+    }
+
+    // Called by JUCE's signal handler with the signal. Only async-signal-safe
+    // calls: the stack goes to the log, then the app dies of the signal itself
+    // rather than JUCE's SIGKILL, so the OS still writes its crash report.
+    void handleCrash(void* context) {
+        const auto signum = static_cast<int>(reinterpret_cast<juce::pointer_sized_int>(context));
+        const int descriptor = crashLogDescriptor.load();
+        if (descriptor >= 0) {
+            static constexpr char header[] = "\n==== " JucePlugin_Name " crashed, signal ";
+            const char number[] = {static_cast<char>('0' + signum / 10 % 10), static_cast<char>('0' + signum % 10)};
+            static constexpr char footer[] = " ====\n";
+            writeToCrashLog(descriptor, header, sizeof(header) - 1);
+            writeToCrashLog(descriptor, number, sizeof(number));
+            writeToCrashLog(descriptor, footer, sizeof(footer) - 1);
+            void* frames[128];
+            ::backtrace_symbols_fd(frames, ::backtrace(frames, 128), descriptor);
+        }
+        ::signal(signum, SIG_DFL);
+        sigset_t signals;
+        sigemptyset(&signals);
+        sigaddset(&signals, signum);
+        ::pthread_sigmask(SIG_UNBLOCK, &signals, nullptr);
+        ::raise(signum);
+    }
+
+    // Each processor's FileLogger may trim the log by replacing the file, so
+    // every install opens the log afresh and closes the descriptor it replaces;
+    // the handler itself is installed once.
+    void installCrashHandler(const juce::File& log) {
+        const int descriptor = ::open(log.getFullPathName().toRawUTF8(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
+        if (descriptor >= 0) {
+            const int previous = crashLogDescriptor.exchange(descriptor);
+            if (previous >= 0) {
+                ::close(previous);
+            }
+        }
+        static std::once_flag installed;
+        std::call_once(installed, [] {
+            // backtrace() can load a library the first time it runs: not in the handler.
+            void* frame[1];
+            ::backtrace(frame, 1);
+            juce::SystemStats::setApplicationCrashHandler(handleCrash);
+        });
+    }
+#endif
 }
 
 //==============================================================================
@@ -59,19 +126,50 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
                                  + (premium ? " (Premium)" : " (Free)"));
         juce::Logger::writeToLog("Wrapper: " + juce::String(getWrapperTypeDescription(wrapperType)));
         juce::Logger::writeToLog("JUCE: " + juce::SystemStats::getJUCEVersion());
-        juce::Logger::writeToLog("OS: " + juce::SystemStats::getOperatingSystemName()
-                                 + (juce::SystemStats::isOperatingSystem64Bit() ? " (64-bit)" : " (32-bit)"));
-        juce::Logger::writeToLog("CPU: " + juce::SystemStats::getCpuModel()
-                                 + " (" + juce::String(juce::SystemStats::getNumCpus()) + " cores, "
-                                 + juce::String(juce::SystemStats::getCpuSpeedInMegahertz()) + " MHz)");
+        juce::String os = juce::SystemStats::getOperatingSystemName();
+#if JUCE_LINUX
+        // The distribution, which "Linux" alone doesn't say.
+        for (const auto& line : juce::StringArray::fromLines(juce::File("/etc/os-release").loadFileAsString())) {
+            if (line.startsWith("PRETTY_NAME=")) {
+                os << " (" << line.fromFirstOccurrenceOf("=", false, false).unquoted() << ")";
+            }
+        }
+#endif
+        juce::Logger::writeToLog("OS: " + os + (juce::SystemStats::isOperatingSystem64Bit() ? " (64-bit)" : " (32-bit)"));
+        // The build's architecture: an x86-64 build on an Arm machine runs emulated.
+#if JUCE_ARM
+        const juce::String architecture = "arm64";
+#else
+        const juce::String architecture = "x86-64";
+#endif
+        juce::StringArray cpu { juce::String(juce::SystemStats::getNumCpus()) + " cores" };
+        if (juce::SystemStats::getCpuSpeedInMegahertz() > 0) {
+            cpu.add(juce::String(juce::SystemStats::getCpuSpeedInMegahertz()) + " MHz");
+        }
+        cpu.add(architecture + " build");
+        const auto cpuModel = juce::SystemStats::getCpuModel().trim();
+        juce::Logger::writeToLog("CPU: " + (cpuModel.isNotEmpty() ? cpuModel + " " : juce::String()) + "(" + cpu.joinIntoString(", ") + ")");
         juce::Logger::writeToLog("RAM: " + juce::String(juce::SystemStats::getMemorySizeInMegabytes()) + " MB");
-        juce::Logger::writeToLog("Device: " + juce::SystemStats::getDeviceDescription()
-                                 + " / " + juce::SystemStats::getDeviceManufacturer());
+        juce::StringArray device { juce::SystemStats::getDeviceDescription().trim(), juce::SystemStats::getDeviceManufacturer().trim() };
+        device.removeEmptyStrings();
+        if (!device.isEmpty()) {
+            juce::Logger::writeToLog("Device: " + device.joinIntoString(" / "));
+        }
         juce::Logger::writeToLog("User: " + juce::SystemStats::getLogonName()
                                  + " @ " + juce::SystemStats::getComputerName()
                                  + " (" + juce::SystemStats::getUserLanguage() + "_"
                                  + juce::SystemStats::getUserRegion() + ")");
     }
+
+    // A standalone app that crashes leaves where it crashed at the end of its
+    // log, and the OS its crash report. A plugin leaves crash handling to its
+    // host. Not on Windows, where JUCE's handler would end the process before
+    // Windows Error Reporting sees the crash.
+#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        installCrashHandler(applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log"));
+    }
+#endif
 
     globalSettings = osci::SettingsStore::forProductGlobals (JucePlugin_Name);
 
@@ -154,8 +252,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
 juce::String CommonAudioProcessor::getProductSlug() const
 {
-    const juce::String pluginName (JucePlugin_Name);
-    return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+    return osci::currentProductSlug();
 }
 
 int CommonAudioProcessor::getNumRecentProjectFiles() const
@@ -170,8 +267,9 @@ juce::File CommonAudioProcessor::getRecentProjectFile(int index) const
 
 void CommonAudioProcessor::addRecentProjectFile(const juce::File& file)
 {
-    if (file == juce::File())
+    if (file == juce::File() || !remembersFiles) {
         return;
+    }
 
     recentProjectFiles.addFile(file);
 
@@ -206,6 +304,12 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
                                                    nullptr);
 }
 
+void CommonAudioProcessor::removeRecentProjectFile(const juce::File& file) {
+    recentProjectFiles.removeFile(file);
+    globalSettings.set("recentProjectFiles", recentProjectFiles.toString());
+    globalSettings.save();
+}
+
 void CommonAudioProcessor::clearRecentProjectFiles() {
     recentProjectFiles.clear();
     globalSettings.set("recentProjectFiles", juce::String());
@@ -217,9 +321,11 @@ void CommonAudioProcessor::recordingExportCompleted(const juce::File& file) {
         return;
     }
 
-    recentRecordingFiles.addFile(file);
-    globalSettings.set("recentRecordingFiles", recentRecordingFiles.toString());
-    globalSettings.save();
+    if (remembersFiles) {
+        recentRecordingFiles.addFile(file);
+        globalSettings.set("recentRecordingFiles", recentRecordingFiles.toString());
+        globalSettings.save();
+    }
     if (globalSettings.getBool("showVideoAfterExport", false)) {
         file.revealToUser();
     }
@@ -287,11 +393,6 @@ void CommonAudioProcessor::addAllParameters() {
 
     // Bind all parameters to the ValueTree for undo/redo support
     stateTree.addListener(this);
-
-    // Parameters that should NOT participate in undo/redo
-    auto isUndoExcluded = [](const juce::String& paramID) {
-        return paramID == "visualiserFullScreen";
-    };
 
     for (auto* param : getParameters()) {
         if (auto* bp = dynamic_cast<osci::BooleanParameter*>(param)) {
@@ -432,6 +533,16 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     juce::Logger::writeToLog("prepareToPlay: sampleRate=" + juce::String(sampleRate)
         + " samplesPerBlock=" + juce::String(samplesPerBlock)
         + " effects=" + juce::String(effects.size()));
+    // Which device a standalone app plays through, for reports of audio problems.
+    const auto* holder = juce::JUCEApplicationBase::isStandaloneApp() ? juce::StandalonePluginHolder::getInstance() : nullptr;
+    auto* device = holder != nullptr ? holder->deviceManager.getCurrentAudioDevice() : nullptr;
+    if (device != nullptr) {
+        juce::Logger::writeToLog("Audio device: " + device->getTypeName() + " / " + device->getName()
+            + " (" + juce::String(device->getActiveOutputChannels().countNumberOfSetBits()) + " out, "
+            + juce::String(device->getActiveInputChannels().countNumberOfSetBits()) + " in, "
+            + juce::String(device->getCurrentSampleRate()) + " Hz, buffer " + juce::String(device->getCurrentBufferSizeSamples())
+            + ", output latency " + juce::String(device->getOutputLatencyInSamples()) + " samples)");
+    }
 
     const int numChannels = juce::jmax(getTotalNumInputChannels(), getTotalNumOutputChannels(), 1);
     const auto prepared = internalSampleRate.prepare(sampleRate, samplesPerBlock, numChannels, supportsInternalSampleRateOverride());
@@ -461,6 +572,7 @@ void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
     }
 
     internalSampleRate.process(buffer, midi, [this](auto& b, auto& m) { processBlockInternal(b, m); });
+    afterDeviceRate(buffer);
 }
 
 bool CommonAudioProcessor::canSetInternalSampleRateRatio(double ratio) const {
@@ -493,6 +605,15 @@ void CommonAudioProcessor::setInternalSampleRateRatio(double ratio) {
         suspendProcessing(false);
     }
 #endif
+}
+
+void CommonAudioProcessor::setProcessingSampleRate(double rate) {
+    if (!supportsInternalSampleRateOverride() || !internalSampleRate.setChosenRate(rate)) { return; }
+    if (internalSampleRate.hasPreparedDevice()) {
+        suspendProcessing(true);
+        prepareToPlay(internalSampleRate.getLastDeviceSampleRate(), internalSampleRate.getLastDeviceBlockSize());
+        suspendProcessing(false);
+    }
 }
 
 void CommonAudioProcessor::releaseResources() {
@@ -699,13 +820,13 @@ juce::File CommonAudioProcessor::getLastOpenedDirectory()
 {
     juce::String savedDir = globalSettings.getString("lastOpenedDirectory");
     if (savedDir.isEmpty())
-        return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+        return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 
     juce::File dir(savedDir);
     if (dir.exists() && dir.isDirectory())
         return dir;
 
-    return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 }
 
 void CommonAudioProcessor::setLastOpenedDirectory(const juce::File& directory)
@@ -723,9 +844,11 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
         juce::String startTime = globalSettings.getString("startTime");
         juce::String endTime = globalSettings.getString("endTime");
         juce::String lastHeartbeat = globalSettings.getString("lastHeartbeatTime");
-        juce::Time start = juce::Time::fromISO8601(startTime);
-        juce::Time end = juce::Time::fromISO8601(endTime);
-        juce::Time heartbeat = juce::Time::fromISO8601(lastHeartbeat);
+        // A setting never saved is no time at all: JUCE asserts parsing an empty one.
+        const auto parse = [](const juce::String& text) { return text.isEmpty() ? juce::Time() : juce::Time::fromISO8601(text); };
+        juce::Time start = parse(startTime);
+        juce::Time end = parse(endTime);
+        juce::Time heartbeat = parse(lastHeartbeat);
         juce::Time now = juce::Time::getCurrentTime();
         bool heartbeatStale = (now.toMilliseconds() - heartbeat.toMilliseconds()) > 3000;
         if ((startTime.isNotEmpty() && endTime.isNotEmpty()) || (startTime.isNotEmpty() && endTime.isEmpty())) {
@@ -838,38 +961,31 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
     if (ffmpegFile.existsAsFile()) {
         // Verify the binary actually works on this system
         if (!validateFFmpegBinary()) {
-            // Binary exists but is incompatible — delete it and show an error
-            juce::Logger::writeToLog("FFmpeg binary incompatible — deleting " + ffmpegFile.getFullPathName());
+            juce::Logger::writeToLog("FFmpeg binary unusable, deleting " + ffmpegFile.getFullPathName());
             ffmpegFile.deleteFile();
-
-            auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
-            juce::String message =
-                "The FFmpeg binary is not compatible with your version of macOS.\n\n"
 #if JUCE_MAC && JUCE_ARM
-                "On Apple Silicon Macs, macOS 12 (Monterey) or later is required "
-                "for video recording and video/GIF file import.\n\n"
-                "Please update your macOS to use these features."
-#else
-                "The existing FFmpeg binary could not be launched. "
-                "It will be re-downloaded on the next attempt.\n\n"
-                "If this problem persists, please contact support."
+            // Apple's own FFmpeg builds need macOS 12: another download won't help.
+            if (juce::SystemStats::getOperatingSystemType() < juce::SystemStats::MacOS_12) {
+                auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+                osci::showOverlayMessageOrAlert(editor,
+                                                "FFmpeg Needs macOS 12",
+                                                "On Apple Silicon Macs, macOS 12 (Monterey) or later is required "
+                                                "for video recording and video/GIF file import.\n\n"
+                                                "Please update your macOS to use these features.",
+                                                osci::ErrorOverlay::Icon::Warning,
+                                                juce::MessageBoxIconType::WarningIcon,
+                                                { 500, 360 },
+                                                juce::Justification::centredTop);
+                return false;
+            }
 #endif
-                ;
-
-            osci::showOverlayMessageOrAlert(editor,
-                                            "FFmpeg Incompatible",
-                                            message,
-                                            osci::ErrorOverlay::Icon::Warning,
-                                            juce::MessageBoxIconType::WarningIcon,
-                                            { 500, 360 },
-                                            juce::Justification::centredTop);
-            return false;
+            // Damaged or half downloaded: offered as a fresh download below.
+        } else {
+            if (onSuccess != nullptr) {
+                onSuccess();
+            }
+            return true;
         }
-
-        if (onSuccess != nullptr) {
-            onSuccess();
-        }
-        return true;
     }
 
     auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());

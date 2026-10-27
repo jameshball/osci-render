@@ -6,9 +6,10 @@
 class OfflineRenderOverlay final : public osci::ComponentOverlay {
 public:
     OfflineRenderOverlay(std::unique_ptr<juce::Component> content,
-                         juce::Point<int> preferredContentSize)
+                         juce::Point<int> preferredContentSize,
+                         const juce::String& title)
         : osci::ComponentOverlay(std::move(content),
-                                 "Render Audio File to Video",
+                                 title,
                                  preferredContentSize,
                                  true) {
         setDismissible(false);

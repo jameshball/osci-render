@@ -1,0 +1,32 @@
+{
+  "generator": "Pillow",
+  "pillow_version": "11.3.0",
+  "fixtures": [
+    {
+      "file": "lzw_saturation.gif",
+      "width": 128,
+      "height": 128,
+      "encoded_bytes": 23160,
+      "sha256": "71d37a39c2cdb0d18a64554db0dfa8583fd135b6579bad215ddf720688eeedfa",
+      "max_code_width": 12,
+      "clear_codes": 5,
+      "saturated_dictionaries": 4,
+      "clears_after_saturation": 4,
+      "kwkwk_codes": 1,
+      "end_codes": 1
+    },
+    {
+      "file": "lzw_kwkwk.gif",
+      "width": 128,
+      "height": 16,
+      "encoded_bytes": 870,
+      "sha256": "9f95098ac50db869f2d905917a5d7a6354dcadf4b5f2d02e823a057b1093f3a6",
+      "max_code_width": 9,
+      "clear_codes": 1,
+      "saturated_dictionaries": 0,
+      "clears_after_saturation": 0,
+      "kwkwk_codes": 62,
+      "end_codes": 1
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+#pragma once
+
+#include "Animation.h"
+#include "Id.h"
+#include "SharedList.h"
+#include <cstdint>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <type_traits>
+
+namespace motion {
+inline constexpr std::size_t maximumEffectsPerOwner = 64;
+struct EffectParameterDefinition {
+    std::string id, name;
+    double defaultValue, min, max;
+    // Places shown after the point; by default 1 for wide ranges, else 2.
+    int decimals = -1;
+    std::string unit;
+};
+
+// What an effect does to each point; prepared effects switch on it.
+// Moving, turning and sizing are an object's own transform, perspective a
+// camera's and a wobble a modulator's, so none is an effect.
+// Kaleidoscope and Duplicator draw what they are on more than once: copies,
+// each placed differently (new kinds go at the end, as baked frames are
+// fingerprinted by them).
+enum class EffectKind { skew, swirl, bulge, ripple, vortex, colour, bitCrush, twist, polygon, spiralCrush, kaleidoscope, duplicator };
+
+inline bool makesCopies(EffectKind kind) { return kind == EffectKind::kaleidoscope || kind == EffectKind::duplicator; }
+
+// The most copies one of them makes (a parameter's top), and the most of one
+// clip all of them make together.
+inline constexpr int maximumCopies = 12, maximumCopiesOfClip = 48;
+
+struct EffectDefinition {
+    EffectKind kind;
+    std::string id, name;
+    std::vector<EffectParameterDefinition> parameters;
+};
+
+inline const std::vector<EffectDefinition>& effectCatalog() {
+    static const std::vector<EffectDefinition> catalog {
+        { EffectKind::skew, "skew", "Skew", {{"strength", "Strength", 1, 0, 1}, {"skewX", "Skew X", 0, -1, 1}, {"skewY", "Skew Y", 0, -1, 1}, {"skewZ", "Skew Z", 0, -1, 1}} },
+        { EffectKind::swirl, "swirl", "Swirl", {{"strength", "Strength", 1, 0, 1}, {"swirl", "Swirl", 0.4, -1, 1}} },
+        { EffectKind::bulge, "bulge", "Bulge", {{"strength", "Strength", 1, 0, 1}, {"bulge", "Bulge", 0.5, 0, 1}} },
+        { EffectKind::ripple, "ripple", "Ripple", {{"strength", "Strength", 1, 0, 1}, {"rippleDepth", "Depth", 0.2, 0, 1}, {"ripplePhase", "Phase", 0, -1, 1}, {"rippleAmount", "Amount", 0.1, 0, 1}} },
+        { EffectKind::vortex, "vortex", "Vortex", {{"strength", "Strength", 0.6, 0, 1}, {"vortexAmount", "Amount", 2, 2, 6}, {"vortexRotation", "Rotation", 0.25, 0, 1}} },
+        { EffectKind::colour, "colour", "Colour", {{"strength", "Strength", 1, 0, 1}, {"hue", "Hue", 0, -180, 180, 0, "°"}, {"saturation", "Saturation", 1, 0, 2}, {"brightness", "Brightness", 1, 0, 2}} },
+        { EffectKind::bitCrush, "bitCrush", "Bit crush", {{"strength", "Strength", 1, 0, 1}, {"crush", "Crush", 0.7, 0, 1}} },
+        { EffectKind::twist, "twist", "Twist", {{"strength", "Strength", 1, 0, 1}, {"twist", "Twist", 0.5, -1, 1}} },
+        { EffectKind::polygon, "polygon", "Polygon", {{"strength", "Strength", 1, 0, 1}, {"sides", "Sides", 5, 2, 12}, {"stripes", "Stripe size", 0.5, 0, 1}, {"turn", "Rotation", 0, 0, 1}, {"stripePhase", "Stripe phase", 0, 0, 1}} },
+        { EffectKind::spiralCrush, "spiralCrush", "Spiral crush", {{"strength", "Strength", 1, 0, 1}, {"density", "Density", 13, 3, 30}, {"spiralTwist", "Twist", 0.6, -1, 1}, {"zoom", "Zoom", 0, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
+        // Segments of a circle, each the shape turned to stand on its
+        // radius (every other mirrored), kept within its own wedge.
+        { EffectKind::kaleidoscope, "kaleidoscope", "Kaleidoscope", {{"strength", "Strength", 1, 0, 1}, {"segments", "Segments", 6, 1, 12, 0}, {"mirror", "Flip alternate", 1, 0, 1}, {"spread", "Spread", 0.4, 0, 1}, {"clip", "Crop to wedge", 1, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
+        // Copies around a circle, each smaller and pushed out towards it.
+        { EffectKind::duplicator, "duplicator", "Duplicator", {{"strength", "Strength", 1, 0, 1}, {"copies", "Copies", 3, 2, 12, 0}, {"spread", "Spread", 0.4, 0, 1}, {"turn", "Rotation", 0, 0, 1}} }
+    };
+    return catalog;
+}
+
+inline const EffectDefinition* effectDefinition(std::string_view id) {
+    for (const auto& definition : effectCatalog()) {
+        if (definition.id == id) {
+            return &definition;
+        }
+    }
+    return nullptr;
+}
+
+struct EffectRange {
+    double start = 0, duration = 1;
+    double end() const { return start + duration; }
+    bool valid() const { return std::isfinite(start) && std::isfinite(duration) && duration > 0 && std::isfinite(end()); }
+};
+
+struct EffectInstance {
+    Id id = 0;
+    std::string type, name;
+    bool enabled = true;
+    PropertyMap properties;
+    std::optional<EffectRange> range;
+
+    bool valid() const {
+        const auto* definition = effectDefinition(type);
+        if (id == 0 || definition == nullptr || (range.has_value() && !range->valid()) || properties.size() != definition->parameters.size()) {
+            return false;
+        }
+        for (const auto& parameter : definition->parameters) {
+            const auto found = properties.find(parameter.id);
+            if (found == properties.end() || !found->second.valid()) {
+                return false;
+            }
+            const auto validValue = [&](double value) { return std::isfinite(value) && value >= parameter.min && value <= parameter.max; };
+            if (!validValue(found->second.base)) {
+                return false;
+            }
+            for (const auto& key : found->second.keyframes()) {
+                if (!validValue(key.value)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+};
+
+inline EffectInstance makeEffect(Id id, const EffectDefinition& definition) {
+    EffectInstance effect;
+    effect.id = id;
+    effect.type = definition.id;
+    effect.name = definition.name;
+    for (const auto& parameter : definition.parameters) {
+        effect.properties.emplace(parameter.id, Curve(parameter.defaultValue));
+    }
+    return effect;
+}
+
+template <typename ProjectType>
+auto findEffectOwner(ProjectType& project, Id ownerId) -> std::conditional_t<std::is_const_v<ProjectType>, const std::vector<EffectInstance>*, std::vector<EffectInstance>*> {
+    if (ownerId == 0) {
+        return &project.effects;
+    }
+    for (auto& group : project.groups) {
+        if (group.id == ownerId) {
+            return &group.effects;
+        }
+    }
+    for (std::size_t index = 0; index < project.tracks.size(); ++index) {
+        const auto& candidate = project.tracks[index];
+        if (candidate.kind == decltype(candidate.kind)::audio) { continue; }
+        const auto clip = std::find_if(candidate.clips.begin(), candidate.clips.end(), [ownerId](const auto& item) { return item.id == ownerId; });
+        if (candidate.id != ownerId && clip == candidate.clips.end()) { continue; }
+        auto& track = itemAt(project.tracks, index);
+        return candidate.id == ownerId ? &track.effects : &track.clips[static_cast<std::size_t>(clip - candidate.clips.begin())].effects;
+    }
+    return nullptr;
+}
+
+// The effect list holding effect `id`; null when none does.
+template <typename ProjectType>
+auto findEffectList(ProjectType& project, Id id) -> std::conditional_t<std::is_const_v<ProjectType>, const std::vector<EffectInstance>*, std::vector<EffectInstance>*> {
+    const auto holds = [id](const auto& effects) { return std::any_of(effects.begin(), effects.end(), [id](const auto& effect) { return effect.id == id; }); };
+    if (holds(project.effects)) {
+        return &project.effects;
+    }
+    for (auto& group : project.groups) {
+        if (holds(group.effects)) {
+            return &group.effects;
+        }
+    }
+    for (std::size_t index = 0; index < project.tracks.size(); ++index) {
+        const auto& candidate = project.tracks[index];
+        if (holds(candidate.effects)) {
+            return &itemAt(project.tracks, index).effects;
+        }
+        const auto clip = std::find_if(candidate.clips.begin(), candidate.clips.end(), [&](const auto& item) { return holds(item.effects); });
+        if (clip != candidate.clips.end()) {
+            return &itemAt(project.tracks, index).clips[static_cast<std::size_t>(clip - candidate.clips.begin())].effects;
+        }
+    }
+    return nullptr;
+}
+
+// Moves effect `id`, with its parameters and keys, to the end of `owner`'s
+// effects (0: the whole composition), or adds a copy under `copyId`. Moving
+// keeps the identity, so routes to its parameters follow it. False when it
+// cannot: no such effect or owner, a full owner, or a move onto its own owner.
+template <typename ProjectType>
+bool moveEffect(ProjectType& project, Id id, Id owner, bool copy, Id copyId) {
+    auto* from = findEffectList(project, id);
+    if (from == nullptr) { return false; }
+    const auto found = std::find_if(from->begin(), from->end(), [id](const auto& effect) { return effect.id == id; });
+    auto effect = *found;
+    auto* to = findEffectOwner(project, owner);
+    from = findEffectList(project, id);
+    if (to == nullptr || from == nullptr || (to == from && !copy) || to->size() >= maximumEffectsPerOwner) { return false; }
+    if (copy) {
+        effect.id = copyId;
+    } else {
+        std::erase_if(*from, [id](const auto& item) { return item.id == id; });
+    }
+    to->push_back(std::move(effect));
+    return true;
+}
+
+template <typename ProjectType>
+auto findEffect(ProjectType& project, Id id) -> std::conditional_t<std::is_const_v<ProjectType>, const EffectInstance*, EffectInstance*> {
+    auto* list = findEffectList(project, id);
+    if (list == nullptr) {
+        return nullptr;
+    }
+    return &*std::find_if(list->begin(), list->end(), [id](const auto& effect) { return effect.id == id; });
+}
+}

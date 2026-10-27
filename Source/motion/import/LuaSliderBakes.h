@@ -1,0 +1,206 @@
+#pragma once
+
+#include "../model/CompositionGraph.h"
+#include "../model/Document.h"
+#include "../model/LuaClipBake.h"
+#include "../model/PropertySchema.h"
+#include "LuaBaker.h"
+#include "BakedSourceArchive.h"
+#include "../render/PreparedDrivers.h"
+#include <functional>
+#include <map>
+
+namespace motion {
+// Message-thread owner of background slider bakes. A Lua clip with slider
+// properties gets its own frames: the script runs off the audio thread with
+// the clip's slider curves (keys, routes and links) sampled per frame,
+// over the clip's content. Results install as a cache (no undo step); stale
+// results are discarded. Playback and export only ever read baked frames.
+class LuaSliderBakes : private juce::Timer {
+public:
+
+    explicit LuaSliderBakes(Document& owner) : document(owner) {}
+    ~LuaSliderBakes() override {
+        stopTimer();
+        for (auto& [id, job] : jobs) { job->cancelled.store(true); }
+        worker.removeAllJobs(true, 2000);
+    }
+    // Coalesces bursts of change messages (drags, previews) into one scan.
+    void requestUpdate() { startTimer(150); }
+    std::function<void(const juce::String&, bool)> onStatus;
+    // Called when the last bake ends, however it ended (baked, failed,
+    // cancelled or no longer wanted).
+    std::function<void()> onIdle;
+
+    using Plan = LuaSliderPlan;
+    // A plan's frames, baked on this thread; null (and why) if they can't be.
+    static std::shared_ptr<LuaClipBake> bakeNow(const Plan& plan, const std::atomic<bool>* cancel, juce::String& error) {
+        auto frames = LuaBaker::bake(plan.name, plan.script, plan.settings, cancel, nullptr, [&plan](double seconds, double* values) {
+            for (const auto& spec : luaSliderSpecs) {
+                const auto found = plan.sliders.find(std::string(spec.id));
+                const auto index = static_cast<std::size_t>(spec.id.back() - 'a');
+                values[index] = found == plan.sliders.end() ? 0.0 : std::clamp(found->second.evaluate(seconds), 0.0, 1.0);
+            }
+        });
+        if (!frames) {
+            error = juce::String(frames.error);
+            return nullptr;
+        }
+        auto archive = BakedSourceArchive::encode(*frames.source);
+        if (!archive) {
+            error = archive.error;
+            return nullptr;
+        }
+        auto bake = std::make_shared<LuaClipBake>();
+        bake->key = plan.key;
+        bake->source = std::make_shared<const PreparedSource>(frames.source);
+        bake->archive = std::move(archive.data);
+        return bake;
+    }
+    // Every Lua clip's slider frames baked now, in a project drawn where
+    // nothing bakes in the background (the command line).
+    static juce::Result bakeAll(Project& project, const std::atomic<bool>* cancel) {
+        juce::Result result = juce::Result::ok();
+        const auto bakeIn = [&](Composition& composition) {
+            std::map<Id, std::shared_ptr<const LuaClipBake>> made;
+            for (const auto& track : composition.tracks) {
+                for (const auto& clip : track.clips) {
+                    const auto asset = clip.composition == 0 ? findAsset(project.assets, clip.asset) : nullptr;
+                    const auto plan = asset != nullptr ? planFor(*asset, clip, composition) : std::nullopt;
+                    if (!plan.has_value() || (clip.luaBake != nullptr && clip.luaBake->key == plan->key)) { continue; }
+                    juce::String error;
+                    auto bake = bakeNow(*plan, cancel, error);
+                    if (bake == nullptr) {
+                        result = juce::Result::fail(plan->name + ": " + error);
+                        continue;
+                    }
+                    made[clip.id] = std::move(bake);
+                }
+            }
+            const auto bakes = [&made](const Track& track) { return std::any_of(track.clips.begin(), track.clips.end(), [&made](const Clip& clip) { return made.contains(clip.id); }); };
+            composition.tracks.changeEach(bakes, [&made](Track& track) {
+                for (auto& clip : track.clips) {
+                    const auto found = made.find(clip.id);
+                    if (found != made.end()) { clip.luaBake = found->second; }
+                }
+            });
+        };
+        bakeIn(project);
+        for (auto& definition : project.definitions) {
+            auto copy = std::make_shared<CompositionDefinition>(*definition);
+            bakeIn(*copy);
+            definition = std::move(copy);
+        }
+        return result;
+    }
+    // The plan with its driven sliders' routes and links attached, so they
+    // reach the script like any other property.
+    static std::optional<Plan> planFor(const Asset& asset, const Clip& clip, const Composition& composition) {
+        auto plan = luaSliderPlan(asset, clip, composition);
+        if (!plan.has_value()) { return plan; }
+        PreparedDrivers drivers(nullptr);
+        for (const auto& name : plan->driven) { drivers.drive(plan->sliders[name], composition, ClipTiming {}, clip.id, name); }
+        return plan;
+    }
+
+    // Starts bakes for clips whose frames are missing or stale, and clears
+    // bakes from clips that no longer have sliders.
+    void update() {
+        std::map<Id, Plan> wanted;
+        std::vector<Id> clear;
+        forEachPlan([&](const Clip& clip, std::optional<Plan> plan) {
+            if (!plan.has_value()) {
+                if (clip.luaBake != nullptr) { clear.push_back(clip.id); }
+            } else if (clip.luaBake == nullptr || clip.luaBake->key != plan->key) {
+                wanted.emplace(clip.id, std::move(*plan));
+            }
+        });
+        for (const auto id : clear) { document.setLuaBake(id, nullptr); }
+        // A failure is remembered only while its clip still wants a bake.
+        std::erase_if(failedKeys, [&](const auto& failed) { return !wanted.contains(failed.first); });
+        // Jobs whose clip no longer wants them (deleted, sliders removed)
+        // stop, so they do not hold up the single worker.
+        for (auto& [id, job] : jobs) {
+            if (!wanted.contains(id)) { job->cancelled.store(true); }
+        }
+        for (auto& [id, plan] : wanted) {
+            const auto failed = failedKeys.find(id);
+            if (failed != failedKeys.end() && failed->second == plan.key) { continue; }
+            const auto running = jobs.find(id);
+            if (running != jobs.end()) {
+                if (running->second->plan.key == plan.key && !running->second->cancelled.load()) { continue; }
+                running->second->cancelled.store(true);
+            }
+            start(std::move(plan));
+        }
+    }
+    bool busy() const { return !jobs.empty(); }
+
+private:
+    struct Job {
+        Plan plan;
+        std::atomic<bool> cancelled {false};
+    };
+    void start(Plan plan) {
+        auto job = std::make_shared<Job>();
+        job->plan = std::move(plan);
+        const auto id = job->plan.clip;
+        jobs[id] = job;
+        if (onStatus) { onStatus("Baking Lua sliders for " + job->plan.name + " (" + juce::String(static_cast<int>(job->plan.settings.frameCount())) + " frames)...", false); }
+        worker.addJob([this, job, alive = std::weak_ptr<int>(alive)] {
+            juce::String error;
+            const auto bake = bakeNow(job->plan, &job->cancelled, error);
+            juce::MessageManager::callAsync([this, job, alive, bake, error] {
+                if (alive.expired()) { return; }
+                const auto current = jobs.find(job->plan.clip);
+                if (current == jobs.end() || current->second != job) { return; }
+                jobs.erase(current);
+                const juce::ScopeGuard idle {[this] { if (jobs.empty() && onIdle) { onIdle(); } }};
+                if (job->cancelled.load()) { return; }
+                if (bake == nullptr) {
+                    // Remembered, so a broken script is not re-run on every edit.
+                    failedKeys[job->plan.clip] = job->plan.key;
+                    if (onStatus) { onStatus("Lua slider bake failed: " + error, true); }
+                    return;
+                }
+                failedKeys.erase(job->plan.clip);
+                if (!stillWanted(*job)) { update(); return; }
+                document.setLuaBake(job->plan.clip, bake);
+                if (onStatus && jobs.empty()) { onStatus("Lua sliders baked.", false); }
+            });
+        });
+    }
+    // Calls visit(clip, plan) for every clip; the plan is empty for a clip
+    // without Lua sliders.
+    template <typename Visit>
+    void forEachPlan(Visit&& visit) const {
+        const auto& project = document.mainProject();
+        forEachComposition(project, [&](const Composition& composition) {
+            for (const auto& track : composition.tracks) {
+                for (const auto& clip : track.clips) {
+                    const auto asset = clip.composition == 0 ? findAsset(project.assets, clip.asset) : nullptr;
+                    visit(clip, asset != nullptr ? planFor(*asset, clip, composition) : std::nullopt);
+                }
+            }
+        });
+    }
+    bool stillWanted(const Job& job) const {
+        bool wanted = false;
+        forEachPlan([&](const Clip& clip, const std::optional<Plan>& plan) {
+            if (clip.id == job.plan.clip) { wanted = plan.has_value() && plan->key == job.plan.key; }
+        });
+        return wanted;
+    }
+
+    void timerCallback() override {
+        stopTimer();
+        update();
+    }
+
+    Document& document;
+    std::map<Id, std::string> failedKeys;
+    juce::ThreadPool worker {1};
+    std::map<Id, std::shared_ptr<Job>> jobs;
+    std::shared_ptr<int> alive = std::make_shared<int>(0);
+};
+}

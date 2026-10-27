@@ -1,0 +1,177 @@
+{
+  "name": "Synthwave drive",
+  "description": "An endless drive into a striped sun: a saw LFO scrolls the road one cell at a time so it loops seamlessly, colour sets the palette, and hidden lines tuck the sun behind the hills.",
+  "picture": 6,
+  "duration": 16,
+  "fps": 60,
+  "export": {
+    "width": 1920,
+    "height": 1080
+  },
+  "beam": {
+    "intensity": 6,
+    "persistence": 0.3,
+    "glow": 0.35
+  },
+  "objects": [
+    {
+      "name": "Road",
+      "generator": "grid",
+      "properties": {
+        "rotation.x": -90,
+        "position.y": -0.6,
+        "position.z": -9,
+        "generator.width": 4,
+        "generator.height": 4,
+        "generator.columns": 8,
+        "generator.rows": 16,
+        "red": 1,
+        "green": 0.25,
+        "blue": 0.85,
+        "scale.x": 3,
+        "scale.y": 6
+      }
+    },
+    {
+      "name": "Sun",
+      "generator": "ellipse",
+      "properties": {
+        "position.y": 1.2,
+        "position.z": -22,
+        "generator.width": 2,
+        "generator.height": 2,
+        "edges": 0,
+        "slices": 100,
+        "fillDetail": 22,
+        "red": 1,
+        "green": 0.7,
+        "blue": 0.15,
+        "scale.x": 4,
+        "scale.y": 4,
+        "solid": 100
+      }
+    },
+    {
+      "name": "Hill 1",
+      "generator": "polygon",
+      "properties": {
+        "position.x": -9,
+        "position.y": 0.0,
+        "position.z": -17.2,
+        "generator.sides": 3,
+        "generator.radius": 0.5,
+        "scale.x": 6.928406466512702,
+        "scale.y": 3.1999999999999997,
+        "red": 0.3,
+        "green": 0.9,
+        "blue": 1,
+        "solid": 100
+      }
+    },
+    {
+      "name": "Hill 2",
+      "generator": "polygon",
+      "properties": {
+        "position.x": -4.5,
+        "position.y": 0.30000000000000004,
+        "position.z": -18.6,
+        "generator.sides": 3,
+        "generator.radius": 0.5,
+        "scale.x": 8.083140877598153,
+        "scale.y": 4.8,
+        "red": 0.3,
+        "green": 0.9,
+        "blue": 1,
+        "solid": 100
+      }
+    },
+    {
+      "name": "Hill 3",
+      "generator": "polygon",
+      "properties": {
+        "position.x": 0.5,
+        "position.y": -0.04999999999999993,
+        "position.z": -16.4,
+        "generator.sides": 3,
+        "generator.radius": 0.5,
+        "scale.x": 5.773672055427252,
+        "scale.y": 2.9333333333333336,
+        "red": 0.3,
+        "green": 0.9,
+        "blue": 1,
+        "solid": 100
+      }
+    },
+    {
+      "name": "Hill 4",
+      "generator": "polygon",
+      "properties": {
+        "position.x": 4.6,
+        "position.y": 0.15000000000000002,
+        "position.z": -17.8,
+        "generator.sides": 3,
+        "generator.radius": 0.5,
+        "scale.x": 7.505773672055427,
+        "scale.y": 4.0,
+        "red": 0.3,
+        "green": 0.9,
+        "blue": 1,
+        "solid": 100
+      }
+    },
+    {
+      "name": "Hill 5",
+      "generator": "polygon",
+      "properties": {
+        "position.x": 9.2,
+        "position.y": 0.375,
+        "position.z": -18.9,
+        "generator.sides": 3,
+        "generator.radius": 0.5,
+        "scale.x": 8.083140877598153,
+        "scale.y": 5.2,
+        "red": 0.3,
+        "green": 0.9,
+        "blue": 1,
+        "solid": 100
+      }
+    }
+  ],
+  "camera": {
+    "properties": {
+      "position.y": 0.3,
+      "position.z": 1.5
+    }
+  },
+  "modulators": [
+    {
+      "name": "Drive",
+      "waveform": "saw",
+      "rate": 0.75,
+      "routes": [
+        {
+          "to": "Road",
+          "property": "position.z",
+          "amount": 0.75
+        }
+      ]
+    },
+    {
+      "name": "Sway",
+      "waveform": "smooth noise",
+      "rate": 0.2,
+      "routes": [
+        {
+          "to": "camera",
+          "property": "rotation.z",
+          "amount": 2
+        },
+        {
+          "to": "camera",
+          "property": "position.x",
+          "amount": 0.15
+        }
+      ]
+    }
+  ]
+}

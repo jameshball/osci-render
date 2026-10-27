@@ -1,0 +1,390 @@
+#include <JuceHeader.h>
+#include "../Source/motion/model/PreparedDrawing.h"
+#include "../Source/motion/model/Animation.h"
+
+class MotionDrawingGuardTest final : public juce::UnitTest {
+public:
+    MotionDrawingGuardTest() : juce::UnitTest("Motion prepared vector discontinuity guards", "Motion") {}
+
+    void runTest() override {
+        beginTest("Smooth keys use automatic clamped tangents");
+        {
+            motion::Curve two;
+            two.setKey({0, 0, motion::Interpolation::smooth});
+            two.setKey({1, 1, motion::Interpolation::smooth});
+            expectWithinAbsoluteError(two.evaluateBase(.25), .15625, 1e-12, "Two keys ease in and out");
+            motion::Curve rising;
+            rising.setKey({0, 0, motion::Interpolation::smooth});
+            rising.setKey({1, 1, motion::Interpolation::smooth});
+            rising.setKey({2, 2, motion::Interpolation::smooth});
+            const auto slope = (rising.evaluateBase(1 + 1e-6) - rising.evaluateBase(1 - 1e-6)) / 2e-6;
+            expectWithinAbsoluteError(slope, 1.0, 1e-4, "Motion flows through a middle key");
+            double previous = -1;
+            bool monotone = true;
+            for (int i = 0; i <= 200; ++i) {
+                const auto value = rising.evaluateBase(i / 100.0);
+                monotone = monotone && value >= previous;
+                previous = value;
+            }
+            expect(monotone, "Monotone keys give monotone motion");
+            motion::Curve peak;
+            peak.setKey({0, 0, motion::Interpolation::smooth});
+            peak.setKey({1, 1, motion::Interpolation::smooth});
+            peak.setKey({2, 0, motion::Interpolation::smooth});
+            double highest = 0;
+            for (int i = 0; i <= 200; ++i) { highest = std::max(highest, peak.evaluateBase(i / 100.0)); }
+            expectEquals(highest, 1.0, "An extreme key never overshoots");
+            motion::Curve uneven;
+            uneven.setKey({0, 0, motion::Interpolation::smooth});
+            uneven.setKey({.1, 1, motion::Interpolation::smooth});
+            uneven.setKey({3, 1.05, motion::Interpolation::smooth});
+            double maximum = 0;
+            for (int i = 0; i <= 300; ++i) { maximum = std::max(maximum, uneven.evaluateBase(i / 100.0)); }
+            expect(maximum <= 1.05 + 1e-12, "Fritsch-Carlson limiting prevents overshoot on uneven spacing");
+        }
+
+        beginTest("Bezier influence reshapes timing and defaults to Hermite");
+        {
+            motion::Curve hermite, bezier;
+            hermite.setKey({0, 0, motion::Interpolation::cubic, 0, 0});
+            hermite.setKey({1, 1, motion::Interpolation::cubic, 0, 0});
+            bezier.setKey({0, 0, motion::Interpolation::cubic, 0, 0, motion::Keyframe::defaultInfluence, .9});
+            bezier.setKey({1, 1, motion::Interpolation::cubic, 0, 0, .9, motion::Keyframe::defaultInfluence});
+            expectWithinAbsoluteError(hermite.evaluateBase(.5), .5, 1e-12);
+            expectWithinAbsoluteError(bezier.evaluateBase(.5), .5, 1e-9, "Symmetric handles stay centred");
+            expect(bezier.evaluateBase(.2) < hermite.evaluateBase(.2), "Long influence eases out harder");
+            expect(bezier.evaluateBase(.8) > hermite.evaluateBase(.8), "and eases in harder");
+            expectWithinAbsoluteError(bezier.evaluateBase(0), 0.0, 1e-12);
+            expectWithinAbsoluteError(bezier.evaluateBase(std::nextafter(1.0, 0.0)), 1.0, 1e-6);
+            bool invalid = false;
+            try { bezier.setKey({2, 0, motion::Interpolation::cubic, 0, 0, 0, .5}); } catch (const std::invalid_argument&) { invalid = true; }
+            expect(invalid, "Zero influence is rejected");
+        }
+
+        beginTest("Flat cubic allocation weights evaluate exactly at every sampled time");
+        for (const auto value : {0.0, .1, .22, 1.0, 2.0, -3.7, 1000000.0, std::numeric_limits<double>::max()}) {
+            motion::Curve flatCubic;
+            flatCubic.setKey({-.37, value, motion::Interpolation::cubic, 19, 0});
+            flatCubic.setKey({1.73, value, motion::Interpolation::smooth, 0, -23});
+            for (int step = 0; step <= 257; ++step) {
+                const auto time = -.37 + 2.1 * (step / 257.0);
+                expectEquals(flatCubic.evaluateBase(time), value);
+                expectEquals(flatCubic.evaluate(time), value);
+            }
+            for (const auto time : {-.5, -.37, std::nextafter(-.37, 1.73), std::nextafter(1.73, -.37), 1.73, 2.0}) {
+                expectEquals(flatCubic.evaluateBase(time), value);
+            }
+        }
+        motion::Curve nonFlatCubic;
+        nonFlatCubic.setKey({0, 2, motion::Interpolation::cubic, 0, 1});
+        nonFlatCubic.setKey({1, 2, motion::Interpolation::linear, 0, 0});
+        expectEquals(nonFlatCubic.evaluateBase(.5), 2.125);
+        nonFlatCubic.setKey({0, 2, motion::Interpolation::cubic, 0, 0});
+        nonFlatCubic.setKey({1, 3, motion::Interpolation::linear, 0, 0});
+        expectEquals(nonFlatCubic.evaluateBase(.5), 2.5);
+
+        beginTest("Disconnected positive-length shapes blank both sides without moving XYZ");
+        std::vector<std::unique_ptr<osci::Shape>> separated;
+        line(separated, 0, 0, 1, 0);
+        line(separated, 5, 2, 6, 2);
+        motion::PreparedDrawing drawing(std::move(separated));
+        for (const auto phase : {0.495, 0.5, 0.505}) {
+            const auto original = drawing.sample(phase);
+            const auto guarded = drawing.sample(phase, 0.01);
+            expect(!dark(original));
+            expect(dark(guarded));
+            samePosition(original, guarded);
+        }
+        expect(!dark(drawing.sample(0.25, 0.01)));
+        expect(!dark(drawing.sample(0.75, 0.01)));
+        expect(dark(drawing.sample(0.001, 0.01)) && dark(drawing.sample(0.999, 0.01)), "Cyclic last-to-first jump is guarded on both sides");
+
+        beginTest("A connected closed polygon retains brightness at every join and seam");
+        std::vector<std::unique_ptr<osci::Shape>> polygon;
+        line(polygon, 0, 0, 1, 0);
+        line(polygon, 1, 0, 1, 1);
+        line(polygon, 1, 1, 0, 1);
+        line(polygon, 0, 1, 0, 0);
+        motion::PreparedDrawing closed(std::move(polygon));
+        for (const auto phase : {0.0, 0.25, 0.5, 0.75, 0.999}) {
+            expect(!dark(closed.sample(phase, 0.01)));
+            expect(!dark(closed.sample(phase, 1)));
+        }
+
+        beginTest("An open path blanks only its cyclic seam");
+        std::vector<std::unique_ptr<osci::Shape>> openShapes;
+        line(openShapes, 0, 0, 1, 0);
+        line(openShapes, 1, 0, 2, 0);
+        motion::PreparedDrawing open(std::move(openShapes));
+        expect(!dark(open.sample(0.5, 0.02)), "Connected join is not a discontinuity");
+        expect(dark(open.sample(0.005, 0.02)) && dark(open.sample(0.995, 0.02)));
+        expect(!dark(open.sample(0.005)), "Zero span retains existing brightness");
+
+        beginTest("Zero-length entries do not create or hide positive-shape adjacency");
+        std::vector<std::unique_ptr<osci::Shape>> zeros;
+        line(zeros, 100, 100, 100, 100);
+        line(zeros, 0, 0, 1, 0);
+        line(zeros, -100, -100, -100, -100);
+        line(zeros, 1, 0, 0, 0);
+        line(zeros, 100, 100, 100, 100);
+        motion::PreparedDrawing zeroFiltered(std::move(zeros));
+        for (const auto phase : {0.0, 0.5, 0.999}) { expect(!dark(zeroFiltered.sample(phase, 0.02))); }
+        expectWithinAbsoluteError(zeroFiltered.sample(1).x, 0.0f, 0.00001f);
+        std::vector<std::unique_ptr<osci::Shape>> gapWithZeros;
+        line(gapWithZeros, 0, 0, 1, 0);
+        line(gapWithZeros, 1, 0, 1, 0);
+        line(gapWithZeros, 5, 0, 6, 0);
+        motion::PreparedDrawing gaps(std::move(gapWithZeros));
+        expect(dark(gaps.sample(.5, .01)));
+        std::vector<std::unique_ptr<osci::Shape>> allZero;
+        line(allZero, 1, 1, 1, 1);
+        motion::PreparedDrawing empty(std::move(allZero));
+        expect(empty.empty() && dark(empty.sample(0.5, 0.1)));
+
+        beginTest("Tolerance is absolute and includes Z discontinuities");
+        std::vector<std::unique_ptr<osci::Shape>> closeEnough;
+        line(closeEnough, 0, 0, 1, 0);
+        line(closeEnough, 1, 0.0000001f, 0, 0);
+        motion::PreparedDrawing tolerance(std::move(closeEnough));
+        expect(!dark(tolerance.sample(.5, .01)));
+        std::vector<std::unique_ptr<osci::Shape>> depth;
+        depth.push_back(std::make_unique<osci::Line>(osci::Point(0, 0, 0), osci::Point(1, 0, 0)));
+        depth.push_back(std::make_unique<osci::Line>(osci::Point(1, 0, 2), osci::Point(2, 0, 2)));
+        motion::PreparedDrawing depthGap(std::move(depth));
+        expect(dark(depthGap.sample(.5, .01)), "Depth jumps also blank inherited colour");
+
+        beginTest("Invalid and large spans remain bounded and preserve geometry");
+        for (const auto span : {-0.1, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()}) {
+            const auto guarded = closed.sample(.3, span);
+            expect(dark(guarded));
+            samePosition(closed.sample(.3), guarded);
+        }
+        for (const auto span : {.5, 1.0, std::numeric_limits<double>::max()}) {
+            expect(dark(drawing.sample(.25, span)));
+            expect(!dark(closed.sample(.25, span)));
+        }
+        expect(dark(drawing.sample(std::numeric_limits<double>::quiet_NaN(), .1)));
+        expect(dark(drawing.sample(std::numeric_limits<double>::infinity(), .1)));
+
+        beginTest("Under-sampling a nonaligned shape boundary cannot emit a bright connector");
+        std::vector<std::unique_ptr<osci::Shape>> unequal;
+        line(unequal, 0, 0, 1, 0);
+        line(unequal, 10, 0, 12, 0);
+        motion::PreparedDrawing uneven(std::move(unequal));
+        for (const auto phase : {0.25, 0.375}) {
+            expect(!dark(uneven.sample(phase)));
+            expect(dark(uneven.sample(phase, .125)));
+        }
+        expect(!dark(uneven.sample(.75, .01)));
+        expect(dark(uneven.sample(.25, .125)), "Seeking and sampling order do not change guard results");
+
+        beginTest("Integer traversal preserves every closed polygon corner and closure");
+        expectEquals(closed.minimumTraversalSamples(), std::int64_t(7));
+        const std::array<osci::Point, 7> squarePoints { osci::Point(0, 0), osci::Point(0, 0),
+            osci::Point(1, 0), osci::Point(1, 1), osci::Point(0, 1), osci::Point(0, 0), osci::Point(0, 0) };
+        for (std::int64_t index = 0; index < 7; ++index) {
+            const auto point = closed.sampleTraversal(index, 7);
+            samePosition(point, squarePoints[static_cast<std::size_t>(index)]);
+            expect(dark(point) == (index == 0 || index == 6));
+        }
+
+        beginTest("Disconnected integer traversals reserve dark endpoints without losing lit endpoints");
+        expectEquals(uneven.minimumTraversalSamples(), std::int64_t(8));
+        // Six extras split 2:4 between lengths 1:2; both full strokes survive.
+        for (const auto index : {0, 5, 6, 13}) { expect(dark(uneven.sampleTraversal(index, 14))); }
+        for (const auto index : {1, 2, 3, 4, 7, 8, 9, 10, 11, 12}) { expect(!dark(uneven.sampleTraversal(index, 14))); }
+        expectEquals(uneven.sampleTraversal(1, 14).x, 0.0f);
+        expectEquals(uneven.sampleTraversal(4, 14).x, 1.0f);
+        expectEquals(uneven.sampleTraversal(7, 14).x, 10.0f);
+        expectEquals(uneven.sampleTraversal(12, 14).x, 12.0f);
+        expectWithinAbsoluteError(uneven.sampleTraversal(2, 14).x, 1.0f / 3.0f, 1e-6f);
+        for (std::int64_t index = 0; index < 14; ++index) {
+            const auto a = uneven.sampleTraversal(index, 14);
+            const auto b = uneven.sampleTraversal((index + 1) % 14, 14);
+            if (std::abs(a.x - b.x) > 2) { expect(dark(a) && dark(b), "Every spatial travel has two dark endpoints"); }
+        }
+
+        beginTest("Without blanking (XY only), strokes have no dark ends: the beam steps from one straight to the next");
+        expectEquals(uneven.minimumTraversalSamples(false), std::int64_t(4));
+        expectEquals(uneven.coarseTraversalSamples(false), std::int64_t(4));
+        {
+            // The same six extras, split 2:4, with no dark samples to make room for.
+            motion::PreparedDrawing::TraversalCursor kept;
+            for (std::int64_t index = 0; index < 10; ++index) {
+                const auto point = uneven.sampleTraversal(index, 10, false, nullptr, false);
+                expect(!dark(point), "every sample is lit");
+                samePosition(point, uneven.sampleTraversal(index, 10, false, &kept, false));
+            }
+            expectEquals(uneven.sampleTraversal(0, 10, false, nullptr, false).x, 0.0f);
+            expectEquals(uneven.sampleTraversal(3, 10, false, nullptr, false).x, 1.0f);
+            expectEquals(uneven.sampleTraversal(4, 10, false, nullptr, false).x, 10.0f);
+            expectEquals(uneven.sampleTraversal(9, 10, false, nullptr, false).x, 12.0f);
+            int crossings = 0;
+            for (std::int64_t index = 0; index + 1 < 10; ++index) { crossings += std::abs(uneven.sampleTraversal(index + 1, 10, false, nullptr, false).x - uneven.sampleTraversal(index, 10, false, nullptr, false).x) > 2 ? 1 : 0; }
+            expectEquals(crossings, 1, "the gap is crossed in one step");
+        }
+
+        beginTest("A traversal cursor samples just as searching does, in any order");
+        {
+            // Strokes of curves and corners, so samples land in many runs of shapes.
+            std::vector<std::unique_ptr<osci::Shape>> many;
+            for (int stroke = 0; stroke < 6; ++stroke) {
+                const auto x = static_cast<float>(stroke * 3);
+                line(many, x, 0, x + 1, 0);
+                many.push_back(std::make_unique<osci::QuadraticBezierCurve>(x + 1, 0, x + 1.5f, .5f, x + 1, 1));
+                line(many, x + 1, 1, x, 1);
+                line(many, x, 1, x, .25f * static_cast<float>(stroke));
+            }
+            const motion::PreparedDrawing drawing(std::move(many));
+            for (const auto count : {drawing.coarseTraversalSamples(), drawing.minimumTraversalSamples(), drawing.minimumTraversalSamples() + 7, std::int64_t {997}}) {
+                const auto same = [&](std::int64_t index, motion::PreparedDrawing::TraversalCursor& cursor, bool even) {
+                    const auto searched = drawing.sampleTraversal(index, count, even);
+                    const auto kept = drawing.sampleTraversal(index, count, even, &cursor);
+                    return searched.x == kept.x && searched.y == kept.y && searched.r == kept.r;
+                };
+                for (const auto even : {false, true}) {
+                    motion::PreparedDrawing::TraversalCursor forward, backward, jumping;
+                    bool all = true;
+                    for (std::int64_t index = 0; index < count; ++index) { all = all && same(index, forward, even); }
+                    for (std::int64_t index = count - 1; index >= 0; --index) { all = all && same(index, backward, even); }
+                    for (std::int64_t step = 0; step < count; ++step) { all = all && same(step * 37 % count, jumping, even); }
+                    expect(all, "a cursor changes no sample (" + juce::String(count) + (even ? ", even)" : ")"));
+                }
+            }
+        }
+
+        std::array<osci::Point, 29> disconnectedOrder;
+        for (std::int64_t index = 0; index < 29; ++index) { disconnectedOrder[static_cast<std::size_t>(index)] = uneven.sampleTraversal(index, 29); }
+        for (std::int64_t step = 28; step >= 0; --step) {
+            const auto index = step * 11 % 29;
+            const auto actual = uneven.sampleTraversal(index, 29);
+            const auto expected = disconnectedOrder[static_cast<std::size_t>(index)];
+            samePosition(actual, expected);
+            expect(dark(actual) == dark(expected));
+        }
+
+        beginTest("A smooth curve of many short lines needs samples only at its ends; corners keep one each");
+        {
+            // A circle as 200 lines: no corners, so walked by length from end to end.
+            std::vector<std::unique_ptr<osci::Shape>> circle;
+            for (int step = 0; step < 200; ++step) {
+                const auto at = [](int k) { const auto a = 2 * juce::MathConstants<float>::pi * static_cast<float>(k) / 200; return osci::Point(std::cos(a), std::sin(a), 0); };
+                circle.push_back(std::make_unique<osci::Line>(at(step), at(step + 1)));
+            }
+            const motion::PreparedDrawing round(std::move(circle));
+            expect(round.minimumTraversalSamples() <= 4, "a circle of 200 lines needs " + juce::String(round.minimumTraversalSamples()) + " samples, not 200");
+            const auto count = round.minimumTraversalSamples() + 40;
+            float largest = 0;
+            for (std::int64_t index = 2; index + 1 < count; ++index) {
+                const auto a = round.sampleTraversal(index - 1, count), b = round.sampleTraversal(index, count);
+                expectWithinAbsoluteError(std::hypot(b.x, b.y), 1.0f, 1.0e-3f, "every sample on the circle");
+                largest = std::max(largest, std::hypot(b.x - a.x, b.y - a.y));
+            }
+            expect(largest < 2 * juce::MathConstants<float>::pi / 40 * 1.3f, "spread evenly round it");
+            // A square: four corners, each its own sample, so they stay sharp.
+            std::vector<std::unique_ptr<osci::Shape>> sides;
+            const std::array<osci::Point, 5> corners {osci::Point(0, 0, 0), osci::Point(1, 0, 0), osci::Point(1, 1, 0), osci::Point(0, 1, 0), osci::Point(0, 0, 0)};
+            for (std::size_t side = 0; side < 4; ++side) { sides.push_back(std::make_unique<osci::Line>(corners[side], corners[side + 1])); }
+            const motion::PreparedDrawing square(std::move(sides));
+            expectEquals(square.minimumTraversalSamples(), std::int64_t(7), "a square: dark start, lit start, four corners, dark end");
+            expectEquals(square.coarseTraversalSamples(), std::int64_t(4), "or just its ends");
+        }
+
+        beginTest("A fading open stroke comes up from dark and goes down to it, its samples evenly spaced");
+        {
+            // Every sample is as bright as any other: one bunched in at an end would draw a bead.
+            std::vector<std::unique_ptr<osci::Shape>> pieces;
+            pieces.push_back(std::make_unique<osci::Line>(osci::Point(0, 0, 0), osci::Point(1, 0, 0)));
+            pieces.push_back(std::make_unique<osci::Line>(osci::Point(1, 0, 0), osci::Point(2, 0, 0)));
+            const motion::PreparedDrawing faded(std::move(pieces), true);
+            const auto count = faded.minimumTraversalSamples() + 20;
+            std::vector<osci::Point> points;
+            for (std::int64_t index = 0; index < count; ++index) { points.push_back(faded.sampleTraversal(index, count)); }
+            const auto last = static_cast<std::size_t>(count - 1);
+            expect(dark(points[0]) && dark(points[last]), "it starts and ends dark");
+            expect(!dark(points[1]) && !dark(points[last - 1]), "and it is lit between");
+            expect(points[1].x > 0 && points[last - 1].x < 2, "its first and last lit samples are inside it, never where a dark one is");
+            float shortest = 10, longest = 0;
+            for (std::size_t index = 2; index + 1 < points.size(); ++index) {
+                const auto step = points[index].x - points[index - 1].x;
+                shortest = std::min(shortest, step);
+                longest = std::max(longest, step);
+            }
+            expect(shortest > .5f * longest, "no lit sample is bunched in near an end");
+        }
+
+        beginTest("Traversal ignores zero lengths and rejects missing or insufficient budgets");
+        expectEquals(zeroFiltered.minimumTraversalSamples(), std::int64_t(5));
+        expectEquals(empty.minimumTraversalSamples(), std::int64_t(0));
+        expect(dark(empty.sampleTraversal(0, 100)));
+        for (const auto count : {-1, 0, 1, 6}) {
+            expect(dark(closed.sampleTraversal(0, count)));
+        }
+        expect(dark(closed.sampleTraversal(-1, 7)));
+        expect(dark(closed.sampleTraversal(7, 7)));
+        expect(dark(closed.sampleTraversal(std::numeric_limits<std::int64_t>::max(), 7)));
+        const auto huge = std::numeric_limits<std::int64_t>::max();
+        expect(!dark(closed.sampleTraversal(1, huge)));
+        expect(dark(closed.sampleTraversal(huge - 1, huge)));
+        samePosition(closed.sampleTraversal(huge - 2, huge), squarePoints[5]);
+
+        beginTest("Curve traversal retains native shape evaluation and inherited colour");
+        std::vector<std::unique_ptr<osci::Shape>> curvedShapes;
+        curvedShapes.push_back(std::make_unique<osci::CubicBezierCurve>(0, 0, 0, 1, 1, 1, 1, 0));
+        osci::CubicBezierCurve reference(0, 0, 0, 1, 1, 1, 1, 0);
+        motion::PreparedDrawing curved(std::move(curvedShapes));
+        expectEquals(curved.minimumTraversalSamples(), std::int64_t(4));
+        for (std::int64_t index = 1; index <= 4; ++index) {
+            const auto expected = reference.nextVector(static_cast<float>(index - 1) / 3.0f);
+            const auto actual = curved.sampleTraversal(index, 6);
+            samePosition(actual, expected);
+            expectEquals(actual.r, expected.r);
+            expectEquals(actual.g, expected.g);
+            expectEquals(actual.b, expected.b);
+        }
+
+        beginTest("Traversal preserves explicit colour and is independent of sample order");
+        std::vector<std::unique_ptr<osci::Shape>> colouredShapes;
+        colouredShapes.push_back(std::make_unique<ColourLine>());
+        motion::PreparedDrawing coloured(std::move(colouredShapes));
+        std::array<osci::Point, 19> ordered;
+        for (std::int64_t index = 0; index < 19; ++index) { ordered[static_cast<std::size_t>(index)] = coloured.sampleTraversal(index, 19); }
+        // Multiplication by seven permutes all indices modulo this prime count.
+        for (std::int64_t step = 0; step < 19; ++step) {
+            const auto index = step * 7 % 19;
+            const auto actual = coloured.sampleTraversal(index, 19);
+            const auto expected = ordered[static_cast<std::size_t>(index)];
+            samePosition(actual, expected);
+            expectEquals(actual.r, expected.r);
+            expectEquals(actual.g, expected.g);
+            expectEquals(actual.b, expected.b);
+            if (index > 0 && index < 18) {
+                expectEquals(actual.r, .2f);
+                expectEquals(actual.g, .4f);
+                expectEquals(actual.b, .8f);
+            } else { expect(dark(actual)); }
+        }
+
+    }
+
+private:
+    class ColourLine final : public osci::Line {
+    public:
+        ColourLine() : osci::Line(0, 0, 1, 0) {}
+        osci::Point nextVector(float progress) override {
+            auto point = osci::Line::nextVector(progress);
+            point.r = .2f; point.g = .4f; point.b = .8f;
+            return point;
+        }
+    };
+    static void line(std::vector<std::unique_ptr<osci::Shape>>& shapes, float x1, float y1, float x2, float y2) {
+        shapes.push_back(std::make_unique<osci::Line>(osci::Point(x1, y1, 0, 0.2f, 0.4f, 0.8f), osci::Point(x2, y2, 0, 0.2f, 0.4f, 0.8f)));
+    }
+    static bool dark(const osci::Point& point) { return point.r == 0 && point.g == 0 && point.b == 0; }
+    void samePosition(const osci::Point& a, const osci::Point& b) {
+        expectEquals(a.x, b.x);
+        expectEquals(a.y, b.y);
+        expectEquals(a.z, b.z);
+    }
+};
+static MotionDrawingGuardTest motionDrawingGuardTest;

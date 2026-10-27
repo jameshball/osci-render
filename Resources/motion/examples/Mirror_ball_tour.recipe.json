@@ -1,0 +1,332 @@
+{
+  "name": "Mirror ball tour",
+  "description": "Lights, shadows and a mirror ball reflecting the room around it.",
+  "picture": 21,
+  "duration": 24,
+  "fps": 60,
+  "beam": {
+    "intensity": 20,
+    "persistence": 0.2
+  },
+  "define": {
+    "u": "clamp((t - 16) / 6, 0, 1)",
+    "turn": "-7 * pi / 8 + 2 * pi / 16 * (min(t, 16) + 6 * (u - u * u / 2))",
+    "reach": "6.395991869913532 + (0.3 - 6.395991869913532) * smoothstep(u)",
+    "aim": "smoothstep(min(1, 1.3 * u))"
+  },
+  "camera": {
+    "path": {
+      "every": 0.5,
+      "position": [
+        "reach * cos(turn)",
+        "2.7 + (0.22 - 2.7) * smoothstep(u)",
+        "reach * sin(turn)"
+      ],
+      "look": [
+        "0",
+        "-0.5 + (-0.1 - 0.1 * cos(2 * pi * t / 4) + 0.5) * aim",
+        "1.3 * aim"
+      ]
+    }
+  },
+  "objects": [
+    {
+      "name": "Floor",
+      "generator": "grid",
+      "properties": {
+        "rotation.x": -90,
+        "position.y": -0.5,
+        "generator.columns": 18,
+        "generator.rows": 18,
+        "generator.width": 3.2,
+        "generator.height": 3.2,
+        "reflects": 40
+      }
+    },
+    {
+      "name": "Mirror ball",
+      "generator": "sphere",
+      "properties": {
+        "position.z": 1.3,
+        "generator.radius": 0.3,
+        "generator.segments": 24,
+        "generator.rings": 12,
+        "reflects": 100,
+        "position.y": -0.1
+      }
+    },
+    {
+      "name": "Pillar 1",
+      "generator": "box",
+      "properties": {
+        "position.x": 0.438406204336,
+        "position.z": 0.438406204336,
+        "position.y": -0.05,
+        "generator.width": 0.22,
+        "generator.depth": 0.22,
+        "generator.height": 0.9,
+        "edges": 0,
+        "outline": 100,
+        "slices": 100,
+        "fillDetail": 8
+      }
+    },
+    {
+      "name": "Pillar 2",
+      "generator": "box",
+      "properties": {
+        "position.x": -0.438406204336,
+        "position.z": 0.438406204336,
+        "position.y": -0.05,
+        "generator.width": 0.22,
+        "generator.depth": 0.22,
+        "generator.height": 0.9,
+        "edges": 0,
+        "outline": 100,
+        "slices": 100,
+        "fillDetail": 8
+      }
+    },
+    {
+      "name": "Pillar 3",
+      "generator": "box",
+      "properties": {
+        "position.x": -0.438406204336,
+        "position.z": -0.438406204336,
+        "position.y": -0.05,
+        "generator.width": 0.22,
+        "generator.depth": 0.22,
+        "generator.height": 0.9,
+        "edges": 0,
+        "outline": 100,
+        "slices": 100,
+        "fillDetail": 8
+      }
+    },
+    {
+      "name": "Pillar 4",
+      "generator": "box",
+      "properties": {
+        "position.x": 0.438406204336,
+        "position.z": -0.438406204336,
+        "position.y": -0.05,
+        "generator.width": 0.22,
+        "generator.depth": 0.22,
+        "generator.height": 0.9,
+        "edges": 0,
+        "outline": 100,
+        "slices": 100,
+        "fillDetail": 8
+      }
+    },
+    {
+      "name": "Torus",
+      "generator": "torus",
+      "properties": {
+        "position.x": 1,
+        "position.y": 0.72,
+        "rotation.x": 90,
+        "generator.radius": 0.3,
+        "generator.thickness": 0.07,
+        "generator.segments": 24,
+        "generator.sides": 10,
+        "edges": 0,
+        "spiral": 100,
+        "fillDetail": 8
+      }
+    },
+    {
+      "name": "Cone",
+      "generator": "cone",
+      "properties": {
+        "position.x": -1,
+        "position.y": -0.2,
+        "position.z": 0,
+        "generator.radius": 0.26,
+        "generator.height": 0.6,
+        "edges": 0,
+        "outline": 100,
+        "slices": 100,
+        "fillDetail": 8,
+        "rotation.y": 0,
+        "rotation.z": 0
+      }
+    },
+    {
+      "name": "Fill",
+      "generator": "ambientLight",
+      "properties": {
+        "light.intensity": 0.04,
+        "red": 0.7,
+        "green": 0.8,
+        "blue": 1
+      }
+    },
+    {
+      "name": "Light",
+      "generator": "pointLight",
+      "properties": {
+        "light.intensity": 2.2,
+        "light.range": 4.5,
+        "light.shadows": 100,
+        "red": 1,
+        "green": 0.78,
+        "blue": 0.5,
+        "position.y": 0.72,
+        "position.x": 0,
+        "position.z": 0
+      }
+    },
+    {
+      "name": "Glow 1",
+      "generator": "arc",
+      "properties": {
+        "generator.radius": 0.055,
+        "generator.start": 0,
+        "generator.sweep": 360,
+        "lit": 0,
+        "red": 1,
+        "green": 0.82,
+        "blue": 0.55,
+        "position.y": 0.72,
+        "rotation.x": 0,
+        "rotation.y": 0,
+        "position.x": 0,
+        "position.z": 0
+      }
+    },
+    {
+      "name": "Glow 2",
+      "generator": "arc",
+      "properties": {
+        "generator.radius": 0.055,
+        "generator.start": 0,
+        "generator.sweep": 360,
+        "lit": 0,
+        "red": 1,
+        "green": 0.82,
+        "blue": 0.55,
+        "position.y": 0.72,
+        "rotation.x": 90,
+        "rotation.y": 0,
+        "position.x": 0,
+        "position.z": 0
+      }
+    },
+    {
+      "name": "Glow 3",
+      "generator": "arc",
+      "properties": {
+        "generator.radius": 0.055,
+        "generator.start": 0,
+        "generator.sweep": 360,
+        "lit": 0,
+        "red": 1,
+        "green": 0.82,
+        "blue": 0.55,
+        "position.y": 0.72,
+        "rotation.x": 0,
+        "rotation.y": 90,
+        "position.x": 0,
+        "position.z": 0
+      }
+    }
+  ],
+  "modulators": [
+    {
+      "name": "Bob",
+      "waveform": "sine",
+      "rate": 0.25,
+      "phase": 0.75,
+      "routes": [
+        {
+          "to": "Mirror ball",
+          "property": "position.y",
+          "amount": 0.1
+        }
+      ]
+    },
+    {
+      "name": "Cone spin",
+      "waveform": "saw",
+      "rate": 0.041666666666666664,
+      "phase": 0.5,
+      "routes": [
+        {
+          "to": "Cone",
+          "property": "rotation.y",
+          "amount": 180
+        }
+      ]
+    },
+    {
+      "name": "Cone sway",
+      "waveform": "sine",
+      "rate": 0.041666666666666664,
+      "phase": 0,
+      "routes": [
+        {
+          "to": "Cone",
+          "property": "rotation.z",
+          "amount": 25
+        }
+      ]
+    },
+    {
+      "name": "Light orbit X",
+      "waveform": "sine",
+      "rate": 0.125,
+      "phase": 0.25,
+      "routes": [
+        {
+          "to": "Light",
+          "property": "position.x",
+          "amount": 1
+        },
+        {
+          "to": "Glow 1",
+          "property": "position.x",
+          "amount": 1
+        },
+        {
+          "to": "Glow 2",
+          "property": "position.x",
+          "amount": 1
+        },
+        {
+          "to": "Glow 3",
+          "property": "position.x",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "name": "Light orbit Z",
+      "waveform": "sine",
+      "rate": 0.125,
+      "phase": 0.0,
+      "routes": [
+        {
+          "to": "Light",
+          "property": "position.z",
+          "amount": 1
+        },
+        {
+          "to": "Glow 1",
+          "property": "position.z",
+          "amount": 1
+        },
+        {
+          "to": "Glow 2",
+          "property": "position.z",
+          "amount": 1
+        },
+        {
+          "to": "Glow 3",
+          "property": "position.z",
+          "amount": 1
+        }
+      ]
+    }
+  ]
+}

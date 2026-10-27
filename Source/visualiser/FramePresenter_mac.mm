@@ -7,6 +7,10 @@
 #import <OpenGL/OpenGL.h>
 #include <array>
 #include <atomic>
+#include <cstring>
+#if JUCE_MODULE_AVAILABLE_jucewright
+#include <jucewright/jucewright.h>
+#endif
 
 @interface OsciGpuPresentationView : NSView
 @end
@@ -30,6 +34,9 @@ class MacFramePresenter final : public FramePresenter, private juce::AsyncUpdate
     juce::Colour backgroundColour;
     OsciGpuPresentationView* view = nil;
     NSView* peerView = nil;
+    // The context whose drawable is hidden, and that drawable.
+    NSOpenGLContext* hiddenContext = nil;
+    NSView* hiddenView = nil;
     std::array<Slot, 3> slots;
     std::atomic<int> pending{-1};
     int displayed = -1;
@@ -54,14 +61,25 @@ public:
         view.layer.contents = nil;
         [view removeFromSuperview];
         [view release];
+        [hiddenView release];
+        [hiddenContext release];
         for (auto& slot : slots) {
             if (slot.surface != nullptr) { CFRelease(slot.surface); }
         }
     }
     void resized(juce::Rectangle<int> area, juce::Colour background) override {
         // Hide only the native drawable; hiding the JUCE host stops rendering.
+        // Asking a context for its view takes the context's lock, which the GL
+        // thread holds through each frame, so a slow frame would stall this
+        // (message) thread: ask once per context, then hide the view kept.
         auto* nativeContext = static_cast<NSOpenGLContext*>(context.getRawContext());
-        [nativeContext.view setHidden:YES];
+        if (nativeContext != hiddenContext || hiddenView == nil) {
+            [hiddenView release];
+            [hiddenContext release];
+            hiddenContext = [nativeContext retain];
+            hiddenView = [nativeContext.view retain];
+        }
+        [hiddenView setHidden:YES];
         auto* peer = owner.getPeer();
         auto* native = peer != nullptr ? static_cast<NSView*>(peer->getNativeHandle()) : nil;
         auto* parent = native.superview;
@@ -94,12 +112,45 @@ public:
         [CATransaction commit];
     }
     void paint(juce::Graphics& g, juce::Rectangle<int> viewport) override {
+#if JUCE_MODULE_AVAILABLE_jucewright && JUCEWRIGHT_ENABLE_AUTOMATION
+        if (jucewright::isTakingComponentScreenshot()) {
+            paintPresentedFrame(g, viewport);
+            return;
+        }
+#endif
         if (available) {
             // Replace ancestor painting with a hole; controls paint normally above it.
             g.setColour(juce::Colours::transparentBlack);
             g.getInternalContext().fillRect(viewport, true);
         }
     }
+#if JUCE_MODULE_AVAILABLE_jucewright && JUCEWRIGHT_ENABLE_AUTOMATION
+    void paintPresentedFrame(juce::Graphics& g, juce::Rectangle<int> viewport) {
+        // Message thread owns displayed. The displayed slot is unavailable to
+        // the GL producer until the next presentation, so its pixels stay stable.
+        handleAsyncUpdate();
+        if (displayed < 0) { return; }
+        const auto surface = slots[displayed].surface;
+        if (surface == nullptr || IOSurfaceLock(surface, kIOSurfaceLockReadOnly, nullptr) != kIOReturnSuccess) { return; }
+        const auto unlock = juce::ScopeGuard([&] { IOSurfaceUnlock(surface, kIOSurfaceLockReadOnly, nullptr); });
+        const int width = (int)IOSurfaceGetWidth(surface);
+        const int height = (int)IOSurfaceGetHeight(surface);
+        const auto* source = static_cast<const juce::uint8*>(IOSurfaceGetBaseAddress(surface));
+        if (source == nullptr || width <= 0 || height <= 0) { return; }
+        juce::Image image(juce::Image::ARGB, width, height, false);
+        {
+            juce::Image::BitmapData pixels(image, juce::Image::BitmapData::writeOnly);
+            // BGRA rows: the same layout as a little-endian ARGB image.
+            const auto stride = IOSurfaceGetBytesPerRow(surface);
+            for (int y = 0; y < height; ++y) {
+                std::memcpy(pixels.getLinePointer(y), source + y * stride, static_cast<std::size_t>(width) * 4);
+            }
+        }
+        g.setColour(backgroundColour);
+        g.fillRect(viewport);
+        g.drawImageWithin(image, viewport.getX(), viewport.getY(), viewport.getWidth(), viewport.getHeight(), juce::RectanglePlacement::centred);
+    }
+#endif
     void handleAsyncUpdate() override {
         const int next = pending.exchange(-1);
         if (next < 0) { return; }

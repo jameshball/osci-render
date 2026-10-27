@@ -1,0 +1,101 @@
+#pragma once
+
+#include <osci_render_core/osci_render_core.h>
+#include <osci_gui/visualiser/osci_VisualiserParameters.h>
+#include <algorithm>
+#include <vector>
+#include <memory>
+#include <stdexcept>
+
+// Message-thread capture of authored beam settings, with fresh effect DSP
+// buffers and built-in LFO phases starting at zero. External processor-owned
+// modulation callbacks cannot be cloned safely and are explicitly rejected.
+// Never register these privately owned parameters with an AudioProcessor.
+class OfflineVisualiserParameters {
+private:
+    // VisualiserParameters/Effect do not own their raw parameters: normally the
+    // product AudioProcessor does. Destroy params/effects BEFORE this registry.
+    std::vector<std::unique_ptr<juce::AudioProcessorParameter>> owned;
+
+    void own(juce::AudioProcessorParameter* parameter) {
+        const auto known = std::any_of(owned.begin(), owned.end(), [parameter](const auto& item) { return item.get() == parameter; });
+        if (parameter != nullptr && !known) {
+            owned.emplace_back(parameter);
+        }
+    }
+
+    void ownEffects(const std::vector<std::shared_ptr<osci::Effect>>& effects) {
+        for (const auto& effect : effects) {
+            own(effect->enabled);
+            own(effect->linked);
+            own(effect->selected);
+            for (auto* parameter : effect->parameters) {
+                // These are exactly EffectParameter::getParameters()'s fields.
+                // Their destructors do not recursively own one another.
+                own(parameter);
+                own(parameter->lfo);
+                own(parameter->lfoRate);
+                own(parameter->lfoStartPercent);
+                own(parameter->lfoEndPercent);
+                own(parameter->sidechain);
+            }
+        }
+    }
+
+    static void copyEffects(const std::vector<std::shared_ptr<osci::Effect>>& source, const std::vector<std::shared_ptr<osci::Effect>>& destination) {
+        for (const auto& target : destination) {
+            const auto found = std::find_if(source.begin(), source.end(), [&](const auto& effect) { return effect->getId() == target->getId(); });
+            if (found == source.end()) {
+                throw std::invalid_argument("Offline visualiser effect layout does not match its source.");
+            }
+            juce::XmlElement state("effect");
+            (*found)->save(&state);
+            target->load(&state);
+        }
+    }
+
+    template <typename Parameter>
+    static void copyParameters(const std::vector<Parameter*>& source, const std::vector<Parameter*>& destination) {
+        for (auto* target : destination) {
+            const auto found = std::find_if(source.begin(), source.end(), [&](auto* parameter) { return parameter->paramID == target->paramID; });
+            if (found == source.end()) {
+                throw std::invalid_argument("Offline visualiser parameter layout does not match its source.");
+            }
+            target->setValue((*found)->getValue());
+        }
+    }
+
+public:
+    VisualiserParameters params;
+
+    OfflineVisualiserParameters() {
+        for (auto* parameter : params.booleans) {
+            own(parameter);
+        }
+        for (auto* parameter : params.integers) {
+            own(parameter);
+        }
+        ownEffects(params.effects);
+        ownEffects(params.audioEffects);
+    }
+
+    // A source's external modulation belongs to its processor: rejected by
+    // default, or left out for the caller to replace with its own offline
+    // modulation (a host that drives the beam from its own data).
+    enum class ExternalModulation { reject, replace };
+
+    explicit OfflineVisualiserParameters(VisualiserParameters& source, ExternalModulation external = ExternalModulation::reject) : OfflineVisualiserParameters() {
+        if (source.applyExternalModulation && external == ExternalModulation::reject) {
+            throw std::invalid_argument("External processor modulation can't be captured as an independent offline beam snapshot.");
+        }
+        copyEffects(source.effects, params.effects);
+        copyEffects(source.audioEffects, params.audioEffects);
+        copyParameters(source.booleans, params.booleans);
+        copyParameters(source.integers, params.integers);
+        // No ValueTree, MIDI manager, listeners, animated-value source pointers,
+        // external inputs or processor callbacks are shared with the source.
+    }
+
+    OfflineVisualiserParameters(const OfflineVisualiserParameters&) = delete;
+    OfflineVisualiserParameters& operator=(const OfflineVisualiserParameters&) = delete;
+};

@@ -1,0 +1,453 @@
+#pragma once
+
+#include "MotionStyle.h"
+#include "MotionIcons.h"
+#include "PreviewGesture.h"
+
+#include "../MotionProcessor.h"
+#include "../render/ScenePreview.h"
+#include "EditorCamera.h"
+#include "EditorTransformFrame.h"
+#include "MotionPath.h"
+#include "CompositionGizmo.h"
+#include "TransformGizmo.h"
+#include "GeneratorHandlesView.h"
+#include "../model/PropertyTarget.h"
+#include <map>
+#include <set>
+
+class MotionCompositionView : public juce::Component, public juce::DragAndDropTarget, public juce::TooltipClient, private juce::Timer {
+public:
+    explicit MotionCompositionView(MotionProcessor& processor);
+    ~MotionCompositionView() override;
+    // The selection the editor shows everywhere: highlighted here, with its gizmo.
+    void setSelection(motion::Id id) {
+        if (selected == id) { return; }
+        selected = id;
+        // A camera has no size or anchor: its tools give way to Move.
+        if (!toolApplies(tool)) { setTool(MotionTransformTool::move); }
+        repaint();
+    }
+    // Whether `value` can act on the selection: a camera has no size or
+    // anchor, and one aimed by Look at isn't turned by hand.
+    bool toolApplies(MotionTransformTool value) const;
+    // Dragging over empty space selects the objects it touches (Shift adds).
+    // Shift-clicking an object toggles it; a Shift drag adds.
+    enum class SelectionChange { replace, add, toggle };
+    std::function<void(const std::vector<motion::Id>&, SelectionChange)> onSelectClips;
+
+    // Part mode picks the exact shapes inside still vector sources (text,
+    // SVG, OBJ, drawings): click or drag over them, double-click for a whole
+    // path, Shift to add. Extract splits them off as an object of their own.
+    bool inPartMode() const { return partMode; }
+    void setPartMode(bool enabled);
+    std::function<void(bool)> onPartModeChanged;
+    // The picked shapes of each clip, with the source they index.
+    struct Picked { std::shared_ptr<const motion::PreparedSource> source; std::set<std::size_t> shapes; };
+    std::function<void(const std::map<motion::Id, Picked>&)> onExtractParts;
+    std::function<void(const juce::String&)> onStatus;
+    std::size_t pickedPartCount() const;
+    // Box picks the parts wholly inside; lasso those inside a drawn loop;
+    // pieces picks whole separate pieces (a letter, an outline) that a click
+    // or a box touches.
+    enum class PartPick { box, lasso, pieces };
+    void setPartPick(PartPick mode) {
+        partPick = mode;
+        hoverShapes.clear();
+        refreshPartBar();
+    }
+    void extractPicked();
+    // Puts the anchor at the middle of the object's geometry, keeping the
+    // object in place; a reason when it cannot.
+    juce::String centreAnchor(motion::Id id);
+    // Where the name prompt points: the Extract button, or the parts bar.
+    juce::Rectangle<int> extractAnchor() const { return extractButton.isVisible() ? extractButton.getBounds() : partBar(); }
+    void resized() override;
+    // Only the axes widget has a tip; the Scene's tools carry their own.
+    juce::String getTooltip() override { return hoverCorner ? "Click an axis to look along it, again to look from behind" + motion::style::dot() + "0 resets the view" : juce::String(); }
+    std::function<void(bool)> onNavigationChanged;
+    std::function<void()> onContextMenu;
+    std::function<void(motion::Id, const std::string&)> onPropertyEdited;
+    std::function<bool(motion::Id)> isSelected;
+    // Every selected object, the one the gizmo is on first.
+    std::function<std::vector<motion::Id>()> selectedObjects;
+    std::function<void(MotionTransformTool)> onToolChanged;
+    void setTool(MotionTransformTool value);
+    std::optional<double> selectedKeyContentTime(motion::Id id) const;
+    void retainSelectedKeyAfterEdit() {
+        if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
+    }
+    std::function<void(bool)> onMotionPathChanged;
+    void setMotionPathVisible(bool visible);
+    // Solid view: the faces of what is shown hide the lines behind them, as
+    // if filled with the background, so a busy scene reads at a glance.
+    void setSolidView(bool on);
+    struct ViewState { motion::editor::Camera camera; MotionTransformTool tool = MotionTransformTool::move; bool motionPath = false; };
+    ViewState viewState() const { return {camera, tool, showMotionPath}; }
+    void restoreView(const ViewState& state);
+    bool isNavigating() const { return navigating; }
+    void setNavigating(bool enabled);
+    void frameSelection();
+    // How far from the left the tool strip floating over the view reaches;
+    // framing keeps what it frames clear of it.
+    void setCoveredLeft(int pixels) { coveredLeft = pixels; }
+    void resetView() {
+        cancelGesture();
+        setDrivenCamera(0);
+        camera = {};
+        repaint();
+    }
+
+    // Looking through an output camera: the Scene shows exactly its view. A
+    // free camera moves as the view is orbited, panned, zoomed or flown
+    // (keyed as a whole at the playhead once it has keys); a rigged one is
+    // only shown, and moving the view leaves it (driveBlocker says why).
+    juce::String driveBlocker(motion::Id id) const;
+    motion::Id drivenCamera() const { return lockedCamera; }
+    // How long the last paint took.
+    double paintMilliseconds() const { return lastPaintMilliseconds; }
+    // `followOutput`: looks through whichever camera the Scope is on at the
+    // playhead, moving on as cuts do.
+    void setDrivenCamera(motion::Id id, bool followOutput = false);
+    // The camera on the Scope at the playhead (0: none).
+    motion::Id outputCamera() const;
+    // A camera's properties for where the Scene is looking from.
+    motion::PropertyMap viewAsCamera() const;
+    std::function<void(motion::Id)> onDrivenCameraChanged;
+    // A camera double-clicked: look through it.
+    std::function<void(motion::Id)> onLookThrough;
+    // Blender's numpad views: look along an axis at the current pivot and
+    // distance.
+    enum class ViewPreset { front, back, right, left, top, bottom };
+    void setViewPreset(ViewPreset preset);
+
+    std::function<void(motion::Id)> onSelection;
+    void refresh() { preview(processor.document.project()); }
+    // What the Scene shows, prepared; others read it (the beam's shares) and
+    // hear when it changes.
+    const motion::PreparedComposition* preparedComposition() const { return prepared.get(); }
+    std::function<void()> onPrepared;
+    void preview(const motion::Project& project);
+
+    void paint(juce::Graphics& g) override;
+    // Output cameras as small pyramids, Blender style. The camera on the
+    // output also outlines its frame where the scene's origin sits, so what
+    // is in shot is clear before looking at the Scope.
+    void paintCameras(juce::Graphics& g, double time) const;
+
+    // Double-clicking an object opens what made it: the text, Lua or drawing
+    // editor, or a nested composition.
+    std::function<void(motion::Id)> onOpenSource;
+    void mouseDoubleClick(const juce::MouseEvent& event) override;
+    void mouseDown(const juce::MouseEvent& event) override;
+
+    void mouseDrag(const juce::MouseEvent& event) override;
+
+    void mouseUp(const juce::MouseEvent& event) override;
+
+    // The visible clip drawn nearest the point (within 18 px), and the world
+    // point there.
+    struct Hit {
+        motion::Id id;
+        float distance;
+        motion::Vec3 point;
+        float depth;
+    };
+    static constexpr float pickReach = 18;
+    std::vector<Hit> hitsNear(juce::Point<float> position) const;
+    static std::vector<std::pair<motion::Vec3, motion::Vec3>> cameraOutline(const motion::PreparedCamera::Frame& frame);
+    motion::Id pickAt(juce::Point<float> position, motion::Vec3* anchor) const;
+    motion::Id pickTarget(juce::Point<float> position, motion::Vec3* anchor) const;
+    // Every object drawn within 18 px of the point, nearest the eye first.
+    std::vector<motion::Id> hitsAt(juce::Point<float> position) const;
+    bool inSelectedGroup(motion::Id clip) const;
+
+    // Context hints only while flying or dragging (the tool strip's tooltips
+    // cover the rest), like Blender's status hints, drawn over the scene.
+    // Effects dropped on an object apply to it; anywhere else, to everything.
+    std::function<void(const std::string&, std::optional<motion::Id>)> onEffectPreview;
+    std::function<void(const std::string&, motion::Id)> onEffectDropped;
+    // An effect card dragged out of Properties moves its effect (Alt copies it).
+    std::function<void(motion::Id, std::optional<motion::Id>)> onEffectMovePreview;
+    std::function<void(motion::Id, motion::Id, bool)> onEffectMoved;
+    bool isInterestedInDragSource(const SourceDetails& details) override {
+        const auto description = details.description.toString();
+        return description.startsWith("motion-effect:") || description.startsWith("motion-effect-instance:");
+    }
+    void itemDragMove(const SourceDetails& details) override;
+    void itemDragExit(const SourceDetails& details) override;
+    void itemDropped(const SourceDetails& details) override;
+    void setEffectDragActive(bool active);
+
+    void paintOverChildren(juce::Graphics& g) override;
+    // Blender's conventions: a mouse wheel zooms; on a trackpad two fingers
+    // orbit, Shift pans and Cmd/Ctrl zooms; a pinch zooms.
+    void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
+    void mouseMagnify(const juce::MouseEvent&, float scale) override;
+    void mouseExit(const juce::MouseEvent&) override {
+        if (!navigating && (hoverHandle != -1 || hoverPart.has_value() || hoverAxis.has_value() || hoverCorner)) {
+            hoverHandle = -1;
+            hoverPart.reset();
+            hoverShapes.clear();
+            hoverAxis.reset();
+            hoverCorner = false;
+            repaint();
+        }
+    }
+    void mouseMove(const juce::MouseEvent& event) override;
+    void focusLost(FocusChangeType) override { cancelGesture(); setNavigating(false); }
+    void visibilityChanged() override { if (!isShowing()) { cancelGesture(); setNavigating(false); } }
+    bool keyPressed(const juce::KeyPress& key) override;
+
+private:
+    motion::Id selected = 0;
+    // Why the scene is empty at the playhead, and where the next visual starts.
+    juce::String emptyMessage() const;
+    double editingTime() const;
+    bool atSelectedPathEnd(double time) const;
+    void updateMotionPath();
+    void paintMotionPath(juce::Graphics& g);
+    bool seekMotionKey(juce::Point<float> position);
+    enum class Gesture { plane, moveAxis, rotateAxis, scaleAxis, uniformScale };
+    bool dragStarted = false;
+    bool editable(double time) const;
+    const motion::Camera* selectedCamera() const;
+    juce::String cameraBlocker() const;
+    bool followCamera();
+    bool cameraExists(motion::Id id) const;
+    MotionCompositionGizmo currentGizmo() const;
+    bool beginGesture(double time);
+    void timerCallback() override;
+    void centreCursor() { juce::Desktop::getInstance().getMainMouseSource().setScreenPosition(localPointToGlobal(getLocalBounds().getCentre().toFloat())); }
+    void releaseCursor();
+    void cancelGesture();
+    bool validGesture();
+    juce::Rectangle<float> outputFrame() const;
+    juce::Rectangle<float> scopeFrame() const;
+    // How far the whole Scene reaches past the output's -1 to 1.
+    motion::hidden::Reach sceneReach() const {
+        const auto frame = outputFrame();
+        return {getWidth() / frame.getWidth(), getHeight() / frame.getHeight()};
+    }
+    void paintLookThrough(juce::Graphics& g) const;
+    motion::editor::Vec2 normalized(juce::Point<float> point) const;
+    motion::Vec3 worldPoint(osci::Point point, double time) const;
+    using CameraView = std::optional<motion::editor::Camera::View>;
+    // Loops over many points take the camera's view once.
+    std::optional<juce::Point<float>> screenPoint(const CameraView& view, motion::Vec3 point) const;
+    std::optional<juce::Point<float>> screenPoint(motion::Vec3 point) const { return screenPoint(camera.view(), point); }
+    std::optional<juce::Point<float>> projected(const CameraView& view, osci::Point point, double time) const { return screenPoint(view, worldPoint(point, time)); }
+    void drawWorldLine(juce::Graphics& g, motion::Vec3 start, motion::Vec3 end) const;
+    // A world line on screen, cut at the near plane and well outside the
+    // view, so lines through or behind the eye still draw their visible part.
+    std::optional<juce::Line<float>> screenLine(const CameraView& view, motion::Vec3 start, motion::Vec3 end) const;
+    // One lit piece of a clip in world space; `shape` is the exact shape it
+    // belongs to, or -1 for a traced source.
+    struct Piece { motion::Vec3 a, b; juce::Colour colour; int shape; };
+    // What the Scene shows, on screen: drawn by paint and hit-tested by
+    // picking, worked out again only when the view, time or content change.
+    struct ScreenPiece { juce::Line<float> line; motion::Vec3 a, b; juce::Colour colour; const motion::PreparedClip* clip; int shape; float depth; };
+    struct PiecesKey {
+        std::uint64_t prepared;
+        const motion::LiveSourceFrames* live;
+        const motion::ScenePreview::Shown* lighting;
+        double time, x, y, z, yaw, pitch, fov;
+        motion::Id selected;
+        int width, height;
+        bool solid, parts;
+        bool operator==(const PiecesKey&) const = default;
+    };
+    bool solidView = true;
+    // The pieces' parts no face is in front of, from this view.
+    void keepUnhidden(const CameraView& view, double time) const;
+    const std::vector<ScreenPiece>& screenPieces() const;
+    mutable std::vector<ScreenPiece> pieceCache;
+    mutable std::optional<PiecesKey> pieceKey;
+    mutable std::shared_ptr<const motion::LiveSourceFrames> pieceLive;
+    std::uint64_t preparedSerial = 0;
+    // Lighting worked out since the project or the composition edited last
+    // changed: the latest stands in while the next is worked out, so an edit
+    // never flashes the scene unlit, but nothing from before is matched.
+    std::uint64_t lightingScope = 0, lightingSince = 0;
+    // A clip's geometry: a vector source's exact shapes (lines straight,
+    // curves divided finely enough to look smooth), otherwise its traced beam.
+    // `lit`, when the Scene preview has one, is the clip's drawing as the
+    // Scope draws it: lit, a mirror's own lines given way.
+    void forEachPiece(const motion::PreparedClip& clip, double time, const CameraView& view, const motion::LiveSourceFrames* live, const std::function<void(const Piece&)>& visit, const motion::PreparedDrawing* lit = nullptr) const;
+    // Lighting and reflections as this view sees them, worked out off the
+    // message thread for the project shown; the latest result, kept while
+    // the pieces built from it are.
+    std::shared_ptr<const motion::Project> shownProject;
+    std::unique_ptr<motion::ScenePreview> scenePreview;
+    mutable std::shared_ptr<const motion::ScenePreview::Shown> lighting;
+    mutable std::optional<std::tuple<std::uint64_t, double, double, double, double, double, double, double, int, int>> lightingAsked;
+    // Whether what is shown looks any different lit, asking for its lighting if so.
+    bool askForLighting(double time) const;
+    double clipTime(const motion::PreparedClip& clip, double time) const;
+    float depthFade(double depth) const;
+    // Effects anywhere above the clip may bend straight lines.
+    bool warps(const motion::PreparedClip& clip) const;
+    // The shapes a clip's parts are picked from: a still vector source on
+    // this timeline; null otherwise.
+    const motion::PreparedDrawing* partDrawing(const motion::PreparedClip& clip) const;
+    juce::String partBlocker(motion::Id clip) const;
+    struct PartHit { motion::Id clip; std::size_t shape; };
+    std::optional<PartHit> pickPart(juce::Point<float> position) const;
+    // Picks the parts inside `area` (all of each shape), or with `touching`
+    // the whole pieces it touches.
+    void pickParts(const juce::Path& area, bool add, bool touching);
+    std::map<motion::Id, Picked> partsIn(const juce::Path& area, bool touching) const;
+    juce::Path marqueeRegion() const;
+    // What the box or lasso being dragged would pick or select.
+    std::map<motion::Id, Picked> marqueeParts;
+    std::vector<motion::Id> marqueeClips;
+    void pickAllParts();
+    void moveAnchor(motion::Vec3 delta);
+    void resetMarquee();
+    motion::Vec3 nearestOnSegment(juce::Point<float> position, motion::Vec3 a, motion::Vec3 b) const;
+    void pickPath(PartHit hit, bool add);
+    void clickPart(PartHit part, bool adding);
+    std::set<std::size_t> pickedBy(PartHit part) const;
+    std::set<std::size_t> hoverShapes;
+    juce::Rectangle<int> partBar() const;
+    static constexpr int barTextInset = 12, extractWidth = 72;
+    std::size_t pickedPieceCount() const;
+    bool anythingPickable() const;
+    bool lookingAlong(ViewPreset preset) const;
+    static ViewPreset opposite(ViewPreset preset);
+    std::optional<PartHit> pressedPart;
+    void prunePicked();
+    void refreshPartBar();
+    std::vector<motion::Id> clipsIn(juce::Rectangle<float> area) const;
+    bool partMode = false;
+    int coveredLeft = 0;
+    std::map<motion::Id, Picked> picked;
+    std::optional<PartHit> hoverPart;
+    std::optional<juce::Rectangle<float>> marquee;
+    PartPick partPick = PartPick::box;
+    juce::Path lasso;
+    bool marqueeArmed = false, marqueeAdds = false;
+    juce::Label partCount;
+    juce::TextButton extractButton {"Extract"};
+    // The view's axes in the top right, Blender style: click one to look along it.
+    // Its hover disc sits 8 px in from the top right, as the tool strip does at the top left.
+    juce::Point<float> orientationCentre() const { return {static_cast<float>(getWidth()) - 48.0f, 48.0f}; }
+    std::optional<ViewPreset> orientationHit(juce::Point<float> position) const;
+    void paintOrientation(juce::Graphics& g) const;
+    std::optional<ViewPreset> hoverAxis;
+    bool hoverCorner = false;
+    struct PathKey {
+        motion::Id selection;
+        std::uint64_t generation;
+        motion::Id scope;
+        std::uint64_t seekSerial, revision;
+        double time, contentTime;
+    };
+    mutable std::optional<PathKey> pathKey;
+    bool showMotionPath = false, pathDirty = true;
+    motion::Id pathSelection = 0;
+    std::uint64_t pathRevision = 0;
+    motion::editor::MotionPath motionPath;
+    MotionProcessor& processor;
+    std::unique_ptr<motion::PreparedComposition> prepared;
+    // The preview's segments, stroked together; the selection's draw on top.
+    osci::LineBatch lines, highlightedLines, hoveredLines;
+    std::optional<motion::Id> dropHover;
+    bool effectDrag = false;
+    motion::ui::PreviewGesture edit {processor.document};
+    juce::Point<float> down;
+    // Clicking again where the last click was, on what it selected, selects
+    // what is drawn behind that, and so round, as Blender's select does.
+    std::optional<juce::Point<float>> lastClick;
+    bool cycleOnRelease = false;
+    motion::editor::Camera camera, cameraAtDown;
+    struct Pose {
+        double x = 0, y = 0, z = 0, pitch = 0, yaw = 0, fov = 0;
+        bool operator==(const Pose&) const = default;
+        // Equal but for rounding (degrees to radians and back).
+        bool near(const Pose& other) const {
+            constexpr double tolerance = 1.0e-9;
+            return std::abs(x - other.x) < tolerance && std::abs(y - other.y) < tolerance && std::abs(z - other.z) < tolerance
+                && std::abs(pitch - other.pitch) < tolerance && std::abs(yaw - other.yaw) < tolerance && std::abs(fov - other.fov) < tolerance;
+        }
+    };
+    motion::Id lockedCamera = 0;
+    bool followingOutput = false;
+    double lastPaintMilliseconds = 0;
+    std::optional<Pose> lastPose;
+    std::optional<motion::editor::Camera> viewBeforeLock;
+    struct Sync final : juce::Timer {
+        std::function<void()> tick;
+        void timerCallback() override { if (tick) { tick(); } }
+    } cameraSync;
+    // A drag's steps can come faster than frames, and each would build the
+    // Scene again: while a mouse button is held, a project arriving within a
+    // frame of the last build waits for that frame, and only the newest is
+    // built then.
+    static constexpr double framePeriod = 1000.0 / 60;
+    std::optional<motion::Project> waiting;
+    double preparedAt = 0;
+    Sync preparation;
+    void prepare(const motion::Project& project);
+    // Zero throughout: no roll at any key or between them.
+    static bool level(const motion::Curve& curve);
+    double cameraTime() const { return processor.document.project().frameTime(processor.position.load()); }
+    // A free camera's pose at the playhead (rotation X as pitch, -Y as yaw).
+    std::optional<Pose> documentPose(motion::Id id) const;
+    Pose viewPose() const {
+        return {camera.position.x, camera.position.y, camera.position.z, camera.pitch * 180 / std::numbers::pi, camera.yaw * 180 / std::numbers::pi, camera.fovDegrees};
+    }
+    // The view moved: write it to the camera. The document moved (playback,
+    // undo, the inspector): move the view.
+    void syncCamera();
+    motion::Vec3 dragAnchor;
+    std::string editedProperty;
+    mutable std::optional<motion::editor::EulerGizmoFrame> gizmoFrame;
+    std::optional<motion::editor::EulerGizmoFrame> gizmoAtDown;
+    MotionTransformTool tool = MotionTransformTool::move;
+    Gesture gesture = Gesture::plane;
+    int dragAxis = 3, hoverHandle = -1;
+    motion::Vec3 dragDirection;
+    motion::editor::Vec2 lastRotationPointer;
+    juce::Point<float> scaleScreenAxis;
+    double rotationDelta = 0;
+    juce::Point<float> savedCursor;
+    juce::String dragHint;
+    bool navigating = false, navigationDrag = false, panDrag = false;
+    double lastTick = 0;
+    motion::Id editSelection = 0;
+    double editTime = 0;
+    // The other selected objects a move, rotate or scale takes along, as
+    // they were when it began: each moves as far in the world, and turns or
+    // scales as much about its own anchor, as After Effects does.
+    std::vector<std::pair<motion::Id, motion::editor::EulerGizmoFrame>> companions;
+    // Writes a drag's offsets (position or rotation) or scale factor into an
+    // object's own curves at its time; whether anything changed.
+    bool applyTransform(motion::Project& project, motion::Id id, const std::array<double, 3>& offsets, double scaleFactor, std::optional<double> contentTime);
+
+    // A selected generator's handles, on its drawing: dragged to change its
+    // numbers, scrolled to step a count. They show with any transform tool
+    // but the anchor's, and are picked before the gizmo.
+    struct ShownHandle {
+        std::size_t index;
+        motion::generator::Handle handle;
+        juce::Point<float> at;
+    };
+    std::optional<motion::ui::generator_handles::Context> handleContext() const;
+    std::vector<ShownHandle> shownHandles(const motion::ui::generator_handles::Context& context) const;
+    int handleAt(juce::Point<float> position) const;
+    void paintGeneratorHandles(juce::Graphics& g) const;
+    void dragHandle(const juce::MouseEvent& event);
+    bool stepHandleCount(float delta);
+    struct HandleDrag {
+        std::size_t index;
+        motion::generator::Handle handle;
+        motion::ui::generator_handles::Context context;
+        std::vector<double> values;
+        motion::Vec3 previous;
+        motion::Id clip;
+    };
+    std::optional<HandleDrag> handleDrag;
+    int hoverGeneratorHandle = -1;
+    float wheelSteps = 0;
+};

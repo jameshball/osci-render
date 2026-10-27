@@ -1,0 +1,97 @@
+#pragma once
+
+#include "Cancellation.h"
+#include "CompositionGraph.h"
+#include "Group.h"
+#include <atomic>
+
+namespace motion {
+// A preparation-only view. Pointers refer to the immutable document snapshot;
+// consumers must copy the required curves/media into their prepared state.
+// Stages are outermost first, followed by the leaf. Each scope clock maps main
+// project seconds to that stage's owning composition, independently of its clip.
+struct CompositionStage {
+    const Track* track = nullptr;
+    const Clip* clip = nullptr;
+    ClipTiming scopeClock;
+    ClipTiming clipClock;
+    const std::vector<Group>* groups = nullptr;
+    const std::vector<EffectInstance>* effects = nullptr;
+    Tempo tempo;
+};
+
+struct CompositionExpansionResult {
+    std::string error;
+    explicit operator bool() const { return error.empty(); }
+};
+
+// Calls visitor(scope, stages) for audible media leaves. All graph validation
+// happens before visiting, including dormant definitions. Callers must discard
+// any prepared partial result if cancellation or invalid timing returns an error.
+template <typename ProjectType, typename Visitor>
+CompositionExpansionResult expandComposition(const ProjectType& project, Visitor&& visitor, const std::atomic<bool>* cancel = nullptr) {
+    const auto graph = validateCompositionGraph(project);
+    if (!graph) { return {graph.error}; }
+    CompositionExpansionResult result;
+    const auto definitions = definitionsById(project);
+    std::vector<CompositionStage> stages;
+    stages.reserve(maximumCompositionDepth + 1);
+    const auto visit = [&](auto&& self, const auto& scope, const ClipTiming& clock) -> bool {
+        if (cancelled(cancel)) { result.error = "Composition preparation cancelled."; return false; }
+        if (!std::isfinite(scope.duration) || scope.duration <= 0 || !std::isfinite(scope.bpm) || scope.bpm <= 0) {
+            result.error = "Invalid reusable composition duration or tempo.";
+            return false;
+        }
+        // Definitions stop at their duration; a longer instance leaves silence.
+        const auto scopeStart = clock.projectTime(0);
+        const auto scopeEnd = clock.projectTime(scope.duration);
+        if (!std::isfinite(scopeStart) || !std::isfinite(scopeEnd)
+            || (scopeEnd <= scopeStart && scopeStart >= clock.start && scopeStart < clock.end())) {
+            result.error = "Composition timing exceeds the supported numeric range.";
+            return false;
+        }
+        const auto visible = ClipTiming(0, scope.duration).nestedIn(clock);
+        if (!visible.has_value()) { return true; }
+        for (const auto& track : scope.tracks) {
+            if (!trackIsAudible(scope, track)) { continue; }
+            for (const auto& clip : track.clips) {
+                if (cancelled(cancel)) { result.error = "Composition preparation cancelled."; return false; }
+                const auto timing = clip.timing(scope.tempo());
+                if (!clip.valid() || !timing.valid() || !std::isfinite(timing.rate * visible->rate)
+                    || timing.rate * visible->rate <= 0) {
+                    result.error = "Invalid timing while preparing a composition clip.";
+                    return false;
+                }
+                const auto mappedStart = visible->projectTime(timing.start);
+                const auto mappedEnd = visible->projectTime(timing.end());
+                const auto first = std::max(visible->start, mappedStart);
+                const auto last = std::min(visible->end(), mappedEnd);
+                if (!std::isfinite(mappedStart) || !std::isfinite(mappedEnd)
+                    || (mappedEnd <= mappedStart && mappedStart >= visible->start && mappedStart < visible->end())
+                    || (first < last && !std::isfinite(timing.localTime(visible->localTime(first))))) {
+                    result.error = "Composition timing exceeds the supported numeric range.";
+                    return false;
+                }
+                const auto mapped = timing.nestedIn(*visible);
+                if (!mapped.has_value()) { continue; }
+                stages.push_back({&track, &clip, *visible, *mapped, &scope.groups, &scope.effects, scope.tempo()});
+                if (clip.composition != 0) {
+                    if (track.kind != TrackKind::visual) {
+                        result.error = "Reusable compositions require a visual track.";
+                        return false;
+                    }
+                    if (!self(self, *definitions.at(clip.composition), *mapped)) { return false; }
+                } else {
+                    visitor(scope, stages);
+                }
+                stages.pop_back();
+            }
+        }
+        return true;
+    };
+    const ClipTiming mainClock(0, project.duration);
+    if (!mainClock.valid()) { return {"Invalid main composition duration."}; }
+    visit(visit, project, mainClock);
+    return result;
+}
+}

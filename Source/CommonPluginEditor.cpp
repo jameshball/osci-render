@@ -15,6 +15,12 @@ namespace {
 #if OSCI_PREMIUM
 const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
 #endif
+// Full screen is kept on the standalone window, which outlives an editor that
+// Create New Project replaces.
+constexpr const char* fullScreenProperty = "osciFullScreen";
+#if JUCE_WINDOWS
+constexpr const char* windowedBoundsProperty = "osciWindowedBounds";
+#endif
 }
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
@@ -136,10 +142,42 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     });
 }
 
+bool CommonPluginEditor::usesSoftwareRendering() const {
+    return audioProcessor.globalSettings.getBool("softwareRendering", false);
+}
+
+void CommonPluginEditor::setSoftwareRendering(bool software) {
+    audioProcessor.globalSettings.set("softwareRendering", software);
+    audioProcessor.globalSettings.save();
+    applyRenderingEngine();
+}
+
+void CommonPluginEditor::applyRenderingEngine() {
+#if JUCE_WINDOWS
+    auto* peer = getPeer();
+    if (peer != nullptr) {
+        const auto engines = peer->getAvailableRenderingEngines();
+        const auto wanted = engines.indexOf(usesSoftwareRendering() ? "Software Renderer" : "Direct2D");
+        if (wanted >= 0 && peer->getCurrentRenderingEngine() != wanted) {
+            peer->setCurrentRenderingEngine(wanted);
+            // The new renderer starts from a blank surface: draw all of it.
+            peer->getComponent().repaint();
+        }
+    }
+#endif
+}
+
 void CommonPluginEditor::parentHierarchyChanged()
 {
     // Refresh the title when the editor is attached/detached.
     updateTitle();
+#if JUCE_WINDOWS
+    // The renderer chosen in View, once the window has one to set.
+    if (juce::JUCEApplicationBase::isStandaloneApp() && getPeer() != nullptr && usesSoftwareRendering()) {
+        juce::Component::SafePointer<CommonPluginEditor> safe(this);
+        juce::MessageManager::callAsync([safe] { if (safe != nullptr) { safe->applyRenderingEngine(); } });
+    }
+#endif
 
     if (getPeer() != nullptr) {
         // Register as KeyListener on the top-level component so that
@@ -191,7 +229,7 @@ void CommonPluginEditor::resized() {
 
     const int promptWidth = juce::jmin(updatePrompt.getPreferredWidth(), getWidth() - 28);
     if (promptWidth > 340) {
-        updatePrompt.setBounds(getWidth() - promptWidth - 14, 42, promptWidth, updatePrompt.getPreferredHeight());
+        updatePrompt.setBounds(updatePromptArea(promptWidth, updatePrompt.getPreferredHeight()));
     } else {
         updatePrompt.setBounds({});
     }
@@ -308,6 +346,10 @@ CommonPluginEditor::~CommonPluginEditor() {
         audioProcessor.haltRecording();
     }
 
+    // Destroy offline render content (joining its worker) before restoring
+    // processor output or releasing visualiser/editor dependencies.
+    activeOverlays.clear();
+
     if (offlineRenderPreviousActiveState.has_value()) {
         audioProcessor.setOfflineRenderActive(*offlineRenderPreviousActiveState);
         offlineRenderPreviousActiveState.reset();
@@ -325,25 +367,26 @@ CommonPluginEditor::~CommonPluginEditor() {
 // editor operations, not "special keys" like j/k for file switching.
 
 bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
-    if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'Z') {
+    const auto letter = osci::shortcutKey(key);
+    if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && letter == 'Z') {
         undoRedoControls.redo();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z') {
+    } else if (key.getModifiers().isCommandDown() && letter == 'Z') {
         undoRedoControls.undo();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
+    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && letter == 'S') {
         saveProjectAs();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'S') {
+    } else if (key.getModifiers().isCommandDown() && letter == 'S') {
         saveProject();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
+    } else if (key.getModifiers().isCommandDown() && letter == 'O') {
         openProject();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'N' && juce::JUCEApplicationBase::isStandaloneApp()) {
+    } else if (key.getModifiers().isCommandDown() && letter == 'N' && juce::JUCEApplicationBase::isStandaloneApp()) {
         resetToDefault();
         return true;
-    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'M') {
+    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && letter == 'M') {
         audioProcessor.muteParameter->setBoolValueNotifyingHost(!audioProcessor.muteParameter->getBoolValue());
         return true;
     } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
@@ -403,19 +446,37 @@ void CommonPluginEditor::saveProject() {
     if (audioProcessor.currentProjectFile.isEmpty()) {
         saveProjectAs();
     } else {
-        auto data = juce::MemoryBlock();
-        audioProcessor.getStateInformation(data);
-        auto file = juce::File(audioProcessor.currentProjectFile);
-        if (!file.replaceWithData(data.getData(), data.getSize())) {
-            osci::showOverlayMessage(*this, "Save Project Failed", "Could not write:\n" + file.getFullPathName());
-            return;
-        }
-        updateTitle();
+        juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+        const auto file = juce::File(audioProcessor.currentProjectFile);
+        beforeSaving([safeThis, file] {
+            if (safeThis == nullptr) {
+                return;
+            }
+            auto data = juce::MemoryBlock();
+            safeThis->audioProcessor.getStateInformation(data);
+            if (!file.replaceWithData(data.getData(), data.getSize())) {
+                osci::showOverlayMessage(*safeThis, "Save Project Failed", "Could not write:\n" + file.getFullPathName());
+                return;
+            }
+            safeThis->projectSaved();
+            safeThis->updateTitle();
+        });
     }
 }
 
 void CommonPluginEditor::saveProjectAs() {
-    chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
+    // The current file, or a new one named for the project, so the dialog
+    // offers a name rather than an empty field.
+    auto start = audioProcessor.getLastOpenedDirectory();
+    if (audioProcessor.currentProjectFile.isNotEmpty()) {
+        start = juce::File(audioProcessor.currentProjectFile);
+    } else {
+        const auto named = juce::File::createLegalFileName(suggestedProjectName().trim());
+        if (named.isNotEmpty()) {
+            start = start.getChildFile(named + "." + projectFileType);
+        }
+    }
+    chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", start, "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::saveMode;
 
     juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
@@ -440,8 +501,8 @@ void CommonPluginEditor::resetWindowSizeAndPosition() {
     auto* standaloneWindow = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (standaloneWindow != nullptr) {
         standaloneWindow->setFullScreen(false);
+        standaloneWindow->getProperties().remove(fullScreenProperty);
     }
-    fullScreen = false;
     setSize(defaultEditorWidth, defaultEditorHeight);
     auto* window = getTopLevelComponent();
     if (window != nullptr && window != this) {
@@ -563,13 +624,9 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             // Step 2: choose output video file (default: inputName + codec extension)
             const auto encodingConfiguration = safeThis->recordingSettings.createVideoEncodingConfiguration();
             const auto& ext = encodingConfiguration.fileExtension;
-            const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
-                inputFile.getFileNameWithoutExtension() + "." + ext);
+            const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(inputFile.getFileNameWithoutExtension() + "." + ext);
 
-            safeThis->chooser = std::make_unique<juce::FileChooser>(
-                "Choose an output video file",
-                suggestedOutput,
-                "*." + ext);
+            safeThis->chooser = std::make_unique<juce::FileChooser>("Choose an output video file", suggestedOutput, "*." + ext);
 
             auto saveFlags = juce::FileBrowserComponent::saveMode |
                 juce::FileBrowserComponent::canSelectFiles |
@@ -587,7 +644,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
                 auto outputFile = outputChooser.getResult();
                 if (outputFile == juce::File()) {
-                    offlineRenderLog.event("output selection ended", "no file returned (cancelled or native dialog failed)");
+                    offlineRenderLog.cancelled("output selection");
                     return;
                 }
 
@@ -600,95 +657,120 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 offlineRenderLog.event("output selected", "file=" + outputFile.getFileName());
                 safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
 
-                // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
-                if (!safeThis->audioProcessor.ensureFFmpegExists()) {
-                    offlineRenderLog.event("render deferred", "FFmpeg unavailable");
-                    return;
-                }
-
-                offlineRenderLog.event("FFmpeg ready");
-
-                // Stop any live recording and pause the main visualiser.
-                if (safeThis->audioProcessor.haltRecording != nullptr) {
-                    safeThis->audioProcessor.haltRecording();
-                }
-
-                const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
-                const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
-
-                // Make the plugin output silent and skip heavy processing during offline render.
-                safeThis->offlineRenderPreviousActiveState = wasOfflineRenderActive;
-                safeThis->audioProcessor.setOfflineRenderActive(true);
-
-                auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
-                auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
-
-                auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
-                    safeThis->audioProcessor,
-                    safeThis->audioProcessor.visualiserParameters,
-                    safeThis->audioProcessor.threadManager,
-                    inputFile,
-                    outputFile,
-                    safeThis->visualiser.getRenderMode(),
-                    encodingConfiguration);
-
-                content->setSize(700, 520);
-
-                content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile](OfflineAudioToVideoRendererComponent::Result r) {
-                    if (safeThis == nullptr) {
-                        offlineRenderLog.cancelled("result delivery because editor closed");
-                        return;
-                    }
-
-                    *resultHolder = r;
-
-                    if (r.success) {
-                        offlineRenderLog.completed();
-                        safeThis->audioProcessor.recordingExportCompleted(outputFile);
-                    } else if (r.cancelled) {
-                        offlineRenderLog.cancelled("render");
-                    } else {
-                        offlineRenderLog.failed("render", r.errorMessage);
-                    }
-
-                    if (auto* overlay = overlayHolder->getComponent()) {
-                        overlay->requestDismiss();
-                    }
-                });
-
-                auto* contentPtr = content.get();
-                const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
-                auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize);
-                *overlayHolder = overlay.get();
-
-                overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder] {
-                    if (safeThis == nullptr) {
-                        return;
-                    }
-
-                    safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
-                    safeThis->offlineRenderPreviousActiveState.reset();
-                    safeThis->visualiser.restoreAfterOfflineRender(safeThis->audioProcessor.getEffectiveSampleRate());
-                    safeThis->visualiser.setPaused(wasVisualiserPaused, false);
-
-                    if (resultHolder != nullptr && resultHolder->has_value()) {
-                        const auto& r = resultHolder->value();
-                        if (!r.success && !r.cancelled) {
-                            osci::showOverlayMessage(*safeThis.getComponent(),
-                                                     "Render Failed",
-                                                     r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
-                        }
-                    }
-                };
-
-                safeThis->showOverlay(std::move(overlay));
-                offlineRenderLog.event("render UI opened");
-                contentPtr->start();
+                safeThis->startOfflineVideoRender(inputFile, inputFile, outputFile, encodingConfiguration, safeThis->visualiser.getRenderMode());
             });
         });
     });
 #endif
 }
+
+
+#if OSCI_PREMIUM
+void CommonPluginEditor::showOfflineRenderFailure(const juce::String& errorMessage, const juce::File&) {
+    osci::showOverlayMessage(*this, "Render Failed", errorMessage.isNotEmpty() ? errorMessage : "An error occurred while rendering.");
+}
+
+bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void(bool succeeded)> completion, std::shared_ptr<VisualiserParameters> beam) {
+    // The renderer owns its onFinished closure until after its destructor has
+    // joined the worker and detached GL. This guard therefore safely retains
+    // temporary signal/soundtrack files through success, cancellation or close.
+    auto succeeded = std::make_shared<bool>(false);
+    auto completionGuard = std::shared_ptr<void>(nullptr, [completion = std::move(completion), succeeded](void*) noexcept {
+        if (completion) {
+            try {
+                completion(*succeeded);
+            } catch (...) {
+                // Resource cleanup must not throw out of component destruction.
+            }
+        }
+    });
+    auto* existing = findActiveOverlay<OfflineRenderOverlay>();
+    if (existing != nullptr) {
+        existing->toFront(true);
+        return false;
+    }
+    const auto safeThis = juce::Component::SafePointer<CommonPluginEditor>(this);
+    // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
+    if (!audioProcessor.ensureFFmpegExists()) {
+        offlineRenderLog.event("render deferred", "FFmpeg unavailable");
+        return false;
+    }
+
+    offlineRenderLog.event("FFmpeg ready");
+
+    // Stop any live recording and pause the main visualiser.
+    if (audioProcessor.haltRecording != nullptr) {
+        audioProcessor.haltRecording();
+    }
+
+    const bool wasVisualiserPaused = visualiser.isPaused();
+    const bool wasOfflineRenderActive = audioProcessor.isOfflineRenderActive();
+
+    // Make the plugin output silent and skip heavy processing during offline render.
+    offlineRenderPreviousActiveState = wasOfflineRenderActive;
+    audioProcessor.setOfflineRenderActive(true);
+
+    auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
+    auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
+
+    auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(audioProcessor, audioProcessor.visualiserParameters, audioProcessor.threadManager, inputSignal, muxAudio,
+        outputFile, initialRenderMode, encodingConfiguration, std::move(beam));
+
+    content->setSize(700, 520);
+
+    content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile, completionGuard, succeeded](OfflineAudioToVideoRendererComponent::Result r) {
+        *succeeded = r.success;
+        if (safeThis == nullptr) {
+            offlineRenderLog.cancelled("result delivery because editor closed");
+            return;
+        }
+
+        *resultHolder = r;
+
+        if (r.success) {
+            offlineRenderLog.completed();
+            safeThis->audioProcessor.recordingExportCompleted(outputFile);
+        } else if (r.cancelled) {
+            offlineRenderLog.cancelled("render");
+        } else {
+            offlineRenderLog.failed("render", r.errorMessage);
+        }
+
+        auto* overlay = overlayHolder->getComponent();
+        if (overlay != nullptr) {
+            overlay->requestDismiss();
+        }
+    });
+
+    auto* contentPtr = content.get();
+    const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
+    auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize, offlineRenderTitle());
+    *overlayHolder = overlay.get();
+
+    overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder, outputFile] {
+        if (safeThis == nullptr) {
+            return;
+        }
+
+        safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
+        safeThis->offlineRenderPreviousActiveState.reset();
+        safeThis->visualiser.restoreAfterOfflineRender(safeThis->audioProcessor.getEffectiveSampleRate());
+        safeThis->visualiser.setPaused(wasVisualiserPaused, false);
+
+        if (resultHolder != nullptr && resultHolder->has_value()) {
+            const auto& r = resultHolder->value();
+            if (!r.success && !r.cancelled) {
+                safeThis->showOfflineRenderFailure(r.errorMessage, outputFile);
+            }
+        }
+    };
+
+    showOverlay(std::move(overlay));
+    offlineRenderLog.event("render UI opened");
+    contentPtr->start();
+    return true;
+}
+#endif
 
 void CommonPluginEditor::resetToDefault() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
@@ -702,11 +784,12 @@ void CommonPluginEditor::toggleFullScreen() {
 #if JUCE_WINDOWS
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !window->isFullScreen();
+        const bool fullScreen = !isFullScreen();
+        window->getProperties().set(fullScreenProperty, fullScreen);
 
         if (fullScreen) {
             // Store the current window bounds before going fullscreen
-            windowedBounds = window->getBounds();
+            window->getProperties().set(windowedBoundsProperty, window->getBounds().toString());
 
             // Get the display that contains the window
             auto& displays = juce::Desktop::getInstance().getDisplays();
@@ -720,6 +803,7 @@ void CommonPluginEditor::toggleFullScreen() {
         } else {
             // Restore the previous windowed bounds
             window->setFullScreen(false);
+            const auto windowedBounds = juce::Rectangle<int>::fromString(window->getProperties()[windowedBoundsProperty].toString());
             if (!windowedBounds.isEmpty()) {
                 window->setBounds(windowedBounds);
             }
@@ -728,13 +812,18 @@ void CommonPluginEditor::toggleFullScreen() {
 #else
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !window->isFullScreen();
-        window->setFullScreen(fullScreen);
+        window->setFullScreen(!window->isFullScreen());
     }
 #endif
 }
 
 bool CommonPluginEditor::isFullScreen() {
+#if JUCE_WINDOWS
+    // Windows counts a maximised window as full screen: only ours is.
+    auto* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    return window != nullptr && static_cast<bool>(window->getProperties()[fullScreenProperty]);
+#else
     auto* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     return window != nullptr && window->isFullScreen();
+#endif
 }
